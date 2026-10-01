@@ -3,7 +3,9 @@
 ## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
 ## On a phone, hold it like a steering wheel in landscape: its tilt steers, and two pedals at the
 ## bottom corners — brake on the left, throttle on the right — take the thumbs. Tap the wheel
-## button at the top right to take the way the phone is held as straight ahead.
+## button at the top right to take the way the phone is held as straight ahead. Turn the phone
+## upright and the drawing area follows: the controls and the HUD re-place themselves from W, H and
+## SIZE, the camera widens to keep the road in view, and the steering neutral is taken again.
 ## No lap timing, no opponents, no collision against the verge — just driving the circuit and the
 ## hills around it.
 
@@ -29,6 +31,18 @@ pad.radiusFrac = 0.11
 pad.centerFrac = 0.86
 global wheel = Tilt(30, 3)
 global wheelArmed = false   ## the first reading sets the neutral; this says it has
+global wasPortrait = false
+
+## The area follows the host (graphics.fitArea in setup), so W, H and SIZE already hold the new size
+## when this runs, and everything drawn from them re-places itself. What the script keeps — the
+## wheel's neutral — it redoes here: the phone is held differently the other way up.
+func window.resized(w, h)
+    var portrait = h > w
+    if portrait <> wasPortrait then
+        wasPortrait = portrait
+        wheelArmed = false
+    end
+end
 
 ## The phone's tilt drives the car instead of the joystick once the sensors answer.
 func tiltOn()
@@ -58,6 +72,8 @@ end
 
 func setup()
     graphics.canvas(W, H, "Rally")
+    graphics.fitArea()
+    wasPortrait = H > W
     motion.enable()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
@@ -104,6 +120,18 @@ func carPose(x, z, heading)
     lift = math.max(lift, hBL - (mean - slopeF * HALF_BASE + slopeR * HALF_TRACK))
     lift = math.max(lift, hBR - (mean - slopeF * HALF_BASE - slopeR * HALF_TRACK))
     return mean + lift, math.atan(slopeF), math.atan(slopeR)
+end
+
+## The camera's vertical field of view. A narrow area — the phone upright — would squeeze the
+## horizontal view to a slot at the usual 45 degrees; it widens as the area narrows so that at least
+## FOV_H_MIN degrees stay in view across, within reason. Landscape is left at 45.
+global FOV_V = 45.0
+global FOV_H_MIN = 60.0
+global FOV_MAX = 75.0
+
+func viewFov()
+    var wide = 2 * math.atan(math.tan(math.rad(FOV_H_MIN) / 2) / (W / H))
+    return math.clamp(math.deg(wide), FOV_V, FOV_MAX)
 end
 
 ## The two pedals and the recentre button, as {x, y, w, h} in the drawing area's units.
@@ -165,6 +193,7 @@ func update(dt)
 
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
+    cam.fovy = viewFov()
 end
 
 ## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the

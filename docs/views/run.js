@@ -12,7 +12,7 @@ export async function init(ctx) {
   // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, watchRenderArea } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -30,6 +30,7 @@ export async function init(ctx) {
   const pane = document.getElementById('output-pane')
   canvasEl.style.display = 'none'
   pane.appendChild(canvasEl)
+  const unwatchArea = watchRenderArea(pane)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
 
   function showText(text) {
     outEl.style.display    = 'block'
@@ -198,6 +199,7 @@ export async function init(ctx) {
   }
 
   const stop = () => {
+    unwatchArea()
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
     window.__ollinRenderW = undefined   // a size hint private to this view: it must not leak

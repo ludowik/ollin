@@ -55,6 +55,25 @@ export function loadProjectIntoRuntime(m, project) {
   } catch (_) { /* best-effort preloading */ }
 }
 
+// Keeps window.__ollinRenderW/H equal to the pane's size as it CHANGES — a rotation, a window resize, a
+// moved divider. The engine reads that pair when a program starts and, for a program that called
+// graphics.fitArea, again on every frame to follow the area. A hidden pane measures 0 x 0 and is
+// ignored: the launch measures it again once it is shown. Returns what stops the watching.
+export function watchRenderArea(pane) {
+  if (typeof ResizeObserver === 'undefined') return () => {}
+  const observer = new ResizeObserver(() => {
+    const r = pane.getBoundingClientRect()
+    const w = Math.round(r.width)
+    const h = Math.round(r.height)
+    if (w > 0 && h > 0) {
+      window.__ollinRenderW = w
+      window.__ollinRenderH = h
+    }
+  })
+  observer.observe(pane)
+  return () => observer.disconnect()
+}
+
 // Runs `code` and routes the result through hooks supplied by the caller:
 //   hooks.onError(msg)    an error (top-level OR graphics frame), as an "error: …" string
 //   hooks.onRunning()     the program has opened a canvas (the graphics loop has started)

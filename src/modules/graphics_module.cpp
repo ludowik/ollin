@@ -82,6 +82,10 @@ static int s_fxaa_loc_span = -1;
 // a preference of the RUNNING PROGRAM, not of the host, like the 3D lighting state.
 static bool s_fxaa_enabled = true;
 static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's spanMax
+static void upload_fxaa_texel() {
+    float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
+    SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
+}
 static void load_fxaa_shader() {
     if (s_fxaa_ready) {
         return;
@@ -92,11 +96,11 @@ static void load_fxaa_shader() {
     s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
     s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
     s_fxaa_ready = true;
-    // texelSize only changes with the render target's size (fixed for the program's whole run, see
-    // gfx_canvas) and spanMax only on a graphics.antialias(_, size) call (which re-uploads it itself,
-    // see gfx_antialias) — so both are uploaded once here rather than every frame in render_frame.
-    float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
-    SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
+    // texelSize only changes with the render target's size (create_render_target re-uploads it when the
+    // area follows the host) and spanMax only on a graphics.antialias(_, size) call (which re-uploads
+    // it itself, see gfx_antialias) — so both are uploaded once here rather than every frame in
+    // render_frame.
+    upload_fxaa_texel();
     SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
 }
 // Freed alongside the 3D shader (reset3d_graphics_state, called from gfx_canvas): same GL context
@@ -145,6 +149,153 @@ void gfx_need_area() {
                                  "define draw() and the engine opens one");
 }
 
+// The physical resolution of a w x h area: the logical size times the device's pixel ratio in the
+// browser, the size itself natively.
+static void set_phys_size(int w, int h) {
+#ifdef __EMSCRIPTEN__
+    double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
+    s_physW = (int)(w * dpr + 0.5);
+    s_physH = (int)(h * dpr + 0.5);
+#else
+    s_physW = w;
+    s_physH = h;
+#endif
+}
+
+#ifdef __EMSCRIPTEN__
+// Override the canvas bitmap to the physical resolution and its CSS display to the logical size;
+// rlViewport in emscripten_frame renders to the full physical bitmap.
+static void size_canvas_element(int w, int h) {
+    EM_ASM(
+        {
+            var c = document.getElementById('canvas');
+            if (c) {
+                c.width = $0;
+                c.height = $1;
+                c.style.width = $2 + 'px';
+                c.style.height = $3 + 'px';
+                c.style.display = 'block';
+            }
+        },
+        s_physW, s_physH, w, h);
+}
+#endif
+
+// The persistent render target, ALWAYS at the physical (device-pixel) resolution — the same density
+// as the screen canvas, systematically, whatever devicePixelRatio is. A fixed supersampling
+// floor (independent of density) was tried here and REMOVED: it kept the final composite a 2:1
+// downsample on any screen with devicePixelRatio < 2 (most desktop monitors), and that lossy,
+// non-mipmapped bilinear reduction of thin noise-animated strokes is what produced a visible
+// shimmer frame to frame — never seen on a Retina/iPhone screen, where devicePixelRatio already
+// made that floor a no-op. Capped: a very large logical canvas at high density could still ask
+// for more than the GPU allows.
+static void create_render_target() {
+    const int MAX_RT = 4096;   // a safe bound, at most GL_MAX_TEXTURE_SIZE on most GPUs
+    s_targetW = s_physW;
+    s_targetH = s_physH;
+    if (s_targetW > MAX_RT) {
+        s_targetW = MAX_RT;
+    }
+    if (s_targetH > MAX_RT) {
+        s_targetH = MAX_RT;
+    }
+    s_target = LoadRenderTexture(s_targetW, s_targetH);
+    // Check the allocation: when the FBO or the texture could not be created — too large, not enough
+    // VRAM — we stay in DIRECT rendering (render_frame falls back) rather than sample an invalid
+    // texture and show a black screen.
+    s_target_ready = (s_target.id != 0 && s_target.texture.id != 0);
+    if (s_target_ready) {
+        SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // smoothing when scaled down
+        BeginTextureMode(s_target);
+        ClearBackground(BLACK);
+        EndTextureMode();
+        if (s_fxaa_ready) {
+            upload_fxaa_texel();   // the texel's size follows the target's
+        } else {
+            load_fxaa_shader();
+        }
+    }
+}
+
+// The size a script reads back as window.width and window.height.
+static void publish_window_size(int w, int h) {
+    Value win = VM::current()->get_global("window");
+    if (win.is_map()) {
+        win.map_set(Value(std::string("width")), Value((int64_t)w));
+        win.map_set(Value(std::string("height")), Value((int64_t)h));
+    }
+}
+
+// graphics.fitArea: the canvas follows the host's drawing area — rotation, window resize, a moved
+// divider. A setting of THIS program, reset by every graphics.canvas like graphics.antialias.
+static bool s_fit_area = false;
+
+// The drawing area changes size: the same sizing steps as graphics.canvas, without what makes that one
+// a NEW program (styles, lighting and the 3D resources are untouched). The render target is the only
+// thing that must be rebuilt, and render_frame calls this BEFORE binding it.
+static void resize_area(int w, int h) {
+    if (s_target_ready) {
+        UnloadRenderTexture(s_target);
+        s_target_ready = false;
+    }
+    set_phys_size(w, h);
+#ifdef __EMSCRIPTEN__
+    SetWindowSize(w, h);
+    size_canvas_element(w, h);
+#endif
+    s_logicalW = w;
+    s_logicalH = h;
+    publish_draw_size();
+    create_render_target();
+    publish_window_size(w, h);
+}
+
+#ifdef __EMSCRIPTEN__
+// The host's drawing area as it is NOW. The views keep window.__ollinRenderW/H up to date
+// (watchRenderArea, lib/pg-run.js); the same pair is what the `window` module read at start-up.
+static bool host_area(int* w, int* h) {
+    int packed = EM_ASM_INT({
+        var w = window.__ollinRenderW;
+        var h = window.__ollinRenderH;
+        if (typeof w !== 'number' || typeof h !== 'number' || w <= 0 || h <= 0)
+            return 0;
+        return (Math.min(Math.round(w), 32767) << 16) | Math.min(Math.round(h), 32767);
+    });
+    *w = packed >> 16;
+    *h = packed & 0xFFFF;
+    return packed != 0;
+}
+#endif
+
+// Follows the host's area when the program asked for it, then tells the script through
+// window.resized(w, h) — once per change, after W, H and the rest already hold the new size.
+static void follow_area() {
+#ifdef __EMSCRIPTEN__
+    if (!s_fit_area || !IsWindowReady())
+        return;
+    int w = 0;
+    int h = 0;
+    if (!host_area(&w, &h) || (w == s_logicalW && h == s_logicalH))
+        return;
+    resize_area(w, h);
+    VM* vm = VM::current();
+    Value win = vm->get_global("window");
+    if (!win.is_map())
+        return;
+    Value cb = win.map_get(Value(std::string("resized")));
+    if (cb.is_callable()) {
+        Value args[2] = {Value((int64_t)w), Value((int64_t)h)};
+        vm->call_value(cb, args, 2);
+    }
+#endif
+}
+
+// graphics.fitArea([enabled]): with no argument, turns it on.
+static int gfx_fit_area(CallCtx& ctx) {
+    s_fit_area = (ctx.argc > 0) ? !is_falsy(ctx.args[0]) : true;
+    return ctx.ret(Value{});
+}
+
 static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     // The size is CHECKED, as graphics.viewport's is: a window of zero pixels is a mistake, and so
@@ -169,6 +320,7 @@ static int gfx_canvas(CallCtx& ctx) {
     reset3d_lighting_state();
     s_fxaa_enabled = true;   // graphics.antialias: a setting of THIS program, not of the host
     s_fxaa_span = 8.0f;
+    s_fit_area = false;   // likewise: the program opts in again, after its own canvas
     s_run_active = false;   // a new program, hence ONE graphics.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
@@ -186,9 +338,7 @@ static int gfx_canvas(CallCtx& ctx) {
         reset3d_graphics_state();               // free the 3D shader, meshes, textures and VBOs in THIS context
         reset_fxaa_shader();
     }
-    double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
-    s_physW = (int)(w * dpr + 0.5);
-    s_physH = (int)(h * dpr + 0.5);
+    set_phys_size(w, h);
     // InitWindow with logical dimensions — sets projection [0,w]×[0,h]
     EM_ASM({
         var o = document.getElementById('output');
@@ -203,20 +353,7 @@ static int gfx_canvas(CallCtx& ctx) {
         InitWindow(w, h, title.c_str());
         SetTargetFPS(0);
     }
-    // Override canvas bitmap to physical resolution, CSS display to logical size
-    // rlViewport in emscripten_frame will render to the full physical bitmap
-    EM_ASM(
-        {
-            var c = document.getElementById('canvas');
-            if (c) {
-                c.width = $0;
-                c.height = $1;
-                c.style.width = $2 + 'px';
-                c.style.height = $3 + 'px';
-                c.style.display = 'block';
-            }
-        },
-        s_physW, s_physH, w, h);
+    size_canvas_element(w, h);
 #else
     if (IsWindowReady()) {
         if (s_target_ready) {
@@ -226,8 +363,7 @@ static int gfx_canvas(CallCtx& ctx) {
         reset3d_graphics_state();   // free the 3D GL resources before any reinitialisation
         reset_fxaa_shader();
     }
-    s_physW = w;
-    s_physH = h;
+    set_phys_size(w, h);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(w, h, title.c_str());
     SetTargetFPS(60);
@@ -241,40 +377,8 @@ static int gfx_canvas(CallCtx& ctx) {
     s_view_w = 0;
     s_view_h = 0;
     publish_draw_size();
-    // Persistent render target, ALWAYS at the physical (device-pixel) resolution — the same density
-    // as the screen canvas, systematically, whatever devicePixelRatio is. A fixed supersampling
-    // floor (independent of density) was tried here and REMOVED: it kept the final composite a 2:1
-    // downsample on any screen with devicePixelRatio < 2 (most desktop monitors), and that lossy,
-    // non-mipmapped bilinear reduction of thin noise-animated strokes is what produced a visible
-    // shimmer frame to frame — never seen on a Retina/iPhone screen, where devicePixelRatio already
-    // made that floor a no-op. Capped: a very large logical canvas at high density could still ask
-    // for more than the GPU allows.
-    const int MAX_RT = 4096;   // a safe bound, at most GL_MAX_TEXTURE_SIZE on most GPUs
-    s_targetW = s_physW;
-    s_targetH = s_physH;
-    if (s_targetW > MAX_RT) {
-        s_targetW = MAX_RT;
-    }
-    if (s_targetH > MAX_RT) {
-        s_targetH = MAX_RT;
-    }
-    s_target = LoadRenderTexture(s_targetW, s_targetH);
-    // Check the allocation: when the FBO or the texture could not be created — too large, not enough
-    // VRAM — we stay in DIRECT rendering (render_frame falls back) rather than sample an invalid
-    // texture and show a black screen.
-    s_target_ready = (s_target.id != 0 && s_target.texture.id != 0);
-    if (s_target_ready) {
-        SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // smoothing when scaled down
-        BeginTextureMode(s_target);
-        ClearBackground(BLACK);
-        EndTextureMode();
-        load_fxaa_shader();
-    }
-    Value win = VM::current()->get_global("window");
-    if (win.is_map()) {
-        win.map_set(Value(std::string("width")), Value((int64_t)w));
-        win.map_set(Value(std::string("height")), Value((int64_t)h));
-    }
+    create_render_target();
+    publish_window_size(w, h);
     if (VM* vm = VM::current())
         vm->mark_gfx_canvas();   // an explicit canvas, so no implicit one (run_entry_hooks)
     return ctx.ret(Value{});
@@ -1483,6 +1587,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     // Frame delta: the wall gap since the previous frame's entry, which includes the rAF wait, unlike
     // GetFrameTime. On the first frame dt is 0.
     double now = GetTime();
+    follow_area();   // before the render target is bound: a new size replaces it
     check_window_activity();
     bool interrupted = s_clock_break || s_last_frame_time < 0.0;
     s_clock_break = false;
@@ -1844,6 +1949,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("clear")), Value::make_builtin(with_area<gfx_clear>));
     m.map_set(Value(std::string("blendMode")), Value::make_builtin(with_area<gfx_blend_mode>));
     m.map_set(Value(std::string("antialias")), Value::make_builtin(gfx_antialias));
+    m.map_set(Value(std::string("fitArea")), Value::make_builtin(gfx_fit_area));
     m.map_set(Value(std::string("strokeSize")), Value::make_builtin(gfx_stroke_size));
     m.map_set(Value(std::string("segments")), Value::make_builtin(gfx_segments));
     m.map_set(Value(std::string("stroke")), Value::make_builtin(gfx_stroke));

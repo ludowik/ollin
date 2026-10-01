@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-01 19:50</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-01 20:31</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-01 19:50</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-01 20:31</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1920,6 +1920,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
     <tr><td><code>graphics.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
     <tr><td><code>graphics.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
+    <tr><td><code>graphics.fitArea([enabled])</code></td><td>Makes the canvas <strong>follow the area</strong> it is shown in: when the area changes size — a phone turned from portrait to landscape, a resized window, a moved divider — the engine resizes the canvas and updates <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code>, <code>SIZE</code>, <code>window.width</code> and <code>window.height</code>, then calls <code>window.resized(w, h)</code> if the script defined it. With no argument, turns it on; <code>graphics.fitArea(false)</code> turns it off. Call it <strong>after</strong> <code>graphics.canvas</code>, which resets it. A canvas opened at an explicit size stays that size until it is asked to follow. The 3D camera's aspect ratio follows the new size; a <code>graphics.viewport</code> is kept. In the browser only: a desktop window never changes size under the program.</td></tr>
     <tr><td><code>graphics.viewport(w, h)</code></td><td>Draw in a fixed <code>w × h</code> field, whatever the area's real size: the engine scales it up, centres it, and letterboxes what is left in black. <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code> and <code>SIZE</code> become the <strong>virtual</strong> size, and <code>mouse</code> and <code>touch</code> deliver their positions in that same frame — so a script never inverts the transform itself. With no argument the viewport is dropped; <code>graphics.canvas</code> drops it too. The <code>ui</code> widgets stay <strong>independent</strong>, at their own size in the area's corner. It is a <strong>2D</strong> feature: 3D takes its aspect ratio from the window, not from the viewport. Outside the field the coordinates are negative or past the edges, which is the honest answer for a finger on a black band.</td></tr>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. An unknown name, or a value of another type, is an error rather than a silent fallback. Reset to <code>"alpha"</code> on every frame.</td></tr>
     <tr><td><code>graphics.antialias([enabled [, size]])</code></td><td>Smooths the edges of the composed frame (on by default). With no argument, turns it back on. <code>size</code> sets how far, in texels, the smoothing may reach along a detected edge (default 8) — a larger value can soften more but does not cost extra, a smaller one softens less. Reset to on/8 at every <code>graphics.canvas</code>.</td></tr>
@@ -2855,6 +2856,17 @@ image.endDraw()
     <tr><td><code>window.height</code></td><td>int</td><td>The render area's height, in pixels</td></tr>
   </tbody>
 </table>
+<p>One callback belongs to this module: <code>window.resized(w, h)</code>, called <strong>once per change</strong> of the area after a program asked to follow it with <code>graphics.fitArea()</code>. When it runs, <code>W</code>, <code>H</code>, <code>SIZE</code> and the others already hold the new size, so anything drawn from them has re-placed itself; the callback is for what the script <em>keeps</em> — a layout it computed once, a camera, a neutral position.</p>
+<pre data-no-run><code><span class="kw">global</span> portrait = <span class="kw">false</span>
+
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)
+    <span class="bi">graphics</span>.fitArea()
+<span class="kw">end</span>
+
+<span class="kw">func</span> window.resized(w, h)
+    portrait = h &gt; w     <span class="cmt">## the phone was turned: choose another layout</span>
+<span class="kw">end</span></code></pre>
 <div class="callout tip">Most of the time you do not need <code>window</code>: the engine already supplies the globals <code>W</code> and <code>H</code> (the render area's width and height), <code>CX</code> and <code>CY</code> (the centre, that is <code>W/2</code> and <code>H/2</code>), and <code>SIZE</code> (<code>min(W, H)</code>, a size that fits either dimension), initialised from <code>window</code> before the run.</div>
 <pre data-no-run><code><span class="cmt">## W, H, CX, CY and SIZE come from the engine — no need for window here</span>
 <span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## a window filling the area</span>

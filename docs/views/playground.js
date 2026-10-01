@@ -1961,6 +1961,7 @@ const outputHdr  = document.getElementById('output-header')
 // area, and app.js puts it back on unmount.
 canvasEl.style.display = 'none'
 outputPane.appendChild(canvasEl)
+disposers.push(Run.watchRenderArea(outputPane))   // a rotation resizes the pane: the engine follows (graphics.fitArea)
 
 // The render area (output plus canvas) only appears while running or paused; at rest the editor
 // takes up ALL the space.
