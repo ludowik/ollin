@@ -230,6 +230,7 @@ static void publish_window_size(int w, int h) {
 // divider. A setting of THIS program, reset by every graphics.canvas like graphics.antialias.
 static bool s_fit_area = false;
 
+#ifdef __EMSCRIPTEN__
 // The drawing area changes size: the same sizing steps as graphics.canvas, without what makes that one
 // a NEW program (styles, lighting and the 3D resources are untouched). The render target is the only
 // thing that must be rebuilt, and render_frame calls this BEFORE binding it.
@@ -239,10 +240,8 @@ static void resize_area(int w, int h) {
         s_target_ready = false;
     }
     set_phys_size(w, h);
-#ifdef __EMSCRIPTEN__
     SetWindowSize(w, h);
     size_canvas_element(w, h);
-#endif
     s_logicalW = w;
     s_logicalH = h;
     publish_draw_size();
@@ -250,7 +249,6 @@ static void resize_area(int w, int h) {
     publish_window_size(w, h);
 }
 
-#ifdef __EMSCRIPTEN__
 // The host's drawing area as it is NOW. The views keep window.__ollinRenderW/H up to date
 // (watchRenderArea, lib/pg-run.js); the same pair is what the `window` module read at start-up.
 static bool host_area(int* w, int* h) {
