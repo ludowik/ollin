@@ -5,14 +5,12 @@
 #include "vm.h"
 #include <raymath.h>
 #include <cmath>
-#include <string>
-#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-#endif
+#include <string>
 
-// The motion sensors, build WITH raylib. raylib has no sensor API, so the readings come from the
-// browser's DeviceOrientationEvent and DeviceMotionEvent; outside the browser the state is
-// "unsupported" and every reading is zero.
+// The motion sensors, browser build. raylib has no sensor API, so the readings come from the browser's
+// DeviceOrientationEvent and DeviceMotionEvent; every other target links motion_stub.cpp, whose state is
+// "unsupported" and whose readings are zero.
 //
 // Three decisions explain the shape of the module:
 //
@@ -45,32 +43,27 @@ struct Reading {
     double pitch = 0.0;
     double gravity[3] = {0.0, 0.0, 0.0};
     double acceleration[3] = {0.0, 0.0, 0.0};
-    bool has_attitude = false;
     Quaternion attitude = {0.0f, 0.0f, 0.0f, 1.0f};
 };
 
 Reading s_cur;
 
+// enable() was called by THIS program: until then a frame has nothing to sample, and does not cross into
+// JavaScript to find out.
+bool s_wanted = false;
+
 // What the JavaScript side hands over each frame: alpha, beta, gamma, the acceleration x y z, then
 // the screen's rotation angle.
 double s_raw[7];
 
-const char* state_name(int state) {
-    switch (state) {
-    case ST_PENDING:
-        return "pending";
-    case ST_ON:
-        return "on";
-    case ST_DENIED:
-        return "denied";
-    case ST_UNSUPPORTED:
-        return "unsupported";
-    default:
-        return "off";
-    }
+// The five names, interned once: a script asks motion.state() every frame.
+const Value& state_name(int state) {
+    static const Value k_names[] = {Value(std::string("off")), Value(std::string("pending")),
+                                    Value(std::string("on")), Value(std::string("denied")),
+                                    Value(std::string("unsupported"))};
+    return k_names[state];
 }
 
-#ifdef __EMSCRIPTEN__
 // Listeners are installed ONCE and outlive the program (a permission is the page's, not the
 // program's). Written as plain statements: EM_ASM is a MACRO, so a comma outside parentheses would
 // split its arguments.
@@ -205,6 +198,7 @@ int sample_raw() {
 }
 
 void request_enable() {
+    s_wanted = true;
     install_watch();
     EM_ASM({
         window.__ollinMotion.enable();
@@ -212,26 +206,12 @@ void request_enable() {
 }
 
 void forget_request() {
+    s_wanted = false;
     EM_ASM({
         if (window.__ollinMotion)
             window.__ollinMotion.wanted = false;
     });
 }
-#else
-bool s_wanted = false;
-
-int sample_raw() {
-    return s_wanted ? ST_UNSUPPORTED : ST_OFF;
-}
-
-void request_enable() {
-    s_wanted = true;
-}
-
-void forget_request() {
-    s_wanted = false;
-}
-#endif
 
 // Rotates (x, y) by the screen's angle, counter-clockwise: a device turned that far counter-clockwise
 // from its natural orientation has its screen axes at that angle to the device's.
@@ -278,11 +258,10 @@ void derive(Reading& r) {
     q = QuaternionMultiply(q, QuaternionFromAxisAngle({0.0f, 1.0f, 0.0f}, (float)gamma));
     q = QuaternionMultiply(q, QuaternionFromAxisAngle({0.0f, 0.0f, 1.0f}, (float)-theta));
     r.attitude = QuaternionNormalize(q);
-    r.has_attitude = true;
 }
 
 int motion_state(CallCtx& ctx) {
-    return ctx.ret(Value(std::string(state_name(s_cur.state))));
+    return ctx.ret(state_name(s_cur.state));
 }
 
 int motion_enable(CallCtx& ctx) {
@@ -313,7 +292,7 @@ int motion_acceleration(CallCtx& ctx) {
 }
 
 int motion_attitude(CallCtx& ctx) {
-    if (!s_cur.has_attitude)
+    if (s_cur.state != ST_ON)
         return ctx.ret(Value{});
     return ctx.ret(make_quat_instance(s_cur.attitude));
 }
@@ -321,13 +300,12 @@ int motion_attitude(CallCtx& ctx) {
 } // namespace
 
 void motion_begin_frame() {
-#ifdef __EMSCRIPTEN__
-    install_watch();
-#endif
     Reading next;
-    next.state = sample_raw();
-    if (next.state == ST_ON)
-        derive(next);
+    if (s_wanted) {
+        next.state = sample_raw();
+        if (next.state == ST_ON)
+            derive(next);
+    }
     s_cur = next;
 }
 

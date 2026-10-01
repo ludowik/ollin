@@ -33,6 +33,8 @@ pad.radiusFrac = 0.11
 pad.centerFrac = 0.86
 global wheel = Tilt(30, 3)
 global wasPortrait = false
+global gasHeld = false      ## the pedals as update() read them: draw() lights the keys from the same answer
+global brakeHeld = false
 
 ## The area follows the host (graphics.fitArea in setup), so W, H and SIZE already hold the new size
 ## when this runs, and everything drawn from them re-places itself. What the script keeps — the
@@ -175,8 +177,10 @@ func update(dt)
     if tiltOn() then
         var roll = motion.tilt()
         steer = wheel.update(dt, roll)
-        if pedalHeld(true) then throttle = throttle + 1 end
-        if pedalHeld(false) then throttle = throttle - 1 end
+        gasHeld = pedalHeld(true)
+        brakeHeld = pedalHeld(false)
+        if gasHeld then throttle = throttle + 1 end
+        if brakeHeld then throttle = throttle - 1 end
     else
         throttle = pad.throttle()
         steer = pad.steer()
@@ -271,35 +275,27 @@ func drawHud()
     hudRow("{math.floor(car.engine.rpm)}", "rpm", xr, u * 4.7, u * 1.3)
 end
 
-## One pedal, lit while a thumb is on it.
-func drawPedal(right, label)
-    var r = pedal(right)
+## A touch key: a rounded rectangle with its label, lit while a thumb is on it. `radius` and `text` are
+## fractions of the key's height.
+func drawKey(r, label, held, radius, text)
     graphics.noStroke()
-    if pedalHeld(right) then
+    if held then
         graphics.fill(PEDAL_HELD)
     else
         graphics.fill(PEDAL_IDLE)
     end
-    graphics.rect(r.x, r.y, r.w, r.h, r.h * 0.25)
+    graphics.rect(r.x, r.y, r.w, r.h, r.h * radius)
     graphics.font("mono")
-    graphics.fontSize(r.h * 0.22)
+    graphics.fontSize(r.h * text)
     graphics.stroke(HUD_TEXT)
     graphics.textMode("center", "center")
     graphics.text(label, r.x + r.w / 2, r.y + r.h / 2)
 end
 
 func drawTiltControls()
-    drawPedal(false, "BRAKE")
-    drawPedal(true, "GAS")
-    var b = wheelButton()
-    graphics.noStroke()
-    graphics.fill(PEDAL_IDLE)
-    graphics.rect(b.x, b.y, b.w, b.h, b.h * 0.5)
-    graphics.font("mono")
-    graphics.fontSize(b.h * 0.3)
-    graphics.stroke(HUD_TEXT)
-    graphics.textMode("center", "center")
-    graphics.text("RESET", b.x + b.w / 2, b.y + b.h / 2)
+    drawKey(pedal(false), "BRAKE", brakeHeld, 0.25, 0.22)
+    drawKey(pedal(true), "GAS", gasHeld, 0.25, 0.22)
+    drawKey(wheelButton(), "RESET", false, 0.5, 0.3)
 end
 
 func draw()

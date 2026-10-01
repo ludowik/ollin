@@ -50,6 +50,10 @@ std::string gfx_take_capture();
 // when the window comes back.
 void gfx_clock_break();
 
+// A new program starts: its graphics.fitArea setting goes back to off and the orientation lock the previous
+// program asked for is released.
+void gfx_program_reset();
+
 // Drawing area in LOGICAL units, as set by graphics.canvas.
 // A frame's projection is in logical units, so a module drawing inside it (ui_module) must refer to
 // these rather than to GetScreenWidth(), which is in physical pixels.

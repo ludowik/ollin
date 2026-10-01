@@ -1961,7 +1961,7 @@ const outputHdr  = document.getElementById('output-header')
 // area, and app.js puts it back on unmount.
 canvasEl.style.display = 'none'
 outputPane.appendChild(canvasEl)
-disposers.push(Run.watchRenderArea(outputPane))   // a rotation resizes the pane: the engine follows (graphics.fitArea)
+disposers.push(Run.watchRenderArea(outputPane), Run.unlockOrientation)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
 
 // The render area (output plus canvas) only appears while running or paused; at rest the editor
 // takes up ALL the space.
@@ -1995,6 +1995,7 @@ function setRunning(running) {
     stopBtn.disabled = false
     document.getElementById('kbar')?.classList.remove('show')   // no typing aid while the program runs
   } else {
+    Run.unlockOrientation()
     runBtn.classList.remove('running')
     runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Run</span><kbd>Alt+↵</kbd>'
     stopBtn.style.display = 'none'
@@ -2140,9 +2141,7 @@ async function launch() {
   // hand, has a reliable layout after the reflow (getBoundingClientRect). The `window` module
   // reads __ollinRenderW/H first (see window_module.cpp).
   setOutputVisible(true)
-  const _rr = outputPane.getBoundingClientRect()
-  window.__ollinRenderW = Math.round(_rr.width)
-  window.__ollinRenderH = Math.round(_rr.height)
+  Run.publishRenderArea(outputPane)
   flushEditorToFile()
   // Preloading, execution and error handling: logic SHARED with the standalone mode (run.html)
   // through pg-run.js, so there is no duplication and no drift.

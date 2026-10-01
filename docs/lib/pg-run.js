@@ -55,23 +55,32 @@ export function loadProjectIntoRuntime(m, project) {
   } catch (_) { /* best-effort preloading */ }
 }
 
-// Keeps window.__ollinRenderW/H equal to the pane's size as it CHANGES — a rotation, a window resize, a
-// moved divider. The engine reads that pair when a program starts and, for a program that called
-// graphics.fitArea, again on every frame to follow the area. A hidden pane measures 0 x 0 and is
-// ignored: the launch measures it again once it is shown. Returns what stops the watching.
+// Hands the engine the pane's size as window.__ollinRenderW/H: the `window` module reads that pair when a
+// program starts and, for a program that called graphics.fitArea, the engine reads it again on every frame
+// to follow the area. A hidden pane measures 0 x 0: `onlyIfShown` leaves the pair alone then, whereas a
+// launch measures once the pane is shown and publishes whatever it finds.
+export function publishRenderArea(pane, onlyIfShown = false) {
+  const r = pane.getBoundingClientRect()
+  const w = Math.round(r.width)
+  const h = Math.round(r.height)
+  if (onlyIfShown && !(w > 0 && h > 0)) return
+  window.__ollinRenderW = w
+  window.__ollinRenderH = h
+}
+
+// Keeps that pair equal to the pane's size as it CHANGES — a rotation, a window resize, a moved divider.
+// Returns what stops the watching.
 export function watchRenderArea(pane) {
   if (typeof ResizeObserver === 'undefined') return () => {}
-  const observer = new ResizeObserver(() => {
-    const r = pane.getBoundingClientRect()
-    const w = Math.round(r.width)
-    const h = Math.round(r.height)
-    if (w > 0 && h > 0) {
-      window.__ollinRenderW = w
-      window.__ollinRenderH = h
-    }
-  })
+  const observer = new ResizeObserver(() => publishRenderArea(pane, true))
   observer.observe(pane)
   return () => observer.disconnect()
+}
+
+// A graphics program that does not follow the area makes the engine lock the screen's orientation; the
+// host releases it when the program stops, otherwise the whole site would stay locked.
+export function unlockOrientation() {
+  try { screen.orientation.unlock() } catch (_) {}
 }
 
 // Runs `code` and routes the result through hooks supplied by the caller:

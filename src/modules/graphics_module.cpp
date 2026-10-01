@@ -88,6 +88,7 @@ static void upload_fxaa_texel() {
 }
 static void load_fxaa_shader() {
     if (s_fxaa_ready) {
+        upload_fxaa_texel();   // already loaded: only the render target's size may have changed
         return;
     }
     const char* HDR = gfx_shader_header();
@@ -96,10 +97,9 @@ static void load_fxaa_shader() {
     s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
     s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
     s_fxaa_ready = true;
-    // texelSize only changes with the render target's size (create_render_target re-uploads it when the
-    // area follows the host) and spanMax only on a graphics.antialias(_, size) call (which re-uploads
-    // it itself, see gfx_antialias) — so both are uploaded once here rather than every frame in
-    // render_frame.
+    // texelSize only changes with the render target's size (load_fxaa_shader re-uploads it when the area
+    // follows the host) and spanMax only on a graphics.antialias(_, size) call (which re-uploads it
+    // itself, see gfx_antialias) — so both are uploaded here rather than every frame in render_frame.
     upload_fxaa_texel();
     SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
 }
@@ -209,11 +209,7 @@ static void create_render_target() {
         BeginTextureMode(s_target);
         ClearBackground(BLACK);
         EndTextureMode();
-        if (s_fxaa_ready) {
-            upload_fxaa_texel();   // the texel's size follows the target's
-        } else {
-            load_fxaa_shader();
-        }
+        load_fxaa_shader();
     }
 }
 
@@ -227,8 +223,36 @@ static void publish_window_size(int w, int h) {
 }
 
 // graphics.fitArea: the canvas follows the host's drawing area — rotation, window resize, a moved
-// divider. A setting of THIS program, reset by every graphics.canvas like graphics.antialias.
+// divider. A setting of THIS program, reset when a program starts (gfx_program_reset) and NOT by
+// graphics.canvas: the implicit canvas is created AFTER setup(), where a script has already turned it on.
 static bool s_fit_area = false;
+
+// A program that did not ask to follow the area keeps the orientation it started in: the engine asks the
+// browser to lock the current one, and unlocks when the program asks to follow (fitArea) or ends. The
+// browser decides — Android Chrome grants it only in full screen or an installed app, iOS Safari never — so
+// where it refuses, the page still turns and the canvas simply keeps its size.
+static void lock_orientation(bool lock) {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        var o = screen.orientation;
+        if (!o)
+            return;
+        if ($0) {
+            if (o.lock)
+                o.lock(o.type).catch(function() {});
+        } else if (o.unlock) {
+            try { o.unlock(); } catch (e) {}
+        }
+    }, lock ? 1 : 0);
+#else
+    (void)lock;
+#endif
+}
+
+void gfx_program_reset() {
+    s_fit_area = false;
+    lock_orientation(false);
+}
 
 #ifdef __EMSCRIPTEN__
 // The drawing area changes size: the same sizing steps as graphics.canvas, without what makes that one
@@ -252,16 +276,19 @@ static void resize_area(int w, int h) {
 // The host's drawing area as it is NOW. The views keep window.__ollinRenderW/H up to date
 // (watchRenderArea, lib/pg-run.js); the same pair is what the `window` module read at start-up.
 static bool host_area(int* w, int* h) {
-    int packed = EM_ASM_INT({
+    static int s_area[2];
+    bool known = EM_ASM_INT({
         var w = window.__ollinRenderW;
         var h = window.__ollinRenderH;
         if (typeof w !== 'number' || typeof h !== 'number' || w <= 0 || h <= 0)
             return 0;
-        return (Math.min(Math.round(w), 32767) << 16) | Math.min(Math.round(h), 32767);
-    });
-    *w = packed >> 16;
-    *h = packed & 0xFFFF;
-    return packed != 0;
+        HEAP32[$0 >> 2] = Math.round(w);
+        HEAP32[($0 >> 2) + 1] = Math.round(h);
+        return 1;
+    }, s_area);
+    *w = s_area[0];
+    *h = s_area[1];
+    return known;
 }
 #endif
 
@@ -269,12 +296,21 @@ static bool host_area(int* w, int* h) {
 // window.resized(w, h) — once per change, after W, H and the rest already hold the new size.
 static void follow_area() {
 #ifdef __EMSCRIPTEN__
+    static int s_area_seen_w = 0;   // the host's size as the previous frame saw it
+    static int s_area_seen_h = 0;
     if (!s_fit_area || !IsWindowReady())
         return;
     int w = 0;
     int h = 0;
     if (!host_area(&w, &h) || (w == s_logicalW && h == s_logicalH))
         return;
+    // Only a size that holds for a frame is followed: dragging a divider changes it on nearly every
+    // frame, and each change would rebuild the render target at device resolution.
+    if (w != s_area_seen_w || h != s_area_seen_h) {
+        s_area_seen_w = w;
+        s_area_seen_h = h;
+        return;
+    }
     resize_area(w, h);
     VM* vm = VM::current();
     Value win = vm->get_global("window");
@@ -291,6 +327,8 @@ static void follow_area() {
 // graphics.fitArea([enabled]): with no argument, turns it on.
 static int gfx_fit_area(CallCtx& ctx) {
     s_fit_area = (ctx.argc > 0) ? !is_falsy(ctx.args[0]) : true;
+    if (IsWindowReady())   // before the canvas exists, graphics.canvas decides
+        lock_orientation(!s_fit_area);
     return ctx.ret(Value{});
 }
 
@@ -318,7 +356,6 @@ static int gfx_canvas(CallCtx& ctx) {
     reset3d_lighting_state();
     s_fxaa_enabled = true;   // graphics.antialias: a setting of THIS program, not of the host
     s_fxaa_span = 8.0f;
-    s_fit_area = false;   // likewise: the program opts in again, after its own canvas
     s_run_active = false;   // a new program, hence ONE graphics.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
@@ -377,6 +414,7 @@ static int gfx_canvas(CallCtx& ctx) {
     publish_draw_size();
     create_render_target();
     publish_window_size(w, h);
+    lock_orientation(!s_fit_area);
     if (VM* vm = VM::current())
         vm->mark_gfx_canvas();   // an explicit canvas, so no implicit one (run_entry_hooks)
     return ctx.ret(Value{});

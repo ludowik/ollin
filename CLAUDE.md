@@ -1051,27 +1051,37 @@ Ce que le code ne dit pas :
 > API : voir le tutoriel (`graphics.fitArea`, section « Le module window »).
 
 La taille du canvas n'était fixée qu'une fois, à `graphics.canvas` : après une rotation du téléphone
-le dessin gardait l'ancienne taille. Le programme demande désormais de suivre la zone (**décision de
-l'utilisateur : sur demande, jamais d'office**, pour ne pas changer les exemples qui calculent leur
-mise en page une fois), et le moteur la suit à chaque image (`follow_area`, en tête de
-`render_frame`). Ce que le code ne dit pas :
+le dessin gardait l'ancienne taille. **Décision de l'utilisateur** : par défaut un programme graphique
+**garde l'orientation de départ** (le moteur demande au navigateur de la verrouiller à la création du
+canvas), et seul `graphics.fitArea()` libère la rotation et fait suivre la zone. Le moteur la suit à
+chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit pas :
 
 - **Le redimensionnement se fait AVANT `BeginTextureMode(s_target)`, jamais pendant.** Il décharge
   puis recrée la texture de rendu : le faire dans `run_user_callbacks`, qui s'exécute cible liée,
   détruirait la cible en cours d'usage. C'est aussi pourquoi le rappel `window.resized` part de là et
-  non d'un écouteur DOM.
+  non d'un écouteur DOM. Une taille n'est suivie qu'après être restée stable **une image** : un
+  séparateur qu'on glisse la change à presque chaque image, et chaque changement reconstruit la cible
+  à la résolution de l'appareil.
 - **`resize_area` n'est PAS `graphics.canvas`.** Les deux partagent `set_phys_size`,
   `size_canvas_element`, `create_render_target` et `publish_window_size`, mais `canvas` remet à zéro
   le style, l'éclairage 3D et les ressources de l'hôte, ce qu'un redimensionnement ne doit pas faire.
-  Le `texelSize` de FXAA suit la cible (`upload_fxaa_texel`) : oublié, le lissage serait calculé sur
-  l'ancienne taille.
+  Le `texelSize` de FXAA suit la cible (`load_fxaa_shader` le renvoie à chaque appel) : oublié, le lissage
+  serait calculé sur l'ancienne taille.
+- **Le réglage `fitArea` se remet à faux au DÉMARRAGE DU PROGRAMME (`gfx_program_reset`, appelé par
+  `ollin_run`), pas dans `graphics.canvas`.** Le canvas implicite est créé APRÈS `setup()` : un
+  `graphics.fitArea()` écrit dans `setup()` y aurait été effacé en silence. Même défaut encore présent
+  pour `graphics.antialias`, remis à zéro par `canvas` : à déplacer de la même façon le jour où on y touche.
+- **Le verrou d'orientation est un VŒU adressé au navigateur** (`lock_orientation`,
+  `screen.orientation.lock(type courant)`), jamais une garantie : Android Chrome ne l'accorde qu'en plein
+  écran ou dans une application installée, iOS Safari jamais. Là où il est refusé, la page tourne quand
+  même et le canvas garde sa taille. L'hôte le relâche quand le programme s'arrête (`unlockOrientation`,
+  `lib/pg-run.js`, appelé par `run.js` et par `setRunning(false)` du playground), sinon tout le site
+  resterait verrouillé. Non vérifié sur un appareil réel : au navigateur de test seul l'appel est vérifié.
 - **L'hôte et le moteur échangent la taille par `window.__ollinRenderW/H`**, le couple que le module
-  `window` lisait déjà au démarrage. `watchRenderArea` (`lib/pg-run.js`, utilisé par `playground.js`
-  et `run.js`) le tient à jour par un `ResizeObserver` sur `#output-pane`. Ce volet n'est correct que
-  tant que la taille de ce panneau ne dépend pas de celle du canvas (`overflow: hidden` et flex) ;
-  un panneau à `0 × 0` (caché) est ignoré.
-- **`fitArea` est remis à faux par `graphics.canvas`** : à appeler après lui, comme `antialias`.
-  Natif : sans effet, une fenêtre de bureau ne change pas de taille sous le programme.
+  `window` lisait déjà au démarrage. `publishRenderArea` et `watchRenderArea` (`lib/pg-run.js`, utilisés par
+  `playground.js` et `run.js`) le tiennent à jour, ce dernier par un `ResizeObserver` sur `#output-pane`. Ce
+  volet n'est correct que tant que la taille de ce panneau ne dépend pas de celle du canvas
+  (`overflow: hidden` et flex) ; un panneau à `0 × 0` (caché) est ignoré.
 - Mesuré au navigateur (rotation simulée par `setViewportSize` et `Emulation.setDeviceMetricsOverride`) :
   le canvas passe de 800×352 à 400×752 en CSS comme en bitmap, `W`, `H`, `SIZE` et `window.width/height`
   suivent, le rappel part une seule fois, dans le playground comme en plein écran. Non couvert par

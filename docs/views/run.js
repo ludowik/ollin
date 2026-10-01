@@ -12,7 +12,7 @@ export async function init(ctx) {
   // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, watchRenderArea } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, watchRenderArea, publishRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -55,9 +55,7 @@ export async function init(ctx) {
     // FRESH render dimensions are handed to the engine (the `window` module reads
     // __ollinRenderW/H first). Without this, the value set by the playground PERSISTS on window,
     // and W/H stay frozen at the old size in full screen.
-    const rr = pane.getBoundingClientRect()
-    window.__ollinRenderW = Math.round(rr.width)
-    window.__ollinRenderH = Math.round(rr.height)
+    publishRenderArea(pane)
     runProgram(mod, code, canvasEl, {
       filename:  entryName,
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
@@ -200,6 +198,7 @@ export async function init(ctx) {
 
   const stop = () => {
     unwatchArea()
+    unlockOrientation()
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
     window.__ollinRenderW = undefined   // a size hint private to this view: it must not leak

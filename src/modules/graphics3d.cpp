@@ -120,8 +120,7 @@ static Camera3D camera_from_map(const Value& v, const char* fn) {
 // it unchanged. The methods MUTATE self in place (a camera is mutable between frames)
 // and return self, so calls chain.
 static double cam_field(const Value& self, const char* k) {
-    Value v = self.map_get(Value(std::string(k)));
-    return v.is_number() ? v.as_num() : 0.0;
+    return map_number_or(self, k, 0.0);
 }
 
 // cam.setPos(x,y,z): sets the camera position.
@@ -322,10 +321,9 @@ struct InstGroup {
     unsigned int vbo_c;   // the colours VBO, persistent
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
     int count;
-    bool owns_mesh;       // the mesh was built for this group (graphics.heightfield): unload it with the group
-    bool shared_instance; // vbo_x/c/t are the shared identity-instance buffers (s_hf_*): never unloaded per group
-    bool prebound;        // the instance attributes were bound into the mesh's VAO once, at creation
-    // What graphics.terrainHeight reads back from a heightfield patch: its grid and heights.
+    // A graphics.heightfield patch (hf_cols > 0) owns its mesh, draws the shared identity-instance buffers
+    // (s_hf_*, never unloaded per group) and had its instance attributes bound into the mesh's VAO once, at
+    // creation. The rest is what graphics.terrainHeight reads back: the patch's grid and heights.
     int hf_cols;
     int hf_rows;
     double hf_x;
@@ -338,11 +336,34 @@ static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
 // instance buffers are made once and shared by all patches, instead of three tiny buffers each.
 static unsigned int s_hf_vbo_x = 0, s_hf_vbo_c = 0, s_hf_vbo_t = 0;
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
+
+// Gives a group's GPU buffers back and forgets them. The heightfield patches' instance buffers are the
+// shared ones and stay; their mesh was built for the patch, so it goes with it (the unit cubes, shared,
+// never do).
+static void release_group_gpu(InstGroup& g) {
+    bool heightfield = g.hf_cols > 0;
+    if (!heightfield) {
+        if (g.vbo_x) {
+            rlUnloadVertexBuffer(g.vbo_x);
+        }
+        if (g.vbo_c) {
+            rlUnloadVertexBuffer(g.vbo_c);
+        }
+        if (g.vbo_t) {
+            rlUnloadVertexBuffer(g.vbo_t);
+        }
+    } else {
+        UnloadMesh(g.mesh);
+        g.mesh = Mesh{};
+    }
+    g.vbo_x = 0;
+    g.vbo_c = 0;
+    g.vbo_t = 0;
+}
 static Matrix s_view3d = MatrixIdentity();   // the view frozen at begin3d, for the solids' MVP; the identity by default, as a fail-safe should a flush precede begin3d
 // The six frustum planes (unit normal x,y,z and offset) of s_view3d · s_proj3d, worked out on the
 // first inFrustum of a frame instead of at every call: a script culls dozens of blocks a frame.
 static float s_frustum[6][4];
-static bool s_frustum_valid[6];
 static bool s_frustum_ready = false;
 static Matrix s_proj3d = MatrixIdentity();   // the perspective projection frozen at begin3d, for inFrustum called OUTSIDE the 3D block, where rlGetMatrixProjection returns the 2D ortho restored by end3d
 
@@ -696,18 +717,7 @@ void reset3d_graphics_state() {
     // Baked instance groups: their VBOs belong to the context, so we free and clear them
     // (the script bakes them again in setup on the next run).
     for (auto& g : s_groups) {
-        if (g.vbo_x && !g.shared_instance) {
-            rlUnloadVertexBuffer(g.vbo_x);
-        }
-        if (g.vbo_c && !g.shared_instance) {
-            rlUnloadVertexBuffer(g.vbo_c);
-        }
-        if (g.vbo_t && !g.shared_instance) {
-            rlUnloadVertexBuffer(g.vbo_t);
-        }
-        if (g.owns_mesh) {
-            UnloadMesh(g.mesh);
-        }
+        release_group_gpu(g);
     }
     if (s_hf_vbo_x) {
         rlUnloadVertexBuffer(s_hf_vbo_x);
@@ -832,16 +842,12 @@ static int gfx_ambient(CallCtx& ctx) {
 // Phase 1: a single active light, directional or point. A Light object carries its own
 // configuration (type, direction or position, colour, enabled) and, on every mutation,
 // pushes it into the global lighting state (last written wins).
-static double inst_field(const Value& self, const char* k, double def) {
-    Value v = self.map_get(Value(std::string(k)));
-    return v.is_number() ? v.as_num() : def;
-}
 
 static void apply_light_from_instance(const Value& self) {
-    int type = (int)inst_field(self, "type", 0);
-    float x = (float)inst_field(self, "dx", 0.0);
-    float y = (float)inst_field(self, "dy", -1.0);
-    float z = (float)inst_field(self, "dz", 0.0);
+    int type = (int)map_number_or(self, "type", 0);
+    float x = (float)map_number_or(self, "dx", 0.0);
+    float y = (float)map_number_or(self, "dy", -1.0);
+    float z = (float)map_number_or(self, "dz", 0.0);
     // A directional light with a NULL direction is refused: the shader would compute
     // normalize(vec3(0)), which is undefined — measured as "the light contributes nothing" on one
     // driver, but nothing guarantees that elsewhere. A meaningless argument is refused, never
@@ -856,10 +862,10 @@ static void apply_light_from_instance(const Value& self) {
         s_light_pos = Vector3{0.0f, 0.0f, 0.0f};
         s_light_tgt = Vector3{x, y, z};
     }
-    s_light_col[0] = (float)inst_field(self, "r", 1.0);
-    s_light_col[1] = (float)inst_field(self, "g", 1.0);
-    s_light_col[2] = (float)inst_field(self, "b", 1.0);
-    s_light_col[3] = (float)inst_field(self, "a", 1.0);
+    s_light_col[0] = (float)map_number_or(self, "r", 1.0);
+    s_light_col[1] = (float)map_number_or(self, "g", 1.0);
+    s_light_col[2] = (float)map_number_or(self, "b", 1.0);
+    s_light_col[3] = (float)map_number_or(self, "a", 1.0);
     s_light_on = !is_falsy(self.map_get(Value(std::string("enabled"))));
     s_lighting_used = true;
 }
@@ -1365,21 +1371,16 @@ static int gfx_in_frustum(CallCtx& ctx) {
                 for (int k = 0; k < 4; k++) {
                     pl[k] = rows[3][k] + (sgn ? -rows[i][k] : rows[i][k]);
                 }
+                // A degenerate plane is zeroed: 0 < -r is false for any radius, so it never culls.
                 float len = std::sqrt(pl[0] * pl[0] + pl[1] * pl[1] + pl[2] * pl[2]);
-                s_frustum_valid[i * 2 + sgn] = len >= 1e-6f;
-                if (s_frustum_valid[i * 2 + sgn]) {
-                    for (int k = 0; k < 4; k++) {
-                        pl[k] /= len;
-                    }
+                for (int k = 0; k < 4; k++) {
+                    pl[k] = len >= 1e-6f ? pl[k] / len : 0.0f;
                 }
             }
         }
         s_frustum_ready = true;
     }
     for (int i = 0; i < 6; i++) {
-        if (!s_frustum_valid[i]) {
-            continue;
-        }
         const float* pl = s_frustum[i];
         if (pl[0] * x + pl[1] * y + pl[2] * z + pl[3] < -r) {
             return ctx.ret(Value::make_bool(false));   // entirely on the wrong side of a plane, hence off screen
@@ -1654,10 +1655,7 @@ static int gfx_heightfield(CallCtx& ctx) {
     g.vbo_x = s_hf_vbo_x;
     g.vbo_c = s_hf_vbo_c;
     g.vbo_t = s_hf_vbo_t;
-    g.shared_instance = true;
     lit_bind_instances(mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
-    g.prebound = true;
-    g.owns_mesh = true;
     g.hf_cols = cols;
     g.hf_rows = rows;
     g.hf_x = ox;
@@ -1687,7 +1685,7 @@ static int gfx_terrain_height(CallCtx& ctx) {
     double x = num_arg(args, argc, 0, "graphics.terrainHeight");
     double z = num_arg(args, argc, 1, "graphics.terrainHeight");
     for (const InstGroup& g : s_groups) {
-        if (g.hf_cols <= 0 || g.count <= 0) {
+        if (g.hf_cols <= 0) {
             continue;
         }
         double u = (x - g.hf_x) / g.hf_cell;
@@ -1732,7 +1730,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
-    if (!g.prebound) {
+    if (g.hf_cols <= 0) {
         lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
     }
     // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
@@ -1768,7 +1766,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     BeginBlendMode(BLEND_ALPHA);
-    if (!g.prebound) {
+    if (g.hf_cols <= 0) {
         lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
     }
     lit_draw_instanced(g.mesh, s_atlas_texid, g.count, s_atlas_flipped);
@@ -1791,26 +1789,8 @@ static void free_group_by_id(Value& handle, const char* key) {
     }
     InstGroup& g = s_groups[id - 1];
     bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.count != 0;
-    if (g.vbo_x && !g.shared_instance) {
-        rlUnloadVertexBuffer(g.vbo_x);
-    }
-    if (g.vbo_c && !g.shared_instance) {
-        rlUnloadVertexBuffer(g.vbo_c);
-    }
-    if (g.vbo_t && !g.shared_instance) {
-        rlUnloadVertexBuffer(g.vbo_t);
-    }
-    g.vbo_x = 0;
-    g.vbo_c = 0;
-    g.vbo_t = 0;
-    g.shared_instance = false;
-    g.prebound = false;
+    release_group_gpu(g);
     g.count = 0;
-    if (g.owns_mesh) {
-        UnloadMesh(g.mesh);
-        g.mesh = Mesh{};
-        g.owns_mesh = false;
-    }
     g.hf_cols = 0;
     g.hf_rows = 0;
     std::vector<float>().swap(g.hf_heights);
