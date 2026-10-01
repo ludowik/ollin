@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-30 20:44</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-01 19:50</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -442,6 +442,7 @@ pre:hover .code-actions,
   <a href="#keyboard">Keyboard</a>
   <a href="#mouse">Mouse</a>
   <a href="#touch">Multitouch</a>
+  <a href="#motion">Motion sensors</a>
   <a href="#ui">The ui module</a>
   <a href="#tween">The tween module</a>
   <a href="#sound">Sound (audio + sound)</a>
@@ -454,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-30 20:44</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-01 19:50</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2366,6 +2367,50 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <li>The tracking is rebuilt by the engine: the graphics layer gives only a snapshot of the contacts on each frame, without saying which has just appeared. It is the comparison from one frame to the next that produces the three callbacks.</li>
   <li>The identifier stays the same from the start of a gesture to its end, but it is <strong>reused</strong> afterwards: do not keep it beyond <code>ended</code>.</li>
   <li>A web page must set <code>touch-action: none</code> on its canvas, otherwise two fingers set off the browser's zoom instead of reaching the program. The site's views already do so.</li>
+</ul>
+</section>
+
+<section id="motion">
+<h2>The <code>motion</code> module</h2>
+<p>The phone's <strong>orientation</strong> and <strong>acceleration</strong>: enough to steer with the way the phone is held. The readings come from the browser, so the module works on a phone's browser and answers <code>"unsupported"</code> everywhere else, a desktop included.</p>
+
+<table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tr><td><code>motion.enable()</code></td><td>asks for the sensors and returns the state, as <code>motion.state()</code> does</td></tr>
+  <tr><td><code>motion.state()</code></td><td><code>"off"</code> (<code>enable</code> never called), <code>"pending"</code> (waiting for the permission or for the first reading), <code>"on"</code>, <code>"denied"</code> or <code>"unsupported"</code></td></tr>
+  <tr><td><code>motion.tilt()</code></td><td><code>roll, pitch</code>, in degrees. The roll is positive when the phone turns <strong>clockwise</strong>, as a steering wheel does, or when its right side goes down; the pitch is how far the screen is tipped back, 0 upright and 90 lying flat, face up</td></tr>
+  <tr><td><code>motion.gravity()</code></td><td><code>x, y, z</code>, in m/s²: what an accelerometer at rest reads, so <code>y</code> is about 9.8 when the phone stands upright</td></tr>
+  <tr><td><code>motion.acceleration()</code></td><td><code>x, y, z</code>, in m/s²: the phone's own acceleration, gravity removed</td></tr>
+  <tr><td><code>motion.attitude()</code></td><td>a <code>Quat</code> taking the screen's frame to the 3D world, or <code>nil</code>. With the phone upright and facing you it is the identity, so it can drive a camera directly. The <strong>heading</strong> is arbitrary: it starts wherever the phone happened to point</td></tr>
+</table>
+
+<p>The axes are those of the <strong>screen</strong> as it is held: <code>x</code> to the right, <code>y</code> up, <code>z</code> towards you, whether the phone is in portrait or in landscape and whichever way the screen is turned. Every reading is zero (the attitude is <code>nil</code>) unless the state is <code>"on"</code>, so a script can read them without testing first, and tests the state only to choose its controls.</p>
+
+<pre><code><span class="kw">func</span> setup()
+    motion.enable()                  <span class="cmt">## once; on iOS the permission is asked at the player's next tap</span>
+<span class="kw">end</span>
+
+<span class="kw">func</span> update(dt)
+    <span class="kw">if</span> motion.state() == <span class="str">"on"</span> <span class="kw">then</span>
+        <span class="kw">var</span> roll = motion.tilt()
+        <span class="cmt">## roll is in degrees: 0 held straight, +30 turned a third of a quarter turn clockwise</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+
+<h3>A steering wheel: <code>samples/lib/tilt.ol</code></h3>
+<p>The <code>Tilt</code> class turns the roll into a value in [-1 ; 1], the range of a joystick or of the arrow keys. Nobody holds a phone the same way, so the neutral position is whatever <code>calibrate</code> was last given.</p>
+<pre><code><span class="kw">import</span> <span class="str">"../lib/tilt.ol"</span>
+<span class="kw">global</span> wheel = Tilt(<span class="num">30</span>, <span class="num">3</span>)       <span class="cmt">## full lock at 30 degrees, 3 degrees ignored around the neutral</span>
+wheel.calibrate(motion.tilt())     <span class="cmt">## the way the phone is held now is straight ahead</span>
+steer = wheel.update(deltaTime, motion.tilt())</code></pre>
+
+<h3>What to know</h3>
+<ul>
+  <li><strong>iOS asks for permission</strong>, and only accepts the request from a tap. <code>enable()</code> records the wish and the player's next tap makes the request, so calling it in <code>setup()</code> is fine. Other browsers need no permission, but they all require a secure page (<code>https</code>).</li>
+  <li><code>"pending"</code> lasts until the first reading arrives. A browser with no sensor fires one empty reading and the state becomes <code>"unsupported"</code>; one that fires nothing at all stays <code>"pending"</code>, so give the player another way to drive.</li>
+  <li><strong>A phone's own rotation speed is not offered.</strong> Chromium assigns the gyroscope's axes to the event's three angles in a different order from the one the specification gives, so the axes of a raw rate could not be trusted to agree between browsers.</li>
+  <li>The roll is read from the direction of gravity, not from the raw angles: it stays steady near the vertical, where the raw angles jump, and it means the same thing whether the phone is held like a wheel or tipped like a tray.</li>
+  <li>On a computer <code>state()</code> is <code>"unsupported"</code> after <code>enable()</code>, so a program keeps its keyboard or touch controls as a fallback, as the <em>Rally</em> example does.</li>
 </ul>
 </section>
 

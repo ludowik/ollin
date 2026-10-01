@@ -1009,6 +1009,43 @@ survolée a changé, ce qui rend le doublon sans effet.
   est LISSÉ dans le temps (0,8 par défaut) et garde une traîne : c'est le RMS temporel qui
   prouve l'extinction.
 
+## Module `motion` (orientation et accélération, implémentation)
+
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module motion »).
+
+raylib n'a aucune API de capteurs : tout vient du navigateur (`DeviceOrientationEvent`,
+`DeviceMotionEvent`), par des `EM_ASM` comme `touch`, avec un relevé par image
+(`motion_begin_frame`, avant les rappels) et un stub qui répond `"unsupported"` hors navigateur.
+Ce que le code ne dit pas :
+
+- **L'inclinaison se lit dans le vecteur « haut », pas dans les angles bruts.** Le vecteur
+  `(-cos b sin g, sin b, cos b cos g)` ne dépend que de `beta` et `gamma`, il est continu là où le
+  couple d'angles saute (téléphone à la verticale : `gamma` vaut ±90 et `beta` change de branche),
+  et il ne demande aucun signe propre à une plateforme. Le roulis est `asin(-haut.x)` dans le
+  repère de l'ÉCRAN : il vaut `sin(angle)` quelle que soit l'inclinaison avant-arrière, ce qu'un
+  `atan2` de deux composantes ne donne pas (indéfini à plat, signe inversé au-delà de la verticale).
+  Mesuré sous Chromium sur sept poses simulées (volant en portrait et en paysage, plateau, à plat).
+- **Les angles sont tournés de `screen.orientation.angle`** (repli `window.orientation`) : sans
+  cela, un téléphone en paysage échange ses axes. ⚠ Le SENS de cet angle est supposé (90 = appareil
+  tourné de 90° vers la gauche, comme Chrome sur Android) et n'a été vérifié sur aucun appareil
+  réel, iOS compris ; le flux de permission d'iOS non plus (simulé par un `requestPermission`
+  factice : il n'est appelé qu'au premier geste, `granted` donne `"on"`, `denied` donne `"denied"`).
+- **`enable()` enregistre un souhait.** Sous iOS la permission ne s'accepte que depuis un geste :
+  les écouteurs de geste sont posés une fois et le premier geste qui suit `enable()` fait la
+  demande. `"pending"` dure jusqu'au premier relevé ; un relevé aux angles `null` (navigateur de
+  bureau) dit `"unsupported"`, un navigateur qui ne tire rien reste `"pending"`.
+- **Pas de vitesse de rotation (résultat négatif mesuré).** Chromium range les axes x, y, z du
+  gyroscope dans `alpha`, `beta`, `gamma`, là où la spécification dit z, x, y : les axes d'un taux
+  brut ne concordent donc pas d'un navigateur à l'autre. Ne pas l'ajouter sans appareil pour trancher.
+- **Tester au navigateur** : `context.grantPermissions(['accelerometer', 'gyroscope',
+  'magnetometer'])` est INDISPENSABLE (sans lui les événements partent avec des angles `null`), puis
+  `Emulation.setSensorOverrideEnabled` et `setSensorOverrideReadings` (`relative-orientation` avec un
+  quaternion, `linear-acceleration` avec xyz) ; `DeviceOrientation.setDeviceOrientationOverride` ne
+  donne rien. Un événement ne part qu'à un CHANGEMENT de valeur, et le relevé initial n'est livré
+  qu'au premier écouteur de la page — un écouteur de test posé avant celui du module le masque. ⚠
+  `print` est muet dans une frame graphique : lire une valeur par `assert(false, …)` en prenant la
+  main sur `window.__ollinFrameError`.
+
 ## Modules `audio` et `sound` (implémentation)
 
 > API : voir le tutoriel (`docs/views/tutorial.html`, section « Modules audio et sound »).

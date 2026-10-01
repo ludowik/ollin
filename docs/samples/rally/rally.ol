@@ -1,6 +1,9 @@
 ## Art of Rally, minimal — one car, one circuit, free exploration. Drive with the ARROW KEYS
 ## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
 ## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
+## On a phone, hold it like a steering wheel in landscape: its tilt steers, and two pedals at the
+## bottom corners — brake on the left, throttle on the right — take the thumbs. Tap the wheel
+## button at the top right to take the way the phone is held as straight ahead.
 ## No lap timing, no opponents, no collision against the verge — just driving the circuit and the
 ## hills around it.
 
@@ -9,6 +12,7 @@ import "vehicle.ol"
 import "engine.ol"
 import "../lib/chasecam.ol"
 import "../lib/joystick.ol"
+import "../lib/tilt.ol"
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global ground = nil
@@ -23,11 +27,20 @@ global pad = Joystick()
 ## road ahead of the car.
 pad.radiusFrac = 0.11
 pad.centerFrac = 0.86
+global wheel = Tilt(30, 3)
+global wheelArmed = false   ## the first reading sets the neutral; this says it has
+
+## The phone's tilt drives the car instead of the joystick once the sensors answer.
+func tiltOn()
+    return motion.state() == "on"
+end
 
 ## A class cannot receive an engine callback (see joystick.ol), so these one-line relays are
 ## what actually arms and moves the touch control.
 func mouse.pressed(x, y)
-    pad.press(x, y)
+    if not tiltOn() then
+        pad.press(x, y)
+    end
 end
 func mouse.moved(x, y)
     pad.move(x, y)
@@ -36,8 +49,16 @@ func mouse.released(x, y)
     pad.release()
 end
 
+## The wheel button recentres the steering on the way the phone is held right now.
+func touch.began(id, x, y)
+    if tiltOn() and inRect(x, y, wheelButton()) then
+        wheelArmed = false
+    end
+end
+
 func setup()
     graphics.canvas(W, H, "Rally")
+    motion.enable()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
@@ -57,6 +78,8 @@ global HUB_COLOR = Color(0.75, 0.75, 0.78)
 global HUD_SHADOW = Color(0, 0, 0, 0.6)
 global HUD_TEXT = Color(1, 1, 1)
 global SKY_COLOR = Color(0.55, 0.72, 0.85)
+global PEDAL_IDLE = Color(1, 1, 1, 0.16)
+global PEDAL_HELD = Color(0.45, 0.65, 1.0, 0.5)
 
 ## Where the car sits on the RENDERED ground: the four wheel contact heights, read from
 ## surfaceAt (the mesh's own surface, not the smooth heightAt field it only approximates), give
@@ -83,11 +106,57 @@ func carPose(x, z, heading)
     return mean + lift, math.atan(slopeF), math.atan(slopeR)
 end
 
+## The two pedals and the recentre button, as {x, y, w, h} in the drawing area's units.
+func pedal(right)
+    var w = SIZE * 0.34
+    var h = SIZE * 0.26
+    var margin = SIZE * 0.03
+    var x = margin
+    if right then
+        x = W - w - margin
+    end
+    return { x: x, y: H - h - margin, w: w, h: h }
+end
+
+func wheelButton()
+    var size = SIZE * 0.14
+    return { x: W - size - SIZE * 0.03, y: SIZE * 0.03, w: size, h: size }
+end
+
+func inRect(x, y, r)
+    return x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
+## Whether any finger is on the pedal. touch.points() is read rather than a callback, because the
+## thumbs slide on and off the pedals while they are held.
+func pedalHeld(right)
+    var r = pedal(right)
+    for p in touch.points() do
+        if inRect(p.x, p.y, r) then
+            return true
+        end
+    end
+    return false
+end
+
 func update(dt)
-    var throttle = pad.throttle()
+    var throttle = 0
+    var steer = 0
+    if tiltOn() then
+        var roll = motion.tilt()
+        if not wheelArmed then
+            wheel.calibrate(roll)
+            wheelArmed = true
+        end
+        steer = wheel.update(dt, roll)
+        if pedalHeld(true) then throttle = throttle + 1 end
+        if pedalHeld(false) then throttle = throttle - 1 end
+    else
+        throttle = pad.throttle()
+        steer = pad.steer()
+    end
     if keyboard.isDown("up") then throttle = throttle + 1 end
     if keyboard.isDown("down") then throttle = throttle - 1 end
-    var steer = pad.steer()
     if keyboard.isDown("left") then steer = steer - 1 end
     if keyboard.isDown("right") then steer = steer + 1 end
     throttle = math.clamp(throttle, -1, 1)
@@ -175,6 +244,37 @@ func drawHud()
     hudRow("{math.floor(car.engine.rpm)}", "rpm", xr, u * 4.7, u * 1.3)
 end
 
+## One pedal, lit while a thumb is on it.
+func drawPedal(right, label)
+    var r = pedal(right)
+    graphics.noStroke()
+    if pedalHeld(right) then
+        graphics.fill(PEDAL_HELD)
+    else
+        graphics.fill(PEDAL_IDLE)
+    end
+    graphics.rect(r.x, r.y, r.w, r.h, r.h * 0.25)
+    graphics.font("mono")
+    graphics.fontSize(r.h * 0.22)
+    graphics.stroke(HUD_TEXT)
+    graphics.textMode("center", "center")
+    graphics.text(label, r.x + r.w / 2, r.y + r.h / 2)
+end
+
+func drawTiltControls()
+    drawPedal(false, "BRAKE")
+    drawPedal(true, "GAS")
+    var b = wheelButton()
+    graphics.noStroke()
+    graphics.fill(PEDAL_IDLE)
+    graphics.rect(b.x, b.y, b.w, b.h, b.h * 0.5)
+    graphics.font("mono")
+    graphics.fontSize(b.h * 0.3)
+    graphics.stroke(HUD_TEXT)
+    graphics.textMode("center", "center")
+    graphics.text("RESET", b.x + b.w / 2, b.y + b.h / 2)
+end
+
 func draw()
     graphics.clear(SKY_COLOR)
     graphics.begin3d(cam)
@@ -186,5 +286,9 @@ func draw()
     drawCar()
     graphics.end3d()
     drawHud()
-    pad.draw()
+    if tiltOn() then
+        drawTiltControls()
+    else
+        pad.draw()
+    end
 end

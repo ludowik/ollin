@@ -23,6 +23,7 @@ Value make_tween_module();
 Value make_audio_module();
 Value make_sound_module();
 Value make_touch_module();
+Value make_motion_module();
 Value make_date_module();
 
 static const struct { const char* name; Value(*make)(); } k_modules[] = {
@@ -44,6 +45,7 @@ static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "audio",    make_audio_module    },
     { "sound",    make_sound_module    },
     { "touch",    make_touch_module    },
+    { "motion",   make_motion_module   },
     { "date",     make_date_module     },
 };
 

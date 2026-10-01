@@ -2,6 +2,7 @@
 #include "audio_module.h"
 #include "sound_module.h"
 #include "touch_module.h"
+#include "motion_module.h"
 #include "ui_module.h"
 #include "tween_module.h"
 #include "engine_font.h"
@@ -1454,6 +1455,7 @@ static void run_user_callbacks(const Value& draw_fn) {
     // Contacts first: a `mouse` callback may read touch.count(), since mouse emulation on a single
     // finger delivers the gesture twice and it is up to the script to decide.
     touch_begin_frame();
+    motion_begin_frame();
     mouse_poll(ui_poll());
     // Multitouch comes AFTER the mouse and does not replace it: on a single finger the system emulates
     // the mouse, so both families of callbacks fire. A script picks the one it listens to — a deliberate

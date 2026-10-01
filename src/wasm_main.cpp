@@ -3,6 +3,7 @@
 #include "modules/audio_module.h"
 #include "modules/sound_module.h"
 #include "modules/touch_module.h"
+#include "modules/motion_module.h"
 #include "modules/mouse_module.h"
 #include "modules/camera_module.h"
 #include "modules/engine_font.h"
@@ -36,6 +37,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     audio_reset();   // the master volume, which a previous program may have turned down
     sound_reset();   // otherwise an oscillator of the previous program would keep sounding
     touch_reset();   // a finger left "down" would look like a gesture under way
+    motion_reset();   // a program asks for the sensors itself, never inherits the last one's request
     mouse_reset();   // nor a button left pressed
     engine_font_reset();   // the atlases belonged to the previous GL context
     // Stop any running graphics loop before destroying the old VM.
