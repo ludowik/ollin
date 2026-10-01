@@ -227,23 +227,92 @@ static void publish_window_size(int w, int h) {
 // graphics.canvas: the implicit canvas is created AFTER setup(), where a script has already turned it on.
 static bool s_fit_area = false;
 
-// A program that did not ask to follow the area keeps the orientation it started in: the engine asks the
-// browser to lock the current one, and unlocks when the program asks to follow (fitArea) or ends. The
-// browser decides — Android Chrome grants it only in full screen or an installed app, iOS Safari never — so
-// where it refuses, the page still turns and the canvas simply keeps its size.
+// A program that did not ask to follow the area keeps the orientation it started in, in two steps. The
+// engine first asks the browser to lock the current orientation. The browser decides — Android Chrome
+// grants it only in full screen or an installed app, iOS Safari never — so where it refuses the page still
+// turns, and the engine HOLDS the orientation itself: the canvas is turned back by however far the screen
+// turned since the program started, so it stays upright in the device's own frame, which is what a lock
+// does. Both end when the program asks to follow (fitArea) or ends.
+//
+// The turn is a CSS rotation of the canvas, so the browser reports pointer positions relative to its
+// rotated bounding box: gfx_screen_map undoes it. s_hold is the pair the JavaScript side writes — the
+// turn in degrees (counter-clockwise, the way screen.orientation.angle grows) and the scale that fits the
+// turned canvas in its pane.
+static double s_hold[2] = {0.0, 1.0};
+
+void gfx_screen_map(float* x, float* y) {
+    int quarter = ((int)(s_hold[0] / 90.0 + 0.5)) % 4;
+    if (quarter == 0)
+        return;
+    double scale = s_hold[1];
+    double dx = *x - (quarter == 2 ? s_logicalW : s_logicalH) * scale / 2.0;
+    double dy = *y - (quarter == 2 ? s_logicalH : s_logicalW) * scale / 2.0;
+    double px = quarter == 1 ? -dy : (quarter == 2 ? -dx : dy);
+    double py = quarter == 1 ? dx : (quarter == 2 ? -dy : -dx);
+    *x = (float)(px / scale + s_logicalW / 2.0);
+    *y = (float)(py / scale + s_logicalH / 2.0);
+}
+
 static void lock_orientation(bool lock) {
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         var o = screen.orientation;
-        if (!o)
-            return;
-        if ($0) {
-            if (o.lock)
-                o.lock(o.type).catch(function() {});
-        } else if (o.unlock) {
-            try { o.unlock(); } catch (e) {}
+        if (o) {
+            if ($0) {
+                if (o.lock)
+                    o.lock(o.type).catch(function() {});
+            } else if (o.unlock) {
+                try { o.unlock(); } catch (e) {}
+            }
         }
-    }, lock ? 1 : 0);
+        if (window.__ollinHoldStop)
+            window.__ollinHoldStop();
+        window.__ollinHoldTheta = 0;
+        HEAPF64[$1 >> 3] = 0;
+        HEAPF64[($1 >> 3) + 1] = 1;
+        var canvas = document.getElementById('canvas');
+        if (!$0 || !canvas)
+            return;
+        var angle = function() {
+            var a = (o && typeof o.angle === 'number') ? o.angle : (window.orientation || 0);
+            return ((a % 360) + 360) % 360;
+        };
+        var start = angle();
+        var update = function() {
+            var pane = canvas.parentElement;
+            if (!pane)
+                return;
+            var theta = (angle() - start + 360) % 360;
+            window.__ollinHoldTheta = theta;
+            var scale = 1;
+            canvas.style.transform = '';
+            if (theta !== 0) {
+                // Measured with no transform on it, which gives the layout box wherever the pane puts it.
+                var box = pane.getBoundingClientRect();
+                var at = canvas.getBoundingClientRect();
+                var turned = theta === 90 || theta === 270;
+                scale = Math.min(box.width / (turned ? at.height : at.width), box.height / (turned ? at.width : at.height));
+                var tx = (box.width - at.width) / 2 - (at.left - box.left);
+                var ty = (box.height - at.height) / 2 - (at.top - box.top);
+                canvas.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) rotate(' + (-theta) + 'deg) scale(' + scale + ')';
+            }
+            HEAPF64[$1 >> 3] = theta;
+            HEAPF64[($1 >> 3) + 1] = scale;
+        };
+        var observer = new ResizeObserver(update);
+        observer.observe(canvas.parentElement);
+        if (o)
+            o.addEventListener('change', update);
+        window.addEventListener('orientationchange', update);
+        window.__ollinHoldStop = function() {
+            observer.disconnect();
+            if (o)
+                o.removeEventListener('change', update);
+            window.removeEventListener('orientationchange', update);
+            canvas.style.transform = '';
+            window.__ollinHoldStop = null;
+        };
+    }, lock ? 1 : 0, s_hold);
 #else
     (void)lock;
 #endif

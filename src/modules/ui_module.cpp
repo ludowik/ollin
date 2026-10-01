@@ -36,6 +36,14 @@
 
 namespace {
 
+// The pointer in the drawing area's own frame, undoing the turn the engine may have applied to the canvas
+// (gfx_screen_map): the widgets draw in that frame and test against it.
+Vector2 pointer() {
+    Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
+    gfx_screen_map(&p.x, &p.y);
+    return p;
+}
+
 struct Node {
     // LIST is the "label: selection" row; LIST_ITEM is a row of the opened list, generated at opening
     // time as a child of the LIST node — so it is drawn and hit-tested by the menu machinery already
@@ -700,7 +708,7 @@ void ui_draw() {
     }
     Metrics m = metrics();
     layout(m, rows);
-    Vector2 mouse = {(float)GetMouseX(), (float)GetMouseY()};
+    Vector2 mouse = pointer();
     draw_row(s_head_box, CheckCollisionPointRec(mouse, s_head_box));
     draw_handle(s_head_box, m);
     if (s_open && !s_nodes[current_menu()].label.empty()) {
@@ -840,7 +848,7 @@ bool poll_drag() {
     }
     int slot = s_drag;
     Metrics m = metrics();
-    double wanted = slider_value_at(slot, (float)GetMouseX(), m);
+    double wanted = slider_value_at(slot, pointer().x, m);
     Value target = s_nodes[slot].target;
     Value on_change = s_nodes[slot].on_change;
     bool integral = s_nodes[slot].integral;
@@ -857,7 +865,7 @@ bool ui_poll() {
         return true;
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         return false;
-    Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
+    Vector2 p = pointer();
     // The rectangles come from the last frame drawn, so what one sees is what one clicks. Before the
     // first frame no row has a box, and therefore no click lands.
     if (CheckCollisionPointRec(p, s_head_box)) {

@@ -77,10 +77,12 @@ export function watchRenderArea(pane) {
   return () => observer.disconnect()
 }
 
-// A graphics program that does not follow the area makes the engine lock the screen's orientation; the
-// host releases it when the program stops, otherwise the whole site would stay locked.
+// A graphics program that does not follow the area makes the engine lock the screen's orientation, and hold
+// it by turning the canvas back where the browser refuses; the host releases both when the program stops,
+// otherwise the whole site would stay locked.
 export function unlockOrientation() {
   try { screen.orientation.unlock() } catch (_) {}
+  if (window.__ollinHoldStop) window.__ollinHoldStop()   // and the engine's own hold of it
 }
 
 // Runs `code` and routes the result through hooks supplied by the caller:
