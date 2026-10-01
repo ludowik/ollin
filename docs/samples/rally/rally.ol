@@ -2,10 +2,12 @@
 ## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
 ## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
 ## On a phone, hold it like a steering wheel in landscape: its tilt steers, and two pedals at the
-## bottom corners — brake on the left, throttle on the right — take the thumbs. Tap the wheel
-## button at the top right to take the way the phone is held as straight ahead. Turn the phone
+## bottom corners — brake on the left, throttle on the right — take the thumbs. Straight ahead is
+## the phone's standard position, held level, so there is nothing to set up; the button at the top
+## right takes the way the phone is held at that moment as straight ahead instead. Turn the phone
 ## upright and the drawing area follows: the controls and the HUD re-place themselves from W, H and
-## SIZE, the camera widens to keep the road in view, and the steering neutral is taken again.
+## SIZE, the camera widens to keep the road in view, and the steering goes back to the standard
+## position.
 ## No lap timing, no opponents, no collision against the verge — just driving the circuit and the
 ## hills around it.
 
@@ -30,17 +32,17 @@ global pad = Joystick()
 pad.radiusFrac = 0.11
 pad.centerFrac = 0.86
 global wheel = Tilt(30, 3)
-global wheelArmed = false   ## the first reading sets the neutral; this says it has
 global wasPortrait = false
 
 ## The area follows the host (graphics.fitArea in setup), so W, H and SIZE already hold the new size
 ## when this runs, and everything drawn from them re-places itself. What the script keeps — the
-## wheel's neutral — it redoes here: the phone is held differently the other way up.
+## wheel's neutral — it redoes here: whatever the player had set goes back to the standard position,
+## the phone being held differently the other way up.
 func window.resized(w, h)
     var portrait = h > w
     if portrait <> wasPortrait then
         wasPortrait = portrait
-        wheelArmed = false
+        wheel.reset()
     end
 end
 
@@ -63,10 +65,10 @@ func mouse.released(x, y)
     pad.release()
 end
 
-## The wheel button recentres the steering on the way the phone is held right now.
+## The wheel button takes the way the phone is held right now as straight ahead.
 func touch.began(id, x, y)
     if tiltOn() and inRect(x, y, wheelButton()) then
-        wheelArmed = false
+        wheel.calibrate(motion.tilt())
     end
 end
 
@@ -172,10 +174,6 @@ func update(dt)
     var steer = 0
     if tiltOn() then
         var roll = motion.tilt()
-        if not wheelArmed then
-            wheel.calibrate(roll)
-            wheelArmed = true
-        end
         steer = wheel.update(dt, roll)
         if pedalHeld(true) then throttle = throttle + 1 end
         if pedalHeld(false) then throttle = throttle - 1 end

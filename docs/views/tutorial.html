@@ -2399,10 +2399,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span></code></pre>
 
 <h3>A steering wheel: <code>samples/lib/tilt.ol</code></h3>
-<p>The <code>Tilt</code> class turns the roll into a value in [-1 ; 1], the range of a joystick or of the arrow keys. Nobody holds a phone the same way, so the neutral position is whatever <code>calibrate</code> was last given.</p>
+<p>The <code>Tilt</code> class turns the roll into a value in [-1 ; 1], the range of a joystick or of the arrow keys. Straight ahead is the phone's <strong>standard position</strong>, a roll of 0 — held level, like a steering wheel held straight, in portrait or in landscape — so nothing has to be set up before driving. <code>calibrate(roll)</code> takes another position as straight ahead for a player who holds the phone differently, and <code>reset()</code> goes back to the standard one.</p>
 <pre><code><span class="kw">import</span> <span class="str">"../lib/tilt.ol"</span>
 <span class="kw">global</span> wheel = Tilt(<span class="num">30</span>, <span class="num">3</span>)       <span class="cmt">## full lock at 30 degrees, 3 degrees ignored around the neutral</span>
-wheel.calibrate(motion.tilt())     <span class="cmt">## the way the phone is held now is straight ahead</span>
+wheel.calibrate(motion.tilt())     <span class="cmt">## optional: the way the phone is held now is straight ahead</span>
 steer = wheel.update(deltaTime, motion.tilt())</code></pre>
 
 <h3>What to know</h3>

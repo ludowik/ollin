@@ -2027,6 +2027,9 @@ assert(math.abs(tw.update(10, -100) + 1) < 1e-6)     ## the other way round
 tw.calibrate(20)
 assert(math.abs(tw.update(10, 20)) < 1e-9)           ## the neutral moved with the way the phone is held
 assert(math.abs(tw.update(10, 50) - 1) < 1e-6)
+tw.reset()                                           ## back to the standard position, a roll of 0
+assert(math.abs(tw.update(10, 20) - 17 / 27) < 1e-6)   ## 20 steers again: it was the calibrated neutral
+assert(math.abs(tw.update(10, 1)) < 1e-9)
 var twSlow = Tilt(30, 3)
 var twFirst = twSlow.update(0.01, 100)
 assert(twFirst > 0.1 and twFirst < 0.13)             ## one short frame only moves part of the way

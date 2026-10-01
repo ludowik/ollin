@@ -9,8 +9,10 @@
 ##   var roll = motion.tilt()
 ##   steer = wheel.update(deltaTime, roll)
 ##
-## The neutral position is wherever the phone was when `calibrate` last ran: nobody holds a phone
-## the same way, and a fixed neutral would steer a little to one side for the whole drive.
+## The neutral is the phone's STANDARD position, a roll of 0: the screen's own horizontal axis level,
+## as a steering wheel held straight is, in portrait or in landscape alike. Nothing has to be set up
+## before driving. `calibrate(roll)` takes another position as straight ahead for a player who holds
+## the phone differently, and `reset()` goes back to the standard one.
 ## `fullLock` is the roll, in degrees from the neutral, that steers fully; `deadZone` the roll
 ## ignored around the neutral so a hand that is not perfectly still does not wander. Past the dead
 ## zone the steering rises from 0, not from a step, and the result is smoothed so that a sensor's
@@ -38,6 +40,10 @@ class Tilt
 
     func calibrate(roll)
         self.neutral = roll
+    end
+
+    func reset()
+        self.neutral = 0.0
     end
 
     func update(dt, roll)
