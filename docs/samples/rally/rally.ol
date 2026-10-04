@@ -12,11 +12,25 @@
 ## hills around it.
 
 import "terrain.ol"
+import "scenery.ol"
 import "vehicle.ol"
 import "engine.ol"
+import "../lib/approach.ol"
 import "../lib/chasecam.ol"
 import "../lib/joystick.ol"
 import "../lib/tilt.ol"
+
+## What the camera does with speed, since the screen is the only place speed can be felt. The view
+## widens (more of the road streams past the edges) and the camera sinks towards the ground (what
+## passes beneath it moves faster, the angular speed of the ground being the speed over the height).
+## TOP_SPEED is the car's fifth-gear limit, engine.ol's 50 m/s, where both reach their full effect.
+global TOP_SPEED = 50.0
+global FOV_SPEED_GAIN = 12.0
+global FOV_CAP = 85.0
+global CHASE_HEIGHT = 5.5
+global CHASE_HEIGHT_FAST = 4.2
+global SPEED_FEEL_RATE = 2.5
+global speedFeel = 0.0     ## |speed| / TOP_SPEED in [0; 1], eased so the camera does not jump on a gear change
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global ground = nil
@@ -25,7 +39,7 @@ global ground = nil
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
                      math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
 global engineSound = EngineSound()
-global chase = ChaseCamera(14, 5.5, 6.0)
+global chase = ChaseCamera(14, CHASE_HEIGHT, 6.0)
 global pad = Joystick()
 ## Half the library's default size, resting at the bottom edge: the control stays clear of the
 ## road ahead of the car.
@@ -82,6 +96,7 @@ func setup()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
+    bakePosts()
     engineSound.start()
 end
 
@@ -193,9 +208,11 @@ func update(dt)
     car.update(dt, throttle, math.clamp(steer, -1, 1))
     engineSound.update(car.engine)
 
+    speedFeel = approach(speedFeel, math.clamp(math.abs(car.speed) / TOP_SPEED, 0, 1), SPEED_FEEL_RATE, dt)
+    chase.height = CHASE_HEIGHT + (CHASE_HEIGHT_FAST - CHASE_HEIGHT) * speedFeel
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
-    cam.fovy = viewFov()
+    cam.fovy = math.min(viewFov() + FOV_SPEED_GAIN * speedFeel, FOV_CAP)
 end
 
 ## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the
@@ -306,6 +323,7 @@ func draw()
             graphics.drawChunk(block)
         end
     end
+    drawPosts(car.x, car.z)
     drawCar()
     graphics.end3d()
     drawHud()
