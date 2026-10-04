@@ -784,8 +784,22 @@ disposers.push(() => {
     const vv = window.visualViewport
     // An open keyboard means the visible area loses more than 120px against the layout viewport.
     const keyboardOpen = () => (vv ? (window.innerHeight - vv.height > 120) : false)
+    // Right after a rotation iOS reports a layout height (innerHeight) and a visible height (vv.height) that
+    // disagree for a moment, by far more than the keyboard would: read then, the keyboard looks open, the
+    // toolbar is hidden and the bottom of the page stays empty. A turn is never the keyboard opening, so the
+    // turn is detected by the screen angle changing, the keyboard is taken as closed, and it is measured
+    // again once the sizes have settled.
+    const screenAngle = () => (screen.orientation ? screen.orientation.angle : (window.orientation || 0))
+    let lastAngle = screenAngle()
+    let settling = 0
     const update = () => {
-      const editing = document.activeElement === view.contentDOM
+      const angle = screenAngle()
+      if (angle !== lastAngle) {
+        lastAngle = angle
+        clearTimeout(settling)
+        settling = setTimeout(() => { settling = 0; update() }, 600)
+      }
+      const editing = document.activeElement === view.contentDOM && !settling
       const running = runBtnEl && runBtnEl.classList.contains('running')
       kbar.classList.toggle('show', editing && keyboardOpen() && !running)
       // While typing, with the keyboard up, the toolbar is hidden so the editor gets its height
@@ -797,7 +811,12 @@ disposers.push(() => {
     if (vv) {
       vv.addEventListener('resize', update)
     }
+    window.addEventListener('orientationchange', update)
+    window.addEventListener('resize', update)
     disposers.push(() => {
+      clearTimeout(settling)
+      window.removeEventListener('orientationchange', update)
+      window.removeEventListener('resize', update)
       view.contentDOM.removeEventListener('focus', update)
       view.contentDOM.removeEventListener('blur', update)
       if (vv) {
