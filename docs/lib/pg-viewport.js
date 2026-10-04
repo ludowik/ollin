@@ -20,7 +20,10 @@ export function pinToVisualViewport() {
     const body = document.body;
     const sync = () => {
         body.style.height = vv.height + 'px';
-        body.style.transform = 'translateY(' + vv.offsetTop + 'px)';
+        // Never negative: iOS reports an offset of about -53 right after a rotation, the visible area then
+        // reaching above the top of the page. Nothing is painted up there, and following it would slide the
+        // toolbar into that strip (measured on the device with the probe: `vv 375@-53`, toolbar lost).
+        body.style.transform = 'translateY(' + Math.max(0, vv.offsetTop) + 'px)';
     };
     // A rotation is the case the two visualViewport events do not cover: iOS may fire neither, or fire them
     // with the sizes of the orientation just left, and the app would keep the old height and offset — the
