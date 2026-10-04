@@ -784,6 +784,15 @@ disposers.push(() => {
     const vv = window.visualViewport
     // An open keyboard means the visible area loses more than 120px against the layout viewport.
     const keyboardOpen = () => (vv ? (window.innerHeight - vv.height > 120) : false)
+    // The other half of the same trouble: with the editor focused, iOS pans the VISIBLE area down to the caret
+    // when the screen turns. The page is pinned (position:fixed), so the toolbar is left above the screen and
+    // an empty strip shows below. Nothing in the page scrolled, which is why only this view is hit: the others
+    // have no focused editor. A turn therefore drops the focus, and the pan is undone whenever no keyboard
+    // explains it.
+    const unpan = () => {
+      if ((settling || !keyboardOpen()) && (window.scrollY > 0 || (vv && (vv.offsetTop > 0 || vv.pageTop > 0))))
+        window.scrollTo(0, 0)
+    }
     // Right after a rotation iOS reports a layout height (innerHeight) and a visible height (vv.height) that
     // disagree for a moment, by far more than the keyboard would: read then, the keyboard looks open, the
     // toolbar is hidden and the bottom of the page stays empty. A turn is never the keyboard opening, so the
@@ -796,9 +805,12 @@ disposers.push(() => {
       const angle = screenAngle()
       if (angle !== lastAngle) {
         lastAngle = angle
+        if (document.activeElement === view.contentDOM)
+          view.contentDOM.blur()
         clearTimeout(settling)
         settling = setTimeout(() => { settling = 0; update() }, 600)
       }
+      unpan()
       const editing = document.activeElement === view.contentDOM && !settling
       const running = runBtnEl && runBtnEl.classList.contains('running')
       kbar.classList.toggle('show', editing && keyboardOpen() && !running)
@@ -810,6 +822,7 @@ disposers.push(() => {
     view.contentDOM.addEventListener('blur', update)
     if (vv) {
       vv.addEventListener('resize', update)
+      vv.addEventListener('scroll', unpan)
     }
     window.addEventListener('orientationchange', update)
     window.addEventListener('resize', update)
@@ -821,6 +834,7 @@ disposers.push(() => {
       view.contentDOM.removeEventListener('blur', update)
       if (vv) {
         vv.removeEventListener('resize', update)
+        vv.removeEventListener('scroll', unpan)
       }
       document.body.classList.remove('kbd-editing')   // no toolbar left hidden behind
     })
