@@ -22,12 +22,34 @@ export function pinToVisualViewport() {
         body.style.height = vv.height + 'px';
         body.style.transform = 'translateY(' + vv.offsetTop + 'px)';
     };
+    // A rotation is the case the two visualViewport events do not cover: iOS may fire neither, or fire them
+    // with the sizes of the orientation just left, and the app would keep the old height and offset — the
+    // toolbar above the screen and an empty strip below. The window's own events catch the turn, and the
+    // sizes are read again as they settle.
+    let settle = [];
+    const resync = () => {
+        sync();
+        settle.forEach(clearTimeout);
+        settle = [100, 300, 700, 1200].map((ms) => setTimeout(sync, ms));
+    };
+    const turn = screen.orientation;
     vv.addEventListener('resize', sync);
     vv.addEventListener('scroll', sync);
+    window.addEventListener('resize', resync);
+    window.addEventListener('orientationchange', resync);
+    if (turn) {
+        turn.addEventListener('change', resync);
+    }
     sync();
     return () => {
         vv.removeEventListener('resize', sync);
         vv.removeEventListener('scroll', sync);
+        window.removeEventListener('resize', resync);
+        window.removeEventListener('orientationchange', resync);
+        if (turn) {
+            turn.removeEventListener('change', resync);
+        }
+        settle.forEach(clearTimeout);
         body.style.height = '';
         body.style.transform = '';
     };

@@ -49,6 +49,7 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 /* Mobile typing, with the keyboard open: the toolbar slides away to enlarge the editor.
    Brought back as soon as the keyboard closes (the class is set by playground.js). */
 body.kbd-editing #toolbar { display: none; }
+#probe-btn.active { color: var(--green); border-color: var(--green); }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 /* Appearance: app-bar.css, common to the three views.
@@ -534,6 +535,9 @@ canvas#canvas {
   </div>
   <div class="spacer"></div>
   <span id="status">Loading…</span>
+  <button id="probe-btn" class="bar-btn icon-only" title="Show the page's viewport figures, live (for diagnosing a layout)">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="7" x2="8" y2="11.5"/><circle cx="8" cy="4.6" r=".5" fill="currentColor"/></svg>
+  </button>
   <button id="reload-btn" class="bar-btn" title="Reload with an empty cache (fetches the latest WASM; the code is kept)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="btn-label">Reload</span>
