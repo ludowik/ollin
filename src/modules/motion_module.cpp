@@ -192,7 +192,7 @@ int sample_raw() {
             ang = screen.orientation.angle;
         else if (typeof window.orientation === 'number')
             ang = window.orientation;
-        HEAPF64[base + 6] = ang - (window.__ollinHoldTheta || 0);
+        HEAPF64[base + 6] = ang;
         return M.state();
     }, s_raw);
 }

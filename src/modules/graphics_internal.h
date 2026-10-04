@@ -65,10 +65,6 @@ int gfx_logical_height();
 // With no viewport the coordinates pass through unchanged and false is returned, which lets a
 // caller keep whatever type it had — a mapped position is fractional, an unmapped one need not be.
 bool gfx_view_map(float* x, float* y);
-// The browser can report a pointer or a contact relative to a canvas the engine has turned back to hold
-// the program's orientation (see lock_orientation): this puts it back in the canvas's own frame. A no-op
-// the rest of the time, and to be applied BEFORE gfx_view_map.
-void gfx_screen_map(float* x, float* y);
 // Strip taken at the top by the FPS overlay, composed ON TOP OF the render texture: a module
 // drawing at the top of the area must leave it free.
 

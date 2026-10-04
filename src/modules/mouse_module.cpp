@@ -41,7 +41,6 @@ static bool s_down = false;
 static void mouse_view_pos(Value* x, Value* y) {
     float fx = (float)GetMouseX();
     float fy = (float)GetMouseY();
-    gfx_screen_map(&fx, &fy);
     if (gfx_view_map(&fx, &fy)) {
         *x = Value((double)fx);
         *y = Value((double)fy);
@@ -65,11 +64,8 @@ void mouse_poll(bool click_taken) {
     // The raw position serves the double-click test, whose threshold is in REAL pixels: under a
     // viewport the same eight virtual pixels would be a different distance on screen. What the
     // script receives, on the other hand, is mapped into the space it draws in.
-    float raw_x = (float)GetMouseX();
-    float raw_y = (float)GetMouseY();
-    gfx_screen_map(&raw_x, &raw_y);
-    int mx = (int)raw_x;
-    int my = (int)raw_y;
+    int mx = GetMouseX();
+    int my = GetMouseY();
     Value x, y;
     mouse_view_pos(&x, &y);
 

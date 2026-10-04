@@ -198,7 +198,6 @@ void sample_contacts() {
         if (lifted & (1 << i))
             continue;
         Vector2 p = GetTouchPosition(i);
-        gfx_screen_map(&p.x, &p.y);
         s_cur[s_cur_count].raw_x = p.x;
         s_cur[s_cur_count].raw_y = p.y;
         gfx_view_map(&p.x, &p.y);   // a contact arrives in the space the script draws in

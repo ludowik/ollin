@@ -63,6 +63,28 @@ export async function init(ctx) {
     });
   }
 
+  // One lock attempt, released at once if it is granted: what the engine asks of the browser for a graphics
+  // program, so this row says what THIS browser answers (iOS Safari has no lock() to call).
+  let lockTrial = "not tried yet";
+  function tryOrientationLock() {
+    const o = screen.orientation;
+    if (!o || typeof o.lock !== "function") {
+      lockTrial = "lock() does not exist";
+      return;
+    }
+    lockTrial = "asked…";
+    o.lock(o.type).then(
+      () => {
+        lockTrial = "granted";
+        try { o.unlock(); } catch (_) {}
+        showWindowFacts();
+      },
+      (e) => {
+        lockTrial = "refused: " + (e && e.name ? e.name : "error");
+        showWindowFacts();
+      });
+  }
+
   function showWindowFacts() {
     const table = document.getElementById("window-facts");
     if (!table)
@@ -82,6 +104,8 @@ export async function init(ctx) {
       // is drawn over it; 32 means Safari has already put the page below that bar.
       ["window less page, in height", (window.outerHeight - window.innerHeight) + " px"],
       ["pixel ratio", String(window.devicePixelRatio)],
+      ["orientation, type and angle", screen.orientation ? screen.orientation.type + ", " + screen.orientation.angle + "°" : "—"],
+      ["orientation lock", lockTrial],
       // The bar's own padding, not --inset-top: a custom property reads back as the expression
       // written for it, never as the pixels it resolves to.
       ["space left above the bar", bar ? getComputedStyle(bar).paddingTop : "—"],
@@ -711,6 +735,7 @@ export async function init(ctx) {
     svgCurves.addEventListener("pointercancel", onCancelCurves);
     closeOnOutside(svgCurves, onCancelCurves);
     closeOnOutside(svgGaps, () => { if (hoverGaps) hoverGaps.clearHover(); });
+    tryOrientationLock();
     showWindowFacts();
     showAudioFacts();
     const testBtn = document.getElementById("audio-test");

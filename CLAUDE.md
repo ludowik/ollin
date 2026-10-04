@@ -1073,23 +1073,24 @@ chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit 
   pour `graphics.antialias`, remis à zéro par `canvas` : à déplacer de la même façon le jour où on y touche.
 - **Le verrou d'orientation est un VŒU adressé au navigateur** (`lock_orientation`,
   `screen.orientation.lock(type courant)`), jamais une garantie : Android Chrome ne l'accorde qu'en plein
-  écran ou dans une application installée, iOS Safari jamais. **Là où il est refusé, le moteur TIENT
-  l'orientation lui-même** : le canvas est tourné en CSS (`transform`, propriété abrégée) de l'écart entre
-  l'angle d'écran courant et celui du démarrage, puis mis à l'échelle pour tenir dans son panneau ; il reste
-  donc droit dans le repère de l'APPAREIL, comme sous un vrai verrou. Conséquence qui coûte cher à oublier :
-  le navigateur rapporte alors la souris et les contacts relativement à la boîte englobante du canvas
-  tourné, et `gfx_screen_map` les remet dans le repère du canvas — appliqué par `mouse_module`,
-  `touch_module` et `ui_module` AVANT `gfx_view_map`. Le module `motion` retranche le même écart de
-  l'angle d'écran (`__ollinHoldTheta`), sinon le roulis serait lu dans le mauvais repère. L'écart est
-  écrit par le JavaScript dans `s_hold` (pas de traversée par image). L'hôte relâche le tout quand le
-  programme s'arrête (`unlockOrientation`, `lib/pg-run.js`, appelé par `run.js` et par
-  `setRunning(false)` du playground), sinon tout le site resterait verrouillé.
-  ⚠ Les propriétés CSS individuelles `rotate`/`scale`/`translate` ont été essayées : le style calculé et
-  le rectangle étaient corrects mais Chromium ne les peignait pas sur ce canvas ; `transform` marche.
-  ⚠ Au harnais, `page.screenshot` de Playwright RÉINITIALISE le recouvrement d'orientation (l'angle repasse
-  à 0 et le maintien se défait) : capturer par `Page.captureScreenshot` en CDP. L'orientation d'écran
-  émulée ne se change qu'avec `Emulation.setDeviceMetricsOverride` ET `setViewportSize` avant lui.
-  Non vérifié sur un appareil réel : le SENS de l'angle est supposé, comme pour `motion`.
+  écran ou dans une application installée, et iOS Safari n'expose pas `lock()` (même en application posée
+  sur l'écran d'accueil). **Là où il est refusé, le moteur garde le canvas ENTIER et DROIT** : mis à
+  l'échelle (jamais agrandi) pour tenir dans son panneau et centré, avec des bandes sur les côtés. Décision
+  de l'utilisateur : le canvas n'est **jamais tourné** — une première version le tournait pour le garder
+  droit dans le repère de l'appareil, et elle a été REJETÉE (le programme apparaissait couché).
+  La souris et les contacts n'ont besoin d'AUCUN remappage : Emscripten les lit contre la boîte du canvas
+  telle qu'elle est à l'écran (mesuré au navigateur, souris ET toucher, à l'échelle 0,468 : la position
+  arrive en pixels du canvas). Un remappage `gfx_screen_map` écrit pour la version qui tournait le canvas
+  les faussait ici, et il a été retiré avec elle. Le module `motion` n'a rien à corriger non plus : le canvas
+  est droit dans l'écran, donc l'angle d'écran est le bon repère. L'hôte relâche le tout quand le programme
+  s'arrête (`unlockOrientation`, `lib/pg-run.js`, appelé par `run.js` et par `setRunning(false)` du
+  playground), sinon tout le site resterait verrouillé. La section « This window » de `#/perf` affiche l'angle, le type et le résultat d'un
+  essai de verrou : c'est la mesure sur l'appareil, à lire avant de raisonner sur ce que Safari accepte.
+  ⚠ Les propriétés CSS individuelles `scale`/`translate` ont été essayées : le style calculé et le
+  rectangle étaient corrects mais Chromium ne les peignait pas sur ce canvas ; `transform` marche.
+  ⚠ Au harnais, `page.screenshot` de Playwright RÉINITIALISE le recouvrement d'orientation : capturer par
+  `Page.captureScreenshot` en CDP. L'orientation d'écran émulée ne se change qu'avec
+  `Emulation.setDeviceMetricsOverride` ET `setViewportSize` avant lui. Non vérifié sur un appareil réel.
 - **L'hôte et le moteur échangent la taille par `window.__ollinRenderW/H`**, le couple que le module
   `window` lisait déjà au démarrage. `publishRenderArea` et `watchRenderArea` (`lib/pg-run.js`, utilisés par
   `playground.js` et `run.js`) le tiennent à jour, ce dernier par un `ResizeObserver` sur `#output-pane`. Ce
