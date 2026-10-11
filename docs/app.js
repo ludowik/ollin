@@ -7,7 +7,7 @@
 // Hash routing:
 //   #/<view>[/<anchor>]  changes view (#/tutorial, #/tutorial/for)
 //   #<anchor> (with no /) is an internal anchor of the current view (native scrolling)
-//   (empty)              is the last visited view, otherwise the default one (the tutorial)
+//   (empty)              is the last visited view, otherwise the default one (the home screen)
 // The "#/" prefix is what tells a route from a plain anchor: the tutorial's section links
 // (href="#intro") stay plain anchors and do not trigger a change of view.
 //
@@ -98,12 +98,13 @@ function getOllin() {
 // remount. Otherwise the anchor is a view parameter (sample/<file>, say), and the view is
 // remounted when it changes.
 const ROUTES = {
+  home:       { html: 'views/home.html',       js: './views/home.js' },
   tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { html: 'views/run.html',        js: './views/run.js' },
   perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
-const DEFAULT_VIEW = 'tutorial'
+const DEFAULT_VIEW = 'home'
 // The last complete ROUTE visited (the view plus its sub-path: a tutorial anchor, a sample…),
 // remembered so as to reopen it on the next launch. The whole route is stored, not just the
 // view, so the exact sample or anchor comes back. `run` is EXCLUDED, being transient and
@@ -116,6 +117,7 @@ const LAST_HASH_KEY = 'ollin-last-route'
 // behaviour of the former standalone page, lost when moving to a single page with one shared
 // viewport. The tutorial stays zoomable, for comfortable reading.
 const VIEWPORT = {
+  home:       'width=device-width, initial-scale=1.0',
   tutorial:   'width=device-width, initial-scale=1.0',
   playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
   run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
@@ -277,7 +279,7 @@ function isStandaloneApp() {
 // restored when the tab is reopened "bare", with no explicit route, OR when the app is installed
 // (a frozen launch URL rather than the last position). Otherwise — a browser tab with an
 // explicit route, a deep link, a bookmark — that route wins. With no remembered route the
-// default is the tutorial.
+// default is the home screen.
 function boot() {
   let last = null
   try {
