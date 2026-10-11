@@ -17,6 +17,9 @@ fall on a vertex, so every face has vertices of its own: the stripes are crisp, 
 smoothed by hand instead (see corner_normal) — smooth across a curved surface, creased where the
 car has an edge.
 
+The doors are shut lines — thin dark strips set a hair proud of the flank, following it — with a handle
+on each; the headlamps are four round lamps standing out of the nose, each in a black bezel.
+
 The four WHEELS are not here: they spin and steer, so the example draws them itself. The model's
 origin is at AXLE height, in the car's own frame (+Z forward, +X to the side, +Y up), the frame in
 which the example draws it. WHEEL_R must therefore equal WHEEL_R in rally.ol: the ground lies at
@@ -37,6 +40,7 @@ GREEN = (0.00, 0.50, 0.22)
 RED = (0.78, 0.06, 0.09)
 GLASS = (0.06, 0.08, 0.11)
 BLACK = (0.04, 0.04, 0.05)
+SHUT_LINE = (0.10, 0.10, 0.12)
 LAMP = (1.00, 0.93, 0.62)
 TAIL_LAMP = (0.85, 0.05, 0.05)
 
@@ -87,8 +91,8 @@ def half_ring(st):
     return [
         (0.0, hb),
         (wb, hb),
-        (ws, hb + 0.22 * (hs - hb)),        # the green stripe ends here
-        (ws, hb + 0.45 * (hs - hb)),        # the red one
+        (ws, hb + 0.14 * (hs - hb)),        # the green stripe ends here
+        (ws, hb + 0.28 * (hs - hb)),        # the red one — the door starts above it
         (ws, hs),                           # the belt line
         (wg, hs + 0.30 * dh),               # the foot of the glass
         (wr, ht - 0.15 * dh),               # the edge of the roof
@@ -102,6 +106,15 @@ def ring(st):
     right = half_ring(st)
     pts = right + [(-x, y) for (x, y) in reversed(right[1:9])]
     return [(x, y - WHEEL_R, st[0]) for (x, y) in pts]
+
+
+def half_ring_at(z):
+    """The half section at any z, interpolated between the two sections that bracket it."""
+    for a, b in zip(STATIONS, STATIONS[1:]):
+        if b[0] <= z <= a[0]:
+            t = (a[0] - z) / (a[0] - b[0])
+            return half_ring(tuple(p + (q - p) * t for p, q in zip(a, b)))
+    raise ValueError(f"z = {z} is outside the body")
 
 
 def sub(a, b):
@@ -141,6 +154,35 @@ class Mesh:
             n = (-n[0], -n[1], -n[2])
         n = unit(n)
         self.quad(pts, [n] * 4, colour)
+
+    def disc_z(self, cx, cy, z, r, colour, sign, n=24):
+        """A disc in a plane of constant z, facing `sign` (+1 forward)."""
+        base = len(self.pos)
+        for k in range(n):
+            a = 2.0 * math.pi * k / n
+            self.pos.append((cx + r * math.cos(a), cy + r * math.sin(a), z))
+        self.pos.append((cx, cy, z))
+        for _ in range(n + 1):
+            self.nrm.append((0.0, 0.0, sign))
+            self.col.append(colour + (1.0,))
+        for k in range(n):
+            tri = [base + k, base + (k + 1) % n, base + n]
+            normal = cross(sub(self.pos[tri[1]], self.pos[tri[0]]), sub(self.pos[tri[2]], self.pos[tri[0]]))
+            self.idx += tri if normal[2] * sign > 0 else [tri[0], tri[2], tri[1]]
+
+    def cylinder_z(self, cx, cy, z0, z1, r, side, front, n=24):
+        """A cylinder along Z from z0 to z1 (z1 the front end), smooth-shaded round its side."""
+        for k in range(n):
+            a0, a1 = 2.0 * math.pi * k / n, 2.0 * math.pi * (k + 1) / n
+            n0, n1 = (math.cos(a0), math.sin(a0), 0.0), (math.cos(a1), math.sin(a1), 0.0)
+            pts = [(cx + r * n0[0], cy + r * n0[1], z0), (cx + r * n1[0], cy + r * n1[1], z0),
+                   (cx + r * n1[0], cy + r * n1[1], z1), (cx + r * n0[0], cy + r * n0[1], z1)]
+            nrm = [n0, n1, n1, n0]
+            mid = (n0[0] + n1[0], n0[1] + n1[1], 0.0)
+            if sum(a * b for a, b in zip(cross(sub(pts[2], pts[0]), sub(pts[3], pts[1])), mid)) < 0:
+                pts, nrm = [pts[0], pts[3], pts[2], pts[1]], [nrm[0], nrm[3], nrm[2], nrm[1]]
+            self.quad(pts, nrm, side)
+        self.disc_z(cx, cy, z1, r, front, 1.0, n)
 
     def box(self, x0, x1, y0, y1, z0, z1, colour):
         c = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
@@ -182,6 +224,38 @@ def paint(top, side, k):
     if glazed:
         return GLASS
     return GREEN if k == 7 else RED
+
+
+SHUT_WIDTH = 0.02
+SHUT_LIFT = 0.005     # how far a shut line stands proud of the flank
+
+
+def shut_across(m, z, k0, k1):
+    """A shut line across the flank at `z`, along the section from ring point k0 up to k1, both sides."""
+    pts = half_ring_at(z)
+    for sign in (-1.0, 1.0):
+        for k in range(k0, k1):
+            (x0, y0), (x1, y1) = pts[k], pts[k + 1]
+            length = math.hypot(x1 - x0, y1 - y0)
+            nx, ny = (y1 - y0) / length, -(x1 - x0) / length      # out of the body, in the section's plane
+            a = (sign * (x0 + nx * SHUT_LIFT), y0 + ny * SHUT_LIFT - WHEEL_R)
+            b = (sign * (x1 + nx * SHUT_LIFT), y1 + ny * SHUT_LIFT - WHEEL_R)
+            h = SHUT_WIDTH / 2
+            m.flat_quad([(a[0], a[1], z + h), (b[0], b[1], z + h), (b[0], b[1], z - h), (a[0], a[1], z - h)],
+                        SHUT_LINE, (sign * nx, ny, 0.0))
+
+
+def shut_along(m, k, z_from, z_to):
+    """A shut line along the flank at ring point k, from z_from back to z_to, both sides: it follows
+    the body, so it is cut at every section it crosses."""
+    zs = [z_from] + [st[0] for st in STATIONS if z_to < st[0] < z_from] + [z_to]
+    h = SHUT_WIDTH / 2
+    for sign in (-1.0, 1.0):
+        for za, zb in zip(zs, zs[1:]):
+            (xa, ya), (xb, yb) = half_ring_at(za)[k], half_ring_at(zb)[k]
+            m.flat_quad([(sign * (xa + SHUT_LIFT), ya - WHEEL_R - h, za), (sign * (xa + SHUT_LIFT), ya - WHEEL_R + h, za),
+                         (sign * (xb + SHUT_LIFT), yb - WHEEL_R + h, zb), (sign * (xb + SHUT_LIFT), yb - WHEEL_R - h, zb)],
+                        SHUT_LINE, (sign, 0.0, 0.0))
 
 
 def build():
@@ -243,15 +317,31 @@ def build():
             tri = [base + a, base + b, base + RING]
             normal = cross(sub(m.pos[tri[1]], m.pos[tri[0]]), sub(m.pos[tri[2]], m.pos[tri[0]]))
             m.idx += tri if normal[2] * sign > 0 else [tri[0], tri[2], tri[1]]
-    nose_z = STATIONS[0][0] + 0.004
+    # Four round headlamps standing out of the nose: two large ones inside, two smaller outside, each
+    # in a black bezel a little wider than the glass.
+    nose = STATIONS[0]
+    lamp_y = (nose[1] + nose[4]) / 2 - WHEEL_R
+    for sign in (-1.0, 1.0):
+        for x, r in ((0.17, 0.085), (0.40, 0.07)):
+            m.cylinder_z(sign * x, lamp_y, nose[0], nose[0] + 0.025, r * 1.20, BLACK, BLACK)
+            m.cylinder_z(sign * x, lamp_y, nose[0], nose[0] + 0.045, r, BLACK, LAMP)
+
     tail_z = STATIONS[-1][0] - 0.004
     for x in (-0.34, 0.34):
-        y0 = STATIONS[0][1] - WHEEL_R + 0.07
-        m.flat_quad([(x - 0.11, y0, nose_z), (x + 0.11, y0, nose_z), (x + 0.11, y0 + 0.12, nose_z),
-                     (x - 0.11, y0 + 0.12, nose_z)], LAMP, (0, 0, 1))
         y1 = STATIONS[-1][1] - WHEEL_R + 0.10
         m.flat_quad([(x - 0.18, y1, tail_z), (x + 0.18, y1, tail_z), (x + 0.18, y1 + 0.10, tail_z),
                      (x - 0.18, y1 + 0.10, tail_z)], TAIL_LAMP, (0, 0, -1))
+
+    # The doors: a shut line up the front edge and another up the back edge, from the top of the sill
+    # stripes to the foot of the glass, joined by one along the bottom, and a handle at the rear.
+    door_front, door_rear = 0.50, -0.55
+    for z in (door_front, door_rear):
+        shut_across(m, z, 3, 5)
+    shut_along(m, 3, door_front, door_rear)
+    for sign in (-1.0, 1.0):
+        ws, hs = half_ring_at(-0.44)[4]
+        x0, x1 = sorted((sign * (ws - 0.01), sign * (ws + 0.035)))
+        m.box(x0, x1, hs - WHEEL_R - 0.12, hs - WHEEL_R - 0.08, -0.50, -0.38, BLACK)
 
     # The wing on the tail, with its end plates, and a mirror on each side.
     top = STATIONS[-1][4] - WHEEL_R
