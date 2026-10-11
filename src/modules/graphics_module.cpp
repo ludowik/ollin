@@ -1135,7 +1135,10 @@ static void flush_pending_capture() {
     if (!s_capture_pending)
         return;
     s_capture_pending = false;
-    Image img = LoadImageFromScreen();   // the batch was already flushed by the caller, see below
+    // Read at the PHYSICAL size of the canvas: LoadImageFromScreen uses raylib's render size, which is
+    // the logical one, so on a dense screen (devicePixelRatio 2 or 3) it returned only the bottom-left
+    // 1/4 or 1/9 of the picture. The batch was already flushed by the caller, see below.
+    Image img = {rlReadScreenPixels(s_physW, s_physH), s_physW, s_physH, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
     int size = 0;
     unsigned char* png = ExportImageToMemory(img, ".png", &size);
     if (png != nullptr && size > 0)
