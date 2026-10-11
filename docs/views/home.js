@@ -83,10 +83,12 @@ export async function init(ctx) {
   const reloadBtn = ctx.root.querySelector('#hard-reload-btn')
   if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)   // before any await: it must work while the tiles load
 
-  const [Store, Samples] = await Promise.all([
-    import('../lib/pg-store.js?v=' + ctx.v),
+  // The projects come through the provider, as in the playground: the views know no concrete store.
+  const [Prov, Samples] = await Promise.all([
+    import('../lib/pg-provider.js?v=' + ctx.v),
     import('../lib/pg-samples.js?v=' + ctx.v),
   ])
+  const Store = await Prov.getProvider(ctx.v)
   const page = ctx.root.querySelector('#home-sections')
 
   // Projects first: the playground's own store, most recent first.

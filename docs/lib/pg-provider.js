@@ -12,12 +12,13 @@
 // (an intended identity, so the migration did not rewrite the call sites). A provider MUST
 // expose:
 //   async init()
-//   async listProjects()                       → [{id,name,entry,updatedAt,fileCount}]
+//   async listProjects()                       → [{id,name,entry,updatedAt,fileCount,remote,thumbnail}]
 //   async getProject(id)                        → the complete project, or null
 //   async createProject(name)                   → a project
 //   async saveProject(project)                  → a project (upsert)
 //   async renameProject(id, name)               → a project, or null
 //   async deleteProject(id)
+//   async setThumbnail(id, url)                 (the tile's picture alone: not updatedAt, not the manifest)
 //   getActiveId() / setActiveId(id)             (the active project's id, synchronous)
 //   slugify(name)                               → slug
 //   MANIFEST : string   TRANSIENT_ID : string   (constants)

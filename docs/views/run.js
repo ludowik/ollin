@@ -186,7 +186,8 @@ export async function init(ctx) {
       name = 'capture-' + stamp() + '-' + n + '.png'
     project.resources[name] = { b64, ext: 'png' }
     // A capture the user asked for REPLACES the picture the project's tile shows, flat or not.
-    project.thumbnail = await Thumb.thumbnailFromPng(b64)
+    // A picture that cannot be turned into a thumbnail must not lose the capture: the old tile stays.
+    try { project.thumbnail = await Thumb.thumbnailFromPng(b64) } catch (_) {}
     await Store.saveProject(project)
     // Immediately usable by the program (image.load(name)), like an image added from the
     // editor.
