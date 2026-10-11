@@ -54,11 +54,40 @@ function label(tile, name) {
   tile.appendChild(text)
 }
 
-function section(title) {
+// The titles of the sections the user folded, kept so that coming back to this screen finds it as it was left.
+const FOLDED_KEY = 'ollin-home-folded'
+function loadFolded() {
+  try { return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) || '[]')) } catch (_) { return new Set() }
+}
+function saveFolded(folded) {
+  try { localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded])) } catch (_) {}
+}
+
+const CHEVRON = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6l4.5 4.5L12.5 6"/></svg>'
+
+// A section: a heading that folds and unfolds everything under it (the tiles, or the line that says there are none).
+function section(title, folded) {
   const sec = document.createElement('section')
   sec.className = 'home-section'
   const h = document.createElement('h2')
-  h.textContent = title
+  const head = document.createElement('button')
+  head.type = 'button'
+  head.className = 'section-head'
+  head.innerHTML = CHEVRON
+  head.append(title)
+  const apply = () => {
+    const isFolded = folded.has(title)
+    sec.classList.toggle('folded', isFolded)
+    head.setAttribute('aria-expanded', String(!isFolded))
+  }
+  head.addEventListener('click', () => {
+    if (!folded.delete(title)) folded.add(title)
+    saveFolded(folded)
+    apply()
+  })
+  apply()
+  h.appendChild(head)
   const tiles = document.createElement('div')
   tiles.className = 'tiles'
   sec.append(h, tiles)
@@ -78,7 +107,8 @@ export async function init(ctx) {
   const catalogue = Samples.fetchCatalog()
   await Store.init()
   const projects = await Store.listProjects()
-  const mine = section('My projects')
+  const folded = loadFolded()
+  const mine = section('My projects', folded)
   for (const p of projects) {
     const tile = document.createElement('button')
     tile.className = 'tile'
@@ -101,7 +131,7 @@ export async function init(ctx) {
 
   // Then the examples, grouped as the catalogue groups them.
   for (const [name, entries] of Samples.groupCatalog(await catalogue)) {
-    const group = section(name)
+    const group = section(name, folded)
     for (const entry of entries) {
       const tile = document.createElement('a')
       tile.className = 'tile'

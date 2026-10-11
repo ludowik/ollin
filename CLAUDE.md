@@ -232,6 +232,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   vue par défaut que pour un premier lancement ou une adresse inconnue — le logo « Ollin » de chaque vue y ramène
   (le tutoriel n'a plus de bouton « Home » : l'utilisateur l'a fait retirer). Le catalogue se lit par `lib/pg-samples.js`, partagé avec
   le menu « Open an example » du playground.
+  **Chaque section se plie et se déplie** par son en-tête (décision de l'utilisateur, parmi trois pistes dont les
+  « dossiers » à la Codea, écartés) ; les sections repliées sont retenues dans `localStorage`
+  (`ollin-home-folded`, par TITRE), de sorte que l'écran se retrouve comme on l'a laissé.
   ⚠ `home.js` appelle `Store.init()`, donc **un navigateur vierge y voit un projet « Untitled »** : c'est
   la migration du magasin, la même qu'à l'ouverture du playground, pas un défaut de la vue.
   **Les icônes** : le champ facultatif `icon` d'une entrée de `samples/index.json` nomme un PNG de
