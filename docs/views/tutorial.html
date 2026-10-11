@@ -372,7 +372,7 @@ pre:hover .code-actions,
 </style>
 
 <!-- The menu bar — the same position and style as the playground's and the full-screen
-     mode's. One button for now: the way to the playground. -->
+     mode's: the way back to the home screen, the engine's report and the playground. -->
 <div id="tuto-bar" class="app-bar">
   <span class="bar-logo">Ollin</span>
   <button class="hamburger bar-btn icon-only" id="ham" aria-label="Menu">
@@ -383,6 +383,10 @@ pre:hover .code-actions,
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="bar-label">Reload</span>
   </button>
+  <a class="bar-btn" href="#/home" title="Back to the home screen">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5L8 2.5l6 5"/><path d="M3.8 6.8V13h8.4V6.8"/></svg>
+    <span class="bar-label">Home</span>
+  </a>
   <a class="bar-btn" href="#/perf" title="The engine's measured drift in work">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V3"/><path d="M2 13h12"/><path d="M4 10l3-4 3 3 3-5"/></svg>
     <span class="bar-label">Engine</span>
