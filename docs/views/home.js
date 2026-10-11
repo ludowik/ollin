@@ -33,17 +33,16 @@ function generatedIcon(name) {
   return icon
 }
 
-// An example's icon is its captured picture when the catalogue names one, the generated tile otherwise
-// — also when the picture cannot be fetched, so a missing file is a tile and not a broken image.
-function exampleIcon(entry) {
-  if (!entry.icon) return generatedIcon(entry.name)
+// A tile's picture: an <img> in the icon box. When it cannot be fetched the generated tile takes its place,
+// so a missing file is a tile and not a broken image.
+function imageIcon(src, name) {
   const icon = document.createElement('span')
   icon.className = 'icon'
   const img = document.createElement('img')
   img.alt = ''
   img.loading = 'lazy'
-  img.src = 'samples/' + entry.icon
-  img.addEventListener('error', () => icon.replaceWith(generatedIcon(entry.name)), { once: true })
+  img.src = src
+  img.addEventListener('error', () => icon.replaceWith(generatedIcon(name)), { once: true })
   icon.appendChild(img)
   return icon
 }
@@ -66,23 +65,7 @@ function section(title) {
   return { sec, tiles }
 }
 
-// A project's icon is the thumbnail of its record when it has one (lib/pg-thumb.js), the generated tile
-// otherwise.
-function projectIcon(project) {
-  if (!project.thumbnail) return generatedIcon(project.name)
-  const icon = document.createElement('span')
-  icon.className = 'icon'
-  const img = document.createElement('img')
-  img.alt = ''
-  img.src = project.thumbnail
-  icon.appendChild(img)
-  return icon
-}
-
 export async function init(ctx) {
-  const reloadBtn = ctx.root.querySelector('#hard-reload-btn')
-  if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)   // before any await: it must work while the tiles load
-
   // The projects come through the provider, as in the playground: the views know no concrete store.
   const [Prov, Samples] = await Promise.all([
     import('../lib/pg-provider.js?v=' + ctx.v),
@@ -91,7 +74,8 @@ export async function init(ctx) {
   const Store = await Prov.getProvider(ctx.v)
   const page = ctx.root.querySelector('#home-sections')
 
-  // Projects first: the playground's own store, most recent first.
+  // Projects first: the playground's own store, most recent first. The catalogue is fetched meanwhile.
+  const catalogue = Samples.fetchCatalog()
   await Store.init()
   const projects = await Store.listProjects()
   const mine = section('My projects')
@@ -99,7 +83,7 @@ export async function init(ctx) {
     const tile = document.createElement('button')
     tile.className = 'tile'
     tile.type = 'button'
-    tile.append(projectIcon(p))
+    tile.append(p.thumbnail ? imageIcon(p.thumbnail, p.name) : generatedIcon(p.name))
     label(tile, p.name)
     tile.addEventListener('click', () => {
       Store.setActiveId(p.id)
@@ -116,13 +100,13 @@ export async function init(ctx) {
   page.appendChild(mine.sec)
 
   // Then the examples, grouped as the catalogue groups them.
-  for (const [name, entries] of Samples.groupCatalog(await Samples.fetchCatalog())) {
+  for (const [name, entries] of Samples.groupCatalog(await catalogue)) {
     const group = section(name)
     for (const entry of entries) {
       const tile = document.createElement('a')
       tile.className = 'tile'
       tile.href = '#/playground/sample/' + entry.file
-      tile.append(exampleIcon(entry))
+      tile.append(entry.icon ? imageIcon('samples/' + entry.icon, entry.name) : generatedIcon(entry.name))
       label(tile, entry.name)
       group.tiles.appendChild(tile)
     }

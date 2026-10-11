@@ -27,8 +27,10 @@ const Store = await Prov.getProvider(ctx.v)
 const GH    = await Prov.getRemote(ctx.v)
 const Run   = await import('../lib/pg-run.js?v=' + ctx.v)   // execution shared with run.html
 const Fmt   = await import('../lib/pg-format.js?v=' + ctx.v)   // the on-demand formatter
-const Samples = await import('../lib/pg-samples.js?v=' + ctx.v)   // the catalogue of examples
-const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
+const [Samples, Thumb] = await Promise.all([
+  import('../lib/pg-samples.js?v=' + ctx.v),   // the catalogue of examples
+  import('../lib/pg-thumb.js?v=' + ctx.v),     // the picture of a project's tile
+])
 const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 const { createRemoteSync } = await import('../lib/pg-sync.js?v=' + ctx.v)
 
@@ -2182,26 +2184,15 @@ async function launch() {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
       setRunning(true)   // the __ollinGfxKbdArmed flag is set by runProgram (pg-run.js)
-      // A project with no thumbnail gets one a few seconds into the run. The object is set too, not only
-      // the record: the editor saves THIS object whole, and a save without the field would erase it.
-      if (currentProject && !isExample() && !currentProject.thumbnail) {
-        const proj = currentProject
-        cancelThumb = Thumb.scheduleAutoThumbnail({
-          mod: ollin,
-          isCurrent: () => isRunning && currentProject === proj,
-          hasThumbnail: () => !!proj.thumbnail,
-          save: async (url) => {
-            proj.thumbnail = url
-            try {
-              await Store.setThumbnail(proj.id, url)
-            } catch (e) {
-              delete proj.thumbnail   // so a later attempt can try again
-              throw e
-            }
-          },
-          report: (text, ok) => Thumb.showNotice(text, ok),
-        })
-      }
+      // A project with no thumbnail gets one a few seconds into the run (never an example).
+      const proj = currentProject
+      cancelThumb = Thumb.scheduleAutoThumbnail({
+        mod: ollin,
+        store: Store,
+        project: isExample() ? null : proj,
+        isCurrent: () => isRunning && currentProject === proj,
+        report: Thumb.showNotice,
+      })
     },
     onOutput:  (out) => showOutput(out),
   })

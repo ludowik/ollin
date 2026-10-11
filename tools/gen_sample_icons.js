@@ -142,15 +142,15 @@ async function main() {
   const toolCtx = await browser.newContext()
   const tool = await toolCtx.newPage()
   let text = fs.readFileSync(CATALOGUE, 'utf8')
-  const done = []
-  const skipped = []
+  let written = 0
+  let skipped = 0
   for (const e of entries) {
     const name = path.basename(e.file, '.ol')
     process.stdout.write(e.file.padEnd(36))
     const r = NO_ICON[e.file] ? { skip: NO_ICON[e.file] } : await capture(browser, base, tool, e.file)
     if (r.skip) {
       console.log('no icon — ' + r.skip)
-      skipped.push(e.file)
+      skipped++
       fs.rmSync(path.join(ICONS, name + '.png'), { force: true })
       text = setIconField(text, e.file, null)
       continue
@@ -158,12 +158,12 @@ async function main() {
     fs.writeFileSync(path.join(ICONS, name + '.png'), Buffer.from(r.url.split(',')[1], 'base64'))
     text = setIconField(text, e.file, 'icons/' + name + '.png')
     console.log('icons/' + name + '.png')
-    done.push(e.file)
+    written++
   }
   fs.writeFileSync(CATALOGUE, text)
   await browser.close()
   server.close()
-  console.log('\n' + done.length + ' icons written, ' + skipped.length + ' without one')
+  console.log('\n' + written + ' icons written, ' + skipped + ' without one')
 }
 
 main().catch((e) => {

@@ -187,6 +187,11 @@ async function mount(view, anchor) {
       return
     }
     viewEl.innerHTML = html
+    // The bar's "Reload" button, wherever a view has one under this id: wired here, once, not by each view.
+    const hardReloadBtn = viewEl.querySelector('#hard-reload-btn')
+    if (hardReloadBtn) {
+      hardReloadBtn.addEventListener('click', hardReload)
+    }
 
     const mod = await import(route.js + '?v=' + V)
     if (stale()) {

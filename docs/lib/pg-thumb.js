@@ -85,47 +85,56 @@ export async function thumbnailFromPng(b64) {
 }
 
 // Asks the engine for a capture and turns it into a thumbnail: {url}, or {url: null, reason} when nothing came.
-export async function captureThumbnail(mod) {
+async function captureThumbnail(mod) {
   if (!mod || !mod.requestCapture) return { url: null, reason: 'the engine cannot capture' }
-  mod.requestCapture()
-  const b64 = await waitCapture(mod)
-  if (!b64) return { url: null, reason: 'no picture came from the engine' }
-  return { url: await thumbnailFromPng(b64) }
+  try {
+    mod.requestCapture()
+    const b64 = await waitCapture(mod)
+    if (!b64) return { url: null, reason: 'no picture came from the engine' }
+    return { url: await thumbnailFromPng(b64) }
+  } catch (e) {
+    return { url: null, reason: 'capture failed: ' + (e && e.message ? e.message : e) }
+  }
 }
 
-// Takes the thumbnail by itself a few seconds into a run, when the project has none, whatever the picture shows.
-// An attempt gives up quietly if the run is over (`isCurrent` false) or the project has meanwhile got a
-// thumbnail; one that got no picture is tried once more. `save(url)` stores the result. `report(text, ok)` is told
-// what became of the attempt, so that a failure can be read rather than guessed at. Returns what cancels it.
-export function scheduleAutoThumbnail({ mod, isCurrent, hasThumbnail, save, report = () => {} }) {
+// Takes the thumbnail of `project` by itself a few seconds into a run, when it has none (no project, or one
+// that already has a thumbnail, is left alone), whatever the picture shows. An attempt gives up quietly if the
+// run is over (`isCurrent` false) or the project has meanwhile got a thumbnail; one that got no picture is tried
+// once more. The object is set as well as the record — the editor saves THIS object whole, and a save without
+// the field would erase it — and put back if the store refuses. `report(text, ok)` is told what became of the
+// attempt, so that a failure can be read rather than guessed at. Returns what cancels it.
+export function scheduleAutoThumbnail({ mod, store, project, isCurrent, report }) {
+  if (!project || project.thumbnail) return () => {}
   let cancelled = false
   let timer = 0
-  const attempt = async (i) => {
-    if (cancelled || !isCurrent() || hasThumbnail()) return
-    report('taking the thumbnail…', true)
-    let made
-    try {
-      made = await captureThumbnail(mod)
-    } catch (e) {
-      made = { url: null, reason: 'capture failed: ' + (e && e.message ? e.message : e) }
-    }
-    if (cancelled || !isCurrent() || hasThumbnail()) return
-    if (made.url) {
-      try {
-        await save(made.url)
-        report('thumbnail saved', true)
-      } catch (e) {
-        report('thumbnail not saved: ' + (e && e.message ? e.message : e), false)
+  const wait = (ms) => new Promise((resolve) => { timer = setTimeout(resolve, ms) })
+  const alive = () => !cancelled && isCurrent() && !project.thumbnail
+  const run = async () => {
+    let waited = 0
+    let reason = ''
+    for (const at of AUTO_DELAYS) {
+      await wait(at - waited)
+      waited = at
+      if (!alive()) return
+      report('taking the thumbnail…', true)
+      const made = await captureThumbnail(mod)
+      if (!alive()) return
+      if (made.url) {
+        project.thumbnail = made.url
+        try {
+          await store.setThumbnail(project.id, made.url)
+          report('thumbnail saved', true)
+        } catch (e) {
+          delete project.thumbnail
+          report('thumbnail not saved: ' + (e && e.message ? e.message : e), false)
+        }
+        return
       }
-      return
+      reason = made.reason
     }
-    if (i + 1 < AUTO_DELAYS.length) {
-      timer = setTimeout(() => attempt(i + 1), AUTO_DELAYS[i + 1] - AUTO_DELAYS[i])
-      return
-    }
-    report('no thumbnail: ' + made.reason, false)
+    report('no thumbnail: ' + reason, false)
   }
-  timer = setTimeout(() => attempt(0), AUTO_DELAYS[0])
+  run()
   return () => {
     cancelled = true
     clearTimeout(timer)

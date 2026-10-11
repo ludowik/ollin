@@ -188,10 +188,6 @@ export async function init(ctx) {
     removeEventListener('touchcancel', release)
   })
 
-  // The "Reload" button (cache cleared).
-  const reloadBtn = root.querySelector('#hard-reload-btn')
-  if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)
-
   // Replaces the <pre><code> blocks with read-only CM6 editors.
   const canvas = document.getElementById('canvas')   // the SHARED canvas, owned by the shell
   root.querySelectorAll('section pre').forEach(pre => {

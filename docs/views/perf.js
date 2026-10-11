@@ -13,10 +13,6 @@
 // be "visible" but unreadable.
 
 export async function init(ctx) {
-  const reloadBtn = ctx.root.querySelector("#hard-reload-btn");
-  if (reloadBtn)
-    reloadBtn.addEventListener("click", ctx.hardReload);
-
   const NBSP = " ";
   const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
   const pct = v => (Math.abs(v) < 0.05 ? "" : v > 0 ? "+" : "−") + Math.abs(v).toFixed(1) + " %";

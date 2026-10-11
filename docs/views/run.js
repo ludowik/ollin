@@ -45,22 +45,12 @@ export async function init(ctx) {
   let cancelThumb = null
   function scheduleThumbnail() {
     if (cancelThumb) cancelThumb()
-    cancelThumb = null
-    if (!project || exampleFile || project.thumbnail) return
     cancelThumb = Thumb.scheduleAutoThumbnail({
       mod,
+      store: Store,
+      project: exampleFile ? null : project,
       isCurrent: () => !capturing,
-      hasThumbnail: () => !!project.thumbnail,
-      save: async (url) => {
-        project.thumbnail = url
-        try {
-          await Store.setThumbnail(project.id, url)
-        } catch (e) {
-          delete project.thumbnail   // so a later attempt can try again
-          throw e
-        }
-      },
-      report: (text, ok) => Thumb.showNotice(text, ok),
+      report: Thumb.showNotice,
     })
   }
 
