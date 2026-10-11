@@ -75,6 +75,33 @@ for i, e in enumerate(entries):
         if f in LIBS:
             errs.append(f"{f}: a library must not be offered as a sample")
 
+# The ICONS the home screen shows. An entry may name one (tools/gen_sample_icons.js writes them); a
+# name with no file would show a generated tile in its place, so it fails nowhere and nobody sees it,
+# and a picture no entry names is dead weight shipped to every visitor. Only existence and weight are
+# checked: whether a picture still matches its example is for the generator to renew.
+ICON_MAX = 200 * 1024
+named = set()
+for e in entries:
+    icon = e.get("icon")
+    if icon is None:
+        continue
+    f = e.get("file")
+    if not (isinstance(icon, str) and icon.startswith("icons/") and icon.endswith(".png")):
+        errs.append(f"{f}: 'icon' must be a path under icons/ ending in .png")
+        continue
+    named.add(icon)
+    path = os.path.join("docs/samples", icon)
+    if not os.path.isfile(path):
+        errs.append(f"{f}: icon {icon} does not exist")
+    elif os.path.getsize(path) > ICON_MAX:
+        errs.append(f"{icon}: {os.path.getsize(path) // 1024} KB, more than the {ICON_MAX // 1024} KB an icon may weigh")
+    elif open(path, "rb").read(8) != b"\x89PNG\r\n\x1a\n":
+        errs.append(f"{icon}: not a PNG")
+for p in sorted(glob.glob("docs/samples/icons/*")):
+    rel = os.path.relpath(p, "docs/samples").replace(os.sep, "/")
+    if rel not in named:
+        errs.append(f"{rel}: in docs/samples/icons/ but named by no entry of index.json")
+
 for f in listed:
     if listed.count(f) > 1:
         errs.append(f"{f}: listed more than once")
@@ -103,5 +130,5 @@ if errs:
     print(f"FAIL  {len(errs)} problem(s) in the sample catalogue")
     sys.exit(1)
 groups = len(dict.fromkeys(e["group"] for e in entries))
-print(f"OK   sample catalogue ({len(entries)} samples in {groups} groups, {len(LIBS)} libraries)")
+print(f"OK   sample catalogue ({len(entries)} samples in {groups} groups, {len(LIBS)} libraries, {len(named)} icons)")
 PYEOF
