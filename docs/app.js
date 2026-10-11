@@ -86,7 +86,12 @@ function getOllin() {
         canvas: document.getElementById('canvas'),
         print: () => {},
         printErr: () => {},
-      })).then(resolve).catch(reject)
+      })).then((module) => {
+        // A handle for the console and for tools (tools/gen_sample_icons.js hides the readout through it),
+        // as window.__ollinView is one for the editor.
+        window.__ollinModule = module
+        resolve(module)
+      }).catch(reject)
     }
     s.onerror = () => reject(new Error('WASM not found'))
     document.head.appendChild(s)

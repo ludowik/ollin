@@ -50,6 +50,10 @@ std::string gfx_take_capture();
 // when the window comes back.
 void gfx_clock_break();
 
+// The HOST's switch for the memory and frame-rate readout (graphics.stats is the program's own). It is
+// not reset when a program starts: the readout is drawn only while both are on.
+void gfx_set_stats_visible(bool visible);
+
 // A new program starts: its graphics.fitArea setting goes back to off and the orientation lock the previous
 // program asked for is released.
 void gfx_program_reset();

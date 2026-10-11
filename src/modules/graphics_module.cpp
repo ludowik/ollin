@@ -82,6 +82,12 @@ static int s_fxaa_loc_span = -1;
 // a preference of the RUNNING PROGRAM, not of the host, like the 3D lighting state.
 static bool s_fxaa_enabled = true;
 static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's spanMax
+// Whether the readout is drawn takes TWO switches, and both must be on: the program's (graphics.stats)
+// and the host's (gfx_set_stats_visible). They are separate because they are reset at different
+// moments — the program's goes back on at every program start, whereas the host's must survive it, or
+// a host that hid the readout before launching a program would find it back on.
+static bool s_stats_program = true;
+static bool s_stats_host = true;
 static void upload_fxaa_texel() {
     float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
     SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
@@ -393,6 +399,7 @@ static int gfx_canvas(CallCtx& ctx) {
     reset3d_lighting_state();
     s_fxaa_enabled = true;   // graphics.antialias: a setting of THIS program, not of the host
     s_fxaa_span = 8.0f;
+    s_stats_program = true;  // graphics.stats likewise; the HOST's switch (s_stats_host) is left alone
     s_run_active = false;   // a new program, hence ONE graphics.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
@@ -1570,12 +1577,26 @@ static void check_window_activity() {
 static const int OVERLAY_SIZE = 16;
 static const int OVERLAY_MARGIN = 8;
 
+void gfx_set_stats_visible(bool visible) {
+    s_stats_host = visible;
+}
+
+// graphics.stats([enabled]): shows or hides the memory and frame-rate readout. With no argument it
+// shows it, as graphics.antialias turns smoothing back on. Pure state, like antialias: no window needed.
+static int gfx_stats(CallCtx& ctx) {
+    s_stats_program = (ctx.argc > 0) ? !is_falsy(ctx.args[0]) : true;
+    return ctx.ret(Value{});
+}
+
 static void draw_fps_overlay() {
-    // FPS computed from OUR delta, which is reliable, and smoothed to avoid flicker.
+    // FPS computed from OUR delta, which is reliable, and smoothed to avoid flicker. Kept up to date
+    // even while the readout is hidden, so it does not start from a stale value when it comes back.
     if (s_frame_dt > 0.0) {
         double inst = 1.0 / s_frame_dt;
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
     }
+    if (!s_stats_program || !s_stats_host)
+        return;
     int fps = (int)(s_fps_ema + 0.5);
     // Memory used, next to the FPS: KB below 1 MB, MB above.
     double kb = ollin_heap_bytes() / 1024.0;
@@ -2022,6 +2043,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("clear")), Value::make_builtin(with_area<gfx_clear>));
     m.map_set(Value(std::string("blendMode")), Value::make_builtin(with_area<gfx_blend_mode>));
     m.map_set(Value(std::string("antialias")), Value::make_builtin(gfx_antialias));
+    m.map_set(Value(std::string("stats")), Value::make_builtin(gfx_stats));
     m.map_set(Value(std::string("fitArea")), Value::make_builtin(gfx_fit_area));
     m.map_set(Value(std::string("strokeSize")), Value::make_builtin(gfx_stroke_size));
     m.map_set(Value(std::string("segments")), Value::make_builtin(gfx_segments));

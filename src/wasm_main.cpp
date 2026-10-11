@@ -112,6 +112,12 @@ static void clock_break_js() {
     gfx_clock_break();
 }
 
+// The host hides or shows the memory and frame-rate readout (the icon generator hides it before it
+// takes a picture). Independent of the program's own graphics.stats.
+static void set_stats_visible_js(bool visible) {
+    gfx_set_stats_visible(visible);
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);  // execute(source, filename)
     emscripten::function("preloadImage", &preload_image_js);
@@ -122,4 +128,5 @@ EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("requestCapture", &request_capture_js);
     emscripten::function("takeCapture", &take_capture_js);
     emscripten::function("clockBreak", &clock_break_js);
+    emscripten::function("setStatsVisible", &set_stats_visible_js);
 }

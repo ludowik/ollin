@@ -241,9 +241,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   lançant chaque exemple dans la vue `run` sous Chromium : `NODE_PATH=$(npm root -g) node
   tools/gen_sample_icons.js [fichier.ol …]`. ⚠ **Rien ne détecte qu'une vignette a vieilli** : le
   garde-fou (`check_samples.sh`) ne vérifie que l'existence, le format PNG et le poids (≤ 200 Ko) d'une
-  icône citée, et l'absence de PNG orphelin. Le script rogne la bande du bas de la capture, où le moteur
-  affiche son compteur d'images par seconde, et écarte les exemples sans canvas, en erreur ou à image
-  plate ; `NO_ICON` y liste ceux qui dessinent mais dont l'image ne sert à rien (la webcam).
+  icône citée, et l'absence de PNG orphelin. Le script coupe le compteur mémoire / images par seconde par le réglage de
+  l'hôte (`window.__ollinModule.setStatsVisible(false)`) — décision de l'utilisateur : ne pas rogner la
+  capture pour l'écarter — et écarte les exemples sans canvas, en erreur ou à image plate ; `NO_ICON` y liste ceux qui dessinent mais dont l'image ne sert à rien (la webcam).
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
@@ -1448,6 +1448,18 @@ mouvement : sensible à la position sous-pixel du trait, donc visible même sur 
 lente, et absent sur les appareils où le rapport valait déjà 1. Retirer le plancher (toujours
 `s_targetW = s_physW`) généralise à tous les écrans ce que l'iPhone montrait déjà sans lissage
 superflu, au prix de bords un peu moins lissés sur un écran à faible densité.
+
+## Compteur mémoire / images par seconde (`graphics.stats`)
+
+Le moteur dessine en bas à droite un relevé de la mémoire et du débit d'images (`draw_fps_overlay`). Il
+s'affiche seulement quand **deux interrupteurs indépendants** sont allumés : celui du PROGRAMME
+(`graphics.stats([enabled])`, sans argument il l'allume, comme `graphics.antialias`) et celui de l'HÔTE
+(`Module.setStatsVisible(bool)`, lié dans `wasm_main.cpp`). Deux, parce qu'ils ne se remettent pas à zéro au
+même moment : celui du programme revient à « allumé » à chaque démarrage de programme
+(`gfx_program_reset`), celui de l'hôte **survit** au démarrage — avec un seul interrupteur, un hôte qui
+cache le relevé avant de lancer un exemple le retrouverait allumé. L'hôte joint le module par
+`window.__ollinModule`, posé par `app.js` à la résolution du module. Vérifié au navigateur dans les deux
+sens, et après un relancement. Non couvert par `tests/run.sh` (`graphics` y est nil).
 
 ## Globales moteur (engine-injected globals)
 

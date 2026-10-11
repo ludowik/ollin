@@ -30,7 +30,6 @@ const SETTLE_LONG = {                  // the heavier ones bake a world or load 
   'transforms_3d/transforms_3d.ol': 7000,
   'primitives_3d/primitives_3d.ol': 7000,
 }
-const TRIM = 28                        // the engine's frame-rate readout sits along the canvas's bottom edge
 // Examples whose picture is no use as an icon, though they draw: the generated tile reads better.
 const NO_ICON = {
   'camera.ol': 'needs a camera; its picture is a waiting message',
@@ -58,19 +57,19 @@ function serve() {
   })
 }
 
-// Crops a picture to a square — centred across, from the top down, the bottom strip left out — and scales it, in a page of its own so the example's page is not
+// Centre-crops a picture to a square and scales it, in a page of its own so the example's page is not
 // disturbed. Returns the PNG as a data URL and how much the picture's brightness varies.
 async function toIcon(tool, pngBase64) {
-  return tool.evaluate(async ([b64, size, trim]) => {
+  return tool.evaluate(async ([b64, size]) => {
     const img = new Image()
     img.src = 'data:image/png;base64,' + b64
     await img.decode()
-    const side = Math.min(img.width, img.height - trim)
+    const side = Math.min(img.width, img.height)
     const c = document.createElement('canvas')
     c.width = size
     c.height = size
     const g = c.getContext('2d')
-    g.drawImage(img, (img.width - side) / 2, 0, side, side, 0, 0, size, size)
+    g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
     const px = g.getImageData(0, 0, size, size).data
     let sum = 0
     let sum2 = 0
@@ -82,7 +81,7 @@ async function toIcon(tool, pngBase64) {
     }
     const mean = sum / n
     return { url: c.toDataURL('image/png'), spread: Math.sqrt(Math.max(sum2 / n - mean * mean, 0)) }
-  }, [pngBase64, SIZE, TRIM])
+  }, [pngBase64, SIZE])
 }
 
 async function capture(browser, base, tool, file) {
@@ -94,6 +93,10 @@ async function capture(browser, base, tool, file) {
       Object.defineProperty(window, '__ollinFrameError', { set() {}, get() { return (m) => window.__errs.push(m) } })
     })
     await page.goto(base + '/index.html#/run/sample/' + file)
+    // The engine's memory and frame-rate readout is hidden through the host's own switch, so the picture
+    // is the example's alone and nothing has to be cropped away.
+    await page.waitForFunction(() => window.__ollinModule, null, { timeout: 20000 })
+    await page.evaluate(() => window.__ollinModule.setStatsVisible(false))
     try {
       await page.waitForFunction(() => {
         const c = document.getElementById('canvas')
