@@ -96,6 +96,7 @@ end
 ## box is listed once. Gives the cells to clear and how many zones they come from.
 func boardFull(g)
     var mark = boardNew()
+    var cleared = []
     var zones = 0
     for z in boardZones do
         var full = true
@@ -107,14 +108,11 @@ func boardFull(g)
         if full then
             zones += 1
             for i in z do
-                mark[i] = 1
+                if mark[i] == 0 then
+                    mark[i] = 1
+                    cleared.push(i)
+                end
             end
-        end
-    end
-    var cleared = []
-    for i = 1, CELLS do
-        if mark[i] == 1 then
-            cleared.push(i)
         end
     end
     return cleared, zones

@@ -41,24 +41,27 @@ global heldSlot = nil
 global dragId = nil
 global target = {r: 0, c: 0, valid: false, near: false}
 global previewCells = []
-global previewKey = 0
 global clearSet = []
-global clearTimer = 0
+global clearPending = 0   ## cells of the wave still shrinking; the last one ends the turn
 global L = {sx: [0, 0, 0], sy: [0, 0, 0]}
+global layoutW = 0
+global layoutH = 0
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
 
 ## The board and its trays in a column when the area is tall, side by side when it is wide: whichever
-## gives the larger cell.
+## gives the larger cell. It depends on W and H alone, so it is recomputed only when they change.
 func layoutCompute()
+    if W == layoutW and H == layoutH then
+        return
+    end
+    layoutW = W
+    layoutH = H
     var m = SIZE * 0.04
     var cp = math.min((W - 2 * m) / GRID, (H - 2 * m) / 15.2)
     var cl = math.min((H - 2 * m) / GRID, (W - 2 * m) / 14.3)
     var portrait = cp >= cl
-    var c = math.floor(cl)
-    if portrait then
-        c = math.floor(cp)
-    end
+    var c = math.floor(math.max(cp, cl))
     var bs = GRID * c
     L.c = c
     L.bs = bs
@@ -127,12 +130,9 @@ func newGame()
     display.score = 0
     display.pop = 1
     fade.a = 0
-    held = nil
-    heldSlot = nil
-    dragId = nil
-    previewCells = []
-    previewKey = 0
+    releaseHold()
     clearSet = []
+    clearPending = 0
     state = "play"
     slots = []
     dealPieces()
@@ -168,7 +168,7 @@ func dealPieces()
     end
     layoutCompute()
     for i = 1, 3 do
-        var p = {shape: picks[i], color: picks[i].color, x: L.sx[i], y: H + 3 * L.c, size: L.tc, moving: true, lift: 0}
+        var p = {shape: picks[i], x: L.sx[i], y: H + 3 * L.c, size: L.tc, moving: true, lift: 0}
         slots[i] = p
         tween.to(p, {y: L.sy[i]}, 0.35, "easeOutBack", func()
             p.moving = false
@@ -215,18 +215,19 @@ end
 
 ## The cells of the wave shrink one after the other, starting nearest to the piece just placed.
 func animateClear(cleared, pr, pc)
-    var farthest = 0
+    clearSet = cleared
+    clearPending = len(cleared)
     for idx in cleared do
         var cell = cells[idx]
         var d = math.abs(boardRow(idx) - pr) + math.abs(boardCol(idx) - pc)
         cell.f = 1
-        tween.to(cell, {s: 0, f: 0}, CLEAR_TIME, "easeInBack").delay(d * CLEAR_STAGGER)
-        if d > farthest then
-            farthest = d
-        end
+        tween.to(cell, {s: 0, f: 0}, CLEAR_TIME, "easeInBack", func()
+            clearPending -= 1
+            if clearPending == 0 then
+                finishClear()
+            end
+        end).delay(d * CLEAR_STAGGER)
     end
-    clearSet = cleared
-    clearTimer = farthest * CLEAR_STAGGER + CLEAR_TIME + 0.05
 end
 
 func finishClear()
@@ -241,7 +242,7 @@ func finishClear()
 end
 
 func placePiece(p, slot, r, c)
-    boardPlace(grid, p.shape, r, c, p.color)
+    boardPlace(grid, p.shape, r, c, p.shape.color)
     slots[slot] = nil
     score += p.shape.n * POINTS_PER_CELL
     var sumR = 0
@@ -250,7 +251,7 @@ func placePiece(p, slot, r, c)
         var rr = r + off[1]
         var cc = c + off[2]
         var cell = cells[boardIdx(rr, cc)]
-        cell.v = p.color
+        cell.v = p.shape.color
         cell.s = 1.2
         tween.to(cell, {s: 1}, 0.2, "easeOutQuad")
         sumR += rr
@@ -303,8 +304,8 @@ end
 func updateTarget()
     var left = held.x - held.shape.w * L.c / 2
     var top = held.y - held.shape.h * L.c / 2
-    target.c = math.floor((left - L.bx) / L.c + 0.5) + 1
-    target.r = math.floor((top - L.by) / L.c + 0.5) + 1
+    target.c = math.round((left - L.bx) / L.c) + 1
+    target.r = math.round((top - L.by) / L.c) + 1
     target.valid = boardCanPlace(grid, held.shape, target.r, target.c)
     target.near = false
     for off in held.shape.cells do
@@ -314,16 +315,9 @@ func updateTarget()
             target.near = true
         end
     end
-    var key = 0
+    previewCells = []
     if target.valid then
-        key = heldSlot * 10000 + target.r * 100 + target.c
-    end
-    if key <> previewKey then
-        previewKey = key
-        previewCells = []
-        if target.valid then
-            previewCells = boardPreview(grid, held.shape, target.r, target.c)
-        end
+        previewCells = boardPreview(grid, held.shape, target.r, target.c)
     end
 end
 
@@ -374,14 +368,18 @@ func moveTo(id, x, y)
     end
 end
 
-func dropHeld()
-    var p = held
-    var slot = heldSlot
+## The hold is over, whatever ended it: nothing is held, and no preview is shown.
+func releaseHold()
     held = nil
     heldSlot = nil
     dragId = nil
     previewCells = []
-    previewKey = 0
+end
+
+func dropHeld()
+    var p = held
+    var slot = heldSlot
+    releaseHold()
     if target.valid then
         placePiece(p, slot, target.r, target.c)
     else
@@ -452,14 +450,14 @@ func drawPiece(p, alpha = 1)
     var x0 = p.x - p.shape.w * p.size / 2
     var y0 = p.y - p.shape.h * p.size / 2
     for off in p.shape.cells do
-        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, p.color, alpha)
+        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, p.shape.color, alpha)
     end
 end
 
 func drawHeader()
     var c = L.c
     drawText("SCORE", L.scoreX, L.scoreY, c * 0.36, "left", "top", MUTED)
-    drawText("{math.floor(display.score + 0.5)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * display.pop, "left", "top", INK)
+    drawText("{math.round(display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * display.pop, "left", "top", INK)
     drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", MUTED)
     drawText("{best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", INK)
     graphics.noStroke()
@@ -474,15 +472,12 @@ func drawBoard()
     graphics.noStroke()
     graphics.fill(0.11, 0.13, 0.19)
     graphics.rect(L.bx - pad, L.by - pad, L.bs + 2 * pad, L.bs + 2 * pad, c * 0.3)
-    for i = 1, CELLS do
-        var r = boardRow(i)
-        var col = boardCol(i)
-        var x = L.bx + (col - 1) * c
-        var y = L.by + (r - 1) * c
-        var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
-        graphics.noStroke()
-        graphics.fill(0.16 + 0.05 * tint, 0.19 + 0.05 * tint, 0.27 + 0.06 * tint)
-        cellRect(x, y, c)
+    for r = 1, GRID do
+        for col = 1, GRID do
+            var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
+            graphics.fill(0.16 + 0.05 * tint, 0.19 + 0.05 * tint, 0.27 + 0.06 * tint)
+            cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
+        end
     end
     graphics.noFill()
     graphics.stroke(0.45, 0.52, 0.70, 0.7)
@@ -518,7 +513,7 @@ func drawPreview()
         var x = L.bx + (cc - 1) * c
         var y = L.by + (rr - 1) * c
         if target.valid then
-            drawCell(x, y, c, held.color, 0.38)
+            drawCell(x, y, c, held.shape.color, 0.38)
         elseif rr >= 1 and rr <= GRID and cc >= 1 and cc <= GRID then
             graphics.noStroke()
             graphics.fill(0.95, 0.25, 0.25, 0.55)
@@ -576,13 +571,12 @@ func setup()
     buildShapes()
     buildSounds()
     best = data.get(BEST_KEY, 0)
-    layoutCompute()
     newGame()
 end
 
 ## A piece waiting in its tray follows the tray, which moves when the area is turned or resized; one
 ## being animated is left to its tween, and the one held to the pointer.
-func update(dt)
+func update()
     layoutCompute()
     for i = 1, 3 do
         var p = slots[i]
@@ -595,12 +589,6 @@ func update(dt)
     ## A finger can vanish with no touch.ended (the browser cancelled it): the piece is dropped where it was.
     if dragId <> nil and dragId <> "mouse" and touch.count() == 0 then
         dropHeld()
-    end
-    if state == "clearing" then
-        clearTimer -= dt
-        if clearTimer <= 0 then
-            finishClear()
-        end
     end
 end
 

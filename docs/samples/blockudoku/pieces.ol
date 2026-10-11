@@ -42,5 +42,5 @@ func buildShapes()
 end
 
 func randomShape()
-    return shapes[math.floor(math.rand() * len(shapes)) + 1]
+    return shapes[math.randInt(1, len(shapes))]
 end
