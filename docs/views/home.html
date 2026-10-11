@@ -44,7 +44,7 @@
     }
     .tiles {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px 12px;
     }
     .tile {
@@ -64,8 +64,9 @@
       -webkit-tap-highlight-color: transparent;
     }
     .tile .icon {
-      width: 84px;
-      height: 84px;
+      width: 100%;
+      max-width: 120px;
+      aspect-ratio: 1;
       border-radius: 22%;
       overflow: hidden;
       display: flex;
