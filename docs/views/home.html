@@ -34,36 +34,42 @@
     @media (max-width: 600px) { .bar-label { display: none; } }
 
     .home-wrap { max-width: 1100px; margin: 0 auto; padding: 8px 18px 64px; }
-    .home-section h2 {
+    /* A section is a native <details>: folding, the keyboard and the accessibility state come with it. The
+       whole heading row is the target, as a finger needs. */
+    .home-section > summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       margin: 18px 0 6px;
+      padding: 8px 0;
+      list-style: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .home-section > summary::-webkit-details-marker { display: none; }
+    .home-section > summary::before {
+      content: "";
+      flex: none;
+      width: 7px;
+      height: 7px;
+      margin: 0 4px 0 2px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+      transition: transform 0.15s;
+    }
+    .home-section[open] > summary::before { transform: rotate(45deg); }
+    .home-section > summary:hover { color: var(--text); }
+    .home-section > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    .home-section h2 {
+      margin: 0;
       font-size: 13px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--text-dim);
-    }
-    /* The heading is a button that folds the section; the whole row is the target, as a finger needs. */
-    .section-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      padding: 8px 0;
-      background: none;
-      border: 0;
       color: inherit;
-      font: inherit;
-      letter-spacing: inherit;
-      text-transform: inherit;
-      text-align: left;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
     }
-    .section-head:hover { color: var(--text); }
-    .section-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-    .section-head svg { flex: none; transition: transform 0.15s; }
-    .section-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
-    .home-section.folded > :not(h2) { display: none; }
     .tiles {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
