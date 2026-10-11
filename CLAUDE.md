@@ -229,8 +229,8 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   exemples, dans l'ordre de leur première apparition. Un projet s'ouvre dans le playground
   (`setActiveId` puis `#/playground`), un exemple en lecture directe (`#/playground/sample/<fichier>`).
   **Décision de l'utilisateur : un lancement rouvre la DERNIÈRE vue visitée**, l'écran principal n'étant la
-  vue par défaut que pour un premier lancement ou une adresse inconnue — le logo du playground y ramène,
-  et le tutoriel (l'aide) a son bouton « Home ». Le catalogue se lit par `lib/pg-samples.js`, partagé avec
+  vue par défaut que pour un premier lancement ou une adresse inconnue — le logo « Ollin » de chaque vue y ramène
+  (le tutoriel n'a plus de bouton « Home » : l'utilisateur l'a fait retirer). Le catalogue se lit par `lib/pg-samples.js`, partagé avec
   le menu « Open an example » du playground.
   ⚠ `home.js` appelle `Store.init()`, donc **un navigateur vierge y voit un projet « Untitled »** : c'est
   la migration du magasin, la même qu'à l'ouverture du playground, pas un défaut de la vue.
