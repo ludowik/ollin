@@ -27,6 +27,7 @@ const Store = await Prov.getProvider(ctx.v)
 const GH    = await Prov.getRemote(ctx.v)
 const Run   = await import('../lib/pg-run.js?v=' + ctx.v)   // execution shared with run.html
 const Fmt   = await import('../lib/pg-format.js?v=' + ctx.v)   // the on-demand formatter
+const Samples = await import('../lib/pg-samples.js?v=' + ctx.v)   // the catalogue of examples
 const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 const { createRemoteSync } = await import('../lib/pg-sync.js?v=' + ctx.v)
 
@@ -1571,18 +1572,6 @@ async function openRemoteProject(slug) {
   } catch (e) { setStatus('Error: ' + e.message, true, true) }
 }
 
-// The groups, in the order of their first appearance in index.json: that order IS the catalogue's,
-// with no second list to keep in step. An entry with no group falls into "Other".
-function exampleGroups() {
-  const groups = new Map()
-  for (const ex of examples) {
-    const g = ex.group || 'Other'
-    if (!groups.has(g)) groups.set(g, [])
-    groups.get(g).push(ex)
-  }
-  return groups
-}
-
 // Fills a panel with the samples of one group. Opening a sample reads it DIRECTLY from the
 // repository (the #/playground/sample/<file> route): no copy, and a refresh brings the
 // repository's version back. To keep or edit it, the banner offers "Create a project".
@@ -1605,12 +1594,12 @@ function renderMenuExampleGroup(name, items) {
 async function renderMenuExamples() {
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Open an example', renderMenuRoot))
-  examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => examples)
+  examples = await Samples.fetchCatalog(examples)
   if (!examples.length) {
     const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'No example.'
     projectMenu.appendChild(d); return
   }
-  for (const [name, items] of exampleGroups()) {
+  for (const [name, items] of Samples.groupCatalog(examples)) {
     const build = panel => fillExampleGroup(panel, items)
     projectMenu.appendChild(menuFlyItem(
       name + '  (' + items.length + ')', name, build,
@@ -1957,7 +1946,7 @@ async function forkExampleToProject(file) {
 // Init.
 async function initProjects() {
   await Store.init()
-  examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => [])
+  examples = await Samples.fetchCatalog()
   projectBtn.disabled = false
   if (exampleFile) {
     await loadExample(exampleFile)
