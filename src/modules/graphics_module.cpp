@@ -1093,9 +1093,9 @@ static int gfx_fps(CallCtx& ctx) {
 // Captures the DISPLAYED framebuffer into a PNG. Since draw() renders into the persistent
 // RenderTexture, which is bound during draw, the composed screen cannot be captured here: the capture
 // is DEFERRED to the end of the frame, after composition, in render_frame — or in gfx_end_draw on the
-// manual path. ⚠ On WASM raylib's TakeScreenshot writes into the page's in-memory filesystem and
-// starts NO download (verified in the browser: no download event, and the file is unreachable) —
-// there, the host capture below is the only way out. See s_shot_path and s_shot_pending above.
+// manual path. ⚠ On WASM the file lands in the page's in-memory filesystem and no download is started
+// (verified in the browser: no download event, and the file is unreachable) — there, the host capture
+// below is the only way out. See s_shot_path and s_shot_pending above.
 static int gfx_screenshot(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string())
@@ -1131,25 +1131,10 @@ std::string gfx_take_capture() {
     return out;
 }
 
-static void flush_pending_capture() {
-    if (!s_capture_pending)
-        return;
-    s_capture_pending = false;
-    // Read at the PHYSICAL size of the canvas: LoadImageFromScreen uses raylib's render size, which is
-    // the logical one, so on a dense screen (devicePixelRatio 2 or 3) it returned only the bottom-left
-    // 1/4 or 1/9 of the picture. The batch was already flushed by the caller, see below.
-    Image img = {rlReadScreenPixels(s_physW, s_physH), s_physW, s_physH, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
-    int size = 0;
-    unsigned char* png = ExportImageToMemory(img, ".png", &size);
-    if (png != nullptr && size > 0)
-        s_capture_b64 = image_b64_encode(png, (size_t)size);
-    if (png != nullptr)
-        MemFree(png);
-    UnloadImage(img);
-}
-
-// Performs a pending capture. Called at the end of the frame by render_frame, when the default
-// framebuffer holds the composed image — what is actually on screen.
+// Performs the pending captures, the script's (graphics.screenshot, a file) and the host's (gfx_take_capture,
+// base64): ONE read of the screen serves both, so they cannot disagree on what a capture is. Called at the
+// end of the frame by render_frame, when the default framebuffer holds the composed image — what is actually
+// on screen.
 static void flush_pending_screenshot() {
     if (!s_shot_pending && !s_capture_pending)
         return;
@@ -1157,11 +1142,23 @@ static void flush_pending_screenshot() {
     // only a pending quad, and reading the screen here gave an entirely black image (observed in the
     // browser).
     rlDrawRenderBatchActive();
-    flush_pending_capture();
-    if (!s_shot_pending)
-        return;
+    // Read at the PHYSICAL size of the canvas: LoadImageFromScreen and TakeScreenshot use raylib's render
+    // size, which is the logical one, so on a dense screen (devicePixelRatio 2 or 3) they returned only the
+    // bottom-left 1/4 or 1/9 of the picture.
+    Image img = {rlReadScreenPixels(s_physW, s_physH), s_physW, s_physH, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+    int size = 0;
+    unsigned char* png = ExportImageToMemory(img, ".png", &size);
+    UnloadImage(img);
+    if (png != nullptr && size > 0) {
+        if (s_capture_pending)
+            s_capture_b64 = image_b64_encode(png, (size_t)size);
+        if (s_shot_pending)
+            SaveFileData(s_shot_path.c_str(), png, size);
+    }
+    if (png != nullptr)
+        MemFree(png);
+    s_capture_pending = false;
     s_shot_pending = false;
-    TakeScreenshot(s_shot_path.c_str());
 }
 
 static int gfx_text(CallCtx& ctx) {

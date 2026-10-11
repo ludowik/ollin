@@ -273,8 +273,11 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   (`devicePixelRatio` 2 ou 3, tout téléphone), la capture ne contenait que le coin bas-gauche, soit 1/4 ou 1/9 du
   dessin — d'où des vignettes qui ne montraient qu'un petit morceau de la fenêtre. Invisible à densité 1, donc au
   harnais par défaut : tester avec `deviceScaleFactor: 2` et `3`. Mesuré : cadre aux quatre bords et point central
-  de même taille aux trois densités. `graphics.screenshot` (fichier, `TakeScreenshot`) n'a pas été corrigé : même
-  défaut possible au navigateur, hors de ce qui a été demandé. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
+  de même taille aux trois densités. **Il n'y a qu'UNE lecture de l'écran** : `flush_pending_screenshot` lit une
+  fois, encode le PNG, puis le range selon la demande — fichier pour `graphics.screenshot` (`SaveFileData`),
+  base64 pour la capture de l'hôte. `TakeScreenshot` de raylib a été abandonné : il lit lui aussi la taille
+  LOGIQUE, et deux lectures pouvaient diverger. ⚠ Non mesuré au navigateur pour `graphics.screenshot` (le
+  fichier y reste dans le système de fichiers en mémoire, que le moteur n'exporte pas) : garanti par construction. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
 - **Toute écriture GitHub passe par `commitOnBranch` (`lib/pg-github.js`), qui se REJOUE sur la
   nouvelle tête.** Lire la référence puis la faire avancer n'est pas atomique : si la branche a
@@ -569,8 +572,8 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
   exécution rend une image entièrement **noire** (constaté au navigateur sur la capture du
   mode plein écran). `flush_pending_screenshot` vide donc le batch une fois, pour le fichier
   comme pour la capture mémoire.
-- Capture : `graphics.screenshot("f.png")` — **chemin RELATIF** (raylib préfixe le CWD ;
-  un chemin absolu échoue). La capture est **différée en fin de frame** → elle contient
+- Capture : `graphics.screenshot("f.png")` — **chemin RELATIF** au répertoire courant
+  du processus (`run-headless.sh` se place à la racine du dépôt). La capture est **différée en fin de frame** → elle contient
   l'écran composé (pas la RenderTexture). Le script doit **terminer** (`graphics.quit()`
   après la capture) sinon la boucle tourne à l'infini sous Xvfb.
 - Inspecter les pixels (pas de PIL/imagemagick) : via chromium (voir B) sur `file://…png`
