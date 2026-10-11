@@ -2192,8 +2192,14 @@ async function launch() {
           hasThumbnail: () => !!proj.thumbnail,
           save: async (url) => {
             proj.thumbnail = url
-            await Store.setThumbnail(proj.id, url)
+            try {
+              await Store.setThumbnail(proj.id, url)
+            } catch (e) {
+              delete proj.thumbnail   // so a later attempt can try again
+              throw e
+            }
           },
+          report: (text, ok) => setStatus(text, true, !ok),
         })
       }
     },

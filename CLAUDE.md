@@ -248,10 +248,18 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   l'image de sa tuile sur l'écran principal, **locale** — la synchronisation GitHub ne pousse que
   `files` et `resources`. **Décision de l'utilisateur, trois règles dans cet ordre** : un projet qui a une
   vignette la garde ; sans vignette, une capture est prise toute seule quelques secondes après le début d'un
-  lancement graphique (3 s, puis deux nouveaux essais si l'image est plate, un programme encore en
+  lancement graphique (3 s, puis deux nouveaux essais si l'image est vide, un programme encore en
   chargement) ; et une capture demandée par le bouton « Capture » de la vue plein écran REMPLACE la
   vignette, plate ou non. Jamais pour un exemple lu depuis le dépôt (pas de projet où la ranger), jamais
   pour un programme sans canvas.
+  ⚠ **Une image « vide » se juge en COMPTANT les pixels qui ressortent du fond, pas par l'écart-type de la
+  luminosité, et la réduction se fait PAR MOITIÉS.** Un dessin de traits très fins et pâles sur fond noir
+  (le cas d'un « vortex ») a un écart-type minuscule et, réduit d'un seul `drawImage`, perd ses traits (la
+  ré-échantillonnage ne regarde que 2 × 2 pixels) : il était rejeté comme vide, sans la moindre vignette
+  (reproduit : 0 octet avec le premier code, une vignette avec le correctif). Un cadre réellement vide est
+  EXACTEMENT uniforme, donc zéro pixel hors du fond, ce qui permet un seuil de 1 niveau. Chaque essai
+  affiche son résultat dans la ligne d'état (« thumbnail saved », « no thumbnail: blank picture (n px stand
+  out) »…) : un échec se lit sur l'appareil au lieu de se deviner.
   ⚠ **Deux pièges d'écriture.** `saveProject` réécrit l'enregistrement ENTIER à partir de l'objet que
   l'éditeur tient : la vignette est donc posée aussi sur cet objet (`proj.thumbnail = url`), sinon la
   sauvegarde suivante l'effacerait (vérifié : elle survit à une modification du code). Et
