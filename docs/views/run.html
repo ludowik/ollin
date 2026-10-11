@@ -42,7 +42,7 @@
   <div id="bar" class="app-bar">
     <!-- "Ollin" on the left as in the other bars; the rest is set to the right:
          Reload, Restart, Capture, Pause, Editor. -->
-    <span class="bar-logo">Ollin</span>
+    <a href="#/home" class="bar-logo" title="Home — the projects and the examples">Ollin</a>
     <span class="spacer"></span>
     <span id="status">Loading…</span>
     <button id="reload-btn" class="bar-btn" title="Reload the page: a fresh WASM instance, the safe path">
@@ -63,7 +63,7 @@
     </button>
     <!-- Back to the editor: at the far RIGHT, in the same corner as the editor's "Full screen"
          button, so one corner makes the round trip. -->
-    <a class="bar-btn" href="#/playground" title="Back to the editor">
+    <a id="editor-link" class="bar-btn" href="#/playground" title="Back to the editor">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
       <span class="bar-label">Editor</span>
     </a>

@@ -212,7 +212,7 @@ export async function init(ctx) {
   const exampleFile = sampleFromAnchor(ctx.anchor)
   // The "Editor" link preserves the current sample; otherwise it would go back to project mode.
   if (exampleFile) {
-    const back = document.querySelector('#bar a')
+    const back = document.getElementById('editor-link')
     if (back) back.setAttribute('href', '#/playground/sample/' + exampleFile)
   }
   let project = null
