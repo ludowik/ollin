@@ -70,6 +70,7 @@ function section(title) {
   h.textContent = title
   head.appendChild(h)
   sec.addEventListener('toggle', () => {
+    if (sec.open === !folded.has(title)) return   // the event that follows the initial state changes nothing
     if (sec.open) folded.delete(title)
     else folded.add(title)
     try { localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded])) } catch (_) {}

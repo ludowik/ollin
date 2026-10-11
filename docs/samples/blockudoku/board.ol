@@ -133,7 +133,7 @@ func boardPreview(g, shape, r, c)
         copy[i] = g[i]
     end
     boardPlace(copy, shape, r, c, 1)
-    var cleared, zones = boardFull(copy)
+    var cleared = boardFull(copy)
     return cleared
 end
 
