@@ -30,6 +30,7 @@ end
 global turns = 0
 global t = 0
 global armColor
+global paused = false
 
 func reset()
     t = 0
@@ -82,10 +83,17 @@ func setup()
 
     ## ui.show replaces the menu on display, which is enough to move from one screen to another
     ## (pause, game over) without rebuilding the interface. The menus are locals of
-    ## setup, captured by the buttons' closures.
+    ## setup, captured by the buttons' closures. `paused` is separate from the "Animation" box,
+    ## so that Resume does not switch on an animation the user had switched off.
     var pause = ui.menu("Pause")
-    pause.button("Resume", func() ui.show(main) end)
-    main.button("Pause", func() ui.show(pause) end)
+    pause.button("Resume", func()
+        paused = false
+        ui.show(main)
+    end)
+    main.button("Pause", func()
+        paused = true
+        ui.show(pause)
+    end)
     ui.show(main)
 
     onTint(config.tint)   ## the callback only fires on a change, so the initial colour is set here
@@ -116,7 +124,7 @@ end
 
 ## The angle and the turns counted: what the widgets steer advances here, and draw() only reads it.
 func update(dt)
-    if not config.anim then
+    if paused or not config.anim then
         return
     end
     t += dt * config.speed
@@ -150,4 +158,7 @@ func draw()
     graphics.stroke(Color(0.85, 0.88, 0.95))
     graphics.fontSize(H * 0.035)
     graphics.text("turns: " + turns, W * 0.05, H * 0.12)
+    if paused then
+        graphics.text("paused", W * 0.05, H * 0.17)
+    end
 end
