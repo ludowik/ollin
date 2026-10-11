@@ -12,6 +12,7 @@ export async function init(ctx) {
   // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
+  const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
   const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, watchRenderArea, publishRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
@@ -39,8 +40,28 @@ export async function init(ctx) {
     outEl.className   = (text && String(text).startsWith('error:')) ? 'err' : 'ok'
   }
 
+  // A project with no thumbnail gets one a few seconds into the run (never an example read from the
+  // repository: it has no project to keep it in). Cancelled by a restart and when the view goes.
+  let cancelThumb = null
+  function scheduleThumbnail() {
+    if (cancelThumb) cancelThumb()
+    cancelThumb = null
+    if (!project || exampleFile || project.thumbnail) return
+    cancelThumb = Thumb.scheduleAutoThumbnail({
+      mod,
+      isCurrent: () => !capturing,
+      hasThumbnail: () => !!project.thumbnail,
+      save: async (url) => {
+        project.thumbnail = url
+        await Store.setThumbnail(project.id, url)
+      },
+    })
+  }
+
   // (Re)starts the current program. Used both at startup and by "Reload".
   async function launch() {
+    if (cancelThumb) cancelThumb()
+    cancelThumb = null
     statusEl.textContent = ''
     // ONE name for the file being run: it is the base the imports resolve against, on the
     // preloading side and inside the engine, which derives its base directory from this very
@@ -61,7 +82,11 @@ export async function init(ctx) {
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
       // A graphics program: keyboard focus goes to the canvas, for interactive programs.
       // preventScroll, otherwise mobile scrolls to bring the canvas into the viewport.
-      onRunning: () => { statusEl.textContent = ''; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
+      onRunning: () => {
+        statusEl.textContent = ''
+        try { canvasEl.focus({ preventScroll: true }) } catch (_) {}
+        scheduleThumbnail()
+      },
       onOutput:  (out) => showText(out),
     })
   }
@@ -110,21 +135,6 @@ export async function init(ctx) {
     return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
   }
 
-  // Waits for the PNG, for at most `tries` frames: a missed capture must not leave the button
-  // stuck (a program with no draw(), a runtime error…).
-  function waitCapture(tries = 40) {
-    return new Promise((resolve) => {
-      const poll = () => {
-        let b64 = ''
-        try { b64 = mod.takeCapture() } catch (_) {}
-        if (b64) return resolve(b64)
-        if (--tries <= 0) return resolve('')
-        requestAnimationFrame(poll)
-      }
-      requestAnimationFrame(poll)
-    })
-  }
-
   // One capture at a time: two clicks close together would tread on each other, the request
   // being a single piece of state on the engine's side, and the first to arrive taking the PNG
   // away — the second would wait in vain and then report a failure.
@@ -154,7 +164,7 @@ export async function init(ctx) {
     }
     statusEl.textContent = 'capture…'
     mod.requestCapture()
-    const b64 = await waitCapture()
+    const b64 = await Thumb.waitCapture(mod)
     if (wasPaused) {
       try { mod.pauseMainLoop() } catch (_) {}
     }
@@ -169,6 +179,9 @@ export async function init(ctx) {
     for (let n = 2; project.resources[name] !== undefined; n++)
       name = 'capture-' + stamp() + '-' + n + '.png'
     project.resources[name] = { b64, ext: 'png' }
+    // A capture the user asked for REPLACES the picture the project's tile shows, flat or not.
+    const thumbnail = await Thumb.thumbnailFromPng(b64, { allowFlat: true })
+    if (thumbnail) project.thumbnail = thumbnail
     await Store.saveProject(project)
     // Immediately usable by the program (image.load(name)), like an image added from the
     // editor.
@@ -197,6 +210,7 @@ export async function init(ctx) {
   }
 
   const stop = () => {
+    if (cancelThumb) cancelThumb()
     unwatchArea()
     unlockOrientation()
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}

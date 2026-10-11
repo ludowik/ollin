@@ -244,6 +244,20 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   icône citée, et l'absence de PNG orphelin. Le script coupe le compteur mémoire / images par seconde par le réglage de
   l'hôte (`window.__ollinModule.setStatsVisible(false)`) — décision de l'utilisateur : ne pas rogner la
   capture pour l'écarter — et écarte les exemples sans canvas, en erreur ou à image plate ; `NO_ICON` y liste ceux qui dessinent mais dont l'image ne sert à rien (la webcam).
+- **Vignette d'un projet** (`project.thumbnail`, un JPEG de 256 px en data URL, `lib/pg-thumb.js`) : c'est
+  l'image de sa tuile sur l'écran principal, **locale** — la synchronisation GitHub ne pousse que
+  `files` et `resources`. **Décision de l'utilisateur, trois règles dans cet ordre** : un projet qui a une
+  vignette la garde ; sans vignette, une capture est prise toute seule quelques secondes après le début d'un
+  lancement graphique (3 s, puis deux nouveaux essais si l'image est plate, un programme encore en
+  chargement) ; et une capture demandée par le bouton « Capture » de la vue plein écran REMPLACE la
+  vignette, plate ou non. Jamais pour un exemple lu depuis le dépôt (pas de projet où la ranger), jamais
+  pour un programme sans canvas.
+  ⚠ **Deux pièges d'écriture.** `saveProject` réécrit l'enregistrement ENTIER à partir de l'objet que
+  l'éditeur tient : la vignette est donc posée aussi sur cet objet (`proj.thumbnail = url`), sinon la
+  sauvegarde suivante l'effacerait (vérifié : elle survit à une modification du code). Et
+  `Store.setThumbnail` lit puis écrit dans UNE transaction, et ne touche ni à `updatedAt` (lancer un
+  programme n'est pas une édition, l'écran principal trie par éditions), ni au manifeste, ni au drapeau
+  de synchronisation.
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
@@ -264,7 +278,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   distante. La suppression distante passe AVANT la locale : si elle échoue, le projet reste entier
   des deux côtés plutôt que de perdre sa copie locale en laissant un dossier orphelin. Décocher
   garde la copie GitHub (libérer la place locale sans perdre la sauvegarde).
-- Modules partagés, dans **`docs/lib/`** : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur), `pg-samples.js` (le catalogue des exemples). Les feuilles de style communes sont dans `docs/css/`, les icônes dans `docs/icons/` — la racine de `docs/` ne porte plus que le shell, le routeur, les deux redirections, le manifeste et la grammaire.
+- Modules partagés, dans **`docs/lib/`** : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur), `pg-samples.js` (le catalogue des exemples), `pg-thumb.js` (la vignette d'un projet). Les feuilles de style communes sont dans `docs/css/`, les icônes dans `docs/icons/` — la racine de `docs/` ne porte plus que le shell, le routeur, les deux redirections, le manifeste et la grammaire.
 
 **Formateur (`lib/pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à
 retenir avant d'y toucher — une ligne qui ouvre à la fois un bloc et un délimiteur

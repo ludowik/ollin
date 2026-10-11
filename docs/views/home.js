@@ -66,6 +66,19 @@ function section(title) {
   return { sec, tiles }
 }
 
+// A project's icon is the thumbnail of its record when it has one (lib/pg-thumb.js), the generated tile
+// otherwise.
+function projectIcon(project) {
+  if (!project.thumbnail) return generatedIcon(project.name)
+  const icon = document.createElement('span')
+  icon.className = 'icon'
+  const img = document.createElement('img')
+  img.alt = ''
+  img.src = project.thumbnail
+  icon.appendChild(img)
+  return icon
+}
+
 export async function init(ctx) {
   const [Store, Samples] = await Promise.all([
     import('../lib/pg-store.js?v=' + ctx.v),
@@ -81,7 +94,7 @@ export async function init(ctx) {
     const tile = document.createElement('button')
     tile.className = 'tile'
     tile.type = 'button'
-    tile.append(generatedIcon(p.name))
+    tile.append(projectIcon(p))
     label(tile, p.name)
     tile.addEventListener('click', () => {
       Store.setActiveId(p.id)

@@ -13,6 +13,7 @@
 //     resources: { "assets/logo.png": { b64, ext } },                     // binaries
 //     createdAt, updatedAt,        // ms epoch
 //     remote:    null              // filled in by the remote sync (repo/branch/sha)
+//     thumbnail: "data:image/jpeg…"// the picture of the project's tile (lib/pg-thumb.js); local only
 //   }
 //
 // `ollin.project.json` is a REAL entry of `files` rather than a set of columns of its own, hence
@@ -137,7 +138,8 @@ export async function listProjects() {
   return all
     .map(p => ({ id: p.id, name: p.name, entry: p.entry, updatedAt: p.updatedAt,
                  fileCount: Object.keys(p.files || {}).length,
-                 remote: p.remote || null }))   // the remote link (a slug), for a unified "Open" menu
+                 remote: p.remote || null,   // the remote link (a slug), for a unified "Open" menu
+                 thumbnail: p.thumbnail || null }))   // the picture of the home screen's tile
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -189,6 +191,18 @@ export async function saveProject(project) {
   const store = await tx('readwrite')
   await reqAsync(store.put(project))
   return project
+}
+
+// Sets a project's thumbnail without touching anything else about it: not its update time (running a
+// program is not an edit, and the home screen sorts by edits), not its manifest, not its sync flag. The
+// read and the write share ONE transaction: read first and written afterwards, a save of the project
+// slipped in between would be overwritten with the older content.
+export async function setThumbnail(id, url) {
+  const store = await tx('readwrite')
+  const record = await reqAsync(store.get(id))
+  if (!record) return
+  record.thumbnail = url
+  await reqAsync(store.put(record))
 }
 
 // Renames a project. For consistency the id, being the slug, hence the folder name, FOLLOWS the

@@ -28,6 +28,7 @@ const GH    = await Prov.getRemote(ctx.v)
 const Run   = await import('../lib/pg-run.js?v=' + ctx.v)   // execution shared with run.html
 const Fmt   = await import('../lib/pg-format.js?v=' + ctx.v)   // the on-demand formatter
 const Samples = await import('../lib/pg-samples.js?v=' + ctx.v)   // the catalogue of examples
+const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
 const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 const { createRemoteSync } = await import('../lib/pg-sync.js?v=' + ctx.v)
 
@@ -1994,6 +1995,9 @@ const ICON_STOP  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="curren
 const ICON_PAUSE = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>'
 const ICON_RESUME= '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
 
+// What cancels the pending automatic thumbnail of the run in progress.
+let cancelThumb = null
+
 function setRunning(running) {
   isRunning = running
   if (running) {
@@ -2003,6 +2007,10 @@ function setRunning(running) {
     stopBtn.disabled = false
     document.getElementById('kbar')?.classList.remove('show')   // no typing aid while the program runs
   } else {
+    if (cancelThumb) {
+      cancelThumb()
+      cancelThumb = null
+    }
     Run.unlockOrientation()
     runBtn.classList.remove('running')
     runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Run</span><kbd>Alt+↵</kbd>'
@@ -2174,6 +2182,20 @@ async function launch() {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
       setRunning(true)   // the __ollinGfxKbdArmed flag is set by runProgram (pg-run.js)
+      // A project with no thumbnail gets one a few seconds into the run. The object is set too, not only
+      // the record: the editor saves THIS object whole, and a save without the field would erase it.
+      if (currentProject && !isExample() && !currentProject.thumbnail) {
+        const proj = currentProject
+        cancelThumb = Thumb.scheduleAutoThumbnail({
+          mod: ollin,
+          isCurrent: () => isRunning && currentProject === proj,
+          hasThumbnail: () => !!proj.thumbnail,
+          save: async (url) => {
+            proj.thumbnail = url
+            await Store.setThumbnail(proj.id, url)
+          },
+        })
+      }
     },
     onOutput:  (out) => showOutput(out),
   })
