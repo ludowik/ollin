@@ -80,6 +80,9 @@ function projectIcon(project) {
 }
 
 export async function init(ctx) {
+  const reloadBtn = ctx.root.querySelector('#hard-reload-btn')
+  if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)   // before any await: it must work while the tiles load
+
   const [Store, Samples] = await Promise.all([
     import('../lib/pg-store.js?v=' + ctx.v),
     import('../lib/pg-samples.js?v=' + ctx.v),
