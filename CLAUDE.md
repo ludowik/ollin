@@ -152,6 +152,8 @@ ollin/
 │                      convert_helmet_glb.py (idem pour docs/samples/helmet.glb — Damaged Helmet,
 │                      crédit obligatoire et NON commercial, cf. plus bas),
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
+│                      gen_sample_icons.js (engendre les vignettes de l'écran principal, docs/samples/icons/ —
+│                      lancé à la MAIN, cf. « Écran principal »),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py / .java, LuaJIT rejouant les .lua) + icount.sh (compte d'instructions)
 └── docs/              la web app servie par GitHub Pages, rangée par RÔLE
@@ -221,7 +223,27 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   `tests/check_samples.sh` garde le catalogue : fichier listé existant, `.ol` du dossier tous
   listés hors les trois bibliothèques d'import, groupes contigus.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
-- `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutorial`, `playground`, `run`, `perf`.
+- `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `home`, `tutorial`, `playground`, `run`, `perf`.
+- **Écran principal (vue `home`)** : une grille de tuiles — « My projects » d'abord (le magasin
+  IndexedDB du playground, du plus récent au plus ancien), puis un thème par groupe du catalogue des
+  exemples, dans l'ordre de leur première apparition. Un projet s'ouvre dans le playground
+  (`setActiveId` puis `#/playground`), un exemple en lecture directe (`#/playground/sample/<fichier>`).
+  **Décision de l'utilisateur : un lancement rouvre la DERNIÈRE vue visitée**, l'écran principal n'étant la
+  vue par défaut que pour un premier lancement ou une adresse inconnue — le logo du playground y ramène,
+  et le tutoriel (l'aide) a son bouton « Home ». Le catalogue se lit par `lib/pg-samples.js`, partagé avec
+  le menu « Open an example » du playground.
+  ⚠ `home.js` appelle `Store.init()`, donc **un navigateur vierge y voit un projet « Untitled »** : c'est
+  la migration du magasin, la même qu'à l'ouverture du playground, pas un défaut de la vue.
+  **Les icônes** : le champ facultatif `icon` d'une entrée de `samples/index.json` nomme un PNG de
+  `samples/icons/` ; sans lui — ou si l'image ne se charge pas — la vue dessine une tuile engendrée
+  (couleur tirée du nom, initiales ; chaque couleur a son contraste mesuré dans `home.js`, à refaire
+  pour toute couleur ajoutée). Les PNG sont produits par `tools/gen_sample_icons.js`, **à la main**, en
+  lançant chaque exemple dans la vue `run` sous Chromium : `NODE_PATH=$(npm root -g) node
+  tools/gen_sample_icons.js [fichier.ol …]`. ⚠ **Rien ne détecte qu'une vignette a vieilli** : le
+  garde-fou (`check_samples.sh`) ne vérifie que l'existence, le format PNG et le poids (≤ 200 Ko) d'une
+  icône citée, et l'absence de PNG orphelin. Le script rogne la bande du bas de la capture, où le moteur
+  affiche son compteur d'images par seconde, et écarte les exemples sans canvas, en erreur ou à image
+  plate ; `NO_ICON` y liste ceux qui dessinent mais dont l'image ne sert à rien (la webcam).
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
@@ -242,7 +264,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   distante. La suppression distante passe AVANT la locale : si elle échoue, le projet reste entier
   des deux côtés plutôt que de perdre sa copie locale en laissant un dossier orphelin. Décocher
   garde la copie GitHub (libérer la place locale sans perdre la sauvegarde).
-- Modules partagés, dans **`docs/lib/`** : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur). Les feuilles de style communes sont dans `docs/css/`, les icônes dans `docs/icons/` — la racine de `docs/` ne porte plus que le shell, le routeur, les deux redirections, le manifeste et la grammaire.
+- Modules partagés, dans **`docs/lib/`** : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur), `pg-samples.js` (le catalogue des exemples). Les feuilles de style communes sont dans `docs/css/`, les icônes dans `docs/icons/` — la racine de `docs/` ne porte plus que le shell, le routeur, les deux redirections, le manifeste et la grammaire.
 
 **Formateur (`lib/pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à
 retenir avant d'y toucher — une ligne qui ouvre à la fois un bloc et un délimiteur
