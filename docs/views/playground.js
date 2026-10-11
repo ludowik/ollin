@@ -2199,7 +2199,7 @@ async function launch() {
               throw e
             }
           },
-          report: (text, ok) => setStatus(text, true, !ok),
+          report: (text, ok) => Thumb.showNotice(text, ok),
         })
       }
     },

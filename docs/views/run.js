@@ -60,7 +60,7 @@ export async function init(ctx) {
           throw e
         }
       },
-      report: (text) => { statusEl.textContent = text },
+      report: (text, ok) => Thumb.showNotice(text, ok),
     })
   }
 
@@ -186,8 +186,7 @@ export async function init(ctx) {
       name = 'capture-' + stamp() + '-' + n + '.png'
     project.resources[name] = { b64, ext: 'png' }
     // A capture the user asked for REPLACES the picture the project's tile shows, flat or not.
-    const { url } = await Thumb.thumbnailFromPng(b64, { allowFlat: true })
-    if (url) project.thumbnail = url
+    project.thumbnail = await Thumb.thumbnailFromPng(b64)
     await Store.saveProject(project)
     // Immediately usable by the program (image.load(name)), like an image added from the
     // editor.

@@ -8,15 +8,26 @@
 // whatever the tile showed (the full-screen view's Capture button).
 
 const SIZE = 256
-// A picture is BLANK when almost nothing in it differs from its commonest brightness: fewer than BLANK_PIXELS
-// pixels (of 65 536) are more than BLANK_STEP levels away from it. Counting pixels rather than taking the
-// spread of the brightness matters for sparse art — a few faint thin lines on black — whose spread is tiny
-// though the picture is not empty. The step is low because an EMPTY frame is exactly uniform, so it has no
-// pixel at all off its background, while faint thin lines, once reduced, sit only a few levels above it
-// (measured: with a step of 6 such a drawing counted zero pixels and was rejected as blank).
-const BLANK_STEP = 1
-const BLANK_PIXELS = 40
-const AUTO_DELAYS = [3000, 4000, 5000]   // ms: after the start, then after each attempt that found nothing usable
+// Delays (ms) of the automatic attempts: the first a few seconds after the start, the second only when the
+// first got no picture from the engine at all (a technical failure — never a judgement on what the picture shows).
+const AUTO_DELAYS = [3000, 5000]
+const NOTICE_MS = 5000
+
+// A short message at the foot of the screen. The toolbar's status line is hidden on a phone, and the outcome of
+// an attempt (taken, or why not) must be readable wherever the program runs.
+export function showNotice(text, ok = true) {
+  const old = document.getElementById('thumb-notice')
+  if (old) old.remove()
+  const el = document.createElement('div')
+  el.id = 'thumb-notice'
+  el.textContent = text
+  el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:10000;' +
+    'max-width:calc(100vw - 32px);padding:8px 14px;border-radius:8px;font:13px system-ui,sans-serif;' +
+    'background:var(--surface2,#222);border:1px solid var(--border-strong,#888);pointer-events:none;' +
+    'color:' + (ok ? 'var(--text,#eee)' : 'var(--red,#f66)')
+  document.body.appendChild(el)
+  setTimeout(() => { if (el.isConnected) el.remove() }, NOTICE_MS)
+}
 
 // Waits for the engine to deliver the capture, for at most `tries` frames: a program with no draw() or
 // one that failed must not wait for ever. '' when nothing came.
@@ -63,59 +74,36 @@ function shrunkSquare(source, sx, sy, side) {
   return out
 }
 
-// A PNG (base64) cropped to its centre square and scaled to SIZE: {url, differing}, where `url` is a data URL
-// and `differing` the number of pixels that stand out from the background. `url` is null when the picture is
-// blank — unless `allowFlat`, for a capture the user asked for, which is theirs whatever it shows.
-export async function thumbnailFromPng(b64, { allowFlat = false } = {}) {
+// A PNG (base64) cropped to its centre square and scaled to SIZE, as a JPEG data URL.
+export async function thumbnailFromPng(b64) {
   const img = new Image()
   img.src = 'data:image/png;base64,' + b64
   await img.decode()
   const side = Math.min(img.width, img.height)
   const canvas = shrunkSquare(img, (img.width - side) / 2, (img.height - side) / 2, side)
-  const g = canvas.getContext('2d')
-  const px = g.getImageData(0, 0, SIZE, SIZE).data
-  const levels = new Uint8Array(SIZE * SIZE)
-  const histogram = new Uint32Array(256)
-  for (let i = 0, k = 0; i < px.length; i += 4, k++) {
-    const y = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2])
-    levels[k] = y
-    histogram[y]++
-  }
-  let background = 0
-  for (let y = 1; y < 256; y++) {
-    if (histogram[y] > histogram[background]) background = y
-  }
-  let differing = 0
-  for (let k = 0; k < levels.length; k++) {
-    if (Math.abs(levels[k] - background) > BLANK_STEP) differing++
-  }
-  if (!allowFlat && differing < BLANK_PIXELS) return { url: null, differing }
-  return { url: canvas.toDataURL('image/jpeg', 0.85), differing }
+  return canvas.toDataURL('image/jpeg', 0.85)
 }
 
-// Asks the engine for a capture and turns it into a thumbnail: {url, differing}, with url null and a `reason`
-// when nothing usable came.
-export async function captureThumbnail(mod, options) {
+// Asks the engine for a capture and turns it into a thumbnail: {url}, or {url: null, reason} when nothing came.
+export async function captureThumbnail(mod) {
   if (!mod || !mod.requestCapture) return { url: null, reason: 'the engine cannot capture' }
   mod.requestCapture()
   const b64 = await waitCapture(mod)
   if (!b64) return { url: null, reason: 'no picture came from the engine' }
-  const made = await thumbnailFromPng(b64, options)
-  if (!made.url) return { url: null, reason: 'blank picture (' + made.differing + ' px stand out)' }
-  return made
+  return { url: await thumbnailFromPng(b64) }
 }
 
-// Takes the thumbnail by itself a few seconds into a run, when the project has none. Each attempt gives up
-// quietly if the run is over (`isCurrent` false) or the project has meanwhile got a thumbnail, and a blank
-// frame — a program still loading — is tried again a little later. `save(url)` stores the result. `report(text, ok)`
-// is told what became of each attempt, so that a failure can be read rather than guessed at. Returns what
-// cancels it.
+// Takes the thumbnail by itself a few seconds into a run, when the project has none, whatever the picture shows.
+// An attempt gives up quietly if the run is over (`isCurrent` false) or the project has meanwhile got a
+// thumbnail; one that got no picture is tried once more. `save(url)` stores the result. `report(text, ok)` is told
+// what became of the attempt, so that a failure can be read rather than guessed at. Returns what cancels it.
 export function scheduleAutoThumbnail({ mod, isCurrent, hasThumbnail, save, report = () => {} }) {
   let cancelled = false
   let timer = 0
   const attempt = async (i) => {
     if (cancelled || !isCurrent() || hasThumbnail()) return
-    let made = { url: null, reason: 'unknown' }
+    report('taking the thumbnail…', true)
+    let made
     try {
       made = await captureThumbnail(mod)
     } catch (e) {
@@ -132,7 +120,7 @@ export function scheduleAutoThumbnail({ mod, isCurrent, hasThumbnail, save, repo
       return
     }
     if (i + 1 < AUTO_DELAYS.length) {
-      timer = setTimeout(() => attempt(i + 1), AUTO_DELAYS[i + 1])
+      timer = setTimeout(() => attempt(i + 1), AUTO_DELAYS[i + 1] - AUTO_DELAYS[i])
       return
     }
     report('no thumbnail: ' + made.reason, false)
