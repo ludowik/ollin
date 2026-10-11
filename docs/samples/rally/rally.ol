@@ -1,4 +1,4 @@
-## Art of Rally, minimal — one car, one circuit, free exploration. Drive with the ARROW KEYS
+## Art of Rally, minimal — one car (a Lancia Stratos), one circuit, free exploration. Drive with the ARROW KEYS
 ## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
 ## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
 ## On a phone, hold it like a steering wheel in landscape: its tilt steers, and two pedals at the
@@ -34,6 +34,7 @@ global speedFeel = 0.0     ## |speed| / TOP_SPEED in [0; 1], eased so the camera
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global ground = nil
+global carModel = nil
 
 ## Starts on the circuit's first waypoint, facing towards the next one.
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
@@ -95,19 +96,21 @@ func setup()
     motion.enable()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
+    carModel = graphics.model("stratos.glb")
     ground = bakeTerrain()
     bakePosts()
     engineSound.start()
 end
 
-global HALF_TRACK = 0.95   ## a wheel's lateral offset from the car's centreline
-global HALF_BASE = 1.2      ## a wheel's longitudinal offset from the axle midpoint
-global WHEEL_R = 0.42
-global WHEEL_H = 0.32
+## The Stratos's proportions: a 2.18 m wheelbase and a wide track, on small rally wheels. WHEEL_R is
+## also the one in tools/gen_stratos_glb.py, which draws the body with its origin at axle height.
+global HALF_TRACK = 0.78   ## a wheel's lateral offset from the car's centreline
+global HALF_BASE = 1.09     ## a wheel's longitudinal offset from the axle midpoint
+global WHEEL_R = 0.33
+global WHEEL_H = 0.26
 
 ## Colours are built once, not every frame: each Color is a class instance.
-global BODY_COLOR = Color(0.82, 0.15, 0.15)
-global CABIN_COLOR = Color(0.22, 0.24, 0.28)
+global MODEL_TINT = Color(1, 1, 1)    ## white leaves the body model its own colours
 global TYRE_COLOR = Color(0.12, 0.12, 0.14)
 global HUB_COLOR = Color(0.75, 0.75, 0.78)
 global HUD_SHADOW = Color(0, 0, 0, 0.6)
@@ -244,12 +247,10 @@ func drawCar()
     ## rotateX lowers +Z for a positive angle and rotateZ raises +X, hence the pitch's minus.
     graphics.rotateX(-math.deg(pitch))
     graphics.rotateZ(math.deg(roll))
-    graphics.fill(BODY_COLOR)
-    graphics.cube(0, 0.4, 0,  1.7, 0.8, 3.6)
-    graphics.fill(CABIN_COLOR)
-    ## +Z is the car's own forward (heading 0 → sin=0, cos=1 → z increases) — the cabin sits
-    ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
-    graphics.cube(0, 1.05, 0.3,  1.3, 0.5, 1.6)
+    ## The body is one model (tools/gen_stratos_glb.py), drawn in the car's own frame: +Z is the
+    ## car's forward (heading 0 → sin=0, cos=1 → z increases), and its origin is at axle height.
+    graphics.fill(MODEL_TINT)
+    graphics.drawModel(carModel, 0, 0, 0, 1)
     var spin = car.travelled / WHEEL_R
     drawWheel(HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)
     drawWheel(-HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)

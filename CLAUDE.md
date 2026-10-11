@@ -143,7 +143,9 @@ ollin/
 │                      pavée depuis ses 32 patchs de Bézier ; le JEU DE DONNÉES est dans le script,
 │                      donc aucun réseau, cf. plus bas),
 │                      gen_terrain_glb.py (engendre docs/samples/terrain.glb — lancé à la MAIN,
-│                      modèle À NOUS ; le seul à porter une couleur par sommet),
+│                      modèle À NOUS ; le seul de « 3D models » à porter une couleur par sommet),
+│                      gen_stratos_glb.py (engendre docs/samples/rally/stratos.glb, la carrosserie
+│                      de la voiture de Rally — lancé à la MAIN, modèle À NOUS, couleurs par sommet),
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
 │                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
