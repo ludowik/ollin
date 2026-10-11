@@ -54,7 +54,6 @@ const isPhone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').m
 // The toolbar sticks to the top of the VISIBLE area when the mobile keyboard opens; otherwise it
 // drifts away and vanishes on iOS. Active for as long as the view is mounted.
 if (isPhone) disposers.push(pinToVisualViewport())
-disposers.push((await import('../lib/pg-probe.js?v=' + ctx.v)).mountProbe(document.getElementById('probe-btn')))
 
 // SAMPLE mode: the #/playground/sample/<file> route opens the sample straight from the
 // repository (samples/…), with NO copy and no persistence. Editing on screen is free but is not
