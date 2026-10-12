@@ -6,6 +6,11 @@
 // the iOS sensors all answer to a gesture only, so the program starts on the tap that closes the gate.
 // Leaving the full screen brings the gate back, with the program paused.
 //
+// The address is also made INSTALLABLE as an app of its own: the page swaps the site's manifest for one
+// built for this example (name, icon, start address), so that the shortcut it leads to opens this
+// kiosk and not the site. Where the browser offers an installation prompt (Chrome, Edge, Android), the
+// gate shows an Install button; elsewhere the hint explains the manual way.
+//
 // What no page can do: stop Escape from leaving the full screen (Chrome on a desktop lets us keep it
 // held, which is asked for), switch the system's own app switcher off, or close the tab. And an iPhone
 // has no Fullscreen API at all: there, the gate only advises installing the app on the home screen.
@@ -66,16 +71,108 @@ export async function init(ctx) {
   // Not installed and no Fullscreen API (an iPhone): the home screen is the only way to lose Safari's bars.
   $('gate-hint').hidden = standalone || canFullscreen
 
+  // ── Installation as an app of its own ─────────────────────────────────────────────────────────
+  // The site's manifest names the site and starts at its home screen. Swapped here for one that names THIS
+  // example and starts at THIS address. A blob URL is enough for Chrome; Safari (iOS) reads the manifest,
+  // the title and the touch icon at the moment of "Add to Home Screen", so they are set before any tap.
+  const manifestLink = document.querySelector('link[rel="manifest"]')
+  const touchIconLink = document.querySelector('link[rel="apple-touch-icon"]')
+  const appTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+  const saved = {
+    manifest: manifestLink && manifestLink.getAttribute('href'),
+    touchIcon: touchIconLink && touchIconLink.getAttribute('href'),
+    appTitle: appTitleMeta && appTitleMeta.getAttribute('content'),
+    title: document.title,
+  }
+  let manifestUrl = null
+
+  function applyIdentity(name, icon) {
+    const base = new URL('.', location.href).href
+    const icons = icon
+      ? [{ src: icon.src, sizes: icon.size + 'x' + icon.size, type: 'image/png', purpose: 'any' }]
+      : [{ src: base + 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+         { src: base + 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }]
+    const manifest = {
+      // The id carries the example: the fragment of a start address is dropped from the identity, so
+      // without it two examples installed from the same site would be one and the same app.
+      id: base + '?app=' + encodeURIComponent(file),
+      name,
+      short_name: name,
+      start_url: location.href,
+      scope: base,
+      display: 'fullscreen',
+      display_override: ['fullscreen', 'standalone'],
+      orientation: 'any',
+      background_color: '#0f1117',
+      theme_color: '#0f1117',
+      icons,
+    }
+    const next = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }))
+    if (manifestLink) manifestLink.setAttribute('href', next)
+    if (manifestUrl) URL.revokeObjectURL(manifestUrl)
+    manifestUrl = next
+    if (touchIconLink && icon) touchIconLink.setAttribute('href', icon.src)
+    if (appTitleMeta) appTitleMeta.setAttribute('content', name)
+    document.title = name
+    // A prompt captured against the PREVIOUS manifest would install the wrong app: it is dropped, and the
+    // browser offers a new one for this manifest (or none, and then no button is shown).
+    window.__installPrompt = null
+    syncInstall()
+  }
+
+  function restoreIdentity() {
+    if (manifestLink && saved.manifest !== null) manifestLink.setAttribute('href', saved.manifest)
+    if (touchIconLink && saved.touchIcon !== null) touchIconLink.setAttribute('href', saved.touchIcon)
+    if (appTitleMeta && saved.appTitle !== null) appTitleMeta.setAttribute('content', saved.appTitle)
+    document.title = saved.title
+    if (manifestUrl) URL.revokeObjectURL(manifestUrl)
+    window.__installPrompt = null
+  }
+
+  // The prompt event is kept by app.js (it can arrive before this view exists); a tap on the button is
+  // the gesture that lets it be shown.
+  const installBtn = $('install-btn')
+  function syncInstall() {
+    installBtn.hidden = standalone || !window.__installPrompt
+  }
+  listen(window, 'ollin-installable', syncInstall)
+  listen(window, 'ollin-installed', syncInstall)
+  installBtn.addEventListener('click', async (e) => {
+    e.stopPropagation()      // the gate itself starts the program: this is not that
+    const prompt = window.__installPrompt
+    if (!prompt) return
+    window.__installPrompt = null      // an event offers its prompt once
+    syncInstall()
+    try {
+      prompt.prompt()
+      await prompt.userChoice
+    } catch (_) {}
+  })
+
+  function loadIcon(file) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve({ src: img.src, size: img.naturalWidth })
+      img.onerror = () => resolve(null)
+      img.src = new URL('samples/' + file, location.href).href
+    })
+  }
+
+  // The catalogue gives the example its name and icon; the manifest is built once both are known (the icon's
+  // real size is read from the image, not assumed). An example the catalogue does not list keeps its file name.
   if (file) {
-    Samples.fetchCatalog().then((entries) => {
+    const fallbackName = $('gate-title').textContent
+    Samples.fetchCatalog().then(async (entries) => {
       const entry = entries.find((e) => e.file === file)
-      if (!entry) return
-      $('gate-title').textContent = entry.name
-      if (entry.icon) {
+      const name = entry ? entry.name : fallbackName
+      const icon = entry && entry.icon ? await loadIcon(entry.icon) : null
+      $('gate-title').textContent = name
+      if (icon) {
         const img = $('gate-icon')
-        img.addEventListener('load', () => { img.hidden = false }, { once: true })
-        img.src = 'samples/' + entry.icon
+        img.src = icon.src
+        img.hidden = false
       }
+      applyIdentity(name, icon)
     })
   }
 
@@ -103,7 +200,7 @@ export async function init(ctx) {
 
   if (!file) {
     fail('error: no example named in the address (#/play/sample/<file>)')
-    return () => { unwatchArea(); listeners.forEach((off) => off()) }
+    return cleanup
   }
 
   // ── Full screen, the screen kept awake, Escape kept held ─────────────────────────────────────
@@ -199,16 +296,18 @@ export async function init(ctx) {
     mod = await getOllin()
   } catch (e) {
     fail('error: ' + (e && e.message ? e.message : e))
-    return () => { unwatchArea(); listeners.forEach((off) => off()) }
+    return cleanup
   }
   try { mod.setStatsVisible(false) } catch (_) {}     // a clean screen: no memory and frame-rate readout
   loadProjectIntoRuntime(mod, null)
   showGate('', 'Touch to play')
+  return cleanup
 
-  return () => {
+  function cleanup() {
     unwatchArea()
     listeners.forEach((off) => off())
     releaseScreen()
+    restoreIdentity()
     unlockOrientation()
     try { navigator.keyboard && navigator.keyboard.unlock && navigator.keyboard.unlock() } catch (_) {}
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}

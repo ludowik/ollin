@@ -287,6 +287,19 @@ async function route() {
 
 addEventListener('hashchange', route)
 
+// The browser's offer to install the page as an app (Chrome, Edge, Android) arrives once, possibly before
+// any view exists: it is kept here, and the kiosk's gate offers it behind a button. The other views make no
+// use of it, so the browser's own banner is held back everywhere.
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  window.__installPrompt = e
+  window.dispatchEvent(new Event('ollin-installable'))
+})
+window.addEventListener('appinstalled', () => {
+  window.__installPrompt = null
+  window.dispatchEvent(new Event('ollin-installed'))
+})
+
 // Is the app running "installed" (added to the iOS home screen, or in standalone display mode)?
 // In that case the OS ALWAYS relaunches the URL frozen at installation time (often #/playground)
 // and NOT the last position, so the last remembered route has to be restored explicitly.

@@ -37,6 +37,9 @@
     .big-btn { padding:14px 34px; border:0; border-radius:12px; background:#9ba1ff; color:#0f1117;
                font:600 17px system-ui, -apple-system, sans-serif; cursor:pointer; touch-action:manipulation; }
     .big-btn:disabled { opacity:0.5; cursor:default; }
+    .ghost-btn { padding:10px 22px; border:1px solid #6b7391; border-radius:12px; background:transparent;
+                 color:#c9d0e6; font:500 15px system-ui, -apple-system, sans-serif; cursor:pointer;
+                 touch-action:manipulation; }
 
     #fail { align-items:stretch; justify-content:flex-start; gap:12px; text-align:left; }
     #fail #out { position:static; flex:1; min-height:0; }
@@ -58,5 +61,6 @@
     <h1 id="gate-title"></h1>
     <p id="gate-note"></p>
     <button id="go-btn" class="big-btn" type="button" disabled>Loading…</button>
+    <button id="install-btn" class="ghost-btn" type="button" hidden>Install as an app</button>
     <p id="gate-hint" hidden>For full screen on an iPhone, tap Share, then "Add to Home Screen", and open the app from there.</p>
   </div>

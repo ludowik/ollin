@@ -240,6 +240,20 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   l'onglet ; l'iPhone n'a AUCUNE API Fullscreen. Sortir du kiosque demande de charger une autre adresse.
   Vérifié au navigateur (Chromium) : gate, entrée en plein écran, hash refusé, deux Retour sans effet,
   gate au retour de plein écran, erreurs. **Non vérifié sur un vrai Safari/iPhone.**
+  **Installable comme application à part entière** (décision de l'utilisateur, après « conseil seulement ») :
+  `play.js` remplace le manifeste du site par un manifeste BLOB propre à l'exemple (nom, icône du
+  catalogue dont la taille est LUE sur l'image, `start_url` = l'adresse du kiosque, `display: fullscreen`),
+  et pose le titre, l'`apple-touch-icon` et `apple-mobile-web-app-title` — Safari lit tout cela à
+  « Ajouter à l'écran d'accueil ». ⚠ **L'`id` du manifeste porte l'exemple (`?app=<fichier>`)** : le
+  fragment d'une `start_url` est écarté de l'identité, donc sans lui deux exemples installés depuis le
+  même site seraient UNE seule application. Chromium rend `getInstallabilityErrors` vide pour ce
+  manifeste blob. Le bouton « Install as an app » du gate n'apparaît que si le navigateur a proposé
+  `beforeinstallprompt` (Chrome, Edge, Android) : `app.js` garde l'événement dans `window.__installPrompt`
+  car il peut arriver avant la vue, et `applyIdentity` l'oublie à chaque changement de manifeste — un
+  événement obtenu contre l'ANCIEN manifeste installerait le site, pas l'exemple. ⚠ **Non vérifié :**
+  Chromium headless n'émet jamais `beforeinstallprompt` (le bouton est testé avec un faux événement), donc
+  ni la réémission réelle après le changement de manifeste, ni l'installation sur Android, ni la lecture
+  d'un manifeste blob par Safari ne sont mesurées.
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `home`, `tutorial`, `playground`, `run`, `perf`.
 - **Écran principal (vue `home`)** : une grille de tuiles — « My projects » d'abord (le magasin
   IndexedDB du playground, du plus récent au plus ancien), puis un thème par groupe du catalogue des
