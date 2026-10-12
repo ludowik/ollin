@@ -847,8 +847,10 @@ void start_step(Tw& t, size_t idx) {
     t.steps[idx].started = true;
     for (auto& c : t.steps[idx].chans) {
         Value cur = c.ref.is_map() ? ref_get(c.ref) : c.holder.map_get(c.key);
-        if (cur.is_number())
+        if (cur.is_number()) {
             c.from = cur.as_num();
+            c.from_value = cur;   // the bound is what the field holds NOW: a stale one would be written back at the start
+        }
     }
 }
 

@@ -1385,6 +1385,21 @@ tween.update(0.75)
 ## index, for one, refuses a float).
 assert(twObj.n == 10 and typeof(twObj.n) == "int")
 
+## The bound written back at the START is what the field holds THEN, not what it held when the tween was
+## declared: with a delay (the field moved meanwhile) or in the second step of a sequence, a stale one
+## put the field back to its old value for a frame.
+tween.cancelAll()
+var twLate = {x: 0}
+tween.to(twLate, {x: 10}, 1.0, "linear").delay(0.5)
+twLate.x = 3
+tween.update(0.5)
+assert(twLate.x == 3)
+var twSeq = {x: 0}
+tween.sequence(twSeq, [{to: {x: 100}, delay: 1.0, curve: "linear"}, {to: {x: 200}, delay: 1.0, curve: "linear"}])
+tween.update(1.0)
+assert(twSeq.x == 100)
+tween.cancelAll()
+
 ## An overshooting curve: the final value must be the EXACT target, not 0.99.
 var twFini = false
 tween.to(twObj, {x: 20}, 0.5, "easeOutBack", func() twFini = true end)
