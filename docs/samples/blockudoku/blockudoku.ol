@@ -468,10 +468,7 @@ end
 
 func drawBoard()
     var c = L.c
-    var pad = c * 0.18
     graphics.noStroke()
-    graphics.fill(0.11, 0.13, 0.19)
-    graphics.rect(L.bx - pad, L.by - pad, L.bs + 2 * pad, L.bs + 2 * pad, c * 0.3)
     for r = 1, GRID do
         for col = 1, GRID do
             var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
@@ -481,7 +478,7 @@ func drawBoard()
     end
     graphics.noFill()
     graphics.stroke(0.45, 0.52, 0.70, 0.7)
-    graphics.strokeSize(c * 0.07)
+    graphics.strokeSize(c * 0.035)
     for k = 1, BOX - 1 do
         graphics.line(L.bx + k * BOX * c, L.by, L.bx + k * BOX * c, L.by + L.bs)
         graphics.line(L.bx, L.by + k * BOX * c, L.bx + L.bs, L.by + k * BOX * c)
