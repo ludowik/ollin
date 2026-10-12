@@ -303,7 +303,8 @@ def build():
             nrm = [corner_normal(s, g, i, dj) for (i, dj) in order]
             m.quad(q, nrm, paint(top, side, k))
 
-    # The two ends: a black grille and tail panel, with the lamps set flush on them.
+    # The two ends: a black grille and a black tail panel. The headlamps stand out of the first, the
+    # tail lamps lie flat on the second.
     for idx, sign in ((0, 1.0), (nst - 1, -1.0)):
         r = rings[idx]
         centre = tuple(sum(p[a] for p in r) / RING for a in range(3))
