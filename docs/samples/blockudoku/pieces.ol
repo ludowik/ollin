@@ -2,6 +2,7 @@
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
 global shapes = []
+## key: the rows of the shape ("#./##"), which names it in a saved game without depending on the order of this list.
 
 ## Each family has one colour, which the host maps to its palette.
 const SHAPE_FAMILIES = [
@@ -30,7 +31,7 @@ func parseShape(rows, color)
             end
         end
     end
-    return {cells: cells, h: len(rows), w: len(rows[1]), color: color, n: len(cells)}
+    return {cells: cells, h: len(rows), w: len(rows[1]), color: color, n: len(cells), key: rows.join("/")}
 end
 
 func buildShapes()
@@ -40,6 +41,15 @@ func buildShapes()
             shapes.push(parseShape(rows, family[1]))
         end
     end
+end
+
+func shapeFromKey(key)
+    for s in shapes do
+        if s.key == key then
+            return s
+        end
+    end
+    return nil
 end
 
 func randomShape()

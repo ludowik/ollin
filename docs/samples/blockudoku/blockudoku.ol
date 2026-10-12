@@ -17,6 +17,7 @@ const CLEAR_TIME = 0.25
 const LIFT_TOUCH = 1.7           ## cells between the finger and the bottom of the piece it holds
 const LIFT_MOUSE = 0.6
 const BEST_KEY = "blockudoku.best"
+const SAVE_KEY = "blockudoku.game"
 const FLOAT_POP = 0.18           ## seconds for a gained point to appear where it was earned
 const FLOAT_HOLD = 0.12          ## seconds it stays there before being drawn into the score
 const FLOAT_FLIGHT = 0.5
@@ -122,6 +123,11 @@ end
 ## ── Game ────────────────────────────────────────────────────────────────────────────────────────
 
 func newGame()
+    resetGame()
+    dealPieces()
+end
+
+func resetGame()
     tween.cancelAll()
     grid = boardNew()
     cells = []
@@ -140,7 +146,84 @@ func newGame()
     clearPending = 0
     state = "play"
     slots = []
-    dealPieces()
+end
+
+## The game in progress, as one text: score, streak, the 81 cells (a digit each, 0 for empty), and the
+## shape of each of the three pieces ("-" once placed). Written after every move, so closing the page
+## loses nothing; a finished game leaves nothing to resume.
+func saveGame()
+    if state == "over" then
+        data.set(SAVE_KEY, nil)
+        return
+    end
+    var keys = []
+    for i = 1, 3 do
+        if slots[i] == nil then
+            keys.push("-")
+        else
+            keys.push(slots[i].shape.key)
+        end
+    end
+    data.set(SAVE_KEY, "{score}|{streak}|{grid.join()}|{keys.join(",")}")
+end
+
+## Puts a saved game back; false (and nothing resumed) when there is none, when it does not read, or when it
+## was already lost. Every part is checked before anything is touched.
+func loadGame()
+    var saved = data.get(SAVE_KEY)
+    if saved == nil then
+        return false
+    end
+    var parts = saved.split("|")
+    if len(parts) <> 4 then
+        return false
+    end
+    var savedScore = parts[1].number()
+    var savedStreak = parts[2].number()
+    var keys = parts[4].split(",")
+    if savedScore == nil or savedStreak == nil or len(parts[3]) <> CELLS or len(keys) <> 3 then
+        return false
+    end
+    var g = boardNew()
+    for i = 1, CELLS do
+        var v = parts[3].char(i).number()
+        if v == nil or v < 0 or v > len(PALETTE) then
+            return false
+        end
+        g[i] = v
+    end
+    var picks = []
+    for key in keys do
+        if key == "-" then
+            picks.push(nil)
+        else
+            var shape = shapeFromKey(key)
+            if shape == nil then
+                return false
+            end
+            picks.push(shape)
+        end
+    end
+    resetGame()
+    grid = g
+    score = savedScore
+    streak = savedStreak
+    display.score = score
+    for i = 1, CELLS do
+        cells[i].v = grid[i]
+    end
+    layoutCompute()
+    for i = 1, 3 do
+        if picks[i] == nil then
+            slots[i] = nil
+        else
+            slots[i] = {shape: picks[i], x: L.sx[i], y: L.sy[i], size: L.tc, moving: false, lift: 0}
+        end
+    end
+    if allSlotsEmpty() then
+        dealPieces()
+    end
+    return not isGameOver()
 end
 
 func allSlotsEmpty()
@@ -179,6 +262,7 @@ func dealPieces()
             p.moving = false
         end).delay((i - 1) * 0.07)
     end
+    saveGame()
 end
 
 func isGameOver()
@@ -322,6 +406,7 @@ func placePiece(p, slot, r, c)
         finishTurn()
     end
     updateBest()
+    saveGame()
 end
 
 func returnPiece(p, slot)
@@ -634,7 +719,9 @@ func setup()
     buildShapes()
     buildSounds()
     best = data.get(BEST_KEY, 0)
-    newGame()
+    if not loadGame() then
+        newGame()
+    end
 end
 
 ## A piece waiting in its tray follows the tray, which moves when the area is turned or resized; one
