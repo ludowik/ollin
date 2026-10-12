@@ -476,13 +476,6 @@ func drawBoard()
             cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
         end
     end
-    graphics.noFill()
-    graphics.stroke(0.45, 0.52, 0.70, 0.7)
-    graphics.strokeSize(c * 0.035)
-    for k = 1, BOX - 1 do
-        graphics.line(L.bx + k * BOX * c, L.by, L.bx + k * BOX * c, L.by + L.bs)
-        graphics.line(L.bx, L.by + k * BOX * c, L.bx + L.bs, L.by + k * BOX * c)
-    end
     for i = 1, CELLS do
         var cell = cells[i]
         if cell.v <> 0 and cell.s > 0.01 then
