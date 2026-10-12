@@ -472,7 +472,7 @@ func drawBoard()
     for r = 1, GRID do
         for col = 1, GRID do
             var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
-            graphics.fill(0.16 + 0.05 * tint, 0.19 + 0.05 * tint, 0.27 + 0.06 * tint)
+            graphics.fill(0.13 + 0.14 * tint, 0.15 + 0.16 * tint, 0.22 + 0.21 * tint)
             cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
         end
     end
