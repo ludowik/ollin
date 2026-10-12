@@ -17,6 +17,9 @@ const CLEAR_TIME = 0.25
 const LIFT_TOUCH = 1.7           ## cells between the finger and the bottom of the piece it holds
 const LIFT_MOUSE = 0.6
 const BEST_KEY = "blockudoku.best"
+const FLOAT_POP = 0.18           ## seconds for a gained point to appear where it was earned
+const FLOAT_HOLD = 0.12          ## seconds it stays there before being drawn into the score
+const FLOAT_FLIGHT = 0.5
 
 const PALETTE = [
     [0.93, 0.35, 0.35], [0.96, 0.60, 0.25], [0.96, 0.82, 0.30], [0.40, 0.80, 0.45],
@@ -34,7 +37,8 @@ global score = 0
 global best = 0
 global newBest = false
 global streak = 0
-global display = {score: 0, pop: 1}
+global display = {score: 0, pop: 1}   ## score: what the counter SHOWS, which catches up as each point lands
+global floaters = []         ## points gained, flying to the score: {row, col, text, color, v, a, k, done}
 global fade = {a: 0}
 global held = nil
 global heldSlot = nil
@@ -129,6 +133,7 @@ func newGame()
     newBest = false
     display.score = 0
     display.pop = 1
+    floaters = []
     fade.a = 0
     releaseHold()
     clearSet = []
@@ -202,10 +207,7 @@ func gameOver()
     sndOver.play()
 end
 
-func showScore()
-    display.pop = 1.3
-    tween.to(display, {score: score}, 0.4, "easeOutQuad")
-    tween.to(display, {pop: 1}, 0.3, "easeOutBack")
+func updateBest()
     if score > best then
         best = score
         newBest = true
@@ -213,13 +215,44 @@ func showScore()
     end
 end
 
+## A gained point shows where it was earned (row and col are in cells, fractions allowed), then is drawn
+## into the score, shrinking: the counter only grows when it lands, so it never runs ahead of what is seen.
+## Its progress is computed from its age and not tweened: a tween between two whole numbers rounds each
+## step, and a literal such as 0.0 is a whole number here.
+func spawnFloater(row, col, v, color, delay)
+    floaters.push({row: row, col: col, text: "+{v}", color: color, v: v, age: -delay, done: false})
+end
+
+func updateFloaters()
+    for f in floaters do
+        f.age += deltaTime
+        if f.age >= FLOAT_POP + FLOAT_HOLD + FLOAT_FLIGHT then
+            f.done = true
+            display.score += f.v
+            display.pop = 1.18
+            tween.to(display, {pop: 1}, 0.18, "easeOutQuad")
+        end
+    end
+    floaters = floaters.filter(func(f) return not f.done end)
+end
+
 ## The cells of the wave shrink one after the other, starting nearest to the piece just placed.
-func animateClear(cleared, pr, pc)
+func animateClear(cleared, pr, pc, bonus, placed)
     clearSet = cleared
     clearPending = len(cleared)
-    for idx in cleared do
+    var share = bonus // len(cleared)
+    var extra = bonus % len(cleared)      ## the first cells carry one more, so the shares add up exactly
+    for n, idx in cleared do
         var cell = cells[idx]
         var d = math.abs(boardRow(idx) - pr) + math.abs(boardCol(idx) - pc)
+        var v = share
+        if n <= extra then
+            v += 1
+        end
+        if placed[idx] then
+            v += POINTS_PER_CELL      ## one cell carries one point, not two
+        end
+        spawnFloater(boardRow(idx), boardCol(idx), v, cell.v, d * CLEAR_STAGGER)
         cell.f = 1
         tween.to(cell, {s: 0, f: 0}, CLEAR_TIME, "easeInBack", func()
             clearPending -= 1
@@ -247,6 +280,7 @@ func placePiece(p, slot, r, c)
     score += p.shape.n * POINTS_PER_CELL
     var sumR = 0
     var sumC = 0
+    var placed = {}
     for off in p.shape.cells do
         var rr = r + off[1]
         var cc = c + off[2]
@@ -254,24 +288,40 @@ func placePiece(p, slot, r, c)
         cell.v = p.shape.color
         cell.s = 1.2
         tween.to(cell, {s: 1}, 0.2, "easeOutQuad")
+        placed[boardIdx(rr, cc)] = true
         sumR += rr
         sumC += cc
     end
     var cleared, zones = boardFull(grid)
+    var clearedSet = {}
+    for idx in cleared do
+        clearedSet[idx] = true
+    end
+    var n = 0
+    for off in p.shape.cells do
+        if not clearedSet[boardIdx(r + off[1], c + off[2])] then
+            spawnFloater(r + off[1], c + off[2], POINTS_PER_CELL, p.shape.color, n * 0.03)
+            n += 1
+        end
+    end
     if zones > 0 then
         streak += 1
-        score += zones * zones * GRID * POINTS_PER_CLEARED_CELL + (streak - 1) * STREAK_BONUS
+        var bonus = zones * zones * GRID * POINTS_PER_CLEARED_CELL
+        var streakBonus = (streak - 1) * STREAK_BONUS
+        score += bonus + streakBonus
         boardClear(grid, cleared)
-        animateClear(cleared, sumR / p.shape.n, sumC / p.shape.n)
+        animateClear(cleared, sumR / p.shape.n, sumC / p.shape.n, bonus, placed)
+        if streakBonus > 0 then
+            spawnFloater(sumR / p.shape.n, sumC / p.shape.n, streakBonus, 3, 0.1)
+        end
         sndClear[math.min(zones + streak - 1, len(sndClear))].play()
         state = "clearing"
-        showScore()
     else
         streak = 0
         sndPlace.play()
-        showScore()
         finishTurn()
     end
+    updateBest()
 end
 
 func returnPiece(p, slot)
@@ -466,6 +516,34 @@ func drawHeader()
     drawText("New game", L.btnX + L.btnW / 2, L.btnY + L.btnH / 2, c * 0.42, "center", "center", INK)
 end
 
+## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
+func drawFloaters()
+    var c = L.c
+    var tx = L.scoreX + c * 0.6
+    var ty = L.scoreY + c * 1.0
+    for f in floaters do
+        if f.age > 0 then
+            var u = math.min(f.age / FLOAT_POP, 1) - 1
+            var grow = 1 + 2.70158 * u * u * u + 1.70158 * u * u          ## easeOutBack
+            var q = math.max(0, math.min((f.age - FLOAT_POP - FLOAT_HOLD) / FLOAT_FLIGHT, 1))
+            var k = q * q                                                  ## easeInQuad: it picks up speed
+            var x0 = L.bx + (f.col - 0.5) * c
+            var y0 = L.by + (f.row - 0.5) * c - grow * c * 0.15
+            var x = x0 + (tx - x0) * k
+            var y = y0 + (ty - y0) * k
+            var size = c * 0.46 * grow * (1 - 0.75 * k)
+            var alpha = 1 - math.max(0, (k - 0.8) / 0.2)
+            var col = PALETTE[f.color]
+            var edge = size * 0.07
+            for off in [[-1, 0], [1, 0], [0, -1], [0, 1]] do
+                drawText(f.text, x + off[1] * edge, y + off[2] * edge, size, "center", "center", [0.04, 0.05, 0.09, 1], alpha * 0.9)
+            end
+            drawText(f.text, x, y, size, "center", "center",
+                     [col[1] + (1 - col[1]) * 0.6, col[2] + (1 - col[2]) * 0.6, col[3] + (1 - col[3]) * 0.6, 1], alpha)
+        end
+    end
+end
+
 func drawBoard()
     var c = L.c
     graphics.noStroke()
@@ -571,6 +649,7 @@ func update()
             p.size = L.tc
         end
     end
+    updateFloaters()
     ## A finger can vanish with no touch.ended (the browser cancelled it): the piece is dropped where it was.
     if dragId <> nil and dragId <> "mouse" and touch.count() == 0 then
         dropHeld()
@@ -591,5 +670,6 @@ func draw()
         end
         drawPiece(held, alpha)
     end
+    drawFloaters()
     drawOver()
 end
