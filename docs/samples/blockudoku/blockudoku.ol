@@ -528,7 +528,7 @@ func drawFloaters()
             var q = math.max(0, math.min((f.age - FLOAT_POP - FLOAT_HOLD) / FLOAT_FLIGHT, 1))
             var k = q * q                                                  ## easeInQuad: it picks up speed
             var x0 = L.bx + (f.col - 0.5) * c
-            var y0 = L.by + (f.row - 0.5) * c - grow * c * 0.15
+            var y0 = L.by + (f.row - 0.5) * c
             var x = x0 + (tx - x0) * k
             var y = y0 + (ty - y0) * k
             var size = c * 0.46 * grow * (1 - 0.75 * k)
