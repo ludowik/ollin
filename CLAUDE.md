@@ -1356,12 +1356,13 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   l'objet animé vivant longtemps après la fin de l'animation.
 - À la fin, la cible **exacte** est écrite : une courbe à dépassement (`back`, `elastic`) ne
   rend pas 1 en 1, et un arrondi laisserait 0,999.
-- ⚠ **Entre deux ENTIERS, un tween arrondit chaque pas** (`Canal::integral`, départ ET cible entiers) :
-  la valeur saute d'une borne à l'autre au lieu de passer par les valeurs intermédiaires. Et un littéral
-  de valeur entière (`0.0`, `1.0`, `1e0`) EST un entier (`num_value`, `typeof(1.0)` rend `"int"`), donc l'écrire
-  en flottant n'y change rien : seul un départ non entier (ou un calcul d'avancement fait par le script,
-  comme les points volants de Blockudoku) donne une animation continue. Constaté, pas supposé : un
-  champ `{k: 0}` animé vers `1` restait à 0 puis passait à 1 d'un coup.
+- **Un tween n'arrondit JAMAIS** (décision de l'utilisateur : le moteur ne décide pas à la place du
+  script ; arrondir, si besoin, est l'affaire de qui lit). Il y avait un canal `integral` (départ ET cible
+  entiers ⇒ `llround` à chaque pas) : une opacité de `0` à `1` restait à 0 puis sautait à 1, et écrire
+  `0.0` n'y changeait rien, car un littéral de valeur entière EST un entier (`num_value`, `typeof(1.0)`
+  rend `"int"`). Les BORNES, elles, sont réécrites avec leur type d'origine (`Chan::from_value` /
+  `to_value`) : un champ animé vers `8` finit entier, et un indice de tableau refuse `8.0` (« array index
+  must be integer », vérifié) — écrire toujours un flottant aurait cassé les compteurs utilisés comme indices.
 - Les 18 courbes sont un tableau `{nom, fonction}` : les noms exposés vivent dans des
   littéraux de chaîne (donc camelCase), les fonctions C++ sont en `snake_case`.
 - **Plan de lecture (`repeat([occurrences] [, allerRetour])`)** : `Tw::plan` est un vecteur de

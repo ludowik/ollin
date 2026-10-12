@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-11 19:27</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-12 21:13</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-11 19:27</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-12 21:13</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2633,7 +2633,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <ul>
   <li>The starting value is read <strong>when the animation starts</strong>, not when it is declared: with a <code>delay</code>, the tween sets off from the value the field has at that moment.</li>
   <li>Declaring a tween on a field <strong>already animated cancels the previous one</strong>: two animations never fight over the same value. Two distinct <code>ref</code>s on the same variable are not recognised as the same, however — the language does not allow them to be compared.</li>
-  <li>When the starting value <strong>and</strong> the target are integers, the value stays an integer throughout.</li>
+  <li>Between two bounds the value is <strong>always a decimal number</strong>, even when both are integers: a field going from <code>0</code> to <code>1</code> passes through every fraction, which is what an opacity needs. The tween never rounds on its own; where a field must stay whole, round it where you read it (<code>math.round</code>). The two bounds themselves are written back as you gave them, so a field tweened to <code>8</code> ends up holding the integer <code>8</code>.</li>
   <li>A target value may be a <strong>class instance</strong>: the numeric fields common to both are interpolated one by one, which covers <code>Color</code> as much as a <code>Vec2</code> of your own. The tween writes <strong>into</strong> the instance; it does not replace it.</li>
   <li>The final value written is the <strong>exact</strong> target: an overshooting curve does not quite give 1 at the end, and rounding would leave 0.999.</li>
   <li>The completion callback may declare further tweens — enough to chain steps — or cancel everything.</li>

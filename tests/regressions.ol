@@ -1375,10 +1375,15 @@ tween.to(twObj, {x: 5}, 0.5, "linear")
 tween.update(10.0)
 assert(twObj.x == 5)
 
-## With BOTH the start and the target integers, the value stays an integer throughout, with no float drift.
+## Between two integers the value is NOT rounded: it passes through the fractions, so a field going from 0 to
+## 1 can serve as an opacity. Rounding, when wanted, is the script's job.
 tween.to(twObj, {n: 10}, 1.0, "linear")
-tween.update(0.5)
-assert(twObj.n == 5 and typeof(twObj.n) == "int")
+tween.update(0.25)
+assert(twObj.n == 2.5)
+tween.update(0.75)
+## ... but the bounds keep their own type: a field tweened to 10 ends up holding the integer 10 (an array
+## index, for one, refuses a float).
+assert(twObj.n == 10 and typeof(twObj.n) == "int")
 
 ## An overshooting curve: the final value must be the EXACT target, not 0.99.
 var twFini = false

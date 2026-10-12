@@ -180,7 +180,11 @@ struct Chan {
     Value key;
     double from = 0.0;
     double to = 0.0;
-    bool integral = false;   // the start AND the target are integers, so we round, with no float drift
+    // The bounds as the script wrote them. Between them the value is always a float, however whole the
+    // bounds are: rounding is the script's business. Only the bounds themselves are written back with
+    // their own type, so a field tweened to 8 ends up holding the integer 8, which an array index needs.
+    Value from_value;
+    Value to_value;
 };
 
 // A STEP of the sequence: the channels it animates, its duration and its curve. A step with no
@@ -343,7 +347,8 @@ void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt
         c.key = kv.first;
         c.from = from.as_num();
         c.to = kv.second.as_num();
-        c.integral = from.is_integer() && kv.second.is_integer();
+        c.from_value = from;
+        c.to_value = kv.second;
         out.push_back(c);
         added++;
     }
@@ -364,7 +369,8 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
         c.key = key;
         c.from = cur.as_num();
         c.to = tgt.as_num();
-        c.integral = cur.is_integer() && tgt.is_integer();
+        c.from_value = cur;
+        c.to_value = tgt;
         out.push_back(c);
         return;
     }
@@ -541,7 +547,8 @@ int tween_value(CallCtx& ctx) {
         c.ref = args[0];
         c.from = cur.as_num();
         c.to = args[1].as_num();
-        c.integral = cur.is_integer() && args[1].is_integer();
+        c.from_value = cur;
+        c.to_value = args[1];
         chans.push_back(c);
     } else if (is_object(cur) && is_object(args[1])) {
         add_struct_chans(chans, cur, args[1], "(ref)", "tween.value");
@@ -818,7 +825,12 @@ double eased(Value curve_fn, int curve, double p) {
 }
 
 void write_chan(const Chan& c, double v) {
-    Value out = c.integral ? Value((int64_t)std::llround(v)) : Value(v);
+    Value out(v);
+    if (v == c.to && c.to_value.is_integer()) {
+        out = c.to_value;
+    } else if (v == c.from && c.from_value.is_integer()) {
+        out = c.from_value;
+    }
     if (c.ref.is_map()) {
         ref_set(c.ref, out);
         return;
