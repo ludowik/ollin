@@ -833,17 +833,11 @@ void write_value(const Chan& c, const Value& out) {
     holder.map_set(c.key, out);
 }
 
-// A value strictly between the bounds: always a float.
-void write_chan(const Chan& c, double v) {
-    write_value(c, Value(v));
-}
-
 // One of the two bounds, written as the script gave it: an integer stays an integer. Only the callers know
 // they are at an end — inferring it from the value would turn any sample that happens to equal a bound
 // (a curve that plateaus) into an integer.
 void write_bound(const Chan& c, bool at_to) {
-    const Value& bound = at_to ? c.to_value : c.from_value;
-    write_value(c, bound.is_integer() ? bound : Value(at_to ? c.to : c.from));
+    write_value(c, at_to ? c.to_value : c.from_value);
 }
 
 // Reads a step's start values, once: it begins from whatever the previous step left. On later passes
@@ -983,7 +977,7 @@ void advance(double dt) {
                 } else {
                     double a = sens > 0 ? c.from : c.to;
                     double b = sens > 0 ? c.to : c.from;
-                    write_chan(c, a + (b - a) * f);
+                    write_value(c, Value(a + (b - a) * f));   // strictly between the bounds: a float
                 }
             }
         }

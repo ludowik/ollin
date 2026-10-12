@@ -283,12 +283,12 @@ export async function init(ctx) {
   loadProjectIntoRuntime(mod, null)
   // The models and imports download behind the launch screen: they need no gesture, and a tap should find
   // them ready instead of a blank canvas. Best-effort, as everywhere else.
-  assets = preloadProgramAssets(mod, code, ctx.v, file).catch(() => {})
+  assets = preloadProgramAssets(mod, code, ctx.v, file)
   showGate('', 'Touch to play')
   return cleanup
 
-  // The router never leaves this view (route.lock): the page is the way out. This is the contract's cleanup,
-  // not a path that runs, which is why the manifest swap is not undone here.
+  // The router never leaves this view (route.lock, armed before the init): the page is the way out. This is
+  // the contract's cleanup, not a path that runs, which is why the manifest swap is not undone here.
   function cleanup() {
     unwatchArea()
     listeners.forEach((off) => off())

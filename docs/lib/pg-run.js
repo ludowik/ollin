@@ -125,11 +125,14 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
-// The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a project whose
-// models are already among its resources), and so are the files the entry imports, and THEIR models.
+// The 3D models referenced are preloaded from samples/ (of no effect for a project whose models are already
+// among its resources), and so are the files the entry imports, and THEIR models. Best-effort: a file that
+// does not come is reported by the engine when the program asks for it, so a caller never has to guard.
 export async function preloadProgramAssets(m, code, v, entryName) {
-  const imported = await preloadSampleImports(m, code, v, entryName)
-  await preloadSampleModels(m, code + '\n' + imported, v, entryName)
+  try {
+    const imported = await preloadSampleImports(m, code, v, entryName)
+    await preloadSampleModels(m, code + '\n' + imported, v, entryName)
+  } catch (_) {}
 }
 
 // Resumes a paused loop. The clock break comes BEFORE: the frame that follows must not be charged with

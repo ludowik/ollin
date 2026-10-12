@@ -232,8 +232,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   neutralisé ; pour l'iPhone, un CONSEIL affiché (« Add to Home Screen »), pas de manifeste dynamique par
   application. Le verrou de navigation est dans `app.js` (`kioskHash` : `route()` rétablit le hash et rend la
   main), et les vues sans barre se DÉCLARENT dans `ROUTES` (`transient` : jamais retenue comme dernière
-  vue, adresse explicite respectée, pas de bandeau de déploiement ; `lock` : le verrou) au lieu d'un test
-  par site ; Retour = un `pushState` renouvelé à chaque `popstate` (même URL, donc pas de `hashchange`). Le
+  vue, adresse explicite respectée, pas de bandeau de déploiement ; `lock` : le verrou, armé AVANT l'init de la vue — sinon un changement d'adresse pendant
+  qu'elle démarre la rend caduque après qu'elle a réécrit le manifeste — et levé si la vue échoue ;
+  `viewport` aussi) au lieu d'un test par site ; Retour = un `pushState` renouvelé à chaque `popstate` (même URL, donc pas de `hashchange`). Le
   programme ne part que sur le TOUCHER du gate : l'API Fullscreen, l'audio et les capteurs iOS exigent un
   geste, et `requestFullscreen` est demandé de façon synchrone dans ce clic. `launchProgram`
   (`lib/pg-run.js`) est partagé avec la vue `run`, pour que les deux ne divergent pas.

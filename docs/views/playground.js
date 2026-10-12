@@ -2172,8 +2172,7 @@ async function launch() {
   // In sample or draft mode the 3D models referenced (graphics.model("x.obj")) are preloaded from
   // samples/; user projects go through their own resources.
   if (!currentProject) {
-    const imported = await Run.preloadSampleImports(ollin, code, ctx.v, entryName)
-    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v, entryName)   // the imports' models too
+    await Run.preloadProgramAssets(ollin, code, ctx.v, entryName)
   }
   // The `data` module's project scope: the project's id, or 'sample:<file>' for a sample.
   window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')

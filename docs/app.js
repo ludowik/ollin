@@ -104,14 +104,20 @@ function getOllin() {
 // remounted when it changes. transient marks a view that is a link which is opened, not a place the app
 // goes back to: it is not remembered as the last route, an explicit address to it is never replaced by
 // that last route, and no deploy banner appears over it. lock keeps the app on that one route (the kiosk).
-// A new chromeless view is a line here, not an edit at each of those places.
+// viewport is the content of the viewport meta. The playground and the run mode lock the zoom
+// (maximum-scale) to avoid iOS's automatic zoom when the editor — whose font is under 16px — takes focus;
+// that was the behaviour of the former standalone page, lost when moving to a single page with one shared
+// viewport. The tutorial stays zoomable, for comfortable reading.
+// A new view, chromeless or not, is one entry here, not an edit at each place that cares.
+const VIEWPORT_PLAIN = 'width=device-width, initial-scale=1.0'
+const VIEWPORT_LOCKED = 'width=device-width, initial-scale=1.0, maximum-scale=1.0'
 const ROUTES = {
-  home:       { html: 'views/home.html',       js: './views/home.js' },
-  tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js', anchorIsSection: true },
-  playground: { html: 'views/playground.html', js: './views/playground.js' },
-  run:        { html: 'views/run.html',        js: './views/run.js',  transient: true },
-  play:       { html: 'views/play.html',       js: './views/play.js', transient: true, lock: true },
-  perf:       { html: 'views/perf.html',       js: './views/perf.js' },
+  home:       { html: 'views/home.html',       js: './views/home.js',       viewport: VIEWPORT_PLAIN },
+  tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js',   viewport: VIEWPORT_PLAIN, anchorIsSection: true },
+  playground: { html: 'views/playground.html', js: './views/playground.js', viewport: VIEWPORT_LOCKED },
+  run:        { html: 'views/run.html',        js: './views/run.js',        viewport: VIEWPORT_LOCKED + ', viewport-fit=cover', transient: true },
+  play:       { html: 'views/play.html',       js: './views/play.js',       viewport: VIEWPORT_LOCKED + ', user-scalable=no, viewport-fit=cover', transient: true, lock: true },
+  perf:       { html: 'views/perf.html',       js: './views/perf.js',       viewport: VIEWPORT_PLAIN },
 }
 const DEFAULT_VIEW = 'home'
 // The last complete ROUTE visited (the view plus its sub-path: a tutorial anchor, a sample…),
@@ -121,21 +127,9 @@ const DEFAULT_VIEW = 'home'
 // and `play` (the kiosk) is a link that is opened.
 const LAST_HASH_KEY = 'ollin-last-route'
 
-// A viewport per view. The playground and the run mode lock the zoom (maximum-scale) to avoid
-// iOS's automatic zoom when the editor — whose font is under 16px — takes focus. That was the
-// behaviour of the former standalone page, lost when moving to a single page with one shared
-// viewport. The tutorial stays zoomable, for comfortable reading.
-const VIEWPORT = {
-  home:       'width=device-width, initial-scale=1.0',
-  tutorial:   'width=device-width, initial-scale=1.0',
-  playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
-  run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
-  play:       'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover',
-  perf:       'width=device-width, initial-scale=1.0',
-}
 function applyViewport(view) {
   const meta = document.querySelector('meta[name="viewport"]')
-  if (meta) meta.setAttribute('content', VIEWPORT[view] || VIEWPORT[DEFAULT_VIEW])
+  if (meta) meta.setAttribute('content', (ROUTES[view] || ROUTES[DEFAULT_VIEW]).viewport)
 }
 
 const viewEl     = document.getElementById('view')
@@ -206,6 +200,11 @@ async function mount(view, anchor) {
       return
     }
     const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V, anchor }
+    // Armed BEFORE the init: a view that rewrites page-global state while it starts (the kiosk's manifest)
+    // must not be superseded half-way, which no cleanup would then undo.
+    if (route.lock) {
+      kioskHash = location.hash
+    }
     const cleanup = (await mod.init(ctx)) || null
     if (stale()) {
       // A more recent navigation took over during the init, so this stale view is cleaned up at
@@ -218,9 +217,6 @@ async function mount(view, anchor) {
     currentCleanup = cleanup
     currentView = view
     currentAnchor = anchor
-    if (route.lock) {
-      kioskHash = location.hash
-    }
     if (!route.transient) {
       try {
         localStorage.setItem(LAST_HASH_KEY, '#/' + view + (anchor ? '/' + anchor : ''))
@@ -236,6 +232,7 @@ async function mount(view, anchor) {
     if (stale()) {
       return
     }
+    kioskHash = null   // a view that failed to start must not trap the page
     console.error('Failed to mount the view "' + view + '":', e)
     viewEl.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui,sans-serif;color:#dde4ef">' +
       '<p style="color:#f87171;font-weight:600;margin-bottom:12px">The view failed to load.</p>' +
@@ -301,10 +298,6 @@ window.addEventListener('appinstalled', () => {
   window.__installPrompt = null
   window.dispatchEvent(new Event('ollin-install-state'))
 })
-
-// An app running "installed" (isStandaloneApp) is ALWAYS relaunched by the OS at the URL frozen at
-// installation time (often #/playground) and NOT at the last position, so the last remembered route
-// has to be restored explicitly.
 
 // Startup: reopen the LAST route visited (remembered on every mount, `run` excepted). It is
 // restored when the tab is reopened "bare", with no explicit route, OR when the app is installed

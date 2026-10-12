@@ -187,7 +187,7 @@ export async function init(ctx) {
     relaunchBtn.addEventListener('click', () => {
       // An IN-PLACE restart: it runs again in the SAME WASM instance, with no page reload.
       if (paused) {
-        try { mod && mod.resumeMainLoop() } catch (_) {}
+        if (mod) resumeLoop(mod)
         paused = false
         setPauseUI()
       }

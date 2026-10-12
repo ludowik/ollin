@@ -312,9 +312,6 @@ func spawnFloater(row, col, v, color, delay)
 end
 
 func updateFloaters()
-    if len(floaters) == 0 then
-        return
-    end
     var flying = []
     for f in floaters do
         f.age += deltaTime
