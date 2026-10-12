@@ -529,11 +529,6 @@ end
 
 func drawTrays()
     for i = 1, 3 do
-        graphics.noStroke()
-        graphics.fill(1, 1, 1, 0.04)
-        graphics.rect(L.sx[i] - L.sw, L.sy[i] - L.sh, 2 * L.sw, 2 * L.sh, L.c * 0.3)
-    end
-    for i = 1, 3 do
         var p = slots[i]
         if p <> nil and p <> held then
             drawPiece(p)
