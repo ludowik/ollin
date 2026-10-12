@@ -225,6 +225,21 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   `tests/check_samples.sh` garde le catalogue : fichier listé existant, `.ol` du dossier tous
   listés hors les trois bibliothèques d'import, groupes contigus.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
+- **Mode kiosque (`#/play/sample/<fichier>`, vue `play`)** : un exemple du DÉPÔT, plein écran, sans barre ni
+  lien, sans moyen d'aller ailleurs. **Décisions de l'utilisateur** : exemples seulement (jamais un projet
+  utilisateur) ; quitter le plein écran ramène à l'écran de lancement (« gate ») avec le programme EN PAUSE
+  (`clockBreak` avant la reprise, sinon l'animation saute de la durée de la pause) ; le bouton Retour est
+  neutralisé ; pour l'iPhone, un CONSEIL affiché (« Add to Home Screen »), pas de manifeste dynamique par
+  application. Le verrou de navigation est dans `app.js` (`kioskHash` : `route()` rétablit le hash et rend la
+  main) ; Retour = un `pushState` renouvelé à chaque `popstate` (même URL, donc pas de `hashchange`). Le
+  programme ne part que sur le TOUCHER du gate : l'API Fullscreen, l'audio et les capteurs iOS exigent un
+  geste, et `requestFullscreen` est demandé de façon synchrone dans ce clic. `launchProgram`
+  (`lib/pg-run.js`) est partagé avec la vue `run`, pour que les deux ne divergent pas.
+  ⚠ **Ce qu'aucune page ne peut faire** : empêcher Échap de quitter le plein écran (seul Chrome de bureau
+  tient la touche, `navigator.keyboard.lock`), couper le sélecteur d'applications du système, fermer
+  l'onglet ; l'iPhone n'a AUCUNE API Fullscreen. Sortir du kiosque demande de charger une autre adresse.
+  Vérifié au navigateur (Chromium) : gate, entrée en plein écran, hash refusé, deux Retour sans effet,
+  gate au retour de plein écran, erreurs. **Non vérifié sur un vrai Safari/iPhone.**
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `home`, `tutorial`, `playground`, `run`, `perf`.
 - **Écran principal (vue `home`)** : une grille de tuiles — « My projects » d'abord (le magasin
   IndexedDB du playground, du plus récent au plus ancien), puis un thème par groupe du catalogue des

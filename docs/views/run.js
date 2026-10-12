@@ -13,7 +13,7 @@ export async function init(ctx) {
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
   const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, watchRenderArea, publishRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, launchProgram, sampleFromAnchor, fetchSample, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -59,31 +59,25 @@ export async function init(ctx) {
     if (cancelThumb) cancelThumb()
     cancelThumb = null
     statusEl.textContent = ''
-    // ONE name for the file being run: it is the base the imports resolve against, on the
-    // preloading side and inside the engine, which derives its base directory from this very
-    // string. Two formulas would let the two disagree.
     const entryName = project ? (project.entry || '') : (exampleFile || '')
-    // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
-    // project whose models are already among its resources).
-    const imported = await preloadSampleImports(mod, code, ctx.v, entryName)
-    await preloadSampleModels(mod, code + '\n' + imported, ctx.v, entryName)   // the imports' models too
-    // The `data` module's project scope, consistent with the playground: the same key.
-    window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')
-    // FRESH render dimensions are handed to the engine (the `window` module reads
-    // __ollinRenderW/H first). Without this, the value set by the playground PERSISTS on window,
-    // and W/H stay frozen at the old size in full screen.
-    publishRenderArea(pane)
-    runProgram(mod, code, canvasEl, {
-      filename:  entryName,
-      onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
-      // A graphics program: keyboard focus goes to the canvas, for interactive programs.
-      // preventScroll, otherwise mobile scrolls to bring the canvas into the viewport.
-      onRunning: () => {
-        statusEl.textContent = ''
-        try { canvasEl.focus({ preventScroll: true }) } catch (_) {}
-        scheduleThumbnail()
+    await launchProgram(mod, {
+      code,
+      entryName,
+      dataScope: exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_'),
+      v: ctx.v,
+      pane,
+      canvasEl,
+      hooks: {
+        onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
+        // A graphics program: keyboard focus goes to the canvas, for interactive programs.
+        // preventScroll, otherwise mobile scrolls to bring the canvas into the viewport.
+        onRunning: () => {
+          statusEl.textContent = ''
+          try { canvasEl.focus({ preventScroll: true }) } catch (_) {}
+          scheduleThumbnail()
+        },
+        onOutput:  (out) => showText(out),
       },
-      onOutput:  (out) => showText(out),
     })
   }
 

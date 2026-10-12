@@ -1,0 +1,62 @@
+<!-- PLAY view (the kiosk) — a fragment mounted by app.js in #view. One example, filling the window,
+     with no toolbar and no link to anywhere else: only a launch screen (the gate) and, when the
+     program fails, a message with a single Retry button. The shared canvas, from the shell, is
+     reparented into #output-pane by play.js. -->
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display:none !important; }
+    /* The app fills the window exactly, and nothing scrolls, selects or zooms: a long press, a
+       pinch or a drag that starts on the program must reach the program and nothing else. */
+    html, body { margin:0; height:100%; min-height:0; overflow:hidden; overscroll-behavior:none;
+                 background:#000; color:#e6e6ee;
+                 font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { position:fixed; top:0; right:0; bottom:0; left:0;
+           -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+           -webkit-tap-highlight-color:transparent; touch-action:none; }
+
+    /* The safe-area insets, for rounded corners and the home bar, are excluded from the area. */
+    #stage { position:fixed; inset:0;
+             padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                      env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    /* #output-pane is the GRAPHICS AREA that window.width and window.height measure. */
+    #output-pane { position:relative; width:100%; height:100%; overflow:hidden; }
+    canvas { display:none; position:absolute; top:0; left:0; right:0; bottom:0; margin:auto;
+             background:#000; touch-action:none; }
+    #out { position:absolute; inset:0; margin:0; padding:16px; white-space:pre-wrap; overflow:auto;
+           font:13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color:#b8f5c0;
+           -webkit-user-select:text; user-select:text; touch-action:auto; }
+
+    /* The launch screen: it stands above everything, and comes back whenever the full screen is left. */
+    #gate, #fail { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column;
+                   align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center;
+                   background:#0f1117; }
+    #gate-icon { width:96px; height:96px; border-radius:22px; object-fit:cover; background:#1a1d2e; }
+    #gate h1 { margin:0; font-size:22px; font-weight:600; }
+    #gate-note { margin:0; color:#a3adc4; font-size:14px; min-height:1.4em; }
+    #gate-hint { margin:8px 0 0; max-width:320px; color:#a3adc4; font-size:13px; line-height:1.5; }
+    .big-btn { padding:14px 34px; border:0; border-radius:12px; background:#9ba1ff; color:#0f1117;
+               font:600 17px system-ui, -apple-system, sans-serif; cursor:pointer; touch-action:manipulation; }
+    .big-btn:disabled { opacity:0.5; cursor:default; }
+
+    #fail { align-items:stretch; justify-content:flex-start; gap:12px; text-align:left; }
+    #fail #out { position:static; flex:1; min-height:0; }
+    #fail.err #out { color:#ff6b6b; }
+    #fail .big-btn { align-self:center; }
+  </style>
+
+  <div id="stage">
+    <div id="output-pane"></div>
+  </div>
+
+  <div id="fail" hidden>
+    <pre id="out"></pre>
+    <button id="retry-btn" class="big-btn" type="button">Retry</button>
+  </div>
+
+  <div id="gate">
+    <img id="gate-icon" alt="" hidden>
+    <h1 id="gate-title"></h1>
+    <p id="gate-note"></p>
+    <button id="go-btn" class="big-btn" type="button" disabled>Loading…</button>
+    <p id="gate-hint" hidden>For full screen on an iPhone, tap Share, then "Add to Home Screen", and open the app from there.</p>
+  </div>

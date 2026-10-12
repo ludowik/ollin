@@ -107,6 +107,7 @@ const ROUTES = {
   tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { html: 'views/run.html',        js: './views/run.js' },
+  play:       { html: 'views/play.html',       js: './views/play.js' },
   perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
 const DEFAULT_VIEW = 'home'
@@ -114,7 +115,8 @@ const DEFAULT_VIEW = 'home'
 // remembered so as to reopen it on the next launch. The whole route is stored, not just the
 // view, so the exact sample or anchor comes back. `run` is EXCLUDED, being transient and
 // requiring an active project: we keep the last tutorial or playground route, so as not to
-// reopen on "no project".
+// reopen on "no project". `play` (the kiosk) is excluded too: it is a link that is opened, not a
+// place the app goes back to.
 const LAST_HASH_KEY = 'ollin-last-route'
 
 // A viewport per view. The playground and the run mode lock the zoom (maximum-scale) to avoid
@@ -126,6 +128,7 @@ const VIEWPORT = {
   tutorial:   'width=device-width, initial-scale=1.0',
   playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
   run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
+  play:       'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover',
   perf:       'width=device-width, initial-scale=1.0',
 }
 function applyViewport(view) {
@@ -140,6 +143,9 @@ let currentView    = null
 let currentCleanup = null
 let currentAnchor  = ''    // the current view's sub-path (a tutorial anchor, or ex/<file>)
 let navSeq         = 0     // re-entrance guard: identifies the current navigation
+// The kiosk (#/play/…) keeps the app on its one route: once it is mounted, every other hash is put
+// back by route(). Leaving it takes loading another ADDRESS, not editing the hash of this one.
+let kioskHash      = null
 
 function parseHash() {
   const h = location.hash
@@ -210,7 +216,10 @@ async function mount(view, anchor) {
     currentCleanup = cleanup
     currentView = view
     currentAnchor = anchor
-    if (view !== 'run') {
+    if (view === 'play') {
+      kioskHash = location.hash
+    }
+    if (view !== 'run' && view !== 'play') {
       try {
         localStorage.setItem(LAST_HASH_KEY, '#/' + view + (anchor ? '/' + anchor : ''))
       } catch (_) {}
@@ -246,6 +255,11 @@ function navigate(view, anchor) {
 }
 
 async function route() {
+  // The kiosk: any other route is refused, and the address put back (replaceState raises no event).
+  if (kioskHash !== null && location.hash !== kioskHash) {
+    history.replaceState(null, '', kioskHash)
+    return
+  }
   const { view, anchor } = parseHash()
   // An unknown view falls back to the default one, and the hash is REWRITTEN to say so: left as
   // it was, the address would name a view that does not exist and, being remembered on mount,
@@ -298,7 +312,8 @@ function boot() {
   // NEVER override an EXPLICIT navigation to #/run: the "Full screen" button opens
   // index.html#/run in a new context, and in installed mode the restoration below would replace
   // it with the last route (which never includes `run`), so full screen would no longer start.
-  const explicitRun = location.hash.startsWith('#/run')
+  // The same goes for #/play, whose address is what an installed kiosk relaunches.
+  const explicitRun = /^#\/(run|play)/.test(location.hash)
   if (!explicitRun && last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
     location.hash = last   // triggers hashchange, hence route()
     return
@@ -327,8 +342,8 @@ const TRANSIENT = ['in_progress', 'queued', 'pending']
 
 async function checkPagesDeploy() {
   // Pointless in the full-screen run mode, where a program is running: no banner over it, and
-  // no API calls from that view.
-  if (location.hash.startsWith('#/run')) return
+  // no API calls from that view. The kiosk is the same, and must show nothing but its program.
+  if (/^#\/(run|play)/.test(location.hash)) return
   let state = null
   try {
     const cached = JSON.parse(sessionStorage.getItem(DEPLOY_CACHE_KEY) || 'null')

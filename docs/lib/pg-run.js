@@ -125,6 +125,27 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
+// Everything a launch does around runProgram: the preloading of what the entry file imports and
+// references, the `data` module's scope, the area handed to the engine. The run view and the kiosk
+// view both start a program through it, so the two cannot drift apart.
+//   entryName   ONE name for the file being run: the base its imports resolve against, on the
+//               preloading side and inside the engine, which derives its base directory from this
+//               very string. Two formulas would let the two disagree.
+//   dataScope   the key of the `data` module's project scope
+//   hooks       those of runProgram, minus the filename
+export async function launchProgram(m, { code, entryName, dataScope, v, pane, canvasEl, hooks }) {
+  // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
+  // project whose models are already among its resources).
+  const imported = await preloadSampleImports(m, code, v, entryName)
+  await preloadSampleModels(m, code + '\n' + imported, v, entryName)   // the imports' models too
+  window.__ollinDataProject = dataScope
+  // FRESH render dimensions are handed to the engine (the `window` module reads
+  // __ollinRenderW/H first). Without this, the value set by the playground PERSISTS on window,
+  // and W/H stay frozen at the old size in full screen.
+  publishRenderArea(pane)
+  runProgram(m, code, canvasEl, { ...hooks, filename: entryName })
+}
+
 // Bytes to base64, in chunks so as not to overflow the argument stack.
 function bytesToB64(bytes) {
   let bin = ''
