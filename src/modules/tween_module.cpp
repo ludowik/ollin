@@ -824,19 +824,26 @@ double eased(Value curve_fn, int curve, double p) {
     return k_curves[curve].fn(p);
 }
 
-void write_chan(const Chan& c, double v) {
-    Value out(v);
-    if (v == c.to && c.to_value.is_integer()) {
-        out = c.to_value;
-    } else if (v == c.from && c.from_value.is_integer()) {
-        out = c.from_value;
-    }
+void write_value(const Chan& c, const Value& out) {
     if (c.ref.is_map()) {
         ref_set(c.ref, out);
         return;
     }
     Value holder = c.holder;   // map_set mutates the map, so a copy of the Value is enough: the same Map*
     holder.map_set(c.key, out);
+}
+
+// A value strictly between the bounds: always a float.
+void write_chan(const Chan& c, double v) {
+    write_value(c, Value(v));
+}
+
+// One of the two bounds, written as the script gave it: an integer stays an integer. Only the callers know
+// they are at an end — inferring it from the value would turn any sample that happens to equal a bound
+// (a curve that plateaus) into an integer.
+void write_bound(const Chan& c, bool at_to) {
+    const Value& bound = at_to ? c.to_value : c.from_value;
+    write_value(c, bound.is_integer() ? bound : Value(at_to ? c.to : c.from));
 }
 
 // Reads a step's start values, once: it begins from whatever the previous step left. On later passes
@@ -862,7 +869,7 @@ void settle_step_end(Tw& t, size_t idx) {
     int8_t sens = t.plan[t.seg];
     std::vector<Chan> chans = t.steps[idx].chans;
     for (const auto& c : chans)
-        write_chan(c, sens > 0 ? c.to : c.from);
+        write_bound(c, sens > 0);
 }
 
 void advance(double dt) {
@@ -971,9 +978,13 @@ void advance(double dt) {
                 // A -1 segment plays from the target back to the start. At a step's end we write the
                 // EXACT value of its endpoint: an overshooting curve (back, elastic) does not return 1
                 // at 1, and rounding would leave 0.999.
-                double a = sens > 0 ? c.from : c.to;
-                double b = sens > 0 ? c.to : c.from;
-                write_chan(c, seg_ends ? b : a + (b - a) * f);
+                if (seg_ends) {
+                    write_bound(c, sens > 0);
+                } else {
+                    double a = sens > 0 ? c.from : c.to;
+                    double b = sens > 0 ? c.to : c.from;
+                    write_chan(c, a + (b - a) * f);
+                }
             }
         }
         if (ends && tween_alive(i, gen0)) {

@@ -1400,6 +1400,15 @@ tween.update(1.0)
 assert(twSeq.x == 100)
 tween.cancelAll()
 
+## Only the callers that really are at an END write a bound with its own type: a curve that sits ON the
+## target midway stays a float until the animation is over.
+var twPlateau = {q: 0}
+tween.to(twPlateau, {q: 10}, 1.0, func(p) return 1 end)
+tween.update(0.5)
+assert(twPlateau.q == 10 and typeof(twPlateau.q) == "float")
+tween.update(0.5)
+assert(twPlateau.q == 10 and typeof(twPlateau.q) == "int")
+
 ## An overshooting curve: the final value must be the EXACT target, not 0.99.
 var twFini = false
 tween.to(twObj, {x: 20}, 0.5, "easeOutBack", func() twFini = true end)

@@ -21,6 +21,9 @@ const SAVE_KEY = "blockudoku.game"
 const FLOAT_POP = 0.18           ## seconds for a gained point to appear where it was earned
 const FLOAT_HOLD = 0.12          ## seconds it stays there before being drawn into the score
 const FLOAT_FLIGHT = 0.5
+const FLOAT_LIFE = FLOAT_POP + FLOAT_HOLD + FLOAT_FLIGHT
+const OUTLINE = [[-1, 0], [1, 0], [0, -1], [0, 1]]      ## where the dark copies of a point's text sit around it
+const OUTLINE_INK = [0.04, 0.05, 0.09, 1]
 
 const PALETTE = [
     [0.93, 0.35, 0.35], [0.96, 0.60, 0.25], [0.96, 0.82, 0.30], [0.40, 0.80, 0.45],
@@ -39,7 +42,7 @@ global best = 0
 global newBest = false
 global streak = 0
 global display = {score: 0, pop: 1}   ## score: what the counter SHOWS, which catches up as each point lands
-global floaters = []         ## points gained, flying to the score: {row, col, text, color, v, age, done}
+global floaters = []         ## points gained, flying to the score: {row, col, text, tint, v, age}
 global fade = {a: 0}
 global held = nil
 global heldSlot = nil
@@ -301,23 +304,29 @@ end
 
 ## A gained point shows where it was earned (row and col are in cells, fractions allowed), then is drawn
 ## into the score, shrinking: the counter only grows when it lands, so it never runs ahead of what is seen.
-## Its progress is computed from its age and not tweened: a tween between two whole numbers rounds each
-## step, and a literal such as 0.0 is a whole number here.
+## Its progress is computed from its age rather than tweened, so there is no callback to outlive it.
 func spawnFloater(row, col, v, color, delay)
-    floaters.push({row: row, col: col, text: "+{v}", color: color, v: v, age: -delay, done: false})
+    var base = PALETTE[color]
+    var tint = [base[1] + (1 - base[1]) * 0.6, base[2] + (1 - base[2]) * 0.6, base[3] + (1 - base[3]) * 0.6, 1]
+    floaters.push({row: row, col: col, text: "+{v}", tint: tint, v: v, age: -delay})
 end
 
 func updateFloaters()
+    if len(floaters) == 0 then
+        return
+    end
+    var flying = []
     for f in floaters do
         f.age += deltaTime
-        if f.age >= FLOAT_POP + FLOAT_HOLD + FLOAT_FLIGHT then
-            f.done = true
+        if f.age < FLOAT_LIFE then
+            flying.push(f)
+        else
             display.score += f.v
             display.pop = 1.18
             tween.to(display, {pop: 1}, 0.18, "easeOutQuad")
         end
     end
-    floaters = floaters.filter(func(f) return not f.done end)
+    floaters = flying
 end
 
 ## The cells of the wave shrink one after the other, starting nearest to the piece just placed.
@@ -618,13 +627,11 @@ func drawFloaters()
             var y = y0 + (ty - y0) * k
             var size = c * 0.46 * grow * (1 - 0.75 * k)
             var alpha = 1 - math.max(0, (k - 0.8) / 0.2)
-            var col = PALETTE[f.color]
             var edge = size * 0.07
-            for off in [[-1, 0], [1, 0], [0, -1], [0, 1]] do
-                drawText(f.text, x + off[1] * edge, y + off[2] * edge, size, "center", "center", [0.04, 0.05, 0.09, 1], alpha * 0.9)
+            for off in OUTLINE do
+                drawText(f.text, x + off[1] * edge, y + off[2] * edge, size, "center", "center", OUTLINE_INK, alpha * 0.9)
             end
-            drawText(f.text, x, y, size, "center", "center",
-                     [col[1] + (1 - col[1]) * 0.6, col[2] + (1 - col[2]) * 0.6, col[3] + (1 - col[3]) * 0.6, 1], alpha)
+            drawText(f.text, x, y, size, "center", "center", f.tint, alpha)
         end
     end
 end

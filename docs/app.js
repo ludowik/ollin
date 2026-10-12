@@ -65,7 +65,7 @@ if (/Mac/i.test(navigator.platform || '')) {
   })
 }
 
-const { hardReload } = await import('./lib/pg-run.js?v=' + V)
+const { hardReload, isStandaloneApp } = await import('./lib/pg-run.js?v=' + V)
 
 // On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).
 // Installed BEFORE any WASM load, so that hard faults are caught too.
@@ -101,22 +101,24 @@ function getOllin() {
 
 // Table of views. anchorIsSection means the anchor is a section id to scroll to, with no
 // remount. Otherwise the anchor is a view parameter (sample/<file>, say), and the view is
-// remounted when it changes.
+// remounted when it changes. transient marks a view that is a link which is opened, not a place the app
+// goes back to: it is not remembered as the last route, an explicit address to it is never replaced by
+// that last route, and no deploy banner appears over it. lock keeps the app on that one route (the kiosk).
+// A new chromeless view is a line here, not an edit at each of those places.
 const ROUTES = {
   home:       { html: 'views/home.html',       js: './views/home.js' },
   tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
-  run:        { html: 'views/run.html',        js: './views/run.js' },
-  play:       { html: 'views/play.html',       js: './views/play.js' },
+  run:        { html: 'views/run.html',        js: './views/run.js',  transient: true },
+  play:       { html: 'views/play.html',       js: './views/play.js', transient: true, lock: true },
   perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
 const DEFAULT_VIEW = 'home'
 // The last complete ROUTE visited (the view plus its sub-path: a tutorial anchor, a sample…),
 // remembered so as to reopen it on the next launch. The whole route is stored, not just the
-// view, so the exact sample or anchor comes back. `run` is EXCLUDED, being transient and
-// requiring an active project: we keep the last tutorial or playground route, so as not to
-// reopen on "no project". `play` (the kiosk) is excluded too: it is a link that is opened, not a
-// place the app goes back to.
+// view, so the exact sample or anchor comes back. The transient views are EXCLUDED: `run` requires an
+// active project (we keep the last tutorial or playground route, so as not to reopen on "no project"),
+// and `play` (the kiosk) is a link that is opened.
 const LAST_HASH_KEY = 'ollin-last-route'
 
 // A viewport per view. The playground and the run mode lock the zoom (maximum-scale) to avoid
@@ -216,10 +218,10 @@ async function mount(view, anchor) {
     currentCleanup = cleanup
     currentView = view
     currentAnchor = anchor
-    if (view === 'play') {
+    if (route.lock) {
       kioskHash = location.hash
     }
-    if (view !== 'run' && view !== 'play') {
+    if (!route.transient) {
       try {
         localStorage.setItem(LAST_HASH_KEY, '#/' + view + (anchor ? '/' + anchor : ''))
       } catch (_) {}
@@ -289,28 +291,20 @@ addEventListener('hashchange', route)
 
 // The browser's offer to install the page as an app (Chrome, Edge, Android) arrives once, possibly before
 // any view exists: it is kept here, and the kiosk's gate offers it behind a button. The other views make no
-// use of it, so the browser's own banner is held back everywhere.
+// use of it, so the browser's own banner is held back everywhere. 'ollin-install-state' says it changed.
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault()
   window.__installPrompt = e
-  window.dispatchEvent(new Event('ollin-installable'))
+  window.dispatchEvent(new Event('ollin-install-state'))
 })
 window.addEventListener('appinstalled', () => {
   window.__installPrompt = null
-  window.dispatchEvent(new Event('ollin-installed'))
+  window.dispatchEvent(new Event('ollin-install-state'))
 })
 
-// Is the app running "installed" (added to the iOS home screen, or in standalone display mode)?
-// In that case the OS ALWAYS relaunches the URL frozen at installation time (often #/playground)
-// and NOT the last position, so the last remembered route has to be restored explicitly.
-function isStandaloneApp() {
-  try {
-    return window.navigator.standalone === true ||
-           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-  } catch (_) {
-    return false
-  }
-}
+// An app running "installed" (isStandaloneApp) is ALWAYS relaunched by the OS at the URL frozen at
+// installation time (often #/playground) and NOT at the last position, so the last remembered route
+// has to be restored explicitly.
 
 // Startup: reopen the LAST route visited (remembered on every mount, `run` excepted). It is
 // restored when the tab is reopened "bare", with no explicit route, OR when the app is installed
@@ -322,12 +316,12 @@ function boot() {
   try {
     last = localStorage.getItem(LAST_HASH_KEY)
   } catch (_) {}
-  // NEVER override an EXPLICIT navigation to #/run: the "Full screen" button opens
+  // NEVER override an EXPLICIT navigation to a transient view: the "Full screen" button opens
   // index.html#/run in a new context, and in installed mode the restoration below would replace
   // it with the last route (which never includes `run`), so full screen would no longer start.
   // The same goes for #/play, whose address is what an installed kiosk relaunches.
-  const explicitRun = /^#\/(run|play)/.test(location.hash)
-  if (!explicitRun && last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
+  const explicitTransient = ROUTES[parseHash().view]?.transient
+  if (!explicitTransient && last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
     location.hash = last   // triggers hashchange, hence route()
     return
   }
@@ -354,9 +348,9 @@ const DEPLOY_TTL = 120000
 const TRANSIENT = ['in_progress', 'queued', 'pending']
 
 async function checkPagesDeploy() {
-  // Pointless in the full-screen run mode, where a program is running: no banner over it, and
-  // no API calls from that view. The kiosk is the same, and must show nothing but its program.
-  if (/^#\/(run|play)/.test(location.hash)) return
+  // Pointless in a transient view, where a program is running: no banner over it, and no API calls
+  // from that view. The kiosk must show nothing but its program.
+  if (ROUTES[parseHash().view]?.transient) return
   let state = null
   try {
     const cached = JSON.parse(sessionStorage.getItem(DEPLOY_CACHE_KEY) || 'null')

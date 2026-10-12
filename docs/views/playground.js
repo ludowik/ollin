@@ -2240,9 +2240,7 @@ if (autoexecWrap) {
 
 stopBtn.addEventListener('click', () => {
   if (isPaused) {
-    // The break before resuming: the time spent paused is not the program's (see run.js).
-    try { ollin.clockBreak() } catch(_) {}
-    try { ollin.resumeMainLoop() } catch(_) {}
+    Run.resumeLoop(ollin)
     isPaused = false
     stopBtn.innerHTML = ICON_PAUSE + '<span class="btn-label"> Pause</span>'
   } else {

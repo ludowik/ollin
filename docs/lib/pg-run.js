@@ -125,6 +125,30 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
+// The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a project whose
+// models are already among its resources), and so are the files the entry imports, and THEIR models.
+export async function preloadProgramAssets(m, code, v, entryName) {
+  const imported = await preloadSampleImports(m, code, v, entryName)
+  await preloadSampleModels(m, code + '\n' + imported, v, entryName)
+}
+
+// Resumes a paused loop. The clock break comes BEFORE: the frame that follows must not be charged with
+// the time spent paused, otherwise every animation jumps forward by the length of the pause.
+export function resumeLoop(m) {
+  try { m.clockBreak() } catch (_) {}
+  try { m.resumeMainLoop() } catch (_) {}
+}
+
+// Is the app running "installed" (added to the iOS home screen, or in a standalone or full-screen display mode)?
+export function isStandaloneApp() {
+  try {
+    return window.navigator.standalone === true ||
+           (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches)
+  } catch (_) {
+    return false
+  }
+}
+
 // Everything a launch does around runProgram: the preloading of what the entry file imports and
 // references, the `data` module's scope, the area handed to the engine. The run view and the kiosk
 // view both start a program through it, so the two cannot drift apart.
@@ -133,11 +157,10 @@ export function runProgram(m, code, canvasEl, hooks) {
 //               very string. Two formulas would let the two disagree.
 //   dataScope   the key of the `data` module's project scope
 //   hooks       those of runProgram, minus the filename
-export async function launchProgram(m, { code, entryName, dataScope, v, pane, canvasEl, hooks }) {
-  // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
-  // project whose models are already among its resources).
-  const imported = await preloadSampleImports(m, code, v, entryName)
-  await preloadSampleModels(m, code + '\n' + imported, v, entryName)   // the imports' models too
+//   assets      the promise of preloadProgramAssets, when the caller started it earlier (the kiosk does, while
+//               its launch screen is up); otherwise it is started here
+export async function launchProgram(m, { code, entryName, dataScope, v, pane, canvasEl, hooks, assets }) {
+  await (assets || preloadProgramAssets(m, code, v, entryName))
   window.__ollinDataProject = dataScope
   // FRESH render dimensions are handed to the engine (the `window` module reads
   // __ollinRenderW/H first). Without this, the value set by the playground PERSISTS on window,

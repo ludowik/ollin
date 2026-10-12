@@ -13,7 +13,7 @@ export async function init(ctx) {
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
   const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
-  const { loadProjectIntoRuntime, launchProgram, sampleFromAnchor, fetchSample, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, launchProgram, resumeLoop, sampleFromAnchor, fetchSample, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -101,10 +101,7 @@ export async function init(ctx) {
     pauseBtn.addEventListener('click', () => {
       if (!mod) return
       if (paused) {
-        // The break BEFORE resuming: the frame that follows must not be charged with the time
-        // spent paused, otherwise every animation jumps forward by the length of the pause.
-        try { mod.clockBreak() } catch (_) {}
-        try { mod.resumeMainLoop() } catch (_) {}
+        resumeLoop(mod)
         paused = false
       } else {
         try { mod.pauseMainLoop() } catch (_) {}
@@ -149,8 +146,7 @@ export async function init(ctx) {
     // While paused no frame goes by, so the loop is resumed for the length of the capture.
     const wasPaused = paused
     if (wasPaused) {
-      try { mod.clockBreak() } catch (_) {}
-      try { mod.resumeMainLoop() } catch (_) {}
+      resumeLoop(mod)
     }
     statusEl.textContent = 'capture…'
     mod.requestCapture()

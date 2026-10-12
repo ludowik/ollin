@@ -16,7 +16,6 @@ implementation to agree on, and the exact shape does not matter.
 """
 import math
 import os
-import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -105,33 +104,7 @@ def build():
             b = a + SIDE
             idx += [a, b, a + 1, a + 1, b, b + 1]
 
-    out = gl.Blob()
-    v_pos = out.floats(pos, 3)
-    v_nrm = out.floats(nrm, 3)
-    # COLOR_0 as four unsigned bytes per vertex, normalised: what raylib expects in mesh.colors,
-    # and four times smaller than floats.
-    v_col = out.view(b"".join(struct.pack("<4B", *(int(round(c * 255.0)) for c in rgba))
-                              for rgba in col), 34962)
-    v_idx = out.ushorts(idx)
-    doc = {
-        "asset": {"version": "2.0", "generator": "ollin tools/gen_terrain_glb.py"},
-        "scene": 0,
-        "scenes": [{"nodes": [0]}],
-        "nodes": [{"name": "Terrain", "mesh": 0}],
-        "meshes": [{"name": "Terrain", "primitives": [{
-            "attributes": {"POSITION": 0, "NORMAL": 1, "COLOR_0": 2}, "indices": 3}]}],
-        "accessors": [
-            {"bufferView": v_pos, "componentType": 5126, "count": len(pos), "type": "VEC3",
-             "min": [min(p[k] for p in pos) for k in range(3)],
-             "max": [max(p[k] for p in pos) for k in range(3)]},
-            {"bufferView": v_nrm, "componentType": 5126, "count": len(nrm), "type": "VEC3"},
-            {"bufferView": v_col, "componentType": 5121, "count": len(col), "type": "VEC4",
-             "normalized": True},
-            {"bufferView": v_idx, "componentType": 5123, "count": len(idx), "type": "SCALAR"},
-        ],
-        "bufferViews": out.views,
-    }
-    return gl.write_glb(doc, out.data), len(pos), len(idx) // 3
+    return gl.write_colored_mesh_glb("Terrain", "ollin tools/gen_terrain_glb.py", pos, nrm, col, idx), len(pos), len(idx) // 3
 
 
 if __name__ == "__main__":

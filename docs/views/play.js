@@ -17,8 +17,8 @@
 
 export async function init(ctx) {
   const { getOllin } = ctx
-  const { sampleFromAnchor, fetchSample, loadProjectIntoRuntime, launchProgram, watchRenderArea, unlockOrientation } =
-    await import('../lib/pg-run.js?v=' + ctx.v)
+  const { sampleFromAnchor, fetchSample, loadProjectIntoRuntime, launchProgram, preloadProgramAssets, resumeLoop,
+          isStandaloneApp, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
   const Samples = await import('../lib/pg-samples.js?v=' + ctx.v)
 
   const $ = (id) => document.getElementById(id)
@@ -58,12 +58,7 @@ export async function init(ctx) {
   listen(window, 'popstate', () => history.pushState(null, '', location.href))
 
   // ── The gate ──────────────────────────────────────────────────────────────────────────────────
-  const standalone = (() => {
-    try {
-      return window.navigator.standalone === true ||
-             (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches)
-    } catch (_) { return false }
-  })()
+  const standalone = isStandaloneApp()
   const root = document.documentElement
   const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen)
 
@@ -78,12 +73,6 @@ export async function init(ctx) {
   const manifestLink = document.querySelector('link[rel="manifest"]')
   const touchIconLink = document.querySelector('link[rel="apple-touch-icon"]')
   const appTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
-  const saved = {
-    manifest: manifestLink && manifestLink.getAttribute('href'),
-    touchIcon: touchIconLink && touchIconLink.getAttribute('href'),
-    appTitle: appTitleMeta && appTitleMeta.getAttribute('content'),
-    title: document.title,
-  }
   let manifestUrl = null
 
   function applyIdentity(name, icon) {
@@ -120,23 +109,13 @@ export async function init(ctx) {
     syncInstall()
   }
 
-  function restoreIdentity() {
-    if (manifestLink && saved.manifest !== null) manifestLink.setAttribute('href', saved.manifest)
-    if (touchIconLink && saved.touchIcon !== null) touchIconLink.setAttribute('href', saved.touchIcon)
-    if (appTitleMeta && saved.appTitle !== null) appTitleMeta.setAttribute('content', saved.appTitle)
-    document.title = saved.title
-    if (manifestUrl) URL.revokeObjectURL(manifestUrl)
-    window.__installPrompt = null
-  }
-
   // The prompt event is kept by app.js (it can arrive before this view exists); a tap on the button is
   // the gesture that lets it be shown.
   const installBtn = $('install-btn')
   function syncInstall() {
     installBtn.hidden = standalone || !window.__installPrompt
   }
-  listen(window, 'ollin-installable', syncInstall)
-  listen(window, 'ollin-installed', syncInstall)
+  listen(window, 'ollin-install-state', syncInstall)
   installBtn.addEventListener('click', async (e) => {
     e.stopPropagation()      // the gate itself starts the program: this is not that
     const prompt = window.__installPrompt
@@ -256,6 +235,7 @@ export async function init(ctx) {
       code,
       entryName: file,
       dataScope: 'sample:' + file,
+      assets,
       v: ctx.v,
       pane,
       canvasEl,
@@ -268,10 +248,7 @@ export async function init(ctx) {
   }
 
   function resume() {
-    // The break BEFORE resuming: the frame that follows must not be charged with the time spent
-    // behind the gate, otherwise every animation jumps forward by the length of the pause.
-    try { mod.clockBreak() } catch (_) {}
-    try { mod.resumeMainLoop() } catch (_) {}
+    resumeLoop(mod)
     running = true
     holdScreen()
     focusCanvas()
@@ -291,23 +268,31 @@ export async function init(ctx) {
   })
 
   // The example and the engine load while the gate is up; the button wakes when both are there.
+  let assets = null
   try {
-    code = await fetchSample(file, ctx.v)     // it rejects on a 404, so an HTML page is never run
-    mod = await getOllin()
+    // Independent, so together: the sample is small, the engine is the long download.
+    ;[code, mod] = await Promise.all([
+      fetchSample(file, ctx.v),     // it rejects on a 404, so an HTML page is never run
+      getOllin(),
+    ])
   } catch (e) {
     fail('error: ' + (e && e.message ? e.message : e))
     return cleanup
   }
   try { mod.setStatsVisible(false) } catch (_) {}     // a clean screen: no memory and frame-rate readout
   loadProjectIntoRuntime(mod, null)
+  // The models and imports download behind the launch screen: they need no gesture, and a tap should find
+  // them ready instead of a blank canvas. Best-effort, as everywhere else.
+  assets = preloadProgramAssets(mod, code, ctx.v, file).catch(() => {})
   showGate('', 'Touch to play')
   return cleanup
 
+  // The router never leaves this view (route.lock): the page is the way out. This is the contract's cleanup,
+  // not a path that runs, which is why the manifest swap is not undone here.
   function cleanup() {
     unwatchArea()
     listeners.forEach((off) => off())
     releaseScreen()
-    restoreIdentity()
     unlockOrientation()
     try { navigator.keyboard && navigator.keyboard.unlock && navigator.keyboard.unlock() } catch (_) {}
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}

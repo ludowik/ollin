@@ -231,7 +231,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   (`clockBreak` avant la reprise, sinon l'animation saute de la durée de la pause) ; le bouton Retour est
   neutralisé ; pour l'iPhone, un CONSEIL affiché (« Add to Home Screen »), pas de manifeste dynamique par
   application. Le verrou de navigation est dans `app.js` (`kioskHash` : `route()` rétablit le hash et rend la
-  main) ; Retour = un `pushState` renouvelé à chaque `popstate` (même URL, donc pas de `hashchange`). Le
+  main), et les vues sans barre se DÉCLARENT dans `ROUTES` (`transient` : jamais retenue comme dernière
+  vue, adresse explicite respectée, pas de bandeau de déploiement ; `lock` : le verrou) au lieu d'un test
+  par site ; Retour = un `pushState` renouvelé à chaque `popstate` (même URL, donc pas de `hashchange`). Le
   programme ne part que sur le TOUCHER du gate : l'API Fullscreen, l'audio et les capteurs iOS exigent un
   geste, et `requestFullscreen` est demandé de façon synchrone dans ce clic. `launchProgram`
   (`lib/pg-run.js`) est partagé avec la vue `run`, pour que les deux ne divergent pas.
@@ -1361,7 +1363,8 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   entiers ⇒ `llround` à chaque pas) : une opacité de `0` à `1` restait à 0 puis sautait à 1, et écrire
   `0.0` n'y changeait rien, car un littéral de valeur entière EST un entier (`num_value`, `typeof(1.0)`
   rend `"int"`). Les BORNES, elles, sont réécrites avec leur type d'origine (`Chan::from_value` /
-  `to_value`) : un champ animé vers `8` finit entier, et un indice de tableau refuse `8.0` (« array index
+  `to_value`, par `write_bound`, appelé SEULEMENT aux extrémités : le déduire de la valeur transformerait en
+  entier tout échantillon qui tombe pile sur une borne) : un champ animé vers `8` finit entier, et un indice de tableau refuse `8.0` (« array index
   must be integer », vérifié) — écrire toujours un flottant aurait cassé les compteurs utilisés comme indices.
 - Les 18 courbes sont un tableau `{nom, fonction}` : les noms exposés vivent dans des
   littéraux de chaîne (donc camelCase), les fonctions C++ sont en `snake_case`.

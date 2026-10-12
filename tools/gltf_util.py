@@ -120,6 +120,37 @@ class Blob:
         return self.view(b"".join(struct.pack("<H", v) for v in values), 34963)
 
 
+def write_colored_mesh_glb(name, generator, pos, nrm, col, idx):
+    """A one-mesh, one-node .glb whose vertices carry a colour: POSITION, NORMAL, COLOR_0 and the indices.
+
+    COLOR_0 is written as four unsigned bytes per vertex, normalised — what raylib expects in mesh.colors, and
+    four times smaller than floats. `col` holds RGBA floats in 0..1; `generator` is recorded in the asset."""
+    out = Blob()
+    v_pos = out.floats(pos, 3)
+    v_nrm = out.floats(nrm, 3)
+    v_col = out.view(b"".join(struct.pack("<4B", *(int(round(c * 255.0)) for c in rgba)) for rgba in col), 34962)
+    v_idx = out.ushorts(idx)
+    doc = {
+        "asset": {"version": "2.0", "generator": generator},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"name": name, "mesh": 0}],
+        "meshes": [{"name": name, "primitives": [{
+            "attributes": {"POSITION": 0, "NORMAL": 1, "COLOR_0": 2}, "indices": 3}]}],
+        "accessors": [
+            {"bufferView": v_pos, "componentType": 5126, "count": len(pos), "type": "VEC3",
+             "min": [min(p[k] for p in pos) for k in range(3)],
+             "max": [max(p[k] for p in pos) for k in range(3)]},
+            {"bufferView": v_nrm, "componentType": 5126, "count": len(nrm), "type": "VEC3"},
+            {"bufferView": v_col, "componentType": 5121, "count": len(col), "type": "VEC4",
+             "normalized": True},
+            {"bufferView": v_idx, "componentType": 5123, "count": len(idx), "type": "SCALAR"},
+        ],
+        "bufferViews": out.views,
+    }
+    return write_glb(doc, out.data)
+
+
 def write_glb(doc, blob):
     """Wraps a document and its binary chunk into a .glb container."""
     doc["buffers"] = [{"byteLength": len(blob)}]
