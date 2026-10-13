@@ -1382,18 +1382,18 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   (`elapsed -= dur` dans une boucle `while`), sans quoi une animation courte perdrait une
   fraction de seconde à chaque parcours.
 - **Suite d'étapes (`tween.sequence(objet, [étapes])`)** : un tween porte un **vecteur
-  d'`Etape`** (canaux, durée, courbe), et `tween.to`/`tween.value` en créent une d'UNE étape —
+  de `Step`** (canaux, durée, courbe), et `tween.to`/`tween.value` en créent une d'UNE étape —
   tout le module ne connaît donc qu'un seul chemin, une séquence n'étant pas un cas
   particulier. Clés d'étape en anglais : `to`, `delay`, `curve`, `target` ; toute autre est
   refusée avec la liste, sans quoi un `duration` mal choisi serait ignoré en silence. `delay`
-  porte les DEUX rôles — durée quand l'étape a `to`, attente sinon (`Etape::attente` retient
+  porte les DEUX rôles — durée quand l'étape a `to`, attente sinon (`Step::is_wait` retient
   ce choix, car une attente sans canal ne doit pas être prise pour une étape vidée par
   `drop_conflicts`). Le plan de lecture s'applique à la SUITE : un segment de sens -1 rejoue
-  les étapes en ordre inverse (`etape_index`), chacune à l'envers.
+  les étapes en ordre inverse (`step_index`), chacune à l'envers.
   Trois pièges éprouvés, tous corrigés : le drapeau de démarrage est **par étape** (global, il
   relisait les bornes en marche arrière et le retour n'allait nulle part) ; une étape franchie
-  en un seul pas de temps doit être **démarrée puis posée** à son extrémité (`demarrer_etape`
-  + `poser_fin_etape`), sinon ses bornes restent celles lues à la construction ; et la
+  en un seul pas de temps doit être **démarrée puis posée** à son extrémité (`start_step`
+  + `settle_step_end`), sinon ses bornes restent celles lues à la construction ; et la
   dernière étape du dernier segment sort de la boucle **sans soustraire** sa durée — c'est ce
   dépassement qui signifie « terminé », le soustraire faisait réécrire la valeur de départ.
   `progress` intègre le TEMPS des étapes franchies, pas leur nombre : des durées inégales

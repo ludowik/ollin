@@ -194,8 +194,8 @@ struct Chan {
 struct Step {
     std::vector<Chan> chans;
     bool is_wait = false;   // a step declared without `to`: it merely lets time pass
-    bool started = false;  // have the bounds been read? On the FIRST pass only — a return trip
-                            // replays the same bounds, otherwise it goes nowhere)
+    bool started = false;   // have the bounds been read? On the FIRST pass only — a return trip
+                            // replays the same bounds, otherwise it goes nowhere
     double dur = 0.0;
     int curve = k_curve_default;
     Value curve_fn;   // curve supplied by the script, taking precedence over `curve`
@@ -473,7 +473,7 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
 
 // The tail shared by tween.to, tween.value and tween.sequence: allocate, install the steps and the
 // completion callback, return the handle. All three used to write it identically.
-int creer_tween(std::vector<Step>&& steps, const Value& on_done) {
+int create_tween(std::vector<Step>&& steps, const Value& on_done) {
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
     t.steps = std::move(steps);
@@ -483,7 +483,7 @@ int creer_tween(std::vector<Step>&& steps, const Value& on_done) {
 }
 
 // The single step of ONE animation: the tween.to and tween.value case.
-Step etape_simple(std::vector<Chan>&& chans, double dur, int curve, const Value& curve_fn) {
+Step single_step(std::vector<Chan>&& chans, double dur, int curve, const Value& curve_fn) {
     Step e;
     e.chans = std::move(chans);
     e.dur = dur;
@@ -522,8 +522,8 @@ int tween_to(CallCtx& ctx) {
     add_map_chans(chans, args[0], args[1], "tween.to");
     drop_conflicts(chans);
     std::vector<Step> steps;
-    steps.push_back(etape_simple(std::move(chans), dur, curve, curve_fn));
-    return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
+    steps.push_back(single_step(std::move(chans), dur, curve, curve_fn));
+    return ctx.ret(make_handle(create_tween(std::move(steps), on_done)));
 }
 
 // tween.value(ref v, target, duration [, curve] [, onDone])
@@ -561,8 +561,8 @@ int tween_value(CallCtx& ctx) {
     // instance, are properly deduplicated.
     drop_conflicts(chans);
     std::vector<Step> steps;
-    steps.push_back(etape_simple(std::move(chans), dur, curve, curve_fn));
-    return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
+    steps.push_back(single_step(std::move(chans), dur, curve, curve_fn));
+    return ctx.ret(make_handle(create_tween(std::move(steps), on_done)));
 }
 
 // tween.sequence(object, [ {to: {field: target}, delay: seconds [, curve: name] [, target: object]}, … ])
@@ -653,7 +653,7 @@ int tween_sequence(CallCtx& ctx) {
     // A single cancellation pass for the WHOLE sequence: called per step, it could free a tween that
     // still had channels targeted by a later step.
     drop_conflicts(all);
-    return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
+    return ctx.ret(make_handle(create_tween(std::move(steps), on_done)));
 }
 
 int tween_cancel_all(CallCtx& ctx) {
@@ -770,9 +770,9 @@ int method_repeat(CallCtx& ctx) {
     int slot = handle_slot(ctx.args[0], FN);
     if (slot >= 0) {
         Tw& t = s_tweens[slot];
-        std::vector<int8_t> bloc = t.plan;
+        std::vector<int8_t> one_pass = t.plan;
         for (int k = 1; k < (int)n; k++)
-            t.plan.insert(t.plan.end(), bloc.begin(), bloc.end());
+            t.plan.insert(t.plan.end(), one_pass.begin(), one_pass.end());
         if (ping_pong) {
             for (size_t i = t.plan.size(); i > 0; i--)
                 t.plan.push_back((int8_t)-t.plan[i - 1]);
@@ -860,10 +860,10 @@ void start_step(Tw& t, size_t idx) {
 // no trace. `idx` is the step's REAL index, as for start_step — two index conventions in the same
 // caller would be a trap.
 void settle_step_end(Tw& t, size_t idx) {
-    int8_t sens = t.plan[t.seg];
+    int8_t direction = t.plan[t.seg];
     std::vector<Chan> chans = t.steps[idx].chans;
     for (const auto& c : chans)
-        write_bound(c, sens > 0);
+        write_bound(c, direction > 0);
 }
 
 void advance(double dt) {
@@ -898,7 +898,7 @@ void advance(double dt) {
         double p = 1.0;
         bool ends = true;      // the last segment is over, so the tween has finished
         bool seg_ends = true;  // the current step is over
-        int8_t sens = 1;
+        int8_t direction = 1;
         size_t idx = 0;
         // This loop calls Ollin code: a `ref` getter in start_step, a setter in settle_step_end. That
         // code can declare a tween, hence push_back onto s_tweens and REALLOCATE the vector, so no
@@ -949,7 +949,7 @@ void advance(double dt) {
             if (!tween_alive(i, gen0))
                 continue;   // cancelled while being crossed: there is nothing left to write
             Tw& t = s_tweens[i];
-            sens = t.plan[t.seg];
+            direction = t.plan[t.seg];
             idx = step_index(t, t.pos);
             double dur = t.steps[idx].dur;
             if (t.elapsed < dur) {
@@ -973,10 +973,10 @@ void advance(double dt) {
                 // EXACT value of its endpoint: an overshooting curve (back, elastic) does not return 1
                 // at 1, and rounding would leave 0.999.
                 if (seg_ends) {
-                    write_bound(c, sens > 0);
+                    write_bound(c, direction > 0);
                 } else {
-                    double a = sens > 0 ? c.from : c.to;
-                    double b = sens > 0 ? c.to : c.from;
+                    double a = direction > 0 ? c.from : c.to;
+                    double b = direction > 0 ? c.to : c.from;
                     write_value(c, Value(a + (b - a) * f));   // strictly between the bounds: a float
                 }
             }
