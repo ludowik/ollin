@@ -981,7 +981,8 @@ Le moteur appelle le module en trois endroits de sa boucle de rendu, et **l'ordr
 - **`ui_reset()` TUE les nœuds sur place, il n'efface pas la table** : vider le vecteur remettait
   chaque slot à la génération 1, et un handle d'avant `ui.clear()` désignait alors le widget qui
   avait pris sa place. Une boucle de dessin interrompue par un getter qui appelle `ui.clear()` relit
-  aussi des nœuds morts mais valides. Une déclaration copie ses arguments et résout son menu parent
+  aussi des nœuds morts mais valides — et SAUTE ceux dont `alive` est faux : leur référence est nil,
+  et la lire plantait le moteur (`tests/gfx_ui_draw_test.ol`, sous Xvfb). Une déclaration copie ses arguments et résout son menu parent
   APRÈS tout code script (getter, setter, `__str`) : ce code peut agrandir le fichier de registres,
   retirer le parent ou vider l'interface. Rien de cela ne se voit avec le stub (handles inertes) :
   `tests/gfx_ui_test.ol` tourne sous `build-gfx/ollin`, reconstruit par `tests/run.sh` s'il existe.

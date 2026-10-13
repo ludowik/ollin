@@ -358,6 +358,9 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
     if (head > widest)
         widest = head;
     for (int slot : rows) {
+        // A getter run for an earlier row can have called ui.clear: the rows left are dead.
+        if (!s_nodes[slot].alive)
+            continue;
         // Fields are COPIED, with no reference into the node: a list's width needs the selected
         // value, and reading it runs a script getter, which can declare a widget and reallocate
         // s_nodes.
@@ -758,6 +761,10 @@ void ui_draw() {
         draw_text_at(back_label(), s_back_box.x + m.pad, s_back_box, m, STYLE.text);
     }
     for (int slot : rows) {
+        // A getter run for an earlier row can have called ui.clear: a dead row has no target left, and
+        // reading its reference would dereference nil (an engine crash, seen).
+        if (!s_nodes[slot].alive)
+            continue;
         // Local copies: reading a checkbox's state calls a script closure, which could declare a
         // widget and reallocate s_nodes under our feet.
         Rectangle rect = s_nodes[slot].box;

@@ -43,6 +43,17 @@ if [ -x build-gfx/ollin ]; then
     echo "── pass suites (.ol, raylib build) ───────────────"
     if bash tools/native-gfx.sh >/dev/null 2>&1; then
         OLLIN=build-gfx/ollin run_pass tests/gfx_ui_test.ol
+        if command -v xvfb-run >/dev/null 2>&1; then
+            out=$(timeout 60 bash tools/run-headless.sh tests/gfx_ui_draw_test.ol 2>&1)
+            rc=$?
+            if [ $rc -eq 0 ]; then
+                echo "OK   tests/gfx_ui_draw_test.ol (Xvfb)"
+            else
+                echo "FAIL tests/gfx_ui_draw_test.ol (Xvfb, exit $rc)"
+                echo "$out" | grep -v "^INFO\|^WARNING" | tail -3 | sed 's/^/     /'
+                fails=$((fails + 1))
+            fi
+        fi
     else
         echo "FAIL build-gfx (tools/native-gfx.sh did not build)"
         fails=$((fails + 1))
