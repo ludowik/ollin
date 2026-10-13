@@ -49,8 +49,6 @@ global heldSlot = nil
 global dragId = nil
 global target = {r: 0, c: 0, valid: false, near: false}
 global previewCells = []
-global clearSet = []
-global clearPending = 0   ## cells of the wave still shrinking; the last one ends the turn
 global L = {sx: [0, 0, 0], sy: [0, 0, 0]}
 global layoutW = 0
 global layoutH = 0
@@ -145,20 +143,14 @@ func resetGame()
     floaters = []
     fade.a = 0
     releaseHold()
-    clearSet = []
-    clearPending = 0
     state = "play"
     slots = []
 end
 
 ## The game in progress, as one text: score, streak, the 81 cells (a digit each, 0 for empty), and the
 ## shape of each of the three pieces ("-" once placed). Written after every move, so closing the page
-## loses nothing; a finished game leaves nothing to resume.
+## loses nothing; loadGame refuses a game that was already lost.
 func saveGame()
-    if state == "over" then
-        data.set(SAVE_KEY, nil)
-        return
-    end
     var keys = []
     for i = 1, 3 do
         if slots[i] == nil then
@@ -307,7 +299,8 @@ end
 ## Its progress is computed from its age rather than tweened, so there is no callback to outlive it.
 func spawnFloater(row, col, v, color, delay)
     var base = PALETTE[color]
-    var tint = [base[1] + (1 - base[1]) * 0.6, base[2] + (1 - base[2]) * 0.6, base[3] + (1 - base[3]) * 0.6, 1]
+    var tint = base.map(func(v) return v + (1 - v) * 0.6 end)
+    tint.push(1)
     floaters.push({row: row, col: col, text: "+{v}", tint: tint, v: v, age: -delay})
 end
 
@@ -328,8 +321,7 @@ end
 
 ## The cells of the wave shrink one after the other, starting nearest to the piece just placed.
 func animateClear(cleared, pr, pc, bonus, placed)
-    clearSet = cleared
-    clearPending = len(cleared)
+    var pending = len(cleared)      ## cells of the wave still shrinking; the last one ends the turn
     var share = bonus // len(cleared)
     var extra = bonus % len(cleared)      ## the first cells carry one more, so the shares add up exactly
     for n, idx in cleared do
@@ -345,23 +337,15 @@ func animateClear(cleared, pr, pc, bonus, placed)
         spawnFloater(boardRow(idx), boardCol(idx), v, cell.v, d * CLEAR_STAGGER)
         cell.f = 1
         tween.to(cell, {s: 0, f: 0}, CLEAR_TIME, "easeInBack", func()
-            clearPending -= 1
-            if clearPending == 0 then
-                finishClear()
+            cell.v = 0
+            cell.s = 1
+            cell.f = 0
+            pending -= 1
+            if pending == 0 then
+                finishTurn()
             end
         end).delay(d * CLEAR_STAGGER)
     end
-end
-
-func finishClear()
-    for idx in clearSet do
-        var cell = cells[idx]
-        cell.v = 0
-        cell.s = 1
-        cell.f = 0
-    end
-    clearSet = []
-    finishTurn()
 end
 
 func placePiece(p, slot, r, c)
@@ -383,13 +367,10 @@ func placePiece(p, slot, r, c)
         sumC += cc
     end
     var cleared, zones = boardFull(grid)
-    var clearedSet = {}
-    for idx in cleared do
-        clearedSet[idx] = true
-    end
+    boardClear(grid, cleared)
     var n = 0
     for off in p.shape.cells do
-        if not clearedSet[boardIdx(r + off[1], c + off[2])] then
+        if grid[boardIdx(r + off[1], c + off[2])] <> 0 then
             spawnFloater(r + off[1], c + off[2], POINTS_PER_CELL, p.shape.color, n * 0.03)
             n += 1
         end
@@ -399,12 +380,11 @@ func placePiece(p, slot, r, c)
         var bonus = zones * zones * GRID * POINTS_PER_CLEARED_CELL
         var streakBonus = (streak - 1) * STREAK_BONUS
         score += bonus + streakBonus
-        boardClear(grid, cleared)
         animateClear(cleared, sumR / p.shape.n, sumC / p.shape.n, bonus, placed)
         if streakBonus > 0 then
             spawnFloater(sumR / p.shape.n, sumC / p.shape.n, streakBonus, 3, 0.1)
         end
-        sndClear[math.min(zones + streak - 1, len(sndClear))].play()
+        playClear(zones, streak)
         state = "clearing"
     else
         streak = 0
@@ -452,7 +432,7 @@ func updateTarget()
     for off in held.shape.cells do
         var rr = target.r + off[1]
         var cc = target.c + off[2]
-        if rr >= 1 and rr <= GRID and cc >= 1 and cc <= GRID then
+        if boardInside(rr, cc) then
             target.near = true
         end
     end
@@ -509,12 +489,11 @@ func moveTo(id, x, y)
     end
 end
 
-## The hold is over, whatever ended it: nothing is held, and no preview is shown.
+## The hold is over, whatever ended it: nothing is held, so no preview is drawn.
 func releaseHold()
     held = nil
     heldSlot = nil
     dragId = nil
-    previewCells = []
 end
 
 func dropHeld()
@@ -595,16 +574,20 @@ func drawPiece(p, alpha = 1)
     end
 end
 
+func drawButton(x, y, w, h, red, green, blue, textSize, alpha = 1)
+    graphics.noStroke()
+    graphics.fill(red, green, blue, alpha)
+    graphics.rect(x, y, w, h, L.c * 0.3)
+    drawText("New game", x + w / 2, y + h / 2, textSize, "center", "center", INK, alpha)
+end
+
 func drawHeader()
     var c = L.c
     drawText("SCORE", L.scoreX, L.scoreY, c * 0.36, "left", "top", MUTED)
     drawText("{math.round(display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * display.pop, "left", "top", INK)
     drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", MUTED)
     drawText("{best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", INK)
-    graphics.noStroke()
-    graphics.fill(0.22, 0.27, 0.40)
-    graphics.rect(L.btnX, L.btnY, L.btnW, L.btnH, c * 0.3)
-    drawText("New game", L.btnX + L.btnW / 2, L.btnY + L.btnH / 2, c * 0.42, "center", "center", INK)
+    drawButton(L.btnX, L.btnY, L.btnW, L.btnH, 0.22, 0.27, 0.40, c * 0.42)
 end
 
 ## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
@@ -616,7 +599,7 @@ func drawFloaters()
         if f.age > 0 then
             var u = math.min(f.age / FLOAT_POP, 1) - 1
             var grow = 1 + 2.70158 * u * u * u + 1.70158 * u * u          ## easeOutBack
-            var q = math.max(0, math.min((f.age - FLOAT_POP - FLOAT_HOLD) / FLOAT_FLIGHT, 1))
+            var q = math.clamp((f.age - FLOAT_POP - FLOAT_HOLD) / FLOAT_FLIGHT, 0, 1)
             var k = q * q                                                  ## easeInQuad: it picks up speed
             var x0 = L.bx + (f.col - 0.5) * c
             var y0 = L.by + (f.row - 0.5) * c
@@ -671,7 +654,7 @@ func drawPreview()
         var y = L.by + (rr - 1) * c
         if target.valid then
             drawCell(x, y, c, held.shape.color, 0.38)
-        elseif rr >= 1 and rr <= GRID and cc >= 1 and cc <= GRID then
+        elseif boardInside(rr, cc) then
             graphics.noStroke()
             graphics.fill(0.95, 0.25, 0.25, 0.55)
             cellRect(x, y, c)
@@ -709,10 +692,7 @@ func drawOver()
     else
         drawText("Best {best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", MUTED, fade.a)
     end
-    graphics.noStroke()
-    graphics.fill(0.30, 0.55, 0.95, fade.a)
-    graphics.rect(L.overX, L.overY, L.overW, L.overH, c * 0.3)
-    drawText("New game", L.overX + L.overW / 2, L.overY + L.overH / 2, c * 0.55, "center", "center", INK, fade.a)
+    drawButton(L.overX, L.overY, L.overW, L.overH, 0.30, 0.55, 0.95, c * 0.55, fade.a)
 end
 
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────

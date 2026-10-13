@@ -6,7 +6,7 @@
 
 const GRID = 9
 const BOX = 3
-const CELLS = 81
+const CELLS = GRID * GRID
 
 ## The 27 zones that clear when full: nine rows, nine columns, nine boxes, each a list of 9 indices.
 global boardZones = []
@@ -21,6 +21,10 @@ end
 
 func boardCol(i)
     return (i - 1) % GRID + 1
+end
+
+func boardInside(r, c)
+    return r >= 1 and r <= GRID and c >= 1 and c <= GRID
 end
 
 func boardNew()
@@ -65,7 +69,7 @@ func boardCanPlace(g, shape, r, c)
     for off in shape.cells do
         var rr = r + off[1]
         var cc = c + off[2]
-        if rr < 1 or rr > GRID or cc < 1 or cc > GRID then
+        if not boardInside(rr, cc) then
             return false
         end
         if g[boardIdx(rr, cc)] <> 0 then

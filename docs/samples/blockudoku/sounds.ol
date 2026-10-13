@@ -18,6 +18,11 @@ func buildSounds()
     end
     sndBad = sound.tone(110, 0.12, "square").envelope(0.003, 0.03, 0.5, 0.06).volume(0.18)
     sndOver = sound.generate(0.9, func(t)
-        return math.sin(t * 6.28318 * (330 - 220 * t)) * math.exp(-t * 3)
+        return math.sin(t * math.TAU * (330 - 220 * t)) * math.exp(-t * 3)
     end).volume(0.30)
+end
+
+## The note follows the combo: clearing more at once, or in a row, climbs the scale up to its top.
+func playClear(zones, streak)
+    sndClear[math.min(zones + streak - 1, len(sndClear))].play()
 end
