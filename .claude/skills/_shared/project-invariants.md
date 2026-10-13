@@ -1,6 +1,6 @@
 # Invariants du projet (liste partagée par les revues)
 
-Utilisée par `/code-review` (pour les fichiers que le diff touche) et par `/review-module`. Ce sont
+Utilisée par `/code-review`, dans ses deux modes (les fichiers que le diff touche, ou le module relu). Ce sont
 des pièges que CLAUDE.md documente et qu'une relecture isolée ne devine pas : chacun a déjà coûté un
 bug réel. Une entrée ne se signale que si le code relu la viole VRAIMENT — pas parce qu'elle figure
 ici. Quand CLAUDE.md change, c'est cette liste qu'on met à jour, pas deux copies.
