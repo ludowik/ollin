@@ -2,6 +2,7 @@
 ## under the finger, so it must be the real one — a row written without its trailing "." made the
 ## box one column too narrow and the piece sat half a cell off.
 
+import "../docs/samples/blockudoku/board.ol"
 import "../docs/samples/blockudoku/pieces.ol"
 
 buildShapes()
@@ -66,4 +67,21 @@ for u in [6, 20, 37] do
         end
     end
 end
+## A piece "fits nowhere" when boardAnyMove says so: the game greys such a piece out, and ends when the whole hand is
+## in that state. Only the single cell fits a grid with one hole; a vertical domino fits once the hole has a
+## free neighbour; nothing fits a full grid.
+var g = boardNew()
+for s in shapes do
+    assert(boardAnyMove(g, s), "{s.key} must fit on an empty grid")
+end
+for i = 1, CELLS do
+    g[i] = 1
+end
+g[boardIdx(5, 5)] = 0
+for s in shapes do
+    assert(boardAnyMove(g, s) == (s.key == "#"), "{s.key} on a grid with one hole: {boardAnyMove(g, s)}")
+end
+g[boardIdx(6, 5)] = 0
+assert(boardAnyMove(g, shapeFromKey("#/#")) and boardAnyMove(g, shapeFromKey("#")), "a domino fits two stacked holes")
+assert(not boardAnyMove(g, shapeFromKey("##")), "a horizontal domino does not fit two stacked holes")
 print("blockudoku pieces ok")

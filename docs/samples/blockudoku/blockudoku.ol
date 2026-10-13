@@ -263,8 +263,9 @@ func loadGame()
     end
     if allSlotsEmpty() then
         dealPieces()
+    else
+        refreshStuck()
     end
-    refreshStuck()
     return not isGameOver()
 end
 
@@ -330,8 +331,9 @@ end
 func finishTurn()
     if allSlotsEmpty() then
         dealPieces()
+    else
+        refreshStuck()
     end
-    refreshStuck()
     if isGameOver() then
         gameOver()
     else
