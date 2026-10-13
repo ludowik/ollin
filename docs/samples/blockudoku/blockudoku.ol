@@ -52,6 +52,12 @@ global previewCells = []
 global L = {sx: [0, 0, 0], sy: [0, 0, 0]}
 global layoutW = 0
 global layoutH = 0
+global gallery = false       ## the catalogue of every piece covers the screen
+global galleryTick = -1      ## the tick of the last toggle: the second path of the same gesture is ignored
+global tick = 0              ## frames so far, which tells two gestures from one gesture that arrives twice
+global sheet = {u: 0, ox: 0, oy: 0, items: []}   ## the catalogue's layout, computed again when W or H change
+global sheetW = 0
+global sheetH = 0
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -80,9 +86,14 @@ func layoutCompute()
         L.bestX = L.bx + 3.5 * c
         L.bestY = top
         L.btnX = L.bx + 6.2 * c
-        L.btnY = top + 0.3 * c
+        L.btnY = top
         L.btnW = 2.8 * c
-        L.btnH = 1.6 * c
+        L.btnH = 1.1 * c
+        L.galX = L.btnX
+        L.galY = top + 1.3 * c
+        L.galW = L.btnW
+        L.galH = L.btnH
+        L.galText = 0.42 * c
         L.tc = 0.55 * c
         L.sw = 1.5 * c
         L.sh = 1.6 * c
@@ -103,6 +114,11 @@ func layoutCompute()
         L.btnY = L.by + 1.65 * c
         L.btnW = 2.3 * c
         L.btnH = 1.1 * c
+        L.galX = colX + 3.1 * c
+        L.galY = L.by + 0.05 * c
+        L.galW = 1.7 * c
+        L.galH = 1.0 * c
+        L.galText = 0.36 * c
         L.tc = 0.36 * c
         L.sw = 2.4 * c
         L.sh = 1.0 * c
@@ -119,6 +135,34 @@ end
 
 func inRect(x, y, rx, ry, rw, rh)
     return x >= rx and x <= rx + rw and y >= ry and y <= ry + rh
+end
+
+## The catalogue: every shape the game can deal, as large as the screen lets them be.
+func sheetCompute()
+    if W == sheetW and H == sheetH then
+        return
+    end
+    sheetW = W
+    sheetH = H
+    var m = SIZE * 0.04
+    var top = SIZE * 0.14
+    var areaW = W - 2 * m
+    var areaH = H - top - m
+    var u = math.floor(areaW / 5)
+    var items, used = packShapes(u, areaW)
+    while used > areaH and u > 4 do
+        u -= 1
+        items, used = packShapes(u, areaW)
+    end
+    sheet.u = u
+    sheet.ox = m
+    sheet.oy = top + (areaH - used) / 2
+    sheet.items = items
+end
+
+func toggleGallery(open)
+    gallery = open
+    galleryTick = tick
 end
 
 ## ── Game ────────────────────────────────────────────────────────────────────────────────────────
@@ -462,7 +506,20 @@ func grab(id, slot, x, y)
 end
 
 func pressAt(id, x, y)
+    if tick == galleryTick then
+        return
+    end
+    if gallery then
+        toggleGallery(false)
+        return
+    end
     layoutCompute()
+    if inRect(x, y, L.galX, L.galY, L.galW, L.galH) then
+        if dragId == nil then
+            toggleGallery(true)
+        end
+        return
+    end
     if inRect(x, y, L.btnX, L.btnY, L.btnW, L.btnH) then
         newGame()
         return
@@ -574,11 +631,11 @@ func drawPiece(p, alpha = 1)
     end
 end
 
-func drawButton(x, y, w, h, red, green, blue, textSize, alpha = 1)
+func drawButton(label, x, y, w, h, red, green, blue, textSize, alpha = 1)
     graphics.noStroke()
     graphics.fill(red, green, blue, alpha)
     graphics.rect(x, y, w, h, L.c * 0.3)
-    drawText("New game", x + w / 2, y + h / 2, textSize, "center", "center", INK, alpha)
+    drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", INK, alpha)
 end
 
 func drawHeader()
@@ -587,7 +644,8 @@ func drawHeader()
     drawText("{math.round(display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * display.pop, "left", "top", INK)
     drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", MUTED)
     drawText("{best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", INK)
-    drawButton(L.btnX, L.btnY, L.btnW, L.btnH, 0.22, 0.27, 0.40, c * 0.42)
+    drawButton("New game", L.btnX, L.btnY, L.btnW, L.btnH, 0.22, 0.27, 0.40, c * 0.42)
+    drawButton("Pieces", L.galX, L.galY, L.galW, L.galH, 0.22, 0.27, 0.40, L.galText)
 end
 
 ## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
@@ -692,7 +750,26 @@ func drawOver()
     else
         drawText("Best {best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", MUTED, fade.a)
     end
-    drawButton(L.overX, L.overY, L.overW, L.overH, 0.30, 0.55, 0.95, c * 0.55, fade.a)
+    drawButton("New game", L.overX, L.overY, L.overW, L.overH, 0.30, 0.55, 0.95, c * 0.55, fade.a)
+end
+
+func drawGallery()
+    if not gallery then
+        return
+    end
+    sheetCompute()
+    graphics.noStroke()
+    graphics.fill(0.03, 0.04, 0.08)
+    graphics.rect(0, 0, W, H)
+    drawText("ALL PIECES", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", INK)
+    drawText("{len(shapes)} shapes, tap anywhere to close", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", MUTED)
+    var u = sheet.u
+    for item in sheet.items do
+        var s = item.shape
+        for off in s.cells do
+            drawCell(sheet.ox + item.x + off[2] * u, sheet.oy + item.y + off[1] * u, u, s.color)
+        end
+    end
 end
 
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
@@ -711,6 +788,7 @@ end
 ## A piece waiting in its tray follows the tray, which moves when the area is turned or resized; one
 ## being animated is left to its tween, and the one held to the pointer.
 func update()
+    tick += 1
     layoutCompute()
     for i = 1, 3 do
         var p = slots[i]
@@ -743,4 +821,5 @@ func draw()
     end
     drawFloaters()
     drawOver()
+    drawGallery()
 end

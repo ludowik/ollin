@@ -59,6 +59,40 @@ func buildShapes()
     end
 end
 
+## Lays every shape out in rows, for a catalogue: a piece takes its bounding box at cell size u, one cell of air
+## separates two pieces and two rows, and each row is centred in areaW. Gives {shape, x, y} per piece (the
+## top-left of its box, measured from the top-left of the area) and the height used.
+func packShapes(u, areaW)
+    var items = []
+    var x = 0
+    var y = 0
+    var rowH = 0
+    var first = 1
+    for s in shapes do
+        if x > 0 and x + s.w * u > areaW then
+            closeRow(items, first, (areaW - (x - u)) / 2, rowH, u)
+            y += rowH + u
+            x = 0
+            rowH = 0
+            first = len(items) + 1
+        end
+        items.push({shape: s, x: x, y: y})
+        x += (s.w + 1) * u
+        rowH = math.max(rowH, s.h * u)
+    end
+    closeRow(items, first, (areaW - (x - u)) / 2, rowH, u)
+    return items, y + rowH
+end
+
+## Centres a finished row: shifts it sideways by dx and each piece down to the middle of the row's height.
+func closeRow(items, first, dx, rowH, u)
+    for i = first, len(items) do
+        var item = items[i]
+        item.x += dx
+        item.y += (rowH - item.shape.h * u) / 2
+    end
+end
+
 func shapeFromKey(key)
     for s in shapes do
         if s.key == key then
