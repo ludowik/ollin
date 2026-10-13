@@ -10,7 +10,8 @@ d'un clone frais sans lui (repli sur le dernier commit, puis le mécanisme se
 ré-amorce).
 
 Résoudre la cible dans cet ordre, s'arrêter à la première non vide :
-1. argument explicite passé à la commande, s'il y en a un — une référence ou un intervalle git. Un
+1. argument explicite passé à la commande, s'il y en a un — un intervalle git (`a..b`), ou une référence seule lue comme `<réf>..HEAD`
+   (jamais `git diff <réf>` nu, qui ajouterait les modifications non commitées). Un
    chemin ou un nom de module n'entre pas ici : c'est le mode module de `/code-review`, qui lit du
    code entier et ne passe pas par cet algorithme ;
 2. `git diff HEAD` (modifications non commitées) — la revue précède souvent le commit ;

@@ -13,7 +13,8 @@ cette revue répond à « est-ce que ça marche, et est-ce que tout le reste est
 | Argument | Mode | Périmètre |
 |---|---|---|
 | aucun | **diff** | la cible de l'algorithme partagé (modifications en attente, sinon depuis la dernière revue, sinon le dernier commit) |
-| une référence ou un intervalle git (`HEAD~3`, `main..HEAD`, `a1b2c3d`) | **diff** | exactement ce diff |
+| un intervalle git (`HEAD~3..HEAD`, `main..HEAD`) | **diff** | exactement cet intervalle |
+| une référence seule (`HEAD~3`, `a1b2c3d`) | **diff** | `<réf>..HEAD` : les commits écrits depuis elle (jamais `git diff <réf>` nu, qui y ajouterait les modifications non commitées) |
 | un chemin de fichier ou de dossier, ou un nom de module (`tween`, `ui`, `sound`, `graphics`…) | **module** | ces fichiers, lus EN ENTIER, que le code date du dernier commit ou d'il y a six mois |
 
 Un argument qui n'est ni une référence git valide (`git rev-parse --verify`) ni un chemin existant ni
@@ -82,8 +83,8 @@ Dans cet ordre de gravité :
 4. **Tests** :
    - mode diff : un bug corrigé, un comportement nouveau ou un refus nouveau SANS test dans le bon
      fichier — la FORME dans `tests/syntax.ol`, le COMPORTEMENT dans `tests/regressions.ol`, l'ÉCHEC dans
-     `tests/test_errors.sh` (cf. CLAUDE.md). Un diff qui change un comportement sans toucher un fichier de
-     test est un constat ;
+     `tests/test_errors.sh` (cf. CLAUDE.md). Un diff qui change un comportement du moteur, de la web app ou
+     d'un exemple sans toucher un fichier de test est un constat (pas un diff de documentation ou de consignes) ;
    - mode module : seulement un cas non couvert qui EXPLIQUE un constat.
 5. **Textes devenus faux** : un commentaire, une ligne du tutoriel, de `grammar.ebnf` ou de CLAUDE.md
    que le diff (ou, en mode module, le code lu) contredit — un champ qui n'existe plus, une règle
