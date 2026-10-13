@@ -1374,9 +1374,8 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   répète le vecteur, le second paramètre y ajoute son miroir (vecteur renversé, sens
   inversés) ; sans compte, `endless` fait tourner l'index au lieu de terminer. Deux appels
   **composent** — `repeat(2, true)` = `+1 +1 -1 -1`, `repeat(nil, true).repeat(2)` = `+1 -1 +1 -1`.
-  Le compte est reconnu par sa POSITION, pas par son type : `true` vaut 1 en Ollin (pas de
-  type booléen), donc `repeat(true)` serait indistinguable de `repeat(1)` — d'où le `nil`
-  explicite pour « sans fin, avec retour ». UNE seule méthode : ni `yoyo()` ni `loop()`. Un segment de sens -1 interpole
+  Le compte est reconnu par sa POSITION, pas par son type : un booléen n'est pas un compte
+  (`repeat(true)` est refusé) — d'où le `nil` explicite pour « sans fin, avec retour ». UNE seule méthode : ni `yoyo()` ni `loop()`. Un segment de sens -1 interpole
   de `to` vers `from` — les bornes des canaux ne sont JAMAIS relues après le premier
   démarrage, sinon un retour dériverait. Le reliquat de temps passe d'un segment au suivant
   (`elapsed -= dur` dans une boucle `while`), sans quoi une animation courte perdrait une

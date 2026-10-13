@@ -1,5 +1,6 @@
 #include "tween_module.h"
 #include "module_utils.h"
+#include "tween_curves.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -17,160 +18,7 @@
 
 namespace {
 
-// They all take and return a progress normalized to [0;1]. The exposed names live in string
-// literals, hence camelCase like the rest of the Ollin API.
-
-double ease_linear(double t) {
-    return t;
-}
-
-double ease_in_quad(double t) {
-    return t * t;
-}
-
-double ease_out_quad(double t) {
-    return t * (2.0 - t);
-}
-
-double ease_in_out_quad(double t) {
-    return t < 0.5 ? 2.0 * t * t : 1.0 - 2.0 * (1.0 - t) * (1.0 - t);
-}
-
-double ease_in_cubic(double t) {
-    return t * t * t;
-}
-
-double ease_out_cubic(double t) {
-    double u = 1.0 - t;
-    return 1.0 - u * u * u;
-}
-
-double ease_in_out_cubic(double t) {
-    if (t < 0.5)
-        return 4.0 * t * t * t;
-    double u = 1.0 - t;
-    return 1.0 - 4.0 * u * u * u;
-}
-
-double ease_in_sine(double t) {
-    return 1.0 - std::cos(t * 1.5707963267948966);
-}
-
-double ease_out_sine(double t) {
-    return std::sin(t * 1.5707963267948966);
-}
-
-double ease_in_out_sine(double t) {
-    return 0.5 * (1.0 - std::cos(t * 3.141592653589793));
-}
-
-double ease_in_expo(double t) {
-    return t <= 0.0 ? 0.0 : std::pow(2.0, 10.0 * t - 10.0);
-}
-
-double ease_out_expo(double t) {
-    return t >= 1.0 ? 1.0 : 1.0 - std::pow(2.0, -10.0 * t);
-}
-
-double ease_in_out_expo(double t) {
-    if (t <= 0.0)
-        return 0.0;
-    if (t >= 1.0)
-        return 1.0;
-    if (t < 0.5)
-        return 0.5 * std::pow(2.0, 20.0 * t - 10.0);
-    return 1.0 - 0.5 * std::pow(2.0, 10.0 - 20.0 * t);
-}
-
-// The overshoot of `back` comes from the 1.70158 constant of Penner's model.
-double ease_in_back(double t) {
-    return t * t * (2.70158 * t - 1.70158);
-}
-
-double ease_out_back(double t) {
-    double u = t - 1.0;
-    return 1.0 + u * u * (2.70158 * u + 1.70158);
-}
-
-double ease_in_out_back(double t) {
-    const double c = 1.70158 * 1.525;
-    if (t < 0.5)
-        return 0.5 * (4.0 * t * t * ((c + 1.0) * 2.0 * t - c));
-    double u = 2.0 * t - 2.0;
-    return 0.5 * (u * u * ((c + 1.0) * u + c) + 2.0);
-}
-
-double ease_out_elastic(double t) {
-    if (t <= 0.0)
-        return 0.0;
-    if (t >= 1.0)
-        return 1.0;
-    return std::pow(2.0, -10.0 * t) * std::sin((10.0 * t - 0.75) * 2.0943951023931953) + 1.0;
-}
-
-double ease_out_bounce(double t) {
-    const double n = 7.5625;
-    const double d = 2.75;
-    if (t < 1.0 / d)
-        return n * t * t;
-    if (t < 2.0 / d) {
-        double u = t - 1.5 / d;
-        return n * u * u + 0.75;
-    }
-    if (t < 2.5 / d) {
-        double u = t - 2.25 / d;
-        return n * u * u + 0.9375;
-    }
-    double u = t - 2.625 / d;
-    return n * u * u + 0.984375;
-}
-
-struct CurveEntry {
-    const char* name;
-    double (*fn)(double);
-};
-
-const CurveEntry k_curves[] = {
-    {"linear", ease_linear},
-    {"easeInQuad", ease_in_quad},
-    {"easeOutQuad", ease_out_quad},
-    {"easeInOutQuad", ease_in_out_quad},
-    {"easeInCubic", ease_in_cubic},
-    {"easeOutCubic", ease_out_cubic},
-    {"easeInOutCubic", ease_in_out_cubic},
-    {"easeInSine", ease_in_sine},
-    {"easeOutSine", ease_out_sine},
-    {"easeInOutSine", ease_in_out_sine},
-    {"easeInExpo", ease_in_expo},
-    {"easeOutExpo", ease_out_expo},
-    {"easeInOutExpo", ease_in_out_expo},
-    {"easeInBack", ease_in_back},
-    {"easeOutBack", ease_out_back},
-    {"easeInOutBack", ease_in_out_back},
-    {"easeOutElastic", ease_out_elastic},
-    {"easeOutBounce", ease_out_bounce},
-};
-
-const int k_curve_default = 3;   // easeInOutQuad
-
-std::string curve_names() {
-    std::string s;
-    for (const auto& c : k_curves) {
-        if (!s.empty())
-            s += ", ";
-        s += c.name;
-    }
-    return s;
-}
-
-int curve_index(const std::string& name, const char* fn) {
-    for (int i = 0; i < (int)(sizeof(k_curves) / sizeof(k_curves[0])); i++) {
-        if (name == k_curves[i].name)
-            return i;
-    }
-    throw std::runtime_error(std::string(fn) + ": unknown curve '" + name + "' — available: " + curve_names());
-}
-
+using namespace easing;
 
 // A channel is ONE animated numeric field. A structured target (a Color, a Vec2) produces one per
 // component, so the rest of the module only ever deals with numbers.
@@ -178,19 +26,28 @@ struct Chan {
     Value holder;   // the map or instance whose key is written; nil when the target is a `ref`
     Value ref;      // the reference (`ref x`); nil when holder is set
     Value key;
-    double from = 0.0;
-    double to = 0.0;
-    // The bounds as the script wrote them. Between them the value is always a float, however whole the
-    // bounds are: rounding is the script's business. Only the bounds themselves are written back with
-    // their own type, so a field tweened to 8 ends up holding the integer 8, which an array index needs.
+    // The bounds as the script wrote them (always numbers). Between them the value is always a float,
+    // however whole the bounds are: rounding is the script's business. Only the bounds themselves are
+    // written back with their own type, so a field tweened to 8 ends up holding the integer 8, which an
+    // array index needs.
     Value from_value;
     Value to_value;
 };
 
-// A STEP of the sequence: the channels it animates, its duration and its curve. A step with no
-// channel is a pure wait ({delay: 0.2} inside a sequence). tween.to and tween.value create a
-// one-step sequence, so the whole module knows a single path and a sequence is not a special
-// case.
+Chan make_chan(const Value& holder, const Value& key, const Value& from, const Value& to) {
+    Chan c;
+    c.holder = holder;
+    c.key = key;
+    c.from_value = from;
+    c.to_value = to;
+    return c;
+}
+
+// A STEP of the sequence: the channels it animates, its duration and its curve. A pure wait
+// ({delay: 0.2} inside a sequence) is a step flagged is_wait: an empty channel list does not say it,
+// since drop_conflicts can empty the channels of a step that still has to play. tween.to and
+// tween.value create a one-step sequence, so the whole module knows a single path and a sequence is
+// not a special case.
 struct Step {
     std::vector<Chan> chans;
     bool is_wait = false;   // a step declared without `to`: it merely lets time pass
@@ -201,21 +58,20 @@ struct Step {
     Value curve_fn;   // curve supplied by the script, taking precedence over `curve`
 };
 
-// PLAYBACK plan: one segment per pass over the SEQUENCE, +1 in the declared direction and -1
-// backwards. repeat(n) repeats the list; its second parameter appends the mirror of the whole plan
-// (list reversed, directions flipped). Two calls COMPOSE, each acting on the plan built so far, so
-// the order matters:
-//   .repeat(2)                    -> +1 +1          (two forward passes)
-//   .repeat(2, true)              -> +1 +1 -1 -1    (two forward, then the two back)
-//   .repeat(nil, true).repeat(2)  -> +1 -1 +1 -1    (two round trips)
-// An empty plan does not exist: every tween starts with one segment. A -1 segment replays the steps
-// in REVERSE order, each one backwards.
 struct Tw {
     std::vector<Step> steps;
     size_t pos = 0;      // the current step, counted in the current segment's order
+    // PLAYBACK plan: one segment per pass over the SEQUENCE, +1 in the declared direction and -1
+    // backwards. repeat(n) repeats the list; its second parameter appends the mirror of the whole plan
+    // (list reversed, directions flipped). Two calls COMPOSE, each acting on the plan built so far, so
+    // the order matters:
+    //   .repeat(2)                    -> +1 +1          (two forward passes)
+    //   .repeat(2, true)              -> +1 +1 -1 -1    (two forward, then the two back)
+    //   .repeat(nil, true).repeat(2)  -> +1 -1 +1 -1    (two round trips)
+    // An empty plan does not exist: every tween starts with one segment. A -1 segment replays the steps
+    // in REVERSE order, each one backwards.
     std::vector<int8_t> plan{1};
     size_t seg = 0;      // the current segment in the plan
-    double cycle = 0.0;  // the duration of one full pass, frozen at construction
     bool endless = false;   // the plan is replayed endlessly
     double elapsed = 0.0;
     double delay = 0.0;
@@ -234,8 +90,6 @@ bool s_engine_driven = false;
 // counter the outcome depended on the slot obtained: above the current index it was advanced, on a
 // recycled slot lower down it was not.
 uint64_t s_pass = 0;
-
-void advance(double dt);
 
 // Duration of one full pass over the sequence, the same in both directions.
 double cycle_duration(const Tw& t) {
@@ -280,6 +134,180 @@ void free_tween(int slot) {
     t.steps.clear();      // releases the Values held: without this the module would keep
     t.on_done = Value{};   // the animated object alive long after the animation ended
     s_free.push_back(slot);
+}
+
+// Takes the curve BY VALUE (a copy of the Value) rather than a reference into the tween: a curve
+// supplied by the script can declare a tween, hence reallocate s_tweens, and any reference to an
+// element would then dangle.
+double eased(Value curve_fn, int curve, double p) {
+    if (curve_fn.is_callable()) {
+        Value r = VM::current()->call_value(curve_fn, Value(p));
+        return r.is_number() ? r.as_num() : p;
+    }
+    return k_curves[curve].fn(p);
+}
+
+void write_value(const Chan& c, const Value& out) {
+    if (c.ref.is_map()) {
+        ref_set(c.ref, out);
+        return;
+    }
+    Value holder = c.holder;   // map_set mutates the map, so a copy of the Value is enough: the same Map*
+    holder.map_set(c.key, out);
+}
+
+// One of the two bounds, written as the script gave it: an integer stays an integer. Only the callers know
+// they are at an end — inferring it from the value would turn any sample that happens to equal a bound
+// (a curve that plateaus) into an integer.
+void write_bound(const Chan& c, bool at_to) {
+    write_value(c, at_to ? c.to_value : c.from_value);
+}
+
+// Reads a step's start values, once: it begins from whatever the previous step left. On later passes
+// — a repetition, or going backwards — the bounds are kept, otherwise a return trip goes nowhere.
+void start_step(Tw& t, size_t idx) {
+    if (t.steps[idx].started)
+        return;
+    t.steps[idx].started = true;
+    for (auto& c : t.steps[idx].chans) {
+        Value cur = c.ref.is_map() ? ref_get(c.ref) : c.holder.map_get(c.key);
+        if (cur.is_number()) {
+            c.from_value = cur;   // the bound is what the field holds NOW: a stale one would be written back at the start
+        }
+    }
+}
+
+// Settles a step's channels at the end it aims for, in the current segment's direction. Called when
+// the step is crossed within a single time step: without it, a step shorter than the step would leave
+// no trace. `idx` is the step's REAL index, as for start_step — two index conventions in the same
+// caller would be a trap.
+void settle_step_end(Tw& t, size_t idx) {
+    int8_t direction = t.plan[t.seg];
+    std::vector<Chan> chans = t.steps[idx].chans;
+    for (const auto& c : chans)
+        write_bound(c, direction > 0);
+}
+
+void advance(double dt) {
+    if (dt <= 0.0 || s_tweens.empty())
+        return;
+    s_pass++;
+    // Completion callbacks are COLLECTED and only called after the pass: a callback can create or
+    // cancel tweens, hence push_back onto s_tweens while we iterate it.
+    std::vector<Value> finished;
+    for (int i = 0; i < (int)s_tweens.size(); i++) {
+        if (!s_tweens[i].alive || s_tweens[i].paused || s_tweens[i].born_pass == s_pass)
+            continue;
+        double step = dt;
+        {
+            Tw& t = s_tweens[i];
+            if (t.delay > 0.0) {
+                t.delay -= step;
+                if (t.delay > 0.0)
+                    continue;
+                step = -t.delay;   // the step's remainder feeds the animation
+                t.delay = 0.0;
+            }
+            t.elapsed += step;
+        }
+        // End of a STEP: we move to the next one keeping the leftover time, otherwise a short
+        // animation would lose a fraction of a second on every pass. When the sequence is exhausted,
+        // the next plan segment replays it, backwards for a -1 segment.
+        // The tween's generation is taken at the START of its advance: every liveness test below
+        // compares against it, because `alive` alone cannot tell "still here" from "cancelled, then
+        // slot taken over by another tween" (see alloc_tween, which sets alive = true again).
+        uint32_t gen0 = s_tweens[i].gen;
+        double p = 1.0;
+        bool done = true;   // the last step of the last segment is over: the tween is done
+        int8_t direction = 1;
+        size_t idx = 0;
+        // This loop calls Ollin code: a `ref` getter in start_step, a setter in settle_step_end. That
+        // code can declare a tween, hence push_back onto s_tweens and REALLOCATE the vector, so no
+        // Tw& reference may cross these calls and the slot's liveness is rechecked after each one.
+        {
+            while (true) {
+                if (!tween_alive(i, gen0))
+                    break;
+                Tw& t = s_tweens[i];
+                double dur = t.steps[step_index(t, t.pos)].dur;
+                if (dur <= 0.0 || t.elapsed < dur)
+                    break;
+                // Last step of the last segment: we leave WITHOUT subtracting, keeping
+                // elapsed >= dur. That overshoot is what says "finished" below — subtracting it made
+                // the tween believe it was restarting this step, and it then rewrote the START value
+                // instead of the target (observed).
+                if (t.pos + 1 >= t.steps.size() && t.seg + 1 >= t.plan.size() && !t.endless)
+                    break;
+                size_t crossed = step_index(t, t.pos);
+                // The crossed step is STARTED and then SETTLED at its exact end before we leave it:
+                // otherwise a step shorter than one time step would be skipped without ever reading
+                // its bounds or writing its target. Each call goes back to s_tweens[i], because the
+                // first may run an Ollin getter that reallocates the vector, which would leave `t`
+                // dangling for the second.
+                //
+                // Liveness is checked on the GENERATION and not on `alive` alone: the code called can
+                // cancel this tween AND THEN declare another, which takes the freed slot and marks it
+                // alive again. The crossed index would then address a stranger's steps, possibly
+                // fewer of them.
+                start_step(s_tweens[i], crossed);
+                if (!tween_alive(i, gen0))
+                    break;
+                settle_step_end(s_tweens[i], crossed);
+                if (!tween_alive(i, gen0))
+                    break;   // the code called cancelled this tween
+                Tw& t2 = s_tweens[i];                 // the reference is READ AGAIN after the calls
+                t2.elapsed -= t2.steps[crossed].dur;
+                if (t2.pos + 1 < t2.steps.size()) {
+                    t2.pos++;
+                } else if (t2.seg + 1 < t2.plan.size()) {
+                    t2.seg++;
+                    t2.pos = 0;
+                } else {
+                    t2.seg = 0;   // endless: the plan is replayed from its first segment
+                    t2.pos = 0;
+                }
+            }
+            if (!tween_alive(i, gen0))
+                continue;   // cancelled while being crossed: there is nothing left to write
+            Tw& t = s_tweens[i];
+            direction = t.plan[t.seg];
+            idx = step_index(t, t.pos);
+            double dur = t.steps[idx].dur;
+            if (t.elapsed < dur) {
+                p = dur > 0.0 ? t.elapsed / dur : 1.0;
+                done = false;
+            }
+        }
+        start_step(s_tweens[i], idx);   // outside of any reference held
+        if (!tween_alive(i, gen0))
+            continue;
+        // At the end we write the EXACT value of each endpoint: an overshooting curve (back, elastic)
+        // does not return 1 at 1, and rounding would leave 0.999.
+        if (done) {
+            settle_step_end(s_tweens[i], idx);
+        } else {
+            // The curve callback and the writes run Ollin code — a `ref` setter, a custom curve — so no
+            // reference into s_tweens may survive here.
+            std::vector<Chan> chans = s_tweens[i].steps[idx].chans;
+            Value curve_fn = s_tweens[i].steps[idx].curve_fn;
+            int curve = s_tweens[i].steps[idx].curve;
+            double f = eased(curve_fn, curve, p);
+            for (const auto& c : chans) {
+                // A -1 segment plays from the target back to the start.
+                double a = (direction > 0 ? c.from_value : c.to_value).as_num();
+                double b = (direction > 0 ? c.to_value : c.from_value).as_num();
+                write_value(c, Value(a + (b - a) * f));   // strictly between the bounds: a float
+            }
+        }
+        if (done && tween_alive(i, gen0)) {
+            Value cb = s_tweens[i].on_done;
+            free_tween(i);
+            if (cb.is_callable())
+                finished.push_back(cb);
+        }
+    }
+    for (auto& cb : finished)
+        VM::current()->call_value(cb);
 }
 
 // Script-side handles: a native class instance carrying {slot, gen}.
@@ -342,14 +370,8 @@ void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt
         Value from = cur.map_get(kv.first);
         if (!from.is_number())
             continue;
-        Chan c;
-        c.holder = cur;   // we write INTO the instance: the tween mutates the object, it does not replace it
-        c.key = kv.first;
-        c.from = from.as_num();
-        c.to = kv.second.as_num();
-        c.from_value = from;
-        c.to_value = kv.second;
-        out.push_back(c);
+        // we write INTO the instance: the tween mutates the object, it does not replace it
+        out.push_back(make_chan(cur, kv.first, from, kv.second));
         added++;
     }
     if (added == 0) {
@@ -364,14 +386,7 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
     // messages below would read garbage.
     std::string field = key.is_string() ? key.as_string() : std::string("(ref)");
     if (cur.is_number() && tgt.is_number()) {
-        Chan c;
-        c.holder = holder;
-        c.key = key;
-        c.from = cur.as_num();
-        c.to = tgt.as_num();
-        c.from_value = cur;
-        c.to_value = tgt;
-        out.push_back(c);
+        out.push_back(make_chan(holder, key, cur, tgt));
         return;
     }
     if (is_object(cur) && is_object(tgt)) {
@@ -457,8 +472,8 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
         if (args[i].is_string()) {
             curve = curve_index(args[i].as_string(), fn);
         } else if (args[i].is_callable()) {
-            if (curve_fn.is_nil() && on_done.is_nil() && i == first) {
-                curve_fn = args[i];   // the first function is the curve, the second the completion callback
+            if (i == first) {
+                curve_fn = args[i];   // a function in the curve position is the curve; any later one is the callback
             } else if (on_done.is_nil()) {
                 on_done = args[i];
             } else {
@@ -472,13 +487,12 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
 }
 
 // The tail shared by tween.to, tween.value and tween.sequence: allocate, install the steps and the
-// completion callback, return the handle. All three used to write it identically.
+// completion callback, return the slot. All three used to write it identically.
 int create_tween(std::vector<Step>&& steps, const Value& on_done) {
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
     t.steps = std::move(steps);
     t.on_done = on_done;
-    t.cycle = cycle_duration(t);
     return slot;
 }
 
@@ -543,12 +557,8 @@ int tween_value(CallCtx& ctx) {
     std::vector<Chan> chans;
     Value cur = ref_get(args[0]);
     if (cur.is_number() && args[1].is_number()) {
-        Chan c;
+        Chan c = make_chan(Value{}, Value{}, cur, args[1]);
         c.ref = args[0];
-        c.from = cur.as_num();
-        c.to = args[1].as_num();
-        c.from_value = cur;
-        c.to_value = args[1];
         chans.push_back(c);
     } else if (is_object(cur) && is_object(args[1])) {
         add_struct_chans(chans, cur, args[1], "(ref)", "tween.value");
@@ -639,7 +649,7 @@ int tween_sequence(CallCtx& ctx) {
         if (!curve.is_nil())
             read_curve(curve, e.curve, e.curve_fn, where.c_str());
         e.is_wait = to_map.is_nil();
-        if (!to_map.is_nil()) {
+        if (!e.is_wait) {
             if (!is_object(target_obj))
                 throw std::runtime_error(where + ": `target` must be an object");
             if (!to_map.is_map() || to_map.map_size() == 0)
@@ -732,7 +742,7 @@ int method_progress(CallCtx& ctx) {
     // division; after that (base + p) / total is at most 1 by construction, and only the floor
     // remains to be applied, for a delay or a negative time. An endless plan reports the progress of
     // its current pass.
-    double cycle = t.cycle;
+    double cycle = cycle_duration(t);
     double done = 0.0;
     for (size_t k = 0; k < t.pos && k < t.steps.size(); k++)
         done += t.steps[step_index(t, k)].dur;
@@ -750,9 +760,8 @@ int method_progress(CallCtx& ctx) {
 //   .repeat(2, true)      forward, forward, back, back          (the return covers the WHOLE plan)
 //   .repeat(nil, true)    forward, back, forward, back, …       endless
 //
-// The count is recognized by its POSITION rather than its type: `true` used to equal 1 in Ollin, which
-// had no boolean type, so repeat(true) would have been indistinguishable from repeat(1). Hence the
-// explicit nil to say "no count" while still asking for the round trip.
+// The count is recognized by its POSITION, not its type: a boolean is not a count (repeat(true) is
+// refused), so "no count, but a round trip" is written with an explicit nil.
 //
 // The round trip appends the plan's mirror: the vector reversed, the directions flipped. Two
 // successive calls therefore compose, each acting on the plan built so far.
@@ -810,186 +819,6 @@ Value make_tween_class() {
 Value tween_class() {
     static Value cls = make_tween_class();
     return cls;
-}
-
-
-// Takes the curve BY VALUE (a copy of the Value) rather than a reference into the tween: a curve
-// supplied by the script can declare a tween, hence reallocate s_tweens, and any reference to an
-// element would then dangle.
-double eased(Value curve_fn, int curve, double p) {
-    if (curve_fn.is_callable()) {
-        Value r = VM::current()->call_value(curve_fn, Value(p));
-        return r.is_number() ? r.as_num() : p;
-    }
-    return k_curves[curve].fn(p);
-}
-
-void write_value(const Chan& c, const Value& out) {
-    if (c.ref.is_map()) {
-        ref_set(c.ref, out);
-        return;
-    }
-    Value holder = c.holder;   // map_set mutates the map, so a copy of the Value is enough: the same Map*
-    holder.map_set(c.key, out);
-}
-
-// One of the two bounds, written as the script gave it: an integer stays an integer. Only the callers know
-// they are at an end — inferring it from the value would turn any sample that happens to equal a bound
-// (a curve that plateaus) into an integer.
-void write_bound(const Chan& c, bool at_to) {
-    write_value(c, at_to ? c.to_value : c.from_value);
-}
-
-// Reads a step's start values, once: it begins from whatever the previous step left. On later passes
-// — a repetition, or going backwards — the bounds are kept, otherwise a return trip goes nowhere.
-void start_step(Tw& t, size_t idx) {
-    if (t.steps[idx].started)
-        return;
-    t.steps[idx].started = true;
-    for (auto& c : t.steps[idx].chans) {
-        Value cur = c.ref.is_map() ? ref_get(c.ref) : c.holder.map_get(c.key);
-        if (cur.is_number()) {
-            c.from = cur.as_num();
-            c.from_value = cur;   // the bound is what the field holds NOW: a stale one would be written back at the start
-        }
-    }
-}
-
-// Settles a step's channels at the end it aims for, in the current segment's direction. Called when
-// the step is crossed within a single time step: without it, a step shorter than the step would leave
-// no trace. `idx` is the step's REAL index, as for start_step — two index conventions in the same
-// caller would be a trap.
-void settle_step_end(Tw& t, size_t idx) {
-    int8_t direction = t.plan[t.seg];
-    std::vector<Chan> chans = t.steps[idx].chans;
-    for (const auto& c : chans)
-        write_bound(c, direction > 0);
-}
-
-void advance(double dt) {
-    if (dt <= 0.0 || s_tweens.empty())
-        return;
-    s_pass++;
-    // Completion callbacks are COLLECTED and only called after the pass: a callback can create or
-    // cancel tweens, hence push_back onto s_tweens while we iterate it.
-    std::vector<Value> finished;
-    for (int i = 0; i < (int)s_tweens.size(); i++) {
-        if (!s_tweens[i].alive || s_tweens[i].paused || s_tweens[i].born_pass == s_pass)
-            continue;
-        double step = dt;
-        {
-            Tw& t = s_tweens[i];
-            if (t.delay > 0.0) {
-                t.delay -= step;
-                if (t.delay > 0.0)
-                    continue;
-                step = -t.delay;   // the step's remainder feeds the animation
-                t.delay = 0.0;
-            }
-            t.elapsed += step;
-        }
-        // End of a STEP: we move to the next one keeping the leftover time, otherwise a short
-        // animation would lose a fraction of a second on every pass. When the sequence is exhausted,
-        // the next plan segment replays it, backwards for a -1 segment.
-        // The tween's generation is taken at the START of its advance: every liveness test below
-        // compares against it, because `alive` alone cannot tell "still here" from "cancelled, then
-        // slot taken over by another tween" (see alloc_tween, which sets alive = true again).
-        uint32_t gen0 = s_tweens[i].gen;
-        double p = 1.0;
-        bool ends = true;      // the last segment is over, so the tween has finished
-        bool seg_ends = true;  // the current step is over
-        int8_t direction = 1;
-        size_t idx = 0;
-        // This loop calls Ollin code: a `ref` getter in start_step, a setter in settle_step_end. That
-        // code can declare a tween, hence push_back onto s_tweens and REALLOCATE the vector, so no
-        // Tw& reference may cross these calls and the slot's liveness is rechecked after each one.
-        {
-            while (true) {
-                if (!tween_alive(i, gen0))
-                    break;
-                Tw& t = s_tweens[i];
-                double dur = t.steps[step_index(t, t.pos)].dur;
-                if (dur <= 0.0 || t.elapsed < dur)
-                    break;
-                // Last step of the last segment: we leave WITHOUT subtracting, keeping
-                // elapsed >= dur. That overshoot is what says "finished" below — subtracting it made
-                // the tween believe it was restarting this step, and it then rewrote the START value
-                // instead of the target (observed).
-                if (t.pos + 1 >= t.steps.size() && t.seg + 1 >= t.plan.size() && !t.endless)
-                    break;
-                size_t crossed = step_index(t, t.pos);
-                // The crossed step is STARTED and then SETTLED at its exact end before we leave it:
-                // otherwise a step shorter than one time step would be skipped without ever reading
-                // its bounds or writing its target. Each call goes back to s_tweens[i], because the
-                // first may run an Ollin getter that reallocates the vector, which would leave `t`
-                // dangling for the second.
-                //
-                // Liveness is checked on the GENERATION and not on `alive` alone: the code called can
-                // cancel this tween AND THEN declare another, which takes the freed slot and marks it
-                // alive again. The crossed index would then address a stranger's steps, possibly
-                // fewer of them.
-                start_step(s_tweens[i], crossed);
-                if (!tween_alive(i, gen0))
-                    break;
-                settle_step_end(s_tweens[i], crossed);
-                if (!tween_alive(i, gen0))
-                    break;   // the code called cancelled this tween
-                Tw& t2 = s_tweens[i];                 // the reference is READ AGAIN after the calls
-                t2.elapsed -= t2.steps[crossed].dur;
-                if (t2.pos + 1 < t2.steps.size()) {
-                    t2.pos++;
-                } else if (t2.seg + 1 < t2.plan.size()) {
-                    t2.seg++;
-                    t2.pos = 0;
-                } else {
-                    t2.seg = 0;   // endless: the plan is replayed from its first segment
-                    t2.pos = 0;
-                }
-            }
-            if (!tween_alive(i, gen0))
-                continue;   // cancelled while being crossed: there is nothing left to write
-            Tw& t = s_tweens[i];
-            direction = t.plan[t.seg];
-            idx = step_index(t, t.pos);
-            double dur = t.steps[idx].dur;
-            if (t.elapsed < dur) {
-                p = dur > 0.0 ? t.elapsed / dur : 1.0;
-                seg_ends = false;
-                ends = false;
-            }
-        }
-        start_step(s_tweens[i], idx);   // outside of any reference held
-        if (!tween_alive(i, gen0))
-            continue;
-        // The writes and the curve callback run Ollin code — a `ref` setter, a custom curve — so no
-        // reference into s_tweens may survive here.
-        {
-            std::vector<Chan> chans = s_tweens[i].steps[idx].chans;
-            Value curve_fn = s_tweens[i].steps[idx].curve_fn;
-            int curve = s_tweens[i].steps[idx].curve;
-            double f = seg_ends ? 1.0 : eased(curve_fn, curve, p);
-            for (const auto& c : chans) {
-                // A -1 segment plays from the target back to the start. At a step's end we write the
-                // EXACT value of its endpoint: an overshooting curve (back, elastic) does not return 1
-                // at 1, and rounding would leave 0.999.
-                if (seg_ends) {
-                    write_bound(c, direction > 0);
-                } else {
-                    double a = direction > 0 ? c.from : c.to;
-                    double b = direction > 0 ? c.to : c.from;
-                    write_value(c, Value(a + (b - a) * f));   // strictly between the bounds: a float
-                }
-            }
-        }
-        if (ends && tween_alive(i, gen0)) {
-            Value cb = s_tweens[i].on_done;
-            free_tween(i);
-            if (cb.is_callable())
-                finished.push_back(cb);
-        }
-    }
-    for (auto& cb : finished)
-        VM::current()->call_value(cb);
 }
 
 } // namespace
