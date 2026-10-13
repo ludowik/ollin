@@ -29,11 +29,15 @@ const PALETTE = [
     [0.93, 0.35, 0.35], [0.96, 0.60, 0.25], [0.96, 0.82, 0.30], [0.40, 0.80, 0.45],
     [0.30, 0.78, 0.80], [0.35, 0.55, 0.95], [0.65, 0.45, 0.90], [0.93, 0.50, 0.75]
 ]
-const INK = [0.92, 0.94, 0.98, 1]
-const MUTED = [0.55, 0.61, 0.74, 1]
-const GOLD = [0.96, 0.82, 0.30, 1]
-const STUCK_TINT = [0.62, 0.64, 0.68]    ## a piece that fits nowhere: grey and faded, still within reach
-const STUCK_ALPHA = 0.55
+const PAPER = [1, 1, 1]                  ## the background
+const INK = [0.13, 0.15, 0.21, 1]
+const MUTED = [0.45, 0.49, 0.58, 1]
+const GOLD = [0.80, 0.58, 0.05, 1]
+const ON_BUTTON = [1, 1, 1, 1]           ## the label of a button, whose fill is dark
+const CELL_LIGHT = 0.91                  ## the empty cells, in two greys that alternate by 3x3 box
+const CELL_DARK = 0.83
+const STUCK_TINT = [0.50, 0.52, 0.56]    ## a piece that fits nowhere: grey and faded, still within reach
+const STUCK_ALPHA = 0.6
 
 global grid = []
 global cells = []            ## what is SHOWN per cell: colour, scale, flash — the grid holds the rules
@@ -656,7 +660,7 @@ func drawButton(label, x, y, w, h, red, green, blue, textSize, alpha = 1)
     graphics.noStroke()
     graphics.fill(red, green, blue, alpha)
     graphics.rect(x, y, w, h, L.c * 0.3)
-    drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", INK, alpha)
+    drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", ON_BUTTON, alpha)
 end
 
 func drawHeader()
@@ -701,7 +705,7 @@ func drawBoard()
     for r = 1, GRID do
         for col = 1, GRID do
             var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
-            var grey = 0.15 + 0.13 * tint
+            var grey = CELL_LIGHT - (CELL_LIGHT - CELL_DARK) * tint
             graphics.fill(grey, grey, grey)
             cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
         end
@@ -742,7 +746,7 @@ func drawPreview()
     end
     for idx in previewCells do
         graphics.noStroke()
-        graphics.fill(1, 1, 1, 0.28)
+        graphics.fill(0.30, 0.55, 0.95, 0.35)
         cellRect(L.bx + (boardCol(idx) - 1) * c, L.by + (boardRow(idx) - 1) * c, c)
     end
 end
@@ -762,7 +766,7 @@ func drawOver()
     end
     var c = L.c
     graphics.noStroke()
-    graphics.fill(0.03, 0.04, 0.08, 0.78 * fade.a)
+    graphics.fill(PAPER[1], PAPER[2], PAPER[3], 0.85 * fade.a)
     graphics.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
     drawText("GAME OVER", mx, L.by + 2.3 * c, c * 1.1, "center", "center", INK, fade.a)
@@ -781,7 +785,7 @@ func drawGallery()
     end
     sheetCompute()
     graphics.noStroke()
-    graphics.fill(0.03, 0.04, 0.08)
+    graphics.fill(PAPER[1], PAPER[2], PAPER[3])
     graphics.rect(0, 0, W, H)
     drawText("ALL PIECES", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", INK)
     drawText("{len(shapes)} shapes, tap anywhere to close", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", MUTED)
@@ -829,7 +833,7 @@ end
 
 func draw()
     layoutCompute()
-    graphics.clear(0.07, 0.08, 0.12)
+    graphics.clear(PAPER[1], PAPER[2], PAPER[3])
     drawHeader()
     drawBoard()
     drawPreview()
