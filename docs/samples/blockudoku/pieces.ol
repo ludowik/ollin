@@ -2,7 +2,6 @@
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
 global shapes = []
-## key: the rows of the shape ("#./##"), which names it in a saved game without depending on the order of this list.
 
 ## Each family has one colour, which the host maps to its palette.
 const SHAPE_FAMILIES = [
@@ -19,7 +18,7 @@ const SHAPE_FAMILIES = [
     [3, [[".#", ".#", "##"], ["#..", "###"], ["##", "#.", "#."], ["###", "..#"]]],
     [4, [["###", ".#."], [".#.", "###"], ["#.", "##", "#."], [".#", "##", ".#"]]],
     [5, [[".##", "##."], ["#.", "##", ".#"]]],
-    [1, [["##", ".##"], [".#", "##", "#."]]]
+    [1, [["##.", ".##"], [".#", "##", "#."]]]
 ]
 
 func parseShape(rows, color)
@@ -31,6 +30,7 @@ func parseShape(rows, color)
             end
         end
     end
+    ## key: the rows of the shape ("#./##"), which names it in a saved game without depending on the order of this list.
     return {cells: cells, h: len(rows), w: len(rows[1]), color: color, n: len(cells), key: rows.join("/")}
 end
 

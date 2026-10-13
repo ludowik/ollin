@@ -34,6 +34,7 @@ run_pass() {
 echo "── pass suites (.ol) ─────────────────────────────"
 run_pass tests/syntax.ol
 run_pass tests/regressions.ol
+run_pass tests/blockudoku_pieces_test.ol
 
 echo "── error suite ───────────────────────────────────"
 if ! bash tests/test_errors.sh; then
