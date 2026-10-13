@@ -1344,7 +1344,7 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   d'un `update` dans `draw()` serait le premier bug. `tween_update_all` pose
   `s_engine_driven`, ce qui rend `tween.update` **no-op** côté script — un appel resté dans
   `draw()` doublerait sinon la vitesse.
-- **Canal** = UN champ numérique animé (`{holder, ref, key, from, to, integral}`). Une cible
+- **Canal** = UN champ numérique animé (`{holder, ref, key, from_value, to_value}`). Une cible
   structurée (instance de classe : `Color`, un `Vec2` utilisateur) est éclatée en un canal
   par composante commune aux deux instances, si bien que l'avancement ne connaît **que des
   nombres** — aucun type n'est câblé dans le module. Le tween écrit **dans** l'instance
@@ -1375,7 +1375,7 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   `to_value`, par `write_bound`, appelé SEULEMENT aux extrémités : le déduire de la valeur transformerait en
   entier tout échantillon qui tombe pile sur une borne) : un champ animé vers `8` finit entier, et un indice de tableau refuse `8.0` (« array index
   must be integer », vérifié) — écrire toujours un flottant aurait cassé les compteurs utilisés comme indices.
-- Les 18 courbes sont un tableau `{nom, fonction}` : les noms exposés vivent dans des
+- Les 18 courbes (`tween_curves.h`) sont un tableau `{nom, fonction}` : les noms exposés vivent dans des
   littéraux de chaîne (donc camelCase), les fonctions C++ sont en `snake_case`.
 - **Plan de lecture (`repeat([occurrences] [, allerRetour])`)** : `Tw::plan` est un vecteur de
   sens (+1 aller, -1 retour), un élément par parcours, et `seg` l'index courant. Le compte
