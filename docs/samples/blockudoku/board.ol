@@ -1,5 +1,5 @@
 ## The RULES of Blockudoku, with no drawing. The grid is a flat array of 81 numbers: 0 for an empty
-## cell, otherwise the colour of the piece that filled it. Rows and columns are 1-based.
+## cell, 1 for a filled one. Rows and columns are 1-based.
 ##
 ## Imported by blockudoku.ol, which reads GRID from here — a const declared by a module is visible
 ## to the functions of the file that imports it.
@@ -90,9 +90,9 @@ func boardAnyMove(g, shape)
     return false
 end
 
-func boardPlace(g, shape, r, c, color)
+func boardPlace(g, shape, r, c)
     for off in shape.cells do
-        g[boardIdx(r + off[1], c + off[2])] = color
+        g[boardIdx(r + off[1], c + off[2])] = 1
     end
 end
 

@@ -4,31 +4,31 @@
 global shapes = []
 global bag = []
 
-## Each family has one colour, which the host maps to its palette, and optionally a weight: how many
+## A family groups the orientations of one piece and optionally gives a weight: how many
 ## times each of its shapes sits in the bag a hand is drawn from. Most shapes weigh DEFAULT_WEIGHT; the
 ## single cell and the line of five come half as often.
 const DEFAULT_WEIGHT = 2
 const SHAPE_FAMILIES = [
-    [1, [["#"]], 1],
-    [2, [["##"], ["#", "#"]]],
-    [3, [["###"], ["#", "#", "#"]]],
-    [4, [["####"], ["#", "#", "#", "#"]]],
-    [5, [["#####"], ["#", "#", "#", "#", "#"]], 1],
-    [6, [["##", "##"]]],
-    [7, [["#..", "#..", "###"], ["###", "#..", "#.."], ["###", "..#", "..#"], ["..#", "..#", "###"]]],
-    [8, [["##", "#."], ["##", ".#"], ["#.", "##"], [".#", "##"]]],
-    [2, [["#.", "#.", "##"], ["###", "#.."], ["##", ".#", ".#"], ["..#", "###"]]],
-    [3, [[".#", ".#", "##"], ["#..", "###"], ["##", "#.", "#."], ["###", "..#"]]],
-    [4, [["###", ".#."], [".#.", "###"], ["#.", "##", "#."], [".#", "##", ".#"]]],
-    [5, [[".##", "##."], ["#.", "##", ".#"]]],
-    [1, [["##.", ".##"], [".#", "##", "#."]]],
-    [6, [["###", "#.#"], ["#.#", "###"], ["##", "#.", "##"], ["##", ".#", "##"]]],
-    [3, [[".#.", "###", ".#."]]],
-    [8, [["#.", ".#"], [".#", "#."]]],
-    [4, [["#..", ".#.", "..#"], ["..#", ".#.", "#.."]]]
+    [[["#"]], 1],
+    [[["##"], ["#", "#"]]],
+    [[["###"], ["#", "#", "#"]]],
+    [[["####"], ["#", "#", "#", "#"]]],
+    [[["#####"], ["#", "#", "#", "#", "#"]], 1],
+    [[["##", "##"]]],
+    [[["#..", "#..", "###"], ["###", "#..", "#.."], ["###", "..#", "..#"], ["..#", "..#", "###"]]],
+    [[["##", "#."], ["##", ".#"], ["#.", "##"], [".#", "##"]]],
+    [[["#.", "#.", "##"], ["###", "#.."], ["##", ".#", ".#"], ["..#", "###"]]],
+    [[[".#", ".#", "##"], ["#..", "###"], ["##", "#.", "#."], ["###", "..#"]]],
+    [[["###", ".#."], [".#.", "###"], ["#.", "##", "#."], [".#", "##", ".#"]]],
+    [[[".##", "##."], ["#.", "##", ".#"]]],
+    [[["##.", ".##"], [".#", "##", "#."]]],
+    [[["###", "#.#"], ["#.#", "###"], ["##", "#.", "##"], ["##", ".#", "##"]]],
+    [[[".#.", "###", ".#."]]],
+    [[["#.", ".#"], [".#", "#."]]],
+    [[["#..", ".#.", "..#"], ["..#", ".#.", "#.."]]]
 ]
 
-func parseShape(rows, color)
+func parseShape(rows)
     var cells = []
     for r, row in rows do
         for c = 1, len(row) do
@@ -38,7 +38,7 @@ func parseShape(rows, color)
         end
     end
     ## key: the rows of the shape ("#./##"), which names it in a saved game without depending on the order of this list.
-    return {cells: cells, h: len(rows), w: len(rows[1]), color: color, n: len(cells), key: rows.join("/")}
+    return {cells: cells, h: len(rows), w: len(rows[1]), n: len(cells), key: rows.join("/")}
 end
 
 func buildShapes()
@@ -46,11 +46,11 @@ func buildShapes()
     bag = []
     for family in SHAPE_FAMILIES do
         var weight = DEFAULT_WEIGHT
-        if len(family) > 2 then
-            weight = family[3]
+        if len(family) > 1 then
+            weight = family[2]
         end
-        for rows in family[2] do
-            var shape = parseShape(rows, family[1])
+        for rows in family[1] do
+            var shape = parseShape(rows)
             shapes.push(shape)
             for i = 1, weight do
                 bag.push(shape)

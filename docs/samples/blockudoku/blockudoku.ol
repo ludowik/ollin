@@ -25,10 +25,9 @@ const FLOAT_LIFE = FLOAT_POP + FLOAT_HOLD + FLOAT_FLIGHT
 const OUTLINE = [[-1, 0], [1, 0], [0, -1], [0, 1]]      ## where the dark copies of a point's text sit around it
 const OUTLINE_INK = [0.04, 0.05, 0.09, 1]
 
-const PALETTE = [
-    [0.93, 0.35, 0.35], [0.96, 0.60, 0.25], [0.96, 0.82, 0.30], [0.40, 0.80, 0.45],
-    [0.30, 0.78, 0.80], [0.35, 0.55, 0.95], [0.65, 0.45, 0.90], [0.93, 0.50, 0.75]
-]
+const FLOAT_TINT = [0.60, 0.75, 0.95, 1]   ## a gained point: light enough for its dark outline to read
+const STREAK_TINT = [0.98, 0.85, 0.40, 1]
+const BLUE = [0.22, 0.45, 0.85]          ## the one colour of every block; the rules only make it lighter
 const PAPER = [1, 1, 1]                  ## the background
 const INK = [0.13, 0.15, 0.21, 1]
 const MUTED = [0.45, 0.49, 0.58, 1]
@@ -36,8 +35,7 @@ const GOLD = [0.80, 0.58, 0.05, 1]
 const ON_BUTTON = [1, 1, 1, 1]           ## the label of a button, whose fill is dark
 const CELL_LIGHT = 0.91                  ## the empty cells, in two greys that alternate by 3x3 box
 const CELL_DARK = 0.83
-const STUCK_TINT = [0.50, 0.52, 0.56]    ## a piece that fits nowhere: grey and faded, still within reach
-const STUCK_ALPHA = 0.6
+const STUCK_LIGHT = 0.62                 ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 
 global grid = []
 global cells = []            ## what is SHOWN per cell: colour, scale, flash — the grid holds the rules
@@ -232,8 +230,11 @@ func loadGame()
     var g = boardNew()
     for i = 1, CELLS do
         var v = parts[3].char(i).number()
-        if v == nil or v < 0 or v > len(PALETTE) then
+        if v == nil or v < 0 then
             return false
+        end
+        if v > 0 then
+            v = 1
         end
         g[i] = v
     end
@@ -362,10 +363,7 @@ end
 ## A gained point shows where it was earned (row and col are in cells, fractions allowed), then is drawn
 ## into the score, shrinking: the counter only grows when it lands, so it never runs ahead of what is seen.
 ## Its progress is computed from its age rather than tweened, so there is no callback to outlive it.
-func spawnFloater(row, col, v, color, delay)
-    var base = PALETTE[color]
-    var tint = base.map(func(v) return v + (1 - v) * 0.6 end)
-    tint.push(1)
+func spawnFloater(row, col, v, tint, delay)
     floaters.push({row: row, col: col, text: "+{v}", tint: tint, v: v, age: -delay})
 end
 
@@ -399,7 +397,7 @@ func animateClear(cleared, pr, pc, bonus, placed)
         if placed[idx] then
             v += POINTS_PER_CELL      ## one cell carries one point, not two
         end
-        spawnFloater(boardRow(idx), boardCol(idx), v, cell.v, d * CLEAR_STAGGER)
+        spawnFloater(boardRow(idx), boardCol(idx), v, FLOAT_TINT, d * CLEAR_STAGGER)
         cell.f = 1
         tween.to(cell, {s: 0, f: 0}, CLEAR_TIME, "easeInBack", func()
             cell.v = 0
@@ -414,7 +412,7 @@ func animateClear(cleared, pr, pc, bonus, placed)
 end
 
 func placePiece(p, slot, r, c)
-    boardPlace(grid, p.shape, r, c, p.shape.color)
+    boardPlace(grid, p.shape, r, c)
     slots[slot] = nil
     score += p.shape.n * POINTS_PER_CELL
     var sumR = 0
@@ -424,7 +422,7 @@ func placePiece(p, slot, r, c)
         var rr = r + off[1]
         var cc = c + off[2]
         var cell = cells[boardIdx(rr, cc)]
-        cell.v = p.shape.color
+        cell.v = 1
         cell.s = 1.2
         tween.to(cell, {s: 1}, 0.2, "easeOutQuad")
         placed[boardIdx(rr, cc)] = true
@@ -436,7 +434,7 @@ func placePiece(p, slot, r, c)
     var n = 0
     for off in p.shape.cells do
         if grid[boardIdx(r + off[1], c + off[2])] <> 0 then
-            spawnFloater(r + off[1], c + off[2], POINTS_PER_CELL, p.shape.color, n * 0.03)
+            spawnFloater(r + off[1], c + off[2], POINTS_PER_CELL, FLOAT_TINT, n * 0.03)
             n += 1
         end
     end
@@ -447,7 +445,7 @@ func placePiece(p, slot, r, c)
         score += bonus + streakBonus
         animateClear(cleared, sumR / p.shape.n, sumC / p.shape.n, bonus, placed)
         if streakBonus > 0 then
-            spawnFloater(sumR / p.shape.n, sumC / p.shape.n, streakBonus, 3, 0.1)
+            spawnFloater(sumR / p.shape.n, sumC / p.shape.n, streakBonus, STREAK_TINT, 0.1)
         end
         playClear(zones, streak)
         state = "clearing"
@@ -633,12 +631,13 @@ func cellRect(x, y, s)
     graphics.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
 end
 
-func drawCell(x, y, s, color, alpha = 1, stuck = false)
-    var col = PALETTE[color]
-    if stuck then
-        col = STUCK_TINT
-        alpha = alpha * STUCK_ALPHA
-    end
+func lighten(col, k)
+    return [col[1] + (1 - col[1]) * k, col[2] + (1 - col[2]) * k, col[3] + (1 - col[3]) * k, 1]
+end
+
+## A block: the one blue, `light` of the way to white.
+func drawCell(x, y, s, alpha = 1, light = 0)
+    var col = lighten(BLUE, light)
     var g = s * 0.05
     var inner = s - 2 * g
     graphics.noStroke()
@@ -649,10 +648,14 @@ func drawCell(x, y, s, color, alpha = 1, stuck = false)
 end
 
 func drawPiece(p, alpha = 1, stuck = false)
+    var light = 0
+    if stuck then
+        light = STUCK_LIGHT
+    end
     var x0 = p.x - p.shape.w * p.size / 2
     var y0 = p.y - p.shape.h * p.size / 2
     for off in p.shape.cells do
-        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, p.shape.color, alpha, stuck)
+        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, alpha, light)
     end
 end
 
@@ -716,7 +719,7 @@ func drawBoard()
             var size = c * cell.s
             var x = L.bx + (boardCol(i) - 1) * c + (c - size) / 2
             var y = L.by + (boardRow(i) - 1) * c + (c - size) / 2
-            drawCell(x, y, size, cell.v)
+            drawCell(x, y, size)
             if cell.f > 0.01 then
                 graphics.fill(1, 1, 1, cell.f * 0.9)
                 cellRect(x, y, size)
@@ -737,7 +740,7 @@ func drawPreview()
         var x = L.bx + (cc - 1) * c
         var y = L.by + (rr - 1) * c
         if target.valid then
-            drawCell(x, y, c, held.shape.color, 0.38)
+            drawCell(x, y, c, 0.38)
         elseif boardInside(rr, cc) then
             graphics.noStroke()
             graphics.fill(0.95, 0.25, 0.25, 0.55)
@@ -746,7 +749,7 @@ func drawPreview()
     end
     for idx in previewCells do
         graphics.noStroke()
-        graphics.fill(0.30, 0.55, 0.95, 0.35)
+        graphics.fill(1, 1, 1, 0.5)
         cellRect(L.bx + (boardCol(idx) - 1) * c, L.by + (boardRow(idx) - 1) * c, c)
     end
 end
@@ -793,7 +796,7 @@ func drawGallery()
     for item in sheet.items do
         var s = item.shape
         for off in s.cells do
-            drawCell(sheet.ox + item.x + off[2] * u, sheet.oy + item.y + off[1] * u, u, s.color)
+            drawCell(sheet.ox + item.x + off[2] * u, sheet.oy + item.y + off[1] * u, u)
         end
     end
 end
