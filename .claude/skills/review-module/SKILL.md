@@ -33,19 +33,8 @@ Dans cet ordre de gravité :
 1. **Correctness** : condition fausse, off-by-one, test de véracité sur une valeur
    qui peut valoir 0, garde absente, erreur avalée, valeur non initialisée,
    débordement d'un tableau de taille fixe.
-2. **Invariants du projet**, ceux que CLAUDE.md documente et qu'une relecture
-   isolée ne devine pas :
-   - un handler *computed-goto* qui laisse une variable à destructeur non trivial
-     en portée au `NEXT()` ;
-   - un `release()` de pool qui teste la capacité **avant** le `clear()`
-     (ré-entrance : `n` change pendant le clear) ;
-   - une identité d'objet gardée à travers un appel Ollin (pointeur ou référence
-     dans un vecteur qui peut `push_back`) au lieu d'un couple `{slot, gen}` ;
-   - du code Ollin appelé depuis le rappel audio ;
-   - un nom exposé à l'API en `snake_case`, ou un identifiant C++ interne en
-     camelCase (ce que `tests/check_naming.sh` vérifie déjà — ne pas le répéter
-     s'il passe) ;
-   - un nouveau type ref-compté placé avant le pivot `T_STRING`.
+2. **Invariants du projet** : la liste de `.claude/skills/_shared/project-invariants.md`,
+   partagée avec `/code-review` — relire la section qui correspond aux fichiers du module.
 3. **Duplication** : deux chemins qui font la même chose alors que le module
    porte déjà le helper, ou une validation recopiée entre le module et son stub
    au lieu de vivre dans l'en-tête partagé.
@@ -73,6 +62,6 @@ comportement voulu, ou demanderait de réécrire le module.
 
 ## Ce que cette revue ne fait pas
 
-Elle ne remplace pas `/code-review` (le diff en cours, bas effort) ni `/simplify`
+Elle ne remplace pas `/code-review` (le diff en cours) ni `/simplify`
 (la qualité du code modifié). Et elle **n'avance jamais** `refs/reviewed` : les
 commits non encore revus par `/code-review` restent en attente.
