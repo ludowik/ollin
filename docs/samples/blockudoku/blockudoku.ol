@@ -32,6 +32,8 @@ const PALETTE = [
 const INK = [0.92, 0.94, 0.98, 1]
 const MUTED = [0.55, 0.61, 0.74, 1]
 const GOLD = [0.96, 0.82, 0.30, 1]
+const STUCK_TINT = [0.62, 0.64, 0.68]    ## a piece that fits nowhere: grey and faded, still within reach
+const STUCK_ALPHA = 0.55
 
 global grid = []
 global cells = []            ## what is SHOWN per cell: colour, scale, flash — the grid holds the rules
@@ -256,12 +258,13 @@ func loadGame()
         if picks[i] == nil then
             slots[i] = nil
         else
-            slots[i] = {shape: picks[i], x: L.sx[i], y: L.sy[i], size: L.tc, moving: false, lift: 0}
+            slots[i] = {shape: picks[i], x: L.sx[i], y: L.sy[i], size: L.tc, moving: false, lift: 0, stuck: false}
         end
     end
     if allSlotsEmpty() then
         dealPieces()
     end
+    refreshStuck()
     return not isGameOver()
 end
 
@@ -295,13 +298,24 @@ func dealPieces()
     end
     layoutCompute()
     for i = 1, 3 do
-        var p = {shape: picks[i], x: L.sx[i], y: H + 3 * L.c, size: L.tc, moving: true, lift: 0}
+        var p = {shape: picks[i], x: L.sx[i], y: H + 3 * L.c, size: L.tc, moving: true, lift: 0, stuck: false}
         slots[i] = p
         tween.to(p, {y: L.sy[i]}, 0.35, "easeOutBack", func()
             p.moving = false
         end).delay((i - 1) * 0.07)
     end
+    refreshStuck()
     saveGame()
+end
+
+## Marks the pieces on offer that fit nowhere on the grid. Called whenever the grid or the hand changes,
+## not every frame: the search walks the whole board.
+func refreshStuck()
+    for i = 1, 3 do
+        if slots[i] <> nil then
+            slots[i].stuck = not boardAnyMove(grid, slots[i].shape)
+        end
+    end
 end
 
 func isGameOver()
@@ -317,6 +331,7 @@ func finishTurn()
     if allSlotsEmpty() then
         dealPieces()
     end
+    refreshStuck()
     if isGameOver() then
         gameOver()
     else
@@ -612,8 +627,12 @@ func cellRect(x, y, s)
     graphics.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
 end
 
-func drawCell(x, y, s, color, alpha = 1)
+func drawCell(x, y, s, color, alpha = 1, stuck = false)
     var col = PALETTE[color]
+    if stuck then
+        col = STUCK_TINT
+        alpha = alpha * STUCK_ALPHA
+    end
     var g = s * 0.05
     var inner = s - 2 * g
     graphics.noStroke()
@@ -623,11 +642,11 @@ func drawCell(x, y, s, color, alpha = 1)
     graphics.rect(x + g + s * 0.08, y + g + s * 0.06, inner - s * 0.16, inner * 0.32, s * 0.12)
 end
 
-func drawPiece(p, alpha = 1)
+func drawPiece(p, alpha = 1, stuck = false)
     var x0 = p.x - p.shape.w * p.size / 2
     var y0 = p.y - p.shape.h * p.size / 2
     for off in p.shape.cells do
-        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, p.shape.color, alpha)
+        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, p.shape.color, alpha, stuck)
     end
 end
 
@@ -730,7 +749,7 @@ func drawTrays()
     for i = 1, 3 do
         var p = slots[i]
         if p <> nil and p <> held then
-            drawPiece(p)
+            drawPiece(p, 1, p.stuck)
         end
     end
 end
