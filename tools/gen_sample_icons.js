@@ -37,6 +37,26 @@ const NO_ICON = {
 }
 const FLAT = 3                         // a picture whose brightness varies less than this is blank
 
+// Examples whose icon is not the plain square picture of a fresh run. `viewport` is the area the example
+// draws in (CSS px), `seed` the `data` entries stored before it starts (project scope, encoded as the
+// engine writes them: 's' + text), and `crop` the square kept, in CSS px of that area. The crop is
+// measured against the example's own layout, so it must be redone when that layout changes.
+//   Blockudoku: at W = H the game picks its side-by-side layout, with the score and the buttons in a
+//   column; this wider-than-tall area gives the column layout instead, and the crop keeps the grid and the
+//   three pieces on offer, without the header. The saved game fills the grid with a few placed pieces.
+const SPECS = {
+  'blockudoku/blockudoku.ol': {
+    viewport: { width: 600, height: 640 },
+    seed: {
+      'blockudoku.game': 's1240|1|' +
+        '000000500' + '220000550' + '280033000' + '880130000' + '000110070' +
+        '600000777' + '660040000' + '600044200' + '000000220' + '|###/.#.,##/##,###/#../#..',
+      'blockudoku.best': 'i2480',
+    },
+    crop: { x: 61, y: 122, side: 475 },
+  },
+}
+
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
                '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.ol': 'text/plain',
                '.glb': 'model/gltf-binary', '.obj': 'text/plain', '.webmanifest': 'application/json' }
@@ -59,17 +79,20 @@ function serve() {
 
 // Centre-crops a picture to a square and scales it, in a page of its own so the example's page is not
 // disturbed. Returns the PNG as a data URL and how much the picture's brightness varies.
-async function toIcon(tool, pngBase64) {
-  return tool.evaluate(async ([b64, size]) => {
+async function toIcon(tool, pngBase64, crop, cssWidth) {
+  return tool.evaluate(async ([b64, size, crop, cssWidth]) => {
     const img = new Image()
     img.src = 'data:image/png;base64,' + b64
     await img.decode()
-    const side = Math.min(img.width, img.height)
+    const k = crop ? img.width / cssWidth : 1
+    const side = crop ? crop.side * k : Math.min(img.width, img.height)
+    const sx = crop ? crop.x * k : (img.width - side) / 2
+    const sy = crop ? crop.y * k : (img.height - side) / 2
     const c = document.createElement('canvas')
     c.width = size
     c.height = size
     const g = c.getContext('2d')
-    g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
+    g.drawImage(img, sx, sy, side, side, 0, 0, size, size)
     const px = g.getImageData(0, 0, size, size).data
     let sum = 0
     let sum2 = 0
@@ -81,13 +104,22 @@ async function toIcon(tool, pngBase64) {
     }
     const mean = sum / n
     return { url: c.toDataURL('image/png'), spread: Math.sqrt(Math.max(sum2 / n - mean * mean, 0)) }
-  }, [pngBase64, SIZE])
+  }, [pngBase64, SIZE, crop || null, cssWidth || 0])
 }
 
 async function capture(browser, base, tool, file) {
-  const ctx = await browser.newContext({ viewport: { width: AREA, height: AREA + BAR } })
+  const spec = SPECS[file]
+  const area = spec ? spec.viewport : { width: AREA, height: AREA }
+  const ctx = await browser.newContext({ viewport: { width: area.width, height: area.height + BAR }, deviceScaleFactor: spec ? 2 : 1 })
   const page = await ctx.newPage()
   try {
+    if (spec) {
+      await page.addInitScript(([key, seed]) => {
+        const stored = {}
+        for (const k in seed) stored[k] = seed[k]
+        try { localStorage.setItem(key, JSON.stringify(stored)) } catch (_) {}
+      }, ['ollin-data:p:sample:' + file, spec.seed])
+    }
     await page.addInitScript(() => {
       window.__errs = []
       Object.defineProperty(window, '__ollinFrameError', { set() {}, get() { return (m) => window.__errs.push(m) } })
@@ -109,7 +141,7 @@ async function capture(browser, base, tool, file) {
     const errs = await page.evaluate(() => window.__errs)
     if (errs.length) return { skip: 'error: ' + errs[0] }
     const png = (await page.locator('#canvas').screenshot()).toString('base64')
-    const icon = await toIcon(tool, png)
+    const icon = await toIcon(tool, png, spec && spec.crop, spec && spec.viewport.width)
     if (icon.spread < FLAT) return { skip: 'flat picture (spread ' + icon.spread.toFixed(1) + ')' }
     return { url: icon.url }
   } finally {
