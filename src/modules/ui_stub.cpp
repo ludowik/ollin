@@ -51,20 +51,22 @@ int stub_self(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
+int nothing(CallCtx& ctx) {
+    return ctx.ret(Value{});
+}
+
 Value make_inert_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("UiElement")));
-    cls.map_set(Value(std::string("button")), Value::make_builtin(stub_button));
-    cls.map_set(Value(std::string("checkbox")), Value::make_builtin(stub_checkbox));
-    cls.map_set(Value(std::string("slider")), Value::make_builtin(stub_slider));
-    cls.map_set(Value(std::string("list")), Value::make_builtin(stub_list));
-    cls.map_set(Value(std::string("menu")), Value::make_builtin(stub_menu));
-    cls.map_set(Value(std::string("open")), Value::make_builtin(stub_self));
-    cls.map_set(Value(std::string("clear")), Value::make_builtin(stub_self));
-    cls.map_set(Value(std::string("remove")), Value::make_builtin([](CallCtx& ctx) -> int {
-        return ctx.ret(Value{});
-    }));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "UiElement")
+        .fn("button", stub_button)
+        .fn("checkbox", stub_checkbox)
+        .fn("slider", stub_slider)
+        .fn("list", stub_list)
+        .fn("menu", stub_menu)
+        .fn("open", stub_self)
+        .fn("clear", stub_self)
+        .fn("remove", nothing)
+        .done();
 }
 
 Value inert_class() {
@@ -72,48 +74,56 @@ Value inert_class() {
     return cls;
 }
 
-int nothing(CallCtx& ctx) {
-    return ctx.ret(Value{});
+int module_button(CallCtx& ctx) {
+    ui_check_button_args(ctx.args, ctx.argc);
+    return ctx.ret(make_inert());
+}
+
+int module_checkbox(CallCtx& ctx) {
+    ui_check_checkbox_args(ctx.args, ctx.argc);
+    return ctx.ret(make_inert());
+}
+
+int module_slider(CallCtx& ctx) {
+    ui_check_slider_args(ctx.args, ctx.argc);
+    Value target = ctx.args[1];
+    Value default_value = ui_slider_default(ctx.args, ctx.argc);
+    ui_slider_init(target, default_value);
+    return ctx.ret(make_inert());
+}
+
+int module_list(CallCtx& ctx) {
+    ui_check_list_args(ctx.args, ctx.argc);
+    ui_list_init(ctx.args[2], ctx.args[1]);
+    return ctx.ret(make_inert());
+}
+
+int module_menu(CallCtx& ctx) {
+    ui_check_menu_args(ctx.args, ctx.argc);
+    return ctx.ret(make_inert());
+}
+
+int module_current(CallCtx& ctx) {
+    return ctx.ret(make_inert());
 }
 
 } // namespace
 
 Value make_ui_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("button")), Value::make_builtin([](CallCtx& ctx) -> int {
-        ui_check_button_args(ctx.args, ctx.argc);
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("checkbox")), Value::make_builtin([](CallCtx& ctx) -> int {
-        ui_check_checkbox_args(ctx.args, ctx.argc);
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("slider")), Value::make_builtin([](CallCtx& ctx) -> int {
-        ui_check_slider_args(ctx.args, ctx.argc);
-        Value target = ctx.args[1];
-        Value default_value = ui_slider_default(ctx.args, ctx.argc);
-        ui_slider_init(target, default_value);
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("list")), Value::make_builtin([](CallCtx& ctx) -> int {
-        ui_check_list_args(ctx.args, ctx.argc);
-        ui_list_init(ctx.args[2], ctx.args[1]);
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("menu")), Value::make_builtin([](CallCtx& ctx) -> int {
-        ui_check_menu_args(ctx.args, ctx.argc);
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("show")), Value::make_builtin(nothing));
-    m.map_set(Value(std::string("open")), Value::make_builtin(nothing));
-    m.map_set(Value(std::string("close")), Value::make_builtin(nothing));
-    m.map_set(Value(std::string("toggle")), Value::make_builtin(nothing));
-    m.map_set(Value(std::string("back")), Value::make_builtin(nothing));
-    m.map_set(Value(std::string("current")), Value::make_builtin([](CallCtx& ctx) -> int {
-        return ctx.ret(make_inert());
-    }));
-    m.map_set(Value(std::string("clear")), Value::make_builtin(nothing));
-    return m;
+    return MapBuilder()
+        .fn("button", module_button)
+        .fn("checkbox", module_checkbox)
+        .fn("slider", module_slider)
+        .fn("list", module_list)
+        .fn("menu", module_menu)
+        .fn("show", nothing)
+        .fn("open", nothing)
+        .fn("close", nothing)
+        .fn("toggle", nothing)
+        .fn("back", nothing)
+        .fn("current", module_current)
+        .fn("clear", nothing)
+        .done();
 }
 
 bool ui_poll() {

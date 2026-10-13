@@ -13,10 +13,12 @@ Value make_ui_module();
 // Called by the render loop (graphics_module.cpp):
 // ui_poll()  BEFORE mouse_poll; returns true when a widget took the click, in which case the click
 //            must NOT reach the script's mouse.* callbacks.
-// ui_draw()  AFTER draw(); paints the widget stack over the scene.
+// ui_draw()  AFTER the frame is composed (inside the drawing area, so the interface is independent of the
+//            viewport) and before a screenshot is taken; paints the widget stack over the scene.
 // ui_reset() when a PROGRAM starts (ollin_run, wasm_main.cpp) — NOT in gfx_run: widgets are declared
 //            at file level, hence BEFORE graphics.run, and a reset there would erase them all. It is
-//            needed because the statics survive the VM between two playground runs.
+//            needed because the statics survive the VM between two playground runs. ui.clear() calls
+//            it too, which also folds the interface back to its handle.
 bool ui_poll();
 void ui_draw();
 void ui_reset();
@@ -40,7 +42,7 @@ inline void ui_check_checkbox_args(const Value* args, int argc) {
     if (!args[0].is_string())
         throw std::runtime_error("ui.checkbox: label must be a string");
     if (!is_ref(args[1]))
-        throw std::runtime_error("ui.checkbox: second argument must be a reference — write `ref maVariable`");
+        throw std::runtime_error("ui.checkbox: second argument must be a reference — write `ref myVariable`");
     if (argc > 2 && !args[2].is_nil() && !args[2].is_callable())
         throw std::runtime_error("ui.checkbox: third argument must be a function");
 }
@@ -54,7 +56,7 @@ inline void ui_check_slider_args(const Value* args, int argc) {
     if (!args[0].is_string())
         throw std::runtime_error("ui.slider: label must be a string");
     if (!is_ref(args[1]))
-        throw std::runtime_error("ui.slider: second argument must be a reference — write `ref maVariable`");
+        throw std::runtime_error("ui.slider: second argument must be a reference — write `ref myVariable`");
     if (!args[2].is_number() || !args[3].is_number())
         throw std::runtime_error("ui.slider: min and max must be numbers");
     if (args[2].as_num() >= args[3].as_num())
@@ -125,7 +127,7 @@ inline std::vector<std::pair<std::string, Value>> ui_list_items(const Value& sou
 
 inline void ui_check_list_args(const Value* args, int argc) {
     if (argc < 3)
-        throw std::runtime_error("ui.list: expected label, tableau|map|enum, ref variable");
+        throw std::runtime_error("ui.list: expected label, array|map|enum, ref variable");
     if (!args[0].is_string())
         throw std::runtime_error("ui.list: label must be a string");
     if (!args[1].is_array() && !args[1].is_map())
@@ -133,7 +135,7 @@ inline void ui_check_list_args(const Value* args, int argc) {
     if (args[1].is_array() ? args[1].array_size() == 0 : args[1].map_size() == 0)
         throw std::runtime_error("ui.list: the list is empty");
     if (!is_ref(args[2]))
-        throw std::runtime_error("ui.list: third argument must be a reference — write `ref maVariable`");
+        throw std::runtime_error("ui.list: third argument must be a reference — write `ref myVariable`");
     if (argc > 3 && !args[3].is_nil() && !args[3].is_callable())
         throw std::runtime_error("ui.list: fourth argument must be a function");
 }

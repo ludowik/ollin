@@ -29,7 +29,8 @@
 //
 // NAVIGATION: one menu is on display at a time. s_nav is the current stack — s_nav[0] is the global
 // menu, the implicit root by default, and the rest is the descent into submenus. Clicking a submenu
-// pushes, the "<" row pops.
+// pushes, the "<" row pops. An opened list is a level of the stack too — current_menu() can designate
+// a LIST node — and choosing an item pops it.
 //
 // The click is handled BEFORE mouse_poll (see ui_poll), so clicking a widget does not also fire the
 // script's mouse.pressed.
@@ -38,14 +39,14 @@ namespace {
 
 struct Node {
     // LIST is the "label: selection" row; LIST_ITEM is a row of the opened list, generated at opening
-    // time as a child of the LIST node — so it is drawn and hit-tested by the menu machinery already
-    // in place, with no notion of a "virtual" row.
+    // time as a child of the LIST node: an ordinary row of the stack, with a round mark of its own
+    // and a click that selects it.
     enum Kind { BUTTON, CHECKBOX, SLIDER, MENU, LIST, LIST_ITEM };
     Kind kind = BUTTON;
     std::string label;
     Value action;      // a button: the function called on a click
-    Value target;      // a checkbox: the reference (`ref x`) to the bound variable
-    Value on_change;   // a checkbox or a slider: an optional function called after a change
+    Value target;      // a checkbox, slider or list: the reference (`ref x`) to the bound variable
+    Value on_change;   // a checkbox, slider or list: an optional function called after a change
     double vmin = 0.0;     // slider: the range's bounds
     double vmax = 1.0;
     double vdefault = 0.0; // a slider: the value to use when the bound variable is nil
@@ -103,11 +104,10 @@ int alloc_node(Node::Kind kind, const std::string& label, int parent) {
     return slot;
 }
 
-void free_subtree(int slot) {
-    std::vector<int> kids = s_nodes[slot].children;
-    for (int k : kids)
-        free_subtree(k);
-    Node& n = s_nodes[slot];
+// Kills a node where it stands: a stale handle is detected by the generation, and the Values it held are
+// released (a removed list must not keep its source alive). `parent` is left alone, so a dead row that a
+// draw loop still holds can read its parent's slot, which is always within the table.
+void kill_node(Node& n) {
     n.alive = false;
     n.gen++;
     n.action = Value{};
@@ -117,9 +117,16 @@ void free_subtree(int slot) {
     n.item = Value{};
     n.children.clear();
     n.label.clear();
-    // The slot is reusable: without this clearing, the next node to occupy it would inherit the
-    // departed one's rectangle and be clickable before it is ever drawn.
+    // The rectangle too: a draw loop interrupted by a script that clears the interface still holds the
+    // slots it was about to paint, and a dead row must paint (and hit-test) nothing.
     n.box = {0, 0, 0, 0};
+}
+
+void free_subtree(int slot) {
+    std::vector<int> kids = s_nodes[slot].children;
+    for (int k : kids)
+        free_subtree(k);
+    kill_node(s_nodes[slot]);
     s_free.push_back(slot);
 }
 
@@ -170,22 +177,22 @@ int menu_slot(const Value& self, const char* fn) {
 Value element_class();
 
 Value make_handle(int slot) {
-    Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), element_class());
-    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
-    h.map_set(Value(std::string("gen")), Value((int64_t)s_nodes[slot].gen));
-    return h;
+    return MapBuilder()
+        .set("__class__", element_class())
+        .int_num("slot", slot)
+        .int_num("gen", (int64_t)s_nodes[slot].gen)
+        .done();
 }
 
-// ALL the appearance lives here and NOWHERE else: colours, thicknesses and proportions. The sizes are
-// FRACTIONS of the drawing area's height, as in the joystick example: the canvas is in physical
-// pixels — several per display pixel on mobile — so fixed sizes would give an interface unreadable
-// there and enormous elsewhere. Changing the style is a matter of editing this single block, because
-// the rendering reads no appearance value inline.
+// The appearance lives here: colours, thicknesses and proportions. The font is a FRACTION of the drawing
+// area's height, as in the joystick example, and every other size a multiple of the font: the canvas is
+// in physical pixels — several per display pixel on mobile — so fixed sizes would give an interface
+// unreadable there and enormous elsewhere. (The rendering still holds a few shapes inline: the
+// segment counts of the rounded rectangles and the proportions of the round list mark.)
 struct Style {
     Color bg;
     Color bg_hover;
-    Color border;     // the discreet outline of the checkboxes and of the track
+    Color border;     // the discreet outline of the checkboxes and of the round list marks
     Color text;
     Color text_dim;   // a slider's value, a sub-menu's chevron
     Color accent;     // a ticked box, and the filled part of a track
@@ -272,7 +279,7 @@ Font ui_font() {
 float text_width(const std::string& text, float font_size) {
     Font font = ui_font();
     if (font.texture.id == 0 || font.baseSize == 0)
-        return (float)text.size() * font_size * 0.5f;   // sans canvas : estimation
+        return (float)text.size() * font_size * 0.5f;   // no canvas: an estimate
     return MeasureTextEx(font, text.c_str(), font_size, font_size / (float)font.baseSize).x;
 }
 
@@ -317,7 +324,7 @@ void slider_set(const Value& target, const Value& on_change, double value, bool 
     Value v = integral ? Value((int64_t)llround(value)) : Value(value);
     ref_set(target, v);
     if (on_change.is_callable())
-        VM::current()->call_value(const_cast<Value&>(on_change), v);
+        VM::current()->call_value(on_change, v);
 }
 
 // Label of the item a list has selected. The target is passed by COPY, because reading a reference
@@ -388,7 +395,7 @@ void toggle_checkbox(const Value& target, const Value& on_change) {
     Value state = Value::make_bool(!checkbox_state(target));
     ref_set(target, state);
     if (on_change.is_callable())
-        VM::current()->call_value(const_cast<Value&>(on_change), state);
+        VM::current()->call_value(on_change, state);
 }
 
 } // namespace
@@ -656,18 +663,7 @@ Value element_class() {
 void ui_reset() {
     s_free.clear();
     for (size_t i = 0; i < s_nodes.size(); i++) {
-        Node& n = s_nodes[i];
-        n.alive = false;
-        n.gen++;
-        n.action = Value{};
-        n.target = Value{};
-        n.on_change = Value{};
-        n.source = Value{};
-        n.item = Value{};
-        n.children.clear();
-        n.label.clear();
-        n.box = {0, 0, 0, 0};
-        n.parent = -1;
+        kill_node(s_nodes[i]);
         s_free.push_back((int)i);
     }
     s_nav.clear();
@@ -944,8 +940,7 @@ bool ui_poll() {
             int list_slot = s_nodes[slot].parent;
             Value list_target = s_nodes[list_slot].target;
             Value list_change = s_nodes[list_slot].on_change;
-            if (!s_nav.empty())
-                s_nav.pop_back();      // choosing closes the list, as a drop-down does
+            s_nav.pop_back();      // choosing closes the list, as a drop-down does
             ref_set(list_target, item);
             if (list_change.is_callable())
                 VM::current()->call_value(list_change, item);
