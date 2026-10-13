@@ -5,7 +5,7 @@ description: Revue de code, en deux modes. Sans argument (ou avec une référenc
 
 `effort moyen → périmètre lu → constats reproduits → classés, sans plafond → corrections`
 
-La qualité du code (réutilisation générale, simplification, efficacité, altitude) reste à `/simplify` :
+La qualité du code (réutilisation générale, simplification, efficacité, altitude) reste à `/simplify` (qui a le même double mode, diff ou module) :
 cette revue répond à « est-ce que ça marche, et est-ce que tout le reste est resté d'accord avec ? ».
 
 ## Le mode se lit dans l'argument
