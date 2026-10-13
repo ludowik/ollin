@@ -2,14 +2,18 @@
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
 global shapes = []
+global bag = []
 
-## Each family has one colour, which the host maps to its palette.
+## Each family has one colour, which the host maps to its palette, and optionally a weight: how many
+## times each of its shapes sits in the bag a hand is drawn from. Most shapes weigh DEFAULT_WEIGHT; the
+## single cell and the line of five come half as often.
+const DEFAULT_WEIGHT = 2
 const SHAPE_FAMILIES = [
-    [1, [["#"]]],
+    [1, [["#"]], 1],
     [2, [["##"], ["#", "#"]]],
     [3, [["###"], ["#", "#", "#"]]],
     [4, [["####"], ["#", "#", "#", "#"]]],
-    [5, [["#####"], ["#", "#", "#", "#", "#"]]],
+    [5, [["#####"], ["#", "#", "#", "#", "#"]], 1],
     [6, [["##", "##"]]],
     [7, [["#..", "#..", "###"], ["###", "#..", "#.."], ["###", "..#", "..#"], ["..#", "..#", "###"]]],
     [8, [["##", "#."], ["##", ".#"], ["#.", "##"], [".#", "##"]]],
@@ -39,9 +43,18 @@ end
 
 func buildShapes()
     shapes = []
+    bag = []
     for family in SHAPE_FAMILIES do
+        var weight = DEFAULT_WEIGHT
+        if len(family) > 2 then
+            weight = family[3]
+        end
         for rows in family[2] do
-            shapes.push(parseShape(rows, family[1]))
+            var shape = parseShape(rows, family[1])
+            shapes.push(shape)
+            for i = 1, weight do
+                bag.push(shape)
+            end
         end
     end
 end
@@ -56,5 +69,5 @@ func shapeFromKey(key)
 end
 
 func randomShape()
-    return shapes[math.randInt(1, len(shapes))]
+    return bag[math.randInt(1, len(bag))]
 end

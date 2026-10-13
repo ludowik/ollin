@@ -27,4 +27,28 @@ for s in shapes do
 end
 assert(len(shapes) == 43, "expected 43 shapes, got {len(shapes)}")
 assert(shapeFromKey("nope") == nil)
+
+## The weights are those of the reference game: 83 draws, the single cell and the line of five at 1.
+assert(len(bag) == 83, "the bag holds {len(bag)} entries, expected 83")
+var counts = {}
+for s in bag do
+    counts[s.key] = (counts[s.key] or 0) + 1
+end
+var light = []
+for s in shapes do
+    if counts[s.key] == 1 then
+        light.push(s.key)
+    else
+        assert(counts[s.key] == 2, "{s.key} weighs {counts[s.key]}")
+    end
+end
+assert(len(light) == 3 and light.contains("#") and light.contains("#####") and light.contains("#/#/#/#/#"), "the weight-1 shapes are wrong")
+
+## randomShape follows the bag: over many draws the light shapes come about half as often as a heavy one.
+var drawn = {}
+for i = 1, 8300 do
+    var k = randomShape().key
+    drawn[k] = (drawn[k] or 0) + 1
+end
+assert(drawn["#"] > 0 and drawn["##"] > drawn["#"], "the single cell must be rarer than the domino")
 print("blockudoku pieces ok")
