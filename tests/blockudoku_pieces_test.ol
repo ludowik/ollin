@@ -25,6 +25,6 @@ for s in shapes do
     footprints[footprint] = true
     assert(shapeFromKey(s.key) == s, "shapeFromKey does not find {s.key}")
 end
-assert(len(shapes) == 38, "expected 38 orientations, got {len(shapes)}")
+assert(len(shapes) == 43, "expected 43 shapes, got {len(shapes)}")
 assert(shapeFromKey("nope") == nil)
 print("blockudoku pieces ok")
