@@ -76,10 +76,11 @@ inline Value ui_slider_default(const Value* args, int argc) {
 
 // A bound variable holding nil is INITIALIZED at declaration time, so the script can read it from
 // the first frame on. Shared with the stub, which has no rendering but must give the script the same
-// value.
-inline void ui_slider_init(const Value* args, int argc) {
-    if (ref_get(args[1]).is_nil())
-        ref_set(args[1], ui_slider_default(args, argc));
+// value. The reference and the default are taken BY VALUE, never as `args` pointers: reading or writing
+// a reference runs script code, which can grow the register file and leave `args` dangling.
+inline void ui_slider_init(Value target, const Value& default_value) {
+    if (ref_get(target).is_nil())
+        ref_set(target, default_value);
 }
 
 // A list's items: the LABEL displayed and the VALUE returned. An array gives its values, a map (or
@@ -138,13 +139,13 @@ inline void ui_check_list_args(const Value* args, int argc) {
 }
 
 // A list is SINGLE-selection: one item is always chosen. A variable bound to nil is therefore
-// initialized to the first item, just as a slider takes its default.
-inline void ui_list_init(const Value* args) {
-    if (!ref_get(args[2]).is_nil())
+// initialized to the first item, just as a slider takes its default. By value, like ui_slider_init.
+inline void ui_list_init(Value target, Value source) {
+    if (!ref_get(target).is_nil())
         return;
-    auto items = ui_list_items(args[1]);
+    auto items = ui_list_items(source);
     if (!items.empty())
-        ref_set(args[2], items[0].second);
+        ref_set(target, items[0].second);
 }
 
 inline void ui_check_menu_args(const Value* args, int argc) {

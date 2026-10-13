@@ -36,6 +36,19 @@ run_pass tests/syntax.ol
 run_pass tests/regressions.ol
 run_pass tests/blockudoku_pieces_test.ol
 
+# Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
+# rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a
+# stale binary would pass or fail for the wrong reason.
+if [ -x build-gfx/ollin ]; then
+    echo "── pass suites (.ol, raylib build) ───────────────"
+    if bash tools/native-gfx.sh >/dev/null 2>&1; then
+        OLLIN=build-gfx/ollin run_pass tests/gfx_ui_test.ol
+    else
+        echo "FAIL build-gfx (tools/native-gfx.sh did not build)"
+        fails=$((fails + 1))
+    fi
+fi
+
 echo "── error suite ───────────────────────────────────"
 if ! bash tests/test_errors.sh; then
     fails=$((fails + 1))

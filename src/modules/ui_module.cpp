@@ -113,6 +113,8 @@ void free_subtree(int slot) {
     n.action = Value{};
     n.target = Value{};
     n.on_change = Value{};
+    n.source = Value{};
+    n.item = Value{};
     n.children.clear();
     n.label.clear();
     // The slot is reusable: without this clearing, the next node to occupy it would inherit the
@@ -383,7 +385,7 @@ bool checkbox_state(const Value& target) {
 
 // Toggling a checkbox: writes the bound variable then notifies. The same copy requirement applies.
 void toggle_checkbox(const Value& target, const Value& on_change) {
-    Value state = Value(checkbox_state(target) ? int64_t(0) : int64_t(1));
+    Value state = Value::make_bool(!checkbox_state(target));
     ref_set(target, state);
     if (on_change.is_callable())
         VM::current()->call_value(const_cast<Value&>(on_change), state);
@@ -392,117 +394,143 @@ void toggle_checkbox(const Value& target, const Value& on_change) {
 } // namespace
 
 
-static int add_button(CallCtx& ctx, const Value* args, int argc, int parent) {
+// A declaration reads ITS arguments into locals before the first call that can run script code (a
+// reference's getter or setter, a __str): that code can grow the register file, and `args` would then
+// dangle. The parent is resolved AFTER such calls too — the same code can remove the menu the widget is
+// declared in, or call ui.clear — so `parent_menu` is a handle taken by value (nil for the root menu).
+static int resolve_parent(const Value& parent_menu, const char* fn) {
+    if (parent_menu.is_nil())
+        return ui_root();
+    return menu_slot(parent_menu, fn);
+}
+
+static int add_button(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_button_args(args, argc);
-    int slot = alloc_node(Node::BUTTON, args[0].as_string(), parent);
-    s_nodes[slot].action = args[1];
+    std::string label = args[0].as_string();
+    Value action = args[1];
+    int slot = alloc_node(Node::BUTTON, label, resolve_parent(parent_menu, fn));
+    s_nodes[slot].action = action;
     return ctx.ret(make_handle(slot));
 }
 
-static int add_checkbox(CallCtx& ctx, const Value* args, int argc, int parent) {
+static int add_checkbox(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_checkbox_args(args, argc);
-    int slot = alloc_node(Node::CHECKBOX, args[0].as_string(), parent);
-    s_nodes[slot].target = args[1];
-    if (argc > 2)
-        s_nodes[slot].on_change = args[2];
+    std::string label = args[0].as_string();
+    Value target = args[1];
+    Value on_change = argc > 2 ? args[2] : Value{};
+    int slot = alloc_node(Node::CHECKBOX, label, resolve_parent(parent_menu, fn));
+    s_nodes[slot].target = target;
+    s_nodes[slot].on_change = on_change;
     return ctx.ret(make_handle(slot));
 }
 
-static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
+static int add_slider(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_slider_args(args, argc);
-    ui_slider_init(args, argc);
-    // EVERYTHING that calls into the script — here reading the reference — happens BEFORE the node is
-    // allocated: a getter can declare a widget, hence reallocate s_nodes, and a reference obtained
-    // before the call would then point at freed memory.
-    // The slider is an INTEGER one only when the bounds AND the starting value are: otherwise a 0..1
-    // slider driving a floating factor would round to 0 or 1.
-    bool integral = args[2].is_integer() && args[3].is_integer() && ref_get(args[1]).is_integer();
-    int slot = alloc_node(Node::SLIDER, args[0].as_string(), parent);
-    Node& n = s_nodes[slot];
-    n.target = args[1];
-    n.vmin = args[2].as_num();
-    n.vmax = args[3].as_num();
-    n.vdefault = ui_slider_default(args, argc).as_num();
-    n.integral = integral;
+    std::string label = args[0].as_string();
+    Value target = args[1];
+    Value vmin = args[2];
+    Value vmax = args[3];
+    Value vdefault = ui_slider_default(args, argc);
+    Value on_change;
     for (int i = 4; i < argc; ++i) {
         if (args[i].is_callable())
-            n.on_change = args[i];
+            on_change = args[i];
     }
+    // EVERYTHING that calls into the script — here reading and writing the reference — happens BEFORE
+    // the node is allocated: a getter can declare a widget, hence reallocate s_nodes, and a reference
+    // obtained before the call would then point at freed memory. From here on `args` is not read.
+    ui_slider_init(target, vdefault);
+    // The slider is an INTEGER one only when the bounds AND the starting value are: otherwise a 0..1
+    // slider driving a floating factor would round to 0 or 1.
+    bool integral = vmin.is_integer() && vmax.is_integer() && ref_get(target).is_integer();
+    int slot = alloc_node(Node::SLIDER, label, resolve_parent(parent_menu, fn));
+    Node& n = s_nodes[slot];
+    n.target = target;
+    n.vmin = vmin.as_num();
+    n.vmax = vmax.as_num();
+    n.vdefault = vdefault.as_num();
+    n.integral = integral;
+    n.on_change = on_change;
     return ctx.ret(make_handle(slot));
 }
 
 // A list is SINGLE-selection: the row shows the selected item, and a click opens the list — through
 // the submenu machinery — to choose another. The items are NOT generated here but at opening time, so
 // the list follows changes to its source without recomputing anything per frame.
-static int add_list(CallCtx& ctx, const Value* args, int argc, int parent) {
+static int add_list(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_list_args(args, argc);
-    ui_list_init(args);   // calls the script (getter/setter), hence BEFORE allocating the node
-    int slot = alloc_node(Node::LIST, args[0].as_string(), parent);
-    s_nodes[slot].source = args[1];
-    s_nodes[slot].target = args[2];
-    if (argc > 3)
-        s_nodes[slot].on_change = args[3];
+    std::string label = args[0].as_string();
+    Value source = args[1];
+    Value target = args[2];
+    Value on_change = argc > 3 ? args[3] : Value{};
+    ui_list_init(target, source);   // calls the script (getter/setter), hence BEFORE allocating the node
+    int slot = alloc_node(Node::LIST, label, resolve_parent(parent_menu, fn));
+    s_nodes[slot].source = source;
+    s_nodes[slot].target = target;
+    s_nodes[slot].on_change = on_change;
     return ctx.ret(make_handle(slot));
 }
 
-static int add_menu(CallCtx& ctx, const Value* args, int argc, int parent) {
+static int add_menu(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_menu_args(args, argc);
-    int slot = alloc_node(Node::MENU, args[0].as_string(), parent);
+    std::string label = args[0].as_string();
+    int slot = alloc_node(Node::MENU, label, resolve_parent(parent_menu, fn));
     return ctx.ret(make_handle(slot));
 }
 
 static int ui_button(CallCtx& ctx) {
-    return add_button(ctx, ctx.args, ctx.argc, ui_root());
+    return add_button(ctx, ctx.args, ctx.argc, Value{}, "ui.button");
 }
 
 static int ui_checkbox(CallCtx& ctx) {
-    return add_checkbox(ctx, ctx.args, ctx.argc, ui_root());
+    return add_checkbox(ctx, ctx.args, ctx.argc, Value{}, "ui.checkbox");
 }
 
 static int ui_slider(CallCtx& ctx) {
-    return add_slider(ctx, ctx.args, ctx.argc, ui_root());
+    return add_slider(ctx, ctx.args, ctx.argc, Value{}, "ui.slider");
 }
 
 static int ui_list(CallCtx& ctx) {
-    return add_list(ctx, ctx.args, ctx.argc, ui_root());
+    return add_list(ctx, ctx.args, ctx.argc, Value{}, "ui.list");
 }
 
 static int ui_menu(CallCtx& ctx) {
-    return add_menu(ctx, ctx.args, ctx.argc, ui_root());
+    return add_menu(ctx, ctx.args, ctx.argc, Value{}, "ui.menu");
 }
 
 // A menu's methods: the receiver is args[0], the user arguments follow.
 
 static int menu_button(CallCtx& ctx) {
-    int parent = menu_slot(ctx.args[0], "menu.button");
-    return add_button(ctx, ctx.args + 1, ctx.argc - 1, parent);
+    menu_slot(ctx.args[0], "menu.button");
+    return add_button(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.button");
 }
 
 static int menu_checkbox(CallCtx& ctx) {
-    int parent = menu_slot(ctx.args[0], "menu.checkbox");
-    return add_checkbox(ctx, ctx.args + 1, ctx.argc - 1, parent);
+    menu_slot(ctx.args[0], "menu.checkbox");
+    return add_checkbox(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.checkbox");
 }
 
 static int menu_slider(CallCtx& ctx) {
-    int parent = menu_slot(ctx.args[0], "menu.slider");
-    return add_slider(ctx, ctx.args + 1, ctx.argc - 1, parent);
+    menu_slot(ctx.args[0], "menu.slider");
+    return add_slider(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.slider");
 }
 
 static int menu_list(CallCtx& ctx) {
-    int parent = menu_slot(ctx.args[0], "menu.list");
-    return add_list(ctx, ctx.args + 1, ctx.argc - 1, parent);
+    menu_slot(ctx.args[0], "menu.list");
+    return add_list(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.list");
 }
 
 static int menu_menu(CallCtx& ctx) {
-    int parent = menu_slot(ctx.args[0], "menu.menu");
-    return add_menu(ctx, ctx.args + 1, ctx.argc - 1, parent);
+    menu_slot(ctx.args[0], "menu.menu");
+    return add_menu(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.menu");
 }
 
 
 // element.open() unfolds this menu — or this list — from the menu on display, which is also what a
 // click on its row does. It pushes, so ui.back() goes back.
 static int menu_open(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "menu.open");
+    Value self = ctx.args[0];   // read before open_list, which can run script code (a __str)
+    int slot = handle_slot(self, "menu.open");
     Node::Kind kind = s_nodes[slot].kind;
     if (kind == Node::LIST) {
         open_list(slot);
@@ -511,7 +539,7 @@ static int menu_open(CallCtx& ctx) {
     } else {
         throw std::runtime_error("menu.open: this ui element is neither a menu nor a list");
     }
-    return ctx.ret(ctx.args[0]);
+    return ctx.ret(self);
 }
 
 // ui.show(menu) replaces the global menu on display and resets the navigation stack, so ui.back() does
@@ -621,9 +649,27 @@ Value element_class() {
 } // namespace
 
 
+// The nodes are KILLED where they stand, not erased: their generation goes up, so a handle from before
+// is stale for good (a cleared table would start every slot again at generation 1, and an old handle
+// would then designate a stranger's widget), and a loop that was reading the table while a script getter
+// called ui.clear still finds valid, dead nodes under its feet.
 void ui_reset() {
-    s_nodes.clear();
     s_free.clear();
+    for (size_t i = 0; i < s_nodes.size(); i++) {
+        Node& n = s_nodes[i];
+        n.alive = false;
+        n.gen++;
+        n.action = Value{};
+        n.target = Value{};
+        n.on_change = Value{};
+        n.source = Value{};
+        n.item = Value{};
+        n.children.clear();
+        n.label.clear();
+        n.box = {0, 0, 0, 0};
+        n.parent = -1;
+        s_free.push_back((int)i);
+    }
     s_nav.clear();
     s_root = -1;
     s_back_box = {0, 0, 0, 0};
