@@ -11,6 +11,7 @@
 import "board.ol"
 import "pieces.ol"
 import "sounds.ol"
+import "texts.ol"
 
 ## What can be tuned: scores, durations, the keys of the saved data, the colours. Nothing here changes while
 ## the game runs.
@@ -23,6 +24,7 @@ global config = {
     liftTouch: 1.7,             ## cells between the finger and the bottom of the piece it holds
     liftMouse: 0.6,
     bestKey: "blockudoku.best",
+    langKey: "blockudoku.lang",
     saveKey: "blockudoku.game",
     floatPop: 0.18,             ## seconds for a gained point to appear where it was earned
     floatHold: 0.12,            ## seconds it stays there before being drawn into the score
@@ -42,10 +44,11 @@ global config = {
     onButton: [1, 1, 1, 1],             ## the label of a button, whose fill is dark
     cellLight: 0.91,                    ## the empty cells, in two greys that alternate by 3x3 box
     cellDark: 0.83,
-    menu: [                             ## the options screen, top to bottom: a label, where the entry leads, and whether it is the main button
-        {label: "How to play", goes: "help"},
-        {label: "All pieces", goes: "pieces"},
-        {label: "Back to game", goes: "game", primary: true}
+    menu: [                             ## the options screen, top to bottom: the key of its text, where it leads, and whether it is the main button
+        {text: "menuHelp", goes: "help"},
+        {text: "menuPieces", goes: "pieces"},
+        {text: "menuLanguage", goes: "language"},
+        {text: "menuBack", goes: "game", primary: true}
     ],
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
@@ -71,7 +74,7 @@ global game = {
     target: {r: 0, c: 0, valid: false, near: false},
     previewCells: [],
     layout: {w: 0, h: 0, sx: [0, 0, 0], sy: [0, 0, 0]},   ## where everything goes, computed again when W or H change
-    screen: "game",             ## what is shown: the game, the options menu, the help or the catalogue of every piece
+    screen: "game",             ## what is shown: the game, the options menu, the help, the languages or the catalogue of every piece
     screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
     sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
@@ -188,16 +191,11 @@ func sheetCompute()
     game.sheet.items = items
 end
 
-## What the help says, one string per paragraph. The figures come from config, so the text cannot drift from the rules.
+## What the help says, one string per paragraph, in the current language. The figures come from config, so the text
+## cannot drift from the rules.
 func helpParagraphs()
-    return [
-        "Drag one of the three pieces onto the grid and let go to place it. A piece cannot be turned.",
-        "Fill a whole row, a whole column or a whole {BOX}x{BOX} box and it is cleared. Several at once are cleared together.",
-        "Each cell you place scores {config.pointsPerCell}. Each zone you clear scores {GRID * config.pointsPerClearedCell}, and clearing several zones at once multiplies that by their number.",
-        "Clear something on consecutive turns and you build a streak: each turn of the streak adds {config.streakBonus} more points than the one before.",
-        "A faded piece fits nowhere on the grid right now. The game is over when none of the three pieces can be placed.",
-        "Your game is saved as you play, and your best score is kept."
-    ]
+    var write = tr("help")
+    return write({box: BOX, cell: config.pointsPerCell, zone: GRID * config.pointsPerClearedCell, streak: config.streakBonus})
 end
 
 ## The help cut into lines no wider than areaW, with the font size already set: a blank line ends each paragraph.
@@ -252,12 +250,12 @@ func showScreen(name)
     game.screenTick = game.tick
 end
 
-## The rectangle of the i-th entry of the options menu, centred in the area.
-func optionRect(i)
+## The rectangle of the i-th of n entries of a menu, centred in the area.
+func optionRect(i, n)
     var w = math.min(W - 2 * SIZE * 0.04, SIZE * 0.7)
     var h = SIZE * 0.11
     var gap = h * 0.35
-    var top = H / 2 - (len(config.menu) * h + (len(config.menu) - 1) * gap) / 2
+    var top = H / 2 - (n * h + (n - 1) * gap) / 2
     return CX - w / 2, top + (i - 1) * (h + gap), w, h
 end
 
@@ -769,12 +767,22 @@ func drawPiece(p, alpha = 1, stuck = false)
     end
 end
 
+## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
+func fitSize(str, size, maxW)
+    graphics.fontSize(size)
+    var tw = graphics.textSize(str)
+    if tw > maxW then
+        return size * maxW / tw
+    end
+    return size
+end
+
 func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
     var L = game.layout
     graphics.noStroke()
     graphics.fill(fill[1], fill[2], fill[3], alpha)
     graphics.rect(x, y, w, h, L.c * 0.3)
-    drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", config.onButton, alpha)
+    drawText(label, x + w / 2, y + h / 2, fitSize(label, textSize, w * 0.9), "center", "center", config.onButton, alpha)
 end
 
 ## The button of the options screen: a thick toothed wheel in the blue of the blocks, with a hole through to the paper.
@@ -797,11 +805,11 @@ end
 func drawHeader()
     var L = game.layout
     var c = L.c
-    drawText("SCORE", L.scoreX, L.scoreY, c * 0.36, "left", "top", config.muted)
+    drawText(tr("scoreHeader"), L.scoreX, L.scoreY, c * 0.36, "left", "top", config.muted)
     drawText("{math.round(game.display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * game.display.pop, "left", "top", config.ink)
-    drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
+    drawText(tr("bestHeader"), L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
     drawText("{game.best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", config.ink)
-    drawButton("New game", L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
+    drawButton(tr("newGame"), L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
     drawGear(L.gearX, L.gearY, L.gearS)
 end
 
@@ -909,14 +917,14 @@ func drawOver()
     graphics.fill(config.paper, 0.85 * game.fade.a)
     graphics.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
-    drawText("GAME OVER", mx, L.by + 2.3 * c, c * 1.1, "center", "center", config.ink, game.fade.a)
-    drawText("Score {game.score}", mx, L.by + 3.6 * c, c * 0.7, "center", "center", config.ink, game.fade.a)
+    drawText(tr("gameOver"), mx, L.by + 2.3 * c, fitSize(tr("gameOver"), c * 1.1, L.bs * 0.95), "center", "center", config.ink, game.fade.a)
+    drawText("{tr("finalScore")} {game.score}", mx, L.by + 3.6 * c, c * 0.7, "center", "center", config.ink, game.fade.a)
     if game.newBest then
-        drawText("New best!", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.gold, game.fade.a)
+        drawText(tr("newBest"), mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.gold, game.fade.a)
     else
-        drawText("Best {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
+        drawText("{tr("bestOver")} {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
     end
-    drawButton("New game", L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
+    drawButton(tr("newGame"), L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
 ## The title of a screen that replaces the game: the background is already painted.
@@ -924,11 +932,27 @@ func drawScreenTitle(title)
     drawText(title, CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
 end
 
-## The options menu: one button per entry of config.menu.
-func drawOptions()
-    drawScreenTitle("OPTIONS")
-    for i, entry in config.menu do
-        var x, y, w, h = optionRect(i)
+## The buttons of a menu screen, top to bottom: {label, primary, and where a press leads (goes) or the language it picks}.
+func optionEntries()
+    var entries = []
+    for entry in config.menu do
+        entries.push({label: tr(entry.text), goes: entry.goes, primary: entry.primary})
+    end
+    return entries
+end
+
+func languageEntries()
+    var entries = []
+    for code in LANGUAGES do
+        entries.push({label: TEXTS[code].name, lang: code, primary: code == i18n.lang})
+    end
+    entries.push({label: tr("back"), goes: "options"})
+    return entries
+end
+
+func drawEntries(entries)
+    for i, entry in entries do
+        var x, y, w, h = optionRect(i, len(entries))
         var fill = config.button
         if entry.primary then
             fill = config.buttonPrimary
@@ -937,15 +961,45 @@ func drawOptions()
     end
 end
 
-## A press on the options menu: the entry under it, if any.
-func pressOptions(x, y)
-    for i, entry in config.menu do
-        var rx, ry, rw, rh = optionRect(i)
+## Picks a language and keeps it for the next launch. The help is cut into lines again, in the new language.
+func chooseLanguage(code)
+    if setLanguage(code) then
+        data.set(config.langKey, code)
+        game.help.w = 0
+    end
+end
+
+## A press on a menu: the entry under it, if any.
+func pressEntries(entries, x, y)
+    for i, entry in entries do
+        var rx, ry, rw, rh = optionRect(i, len(entries))
         if inRect(x, y, rx, ry, rw, rh) then
-            showScreen(entry.goes)
+            if entry.lang <> nil then
+                chooseLanguage(entry.lang)
+            else
+                showScreen(entry.goes)
+            end
             return
         end
     end
+end
+
+func drawOptions()
+    drawScreenTitle(tr("optionsTitle"))
+    drawEntries(optionEntries())
+end
+
+func pressOptions(x, y)
+    pressEntries(optionEntries(), x, y)
+end
+
+func drawLanguage()
+    drawScreenTitle(tr("languageTitle"))
+    drawEntries(languageEntries())
+end
+
+func pressLanguage(x, y)
+    pressEntries(languageEntries(), x, y)
 end
 
 func backToOptions(x, y)
@@ -955,7 +1009,7 @@ end
 func drawHelp()
     helpCompute()
     var help = game.help
-    drawScreenTitle("HOW TO PLAY")
+    drawScreenTitle(tr("helpTitle"))
     var y = help.y
     for line in help.lines do
         if line <> "" then
@@ -963,13 +1017,13 @@ func drawHelp()
         end
         y += help.size * 1.35
     end
-    drawText("tap anywhere to go back", CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
+    drawText(tr("tapBack"), CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
 end
 
 func drawGallery()
     sheetCompute()
-    drawScreenTitle("ALL PIECES")
-    drawText("{len(pieces.shapes)} shapes, tap anywhere to go back", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
+    drawScreenTitle(tr("piecesTitle"))
+    drawText("{len(pieces.shapes)} {tr("piecesHint")}", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
     var u = game.sheet.u
     for item in game.sheet.items do
         var s = item.shape
@@ -983,7 +1037,8 @@ end
 global screens = {
     options: {draw: drawOptions, press: pressOptions},
     help: {draw: drawHelp, press: backToOptions},
-    pieces: {draw: drawGallery, press: backToOptions}
+    pieces: {draw: drawGallery, press: backToOptions},
+    language: {draw: drawLanguage, press: pressLanguage}
 }
 
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
@@ -993,6 +1048,7 @@ func setup()
     graphics.fitArea()
     buildShapes()
     buildSounds()
+    setLanguage(data.get(config.langKey, LANGUAGES[1]))
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then
         newGame()
