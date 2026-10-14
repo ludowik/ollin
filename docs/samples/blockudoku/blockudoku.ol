@@ -42,6 +42,10 @@ global config = {
     onButton: [1, 1, 1, 1],             ## the label of a button, whose fill is dark
     cellLight: 0.91,                    ## the empty cells, in two greys that alternate by 3x3 box
     cellDark: 0.83,
+    menu: [                             ## the options screen, top to bottom: a label and where the entry leads
+        {label: "All pieces", goes: "pieces"},
+        {label: "Back to game", goes: "game"}
+    ],
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
 config.floatLife = config.floatPop + config.floatHold + config.floatFlight
@@ -68,8 +72,8 @@ global game = {
     layout: {sx: [0, 0, 0], sy: [0, 0, 0]},
     layoutW: 0,
     layoutH: 0,
-    gallery: false,             ## the catalogue of every piece covers the screen
-    galleryTick: -1,            ## the tick of the last toggle: the second path of the same gesture is ignored
+    screen: "game",             ## what is shown: the game, the options menu, or the catalogue of every piece
+    screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
     sheet: {u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
     sheetW: 0,
@@ -92,6 +96,16 @@ func layoutCompute()
     var cl = math.min((H - 2 * m) / GRID, (W - 2 * m) / 14.3)
     var portrait = cp >= cl
     var c = math.floor(math.max(cp, cl))
+    var gear = math.max(SIZE * 0.08, 40)
+    L.gearS = gear
+    L.gearX = W - m - gear
+    L.gearY = m
+    if portrait then
+        ## The header must not run under the gear: a narrow and short area shrinks the board until it clears.
+        while c > 8 and (W + GRID * c) / 2 > L.gearX - 0.3 * m and (H - 15.2 * c) / 2 < L.gearY + gear + 0.3 * m do
+            c -= 1
+        end
+    end
     var bs = GRID * c
     L.c = c
     L.bs = bs
@@ -107,11 +121,6 @@ func layoutCompute()
         L.btnY = top
         L.btnW = 2.8 * c
         L.btnH = 1.1 * c
-        L.galX = L.btnX
-        L.galY = top + 1.3 * c
-        L.galW = L.btnW
-        L.galH = L.btnH
-        L.galText = 0.42 * c
         L.tc = 0.55 * c
         L.sw = 1.5 * c
         L.sh = 1.6 * c
@@ -132,11 +141,6 @@ func layoutCompute()
         L.btnY = L.by + 1.65 * c
         L.btnW = 2.3 * c
         L.btnH = 1.1 * c
-        L.galX = colX + 3.1 * c
-        L.galY = L.by + 0.05 * c
-        L.galW = 1.7 * c
-        L.galH = 1.0 * c
-        L.galText = 0.36 * c
         L.tc = 0.36 * c
         L.sw = 2.4 * c
         L.sh = 1.0 * c
@@ -178,9 +182,18 @@ func sheetCompute()
     game.sheet.items = items
 end
 
-func toggleGallery(open)
-    game.gallery = open
-    game.galleryTick = game.tick
+func showScreen(name)
+    game.screen = name
+    game.screenTick = game.tick
+end
+
+## The rectangle of the i-th entry of the options menu, centred in the area.
+func optionRect(i)
+    var w = math.min(W - 2 * SIZE * 0.04, SIZE * 0.7)
+    var h = SIZE * 0.11
+    var gap = h * 0.35
+    var top = H / 2 - (len(config.menu) * h + (len(config.menu) - 1) * gap) / 2
+    return CX - w / 2, top + (i - 1) * (h + gap), w, h
 end
 
 ## ── Game ────────────────────────────────────────────────────────────────────────────────────────
@@ -562,17 +575,27 @@ end
 
 func pressAt(id, x, y)
     var L = game.layout
-    if game.tick == game.galleryTick then
+    if game.tick == game.screenTick then
         return
     end
-    if game.gallery then
-        toggleGallery(false)
+    if game.screen == "pieces" then
+        showScreen("options")
+        return
+    end
+    if game.screen == "options" then
+        for i, entry in config.menu do
+            var rx, ry, rw, rh = optionRect(i)
+            if inRect(x, y, rx, ry, rw, rh) then
+                showScreen(entry.goes)
+                return
+            end
+        end
         return
     end
     layoutCompute()
-    if inRect(x, y, L.galX, L.galY, L.galW, L.galH) then
+    if inRect(x, y, L.gearX, L.gearY, L.gearS, L.gearS) then
         if game.dragId == nil then
-            toggleGallery(true)
+            showScreen("options")
         end
         return
     end
@@ -699,6 +722,25 @@ func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
     drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", config.onButton, alpha)
 end
 
+## The button of the options screen: a toothed wheel with a hole, on the fill of the other buttons.
+func drawGear(x, y, s)
+    graphics.noStroke()
+    graphics.fill(config.button[1], config.button[2], config.button[3])
+    graphics.rect(x, y, s, s, s * 0.22)
+    graphics.fill(config.onButton[1], config.onButton[2], config.onButton[3])
+    for k = 0, 7 do
+        graphics.push()
+        graphics.translate(x + s / 2, y + s / 2)
+        graphics.rotate(k * 45)
+        graphics.rectMode("center")
+        graphics.rect(0, -s * 0.30, s * 0.13, s * 0.15)
+        graphics.pop()
+    end
+    graphics.circle(x + s / 2, y + s / 2, s * 0.24)
+    graphics.fill(config.button[1], config.button[2], config.button[3])
+    graphics.circle(x + s / 2, y + s / 2, s * 0.10)
+end
+
 func drawHeader()
     var L = game.layout
     var c = L.c
@@ -707,7 +749,7 @@ func drawHeader()
     drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
     drawText("{game.best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", config.ink)
     drawButton("New game", L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
-    drawButton("Pieces", L.galX, L.galY, L.galW, L.galH, config.button, L.galText)
+    drawGear(L.gearX, L.gearY, L.gearS)
 end
 
 ## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
@@ -824,16 +866,29 @@ func drawOver()
     drawButton("New game", L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
-func drawGallery()
-    if not game.gallery then
-        return
+## The options menu: a title and one button per entry of config.menu.
+func drawOptions()
+    graphics.noStroke()
+    graphics.fill(config.paper)
+    graphics.rect(0, 0, W, H)
+    drawText("OPTIONS", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+    for i, entry in config.menu do
+        var x, y, w, h = optionRect(i)
+        var fill = config.button
+        if entry.goes == "game" then
+            fill = config.buttonPrimary
+        end
+        drawButton(entry.label, x, y, w, h, fill, h * 0.4)
     end
+end
+
+func drawGallery()
     sheetCompute()
     graphics.noStroke()
     graphics.fill(config.paper)
     graphics.rect(0, 0, W, H)
     drawText("ALL PIECES", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
-    drawText("{len(pieces.shapes)} shapes, tap anywhere to close", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
+    drawText("{len(pieces.shapes)} shapes, tap anywhere to go back", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
     var u = game.sheet.u
     for item in game.sheet.items do
         var s = item.shape
@@ -893,5 +948,9 @@ func draw()
     end
     drawFloaters()
     drawOver()
-    drawGallery()
+    if game.screen == "options" then
+        drawOptions()
+    elseif game.screen == "pieces" then
+        drawGallery()
+    end
 end
