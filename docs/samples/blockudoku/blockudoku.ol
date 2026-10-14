@@ -1,12 +1,13 @@
 ## Blockudoku: a 9x9 grid cut into nine 3x3 boxes. Drag one of the three pieces onto the grid; every
 ## complete row, column or box is cleared. The game ends when none of the pieces left fits anywhere.
 ##
-## board.ol holds the rules, pieces.ol the shapes, sounds.ol the sound; this file is the game: its
+## board.ol holds the rules, pieces.ol the shapes, sounds.ol the sound, texts.ol the words in French and
+## English; this file is the game: its
 ## state, its input, its animations and its drawing. The layout follows the orientation of the area
 ## (graphics.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
 ##
 ## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs.
-## The other files keep theirs in one object each: `board`, `pieces`, `sounds`.
+## The other files keep theirs in one object each: `board`, `pieces`, `sounds`, `i18n`.
 
 import "board.ol"
 import "pieces.ol"
