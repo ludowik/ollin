@@ -9,7 +9,7 @@ buildShapes()
 
 var keys = {}
 var footprints = {}
-for s in shapes do
+for s in pieces.shapes do
     var maxRow = 0
     var maxCol = 0
     var cellNames = []
@@ -26,17 +26,17 @@ for s in shapes do
     footprints[footprint] = true
     assert(shapeFromKey(s.key) == s, "shapeFromKey does not find {s.key}")
 end
-assert(len(shapes) == 43, "expected 43 shapes, got {len(shapes)}")
+assert(len(pieces.shapes) == 43, "expected 43 shapes, got {len(pieces.shapes)}")
 assert(shapeFromKey("nope") == nil)
 
 ## The weights are those of the reference game: 83 draws, the single cell and the line of five at 1.
-assert(len(bag) == 83, "the bag holds {len(bag)} entries, expected 83")
+assert(len(pieces.bag) == 83, "the bag holds {len(pieces.bag)} entries, expected 83")
 var counts = {}
-for s in bag do
+for s in pieces.bag do
     counts[s.key] = (counts[s.key] or 0) + 1
 end
 var light = []
-for s in shapes do
+for s in pieces.shapes do
     if counts[s.key] == 1 then
         light.push(s.key)
     else
@@ -56,7 +56,7 @@ assert(drawn["#"] > 0 and drawn["##"] > drawn["#"], "the single cell must be rar
 for u in [6, 20, 37] do
     var areaW = 5 * u + 3 * u
     var items, used = packShapes(u, areaW)
-    assert(len(items) == len(shapes), "u={u}: {len(items)} pieces laid out")
+    assert(len(items) == len(pieces.shapes), "u={u}: {len(items)} pieces laid out")
     for i, a in items do
         assert(a.x >= -0.001 and a.x + a.shape.w * u <= areaW + 0.001, "u={u}: {a.shape.key} leaves the area")
         assert(a.y >= -0.001 and a.y + a.shape.h * u <= used + 0.001, "u={u}: {a.shape.key} leaves the height")
@@ -71,14 +71,14 @@ end
 ## in that state. Only the single cell fits a grid with one hole; a vertical domino fits once the hole has a
 ## free neighbour; nothing fits a full grid.
 var g = boardNew()
-for s in shapes do
+for s in pieces.shapes do
     assert(boardAnyMove(g, s), "{s.key} must fit on an empty grid")
 end
 for i = 1, CELLS do
     g[i] = 1
 end
 g[boardIdx(5, 5)] = 0
-for s in shapes do
+for s in pieces.shapes do
     assert(boardAnyMove(g, s) == (s.key == "#"), "{s.key} on a grid with one hole: {boardAnyMove(g, s)}")
 end
 g[boardIdx(6, 5)] = 0

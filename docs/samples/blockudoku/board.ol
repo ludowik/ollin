@@ -9,7 +9,7 @@ const BOX = 3
 const CELLS = GRID * GRID
 
 ## The 27 zones that clear when full: nine rows, nine columns, nine boxes, each a list of 9 indices.
-global boardZones = []
+global board = {zones: []}
 
 func boardIdx(r, c)
     return (r - 1) * GRID + c
@@ -36,20 +36,20 @@ func boardNew()
 end
 
 func boardBuildZones()
-    boardZones = []
+    board.zones = []
     for r = 1, GRID do
         var z = []
         for c = 1, GRID do
             z.push(boardIdx(r, c))
         end
-        boardZones.push(z)
+        board.zones.push(z)
     end
     for c = 1, GRID do
         var z = []
         for r = 1, GRID do
             z.push(boardIdx(r, c))
         end
-        boardZones.push(z)
+        board.zones.push(z)
     end
     for br = 0, BOX - 1 do
         for bc = 0, BOX - 1 do
@@ -59,7 +59,7 @@ func boardBuildZones()
                     z.push(boardIdx(br * BOX + r, bc * BOX + c))
                 end
             end
-            boardZones.push(z)
+            board.zones.push(z)
         end
     end
 end
@@ -102,7 +102,7 @@ func boardFull(g)
     var mark = boardNew()
     var cleared = []
     var zones = 0
-    for z in boardZones do
+    for z in board.zones do
         var full = true
         for i in z do
             if g[i] == 0 then

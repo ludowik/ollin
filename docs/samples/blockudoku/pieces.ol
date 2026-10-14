@@ -1,8 +1,7 @@
 ## The PIECES of Blockudoku. A piece is never rotated by the player, so each orientation is a shape
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
-global shapes = []
-global bag = []
+global pieces = {shapes: [], bag: []}
 
 ## A family groups the orientations of one piece and optionally gives a weight: how many
 ## times each of its shapes sits in the bag a hand is drawn from. Most shapes weigh DEFAULT_WEIGHT; the
@@ -42,8 +41,8 @@ func parseShape(rows)
 end
 
 func buildShapes()
-    shapes = []
-    bag = []
+    pieces.shapes = []
+    pieces.bag = []
     for family in SHAPE_FAMILIES do
         var weight = DEFAULT_WEIGHT
         if len(family) > 1 then
@@ -51,9 +50,9 @@ func buildShapes()
         end
         for rows in family[1] do
             var shape = parseShape(rows)
-            shapes.push(shape)
+            pieces.shapes.push(shape)
             for i = 1, weight do
-                bag.push(shape)
+                pieces.bag.push(shape)
             end
         end
     end
@@ -68,7 +67,7 @@ func packShapes(u, areaW)
     var y = 0
     var rowH = 0
     var first = 1
-    for s in shapes do
+    for s in pieces.shapes do
         if x > 0 and x + s.w * u > areaW then
             closeRow(items, first, (areaW - (x - u)) / 2, rowH, u)
             y += rowH + u
@@ -94,7 +93,7 @@ func closeRow(items, first, dx, rowH, u)
 end
 
 func shapeFromKey(key)
-    for s in shapes do
+    for s in pieces.shapes do
         if s.key == key then
             return s
         end
@@ -103,5 +102,5 @@ func shapeFromKey(key)
 end
 
 func randomShape()
-    return bag[math.randInt(1, len(bag))]
+    return pieces.bag[math.randInt(1, len(pieces.bag))]
 end
