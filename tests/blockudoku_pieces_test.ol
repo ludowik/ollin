@@ -86,11 +86,6 @@ assert(boardAnyMove(g, shapeFromKey("#/#")) and boardAnyMove(g, shapeFromKey("#"
 assert(not boardAnyMove(g, shapeFromKey("##")), "a horizontal domino does not fit two stacked holes")
 ## boardFull finds every full zone at once and lists a shared cell once; boardPreview shows what a placement would clear
 ## without touching the grid.
-func fillCells(grid, list)
-    for pair in list do
-        grid[boardIdx(pair[1], pair[2])] = 1
-    end
-end
 var f = boardNew()
 var none, nzones = boardFull(f)
 assert(len(none) == 0 and nzones == 0, "an empty grid has no full zone")

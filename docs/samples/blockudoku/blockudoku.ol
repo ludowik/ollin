@@ -51,6 +51,9 @@ global config = {
         {text: "menuLanguage", goes: "language"},
         {text: "menuBack", goes: "game", primary: true}
     ],
+    margin: 0.04,                       ## fractions of SIZE: the margin of a screen, the band its title takes, the margin of a text
+    titleBand: 0.14,
+    textMargin: 0.06,
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
 config.floatLife = config.floatPop + config.floatHold + config.floatFlight
@@ -102,10 +105,13 @@ func layoutCompute()
     if not areaChanged(L) then
         return
     end
-    var m = SIZE * 0.04
-    var colH = 15.2                 ## the height of the column of the header, the board and the trays, in cells
+    var m = SIZE * config.margin
+    ## What the area must hold, in cells: the height of the column (header, board, trays) when it stands, and the width
+    ## of the board plus its side column when they stand together. They add up the offsets placed below.
+    var colH = 15.2
+    var rowW = 14.3
     var cp = math.min((W - 2 * m) / GRID, (H - 2 * m) / colH)
-    var cl = math.min((H - 2 * m) / GRID, (W - 2 * m) / 14.3)
+    var cl = math.min((H - 2 * m) / GRID, (W - 2 * m) / rowW)
     var portrait = cp >= cl
     var c = math.floor(math.max(cp, cl))
     var gear = math.max(SIZE * 0.08, 40)
@@ -132,7 +138,6 @@ func layoutCompute()
         L.btnX = L.bx + 6.2 * c
         L.btnY = top
         L.btnW = 2.8 * c
-        L.btnH = 1.1 * c
         L.tc = 0.55 * c
         L.sw = 1.5 * c
         L.sh = 1.6 * c
@@ -152,7 +157,6 @@ func layoutCompute()
         L.btnX = colX + 2.5 * c
         L.btnY = L.by + 1.65 * c
         L.btnW = 2.3 * c
-        L.btnH = 1.1 * c
         L.tc = 0.36 * c
         L.sw = 2.4 * c
         L.sh = 1.0 * c
@@ -161,6 +165,7 @@ func layoutCompute()
             L.sy[i] = L.by + 3.0 * c + (i - 0.5) * 2.0 * c
         end
     end
+    L.btnH = 1.1 * c
     L.overW = 4.4 * c
     L.overH = 1.4 * c
     L.overX = L.bx + bs / 2 - L.overW / 2
@@ -176,8 +181,8 @@ func sheetCompute()
     if not areaChanged(game.sheet) then
         return
     end
-    var m = SIZE * 0.04
-    var top = SIZE * 0.14
+    var m = SIZE * config.margin
+    var top = SIZE * config.titleBand
     var areaW = W - 2 * m
     var areaH = H - top - m
     var u = math.floor(areaW / 5)
@@ -226,14 +231,14 @@ end
 ## The help at the largest size that fits under the title.
 func helpCompute()
     var help = game.help
-    var moved = areaChanged(help)
-    if not moved and help.lang == i18n.lang then
+    if not areaChanged(help) and help.lang == i18n.lang then
         return
     end
     help.lang = i18n.lang
-    var m = SIZE * 0.06
+    var m = SIZE * config.textMargin
+    var top = SIZE * config.titleBand
     var areaW = W - 2 * m
-    var areaH = H - SIZE * 0.14 - m
+    var areaH = H - top - m
     var size = math.floor(SIZE * 0.04)
     var lines = wrapHelp(size, areaW)
     while len(lines) * size * 1.35 > areaH and size > 10 do
@@ -241,7 +246,7 @@ func helpCompute()
         lines = wrapHelp(size, areaW)
     end
     help.x = m
-    help.y = SIZE * 0.14
+    help.y = top
     help.size = size
     help.lines = lines
 end
@@ -254,7 +259,7 @@ end
 
 ## The rectangle of the i-th of n entries of a menu, centred in the area.
 func optionRect(i, n)
-    var w = math.min(W - 2 * SIZE * 0.04, SIZE * 0.7)
+    var w = math.min(W - 2 * SIZE * config.margin, SIZE * 0.7)
     var h = SIZE * 0.11
     var gap = h * 0.35
     var top = H / 2 - (n * h + (n - 1) * gap) / 2
@@ -531,6 +536,8 @@ func placePiece(p, slot, r, c)
         sumR += rr
         sumC += cc
     end
+    var pr = sumR / p.shape.n        ## the centre of the piece: where the wave starts and the streak bonus is born
+    var pc = sumC / p.shape.n
     var cleared, zones = boardFull(game.grid)
     boardClear(game.grid, cleared)
     var n = 0
@@ -545,9 +552,9 @@ func placePiece(p, slot, r, c)
         var bonus = zones * zones * GRID * config.pointsPerClearedCell
         var streakBonus = (game.streak - 1) * config.streakBonus
         game.score += bonus + streakBonus
-        animateClear(cleared, sumR / p.shape.n, sumC / p.shape.n, bonus, placed)
+        animateClear(cleared, pr, pc, bonus, placed)
         if streakBonus > 0 then
-            spawnFloater(sumR / p.shape.n, sumC / p.shape.n, streakBonus, config.streakTint, 0.1)
+            spawnFloater(pr, pc, streakBonus, config.streakTint, 0.1)
         end
         playClear(zones, game.streak)
         game.state = "clearing"
@@ -591,28 +598,29 @@ end
 ## Where the held piece would land: the cell nearest its top-left corner, and whether it fits.
 func updateTarget()
     var L = game.layout
-    var left = game.held.x - game.held.shape.w * L.c / 2
-    var top = game.held.y - game.held.shape.h * L.c / 2
+    var held = game.held
+    var t = game.target
+    var left = held.x - held.shape.w * L.c / 2
+    var top = held.y - held.shape.h * L.c / 2
     var c = math.round((left - L.bx) / L.c) + 1
     var r = math.round((top - L.by) / L.c) + 1
-    if c == game.target.c and r == game.target.r and game.held.shape == game.target.shape then
+    if c == t.c and r == t.r and held.shape == t.shape then
         return
     end
-    game.target.c = c
-    game.target.r = r
-    game.target.shape = game.held.shape
-    game.target.valid = boardCanPlace(game.grid, game.held.shape, game.target.r, game.target.c)
-    game.target.near = false
-    for off in game.held.shape.cells do
-        var rr = game.target.r + off[1]
-        var cc = game.target.c + off[2]
-        if boardInside(rr, cc) then
-            game.target.near = true
+    t.c = c
+    t.r = r
+    t.shape = held.shape
+    t.valid = boardCanPlace(game.grid, held.shape, r, c)
+    t.near = false
+    for off in held.shape.cells do
+        if boardInside(r + off[1], c + off[2]) then
+            t.near = true
         end
     end
-    game.previewCells = []
-    if game.target.valid then
-        game.previewCells = boardPreview(game.grid, game.held.shape, game.target.r, game.target.c)
+    if t.valid then
+        game.previewCells = boardPreview(game.grid, held.shape, r, c)
+    else
+        game.previewCells = []
     end
 end
 
@@ -741,6 +749,12 @@ func drawText(str, x, y, size, h, v, col, alpha = 1)
     graphics.noStroke()
 end
 
+## The top-left corner on the screen of the cell at row r, column c.
+func cellOrigin(r, c)
+    var L = game.layout
+    return L.bx + (c - 1) * L.c, L.by + (r - 1) * L.c
+end
+
 ## The rectangle of a cell, inset to leave the gap between neighbours.
 func cellRect(x, y, s)
     graphics.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
@@ -754,19 +768,21 @@ func drawCell(x, y, s, alpha = 1, stuck = false)
     end
     var g = s * 0.05
     var inner = s - 2 * g
-    graphics.noStroke()
     graphics.fill(col[1], col[2], col[3], alpha)
     graphics.rect(x + g, y + g, inner, inner, s * 0.18)
     graphics.fill(1, 1, 1, 0.22 * alpha)
     graphics.rect(x + g + s * 0.08, y + g + s * 0.06, inner - s * 0.16, inner * 0.32, s * 0.12)
 end
 
-func drawPiece(p, alpha = 1, stuck = false)
-    var x0 = p.x - p.shape.w * p.size / 2
-    var y0 = p.y - p.shape.h * p.size / 2
-    for off in p.shape.cells do
-        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, alpha, stuck)
+## The blocks of a shape whose top-left corner is at (x0, y0), s wide each.
+func drawShape(shape, x0, y0, s, alpha = 1, stuck = false)
+    for off in shape.cells do
+        drawCell(x0 + off[2] * s, y0 + off[1] * s, s, alpha, stuck)
     end
+end
+
+func drawPiece(p, alpha = 1, stuck = false)
+    drawShape(p.shape, p.x - p.shape.w * p.size / 2, p.y - p.shape.h * p.size / 2, p.size, alpha, stuck)
 end
 
 ## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
@@ -781,7 +797,6 @@ end
 
 func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
     var L = game.layout
-    graphics.noStroke()
     graphics.fill(fill[1], fill[2], fill[3], alpha)
     graphics.rect(x, y, w, h, L.c * 0.3)
     drawText(label, x + w / 2, y + h / 2, fitSize(label, textSize, w * 0.9), "center", "center", config.onButton, alpha)
@@ -789,7 +804,6 @@ end
 
 ## The button of the options screen: a thick toothed wheel in the blue of the blocks, with a hole through to the paper.
 func drawGear(x, y, s)
-    graphics.noStroke()
     graphics.fill(config.blue[1], config.blue[2], config.blue[3])
     graphics.push()
     graphics.translate(x + s / 2, y + s / 2)
@@ -821,48 +835,57 @@ func drawFloaters()
     var c = L.c
     var tx = L.scoreX + c * 0.6
     var ty = L.scoreY + c * 1.0
+    var ink = config.outlineInk
+    graphics.textMode("center", "center")
     for f in game.floaters do
         if f.age > 0 then
             var u = math.min(f.age / config.floatPop, 1) - 1
             var grow = 1 + 2.70158 * u * u * u + 1.70158 * u * u          ## easeOutBack
             var q = math.clamp((f.age - config.floatPop - config.floatHold) / config.floatFlight, 0, 1)
             var k = q * q                                                  ## easeInQuad: it picks up speed
-            var x0 = L.bx + (f.col - 0.5) * c
-            var y0 = L.by + (f.row - 0.5) * c
+            var ox, oy = cellOrigin(f.row, f.col)
+            var x0 = ox + c / 2
+            var y0 = oy + c / 2
             var x = x0 + (tx - x0) * k
             var y = y0 + (ty - y0) * k
             var size = c * 0.46 * grow * (1 - 0.75 * k)
             var alpha = 1 - math.max(0, (k - 0.8) / 0.2)
             var edge = size * 0.07
+            graphics.fontSize(size)
+            graphics.stroke(ink[1], ink[2], ink[3], ink[4] * alpha * 0.9)
             for off in config.outline do
-                drawText(f.text, x + off[1] * edge, y + off[2] * edge, size, "center", "center", config.outlineInk, alpha * 0.9)
+                graphics.text(f.text, x + off[1] * edge, y + off[2] * edge)
             end
-            drawText(f.text, x, y, size, "center", "center", f.tint, alpha)
+            graphics.stroke(f.tint[1], f.tint[2], f.tint[3], f.tint[4] * alpha)
+            graphics.text(f.text, x, y)
         end
     end
+    graphics.noStroke()
 end
 
 func drawBoard()
     var L = game.layout
     var c = L.c
-    graphics.noStroke()
-    for r = 1, GRID do
-        for col = 1, GRID do
-            var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
-            var grey = config.cellLight - (config.cellLight - config.cellDark) * tint
-            graphics.fill(grey)
-            cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
+    ## The empty cells, the two greys of the 3x3 boxes one after the other: a fill per grey, not per cell.
+    for tint = 0, 1 do
+        graphics.fill(config.cellLight - (config.cellLight - config.cellDark) * tint)
+        for r = 1, GRID do
+            for col = 1, GRID do
+                if ((r - 1) // BOX + (col - 1) // BOX) % 2 == tint then
+                    var x, y = cellOrigin(r, col)
+                    cellRect(x, y, c)
+                end
+            end
         end
     end
-    var i = 0
     for r = 1, GRID do
         for col = 1, GRID do
-            i += 1
-            var cell = game.cells[i]
+            var cell = game.cells[boardIdx(r, col)]
             if cell.v <> 0 and cell.s > 0.01 then
                 var size = c * cell.s
-                var x = L.bx + (col - 1) * c + (c - size) / 2
-                var y = L.by + (r - 1) * c + (c - size) / 2
+                var ox, oy = cellOrigin(r, col)
+                var x = ox + (c - size) / 2
+                var y = oy + (c - size) / 2
                 drawCell(x, y, size)
                 if cell.f > 0.01 then
                     graphics.fill(1, 1, 1, cell.f * 0.9)
@@ -876,27 +899,28 @@ end
 ## The shadow of the held piece where it would land, and the cells that landing would clear.
 func drawPreview()
     var L = game.layout
-    if game.held == nil then
+    var held = game.held
+    if held == nil then
         return
     end
     var c = L.c
-    for off in game.held.shape.cells do
-        var rr = game.target.r + off[1]
-        var cc = game.target.c + off[2]
-        var x = L.bx + (cc - 1) * c
-        var y = L.by + (rr - 1) * c
-        if game.target.valid then
-            drawCell(x, y, c, 0.38)
-        elseif boardInside(rr, cc) then
-            graphics.noStroke()
-            graphics.fill(config.invalid[1], config.invalid[2], config.invalid[3], 0.55)
-            cellRect(x, y, c)
+    var t = game.target
+    if t.valid then
+        var x0, y0 = cellOrigin(t.r, t.c)
+        drawShape(held.shape, x0, y0, c, 0.38)
+    else
+        graphics.fill(config.invalid[1], config.invalid[2], config.invalid[3], 0.55)
+        for off in held.shape.cells do
+            if boardInside(t.r + off[1], t.c + off[2]) then
+                var x, y = cellOrigin(t.r + off[1], t.c + off[2])
+                cellRect(x, y, c)
+            end
         end
     end
+    graphics.fill(1, 1, 1, 0.5)
     for idx in game.previewCells do
-        graphics.noStroke()
-        graphics.fill(1, 1, 1, 0.5)
-        cellRect(L.bx + (boardCol(idx) - 1) * c, L.by + (boardRow(idx) - 1) * c, c)
+        var x, y = cellOrigin(boardRow(idx), boardCol(idx))
+        cellRect(x, y, c)
     end
 end
 
@@ -915,7 +939,6 @@ func drawOver()
         return
     end
     var c = L.c
-    graphics.noStroke()
     graphics.fill(config.paper, 0.85 * game.fade.a)
     graphics.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
@@ -1019,12 +1042,9 @@ func drawGallery()
     sheetCompute()
     drawScreenTitle(tr("menuPieces"))
     drawText("{len(pieces.shapes)} {tr("shapes")}, {tr("tapBack")}", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
-    var u = game.sheet.u
-    for item in game.sheet.items do
-        var s = item.shape
-        for off in s.cells do
-            drawCell(game.sheet.ox + item.x + off[2] * u, game.sheet.oy + item.y + off[1] * u, u)
-        end
+    var sheet = game.sheet
+    for item in sheet.items do
+        drawShape(item.shape, sheet.ox + item.x, sheet.oy + item.y, sheet.u)
     end
 end
 
@@ -1074,6 +1094,7 @@ end
 func draw()
     layoutCompute()
     graphics.clear(config.paper)
+    graphics.noStroke()
     if game.screen <> "game" then
         screens[game.screen].draw()
         return

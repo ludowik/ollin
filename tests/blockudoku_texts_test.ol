@@ -25,7 +25,7 @@ for code in LANGUAGES do
         assert(text.find("\{") == nil, "{code}: a placeholder was not replaced in: {text}")
     end
     var all = paragraphs.join(" ")
-    assert(all.find("3x3") <> nil and all.find("90") <> nil and all.find("50") <> nil, "{code}: the help lost a figure of the rules")
+    assert(all.find("{rules.box}x{rules.box}") <> nil and all.find("{rules.zone}") <> nil and all.find("{rules.streak}") <> nil, "{code}: the help lost a figure of the rules")
 end
 
 setLanguage("en")
