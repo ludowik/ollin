@@ -777,23 +777,21 @@ func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
     drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", config.onButton, alpha)
 end
 
-## The button of the options screen: a toothed wheel with a hole, on the fill of the other buttons.
+## The button of the options screen: a thick toothed wheel in the blue of the blocks, with a hole through to the paper.
 func drawGear(x, y, s)
     graphics.noStroke()
-    graphics.fill(config.button[1], config.button[2], config.button[3])
-    graphics.rect(x, y, s, s, s * 0.22)
-    graphics.fill(config.onButton[1], config.onButton[2], config.onButton[3])
+    graphics.fill(config.blue[1], config.blue[2], config.blue[3])
     graphics.push()
     graphics.translate(x + s / 2, y + s / 2)
     graphics.rectMode("center")
     for k = 1, 8 do
-        graphics.rect(0, -s * 0.30, s * 0.13, s * 0.15)
+        graphics.rect(0, -s * 0.34, s * 0.20, s * 0.20, s * 0.04)
         graphics.rotate(45)
     end
     graphics.pop()
-    graphics.circle(x + s / 2, y + s / 2, s * 0.24)
-    graphics.fill(config.button[1], config.button[2], config.button[3])
-    graphics.circle(x + s / 2, y + s / 2, s * 0.10)
+    graphics.circle(x + s / 2, y + s / 2, s * 0.30)
+    graphics.fill(config.paper)
+    graphics.circle(x + s / 2, y + s / 2, s * 0.13)
 end
 
 func drawHeader()
