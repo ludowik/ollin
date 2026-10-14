@@ -42,10 +42,10 @@ global config = {
     onButton: [1, 1, 1, 1],             ## the label of a button, whose fill is dark
     cellLight: 0.91,                    ## the empty cells, in two greys that alternate by 3x3 box
     cellDark: 0.83,
-    menu: [                             ## the options screen, top to bottom: a label and where the entry leads
+    menu: [                             ## the options screen, top to bottom: a label, where the entry leads, and whether it is the main button
         {label: "How to play", goes: "help"},
         {label: "All pieces", goes: "pieces"},
-        {label: "Back to game", goes: "game"}
+        {label: "Back to game", goes: "game", primary: true}
     ],
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
@@ -70,31 +70,37 @@ global game = {
     dragId: nil,
     target: {r: 0, c: 0, valid: false, near: false},
     previewCells: [],
-    layout: {sx: [0, 0, 0], sy: [0, 0, 0]},
-    layoutW: 0,
-    layoutH: 0,
+    layout: {w: 0, h: 0, sx: [0, 0, 0], sy: [0, 0, 0]},   ## where everything goes, computed again when W or H change
     screen: "game",             ## what is shown: the game, the options menu, the help or the catalogue of every piece
     screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
-    sheet: {u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
-    sheetW: 0,
-    sheetH: 0,
-    help: {w: 0, h: 0, size: 0, lines: []}   ## the help text cut into lines for this area, computed again when W or H change
+    sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
+    help: {w: 0, h: 0, x: 0, y: 0, size: 0, lines: []}    ## the help text cut into lines, computed again when W or H change
 }
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
+
+## True when W or H differ from the area `cache` was computed for, which it then remembers: what depends on the
+## area alone is computed again only then.
+func areaChanged(cache)
+    if W == cache.w and H == cache.h then
+        return false
+    end
+    cache.w = W
+    cache.h = H
+    return true
+end
 
 ## The board and its trays in a column when the area is tall, side by side when it is wide: whichever
 ## gives the larger cell. It depends on W and H alone, so it is recomputed only when they change.
 func layoutCompute()
     var L = game.layout
-    if W == game.layoutW and H == game.layoutH then
+    if not areaChanged(L) then
         return
     end
-    game.layoutW = W
-    game.layoutH = H
     var m = SIZE * 0.04
-    var cp = math.min((W - 2 * m) / GRID, (H - 2 * m) / 15.2)
+    var colH = 15.2                 ## the height of the column of the header, the board and the trays, in cells
+    var cp = math.min((W - 2 * m) / GRID, (H - 2 * m) / colH)
     var cl = math.min((H - 2 * m) / GRID, (W - 2 * m) / 14.3)
     var portrait = cp >= cl
     var c = math.floor(math.max(cp, cl))
@@ -104,7 +110,7 @@ func layoutCompute()
     L.gearY = m
     if portrait then
         ## The header must not run under the gear: a narrow and short area shrinks the board until it clears.
-        while c > 8 and (W + GRID * c) / 2 > L.gearX - 0.3 * m and (H - 15.2 * c) / 2 < L.gearY + gear + 0.3 * m do
+        while c > 8 and (W + GRID * c) / 2 > L.gearX - 0.3 * m and (H - colH * c) / 2 < L.gearY + gear + 0.3 * m do
             c -= 1
         end
     end
@@ -112,7 +118,7 @@ func layoutCompute()
     L.c = c
     L.bs = bs
     if portrait then
-        var top = (H - 15.2 * c) / 2
+        var top = (H - colH * c) / 2
         L.bx = (W - bs) / 2
         L.by = top + 2.6 * c
         L.scoreX = L.bx
@@ -163,11 +169,9 @@ end
 
 ## The catalogue: every shape the game can deal, as large as the screen lets them be.
 func sheetCompute()
-    if W == game.sheetW and H == game.sheetH then
+    if not areaChanged(game.sheet) then
         return
     end
-    game.sheetW = W
-    game.sheetH = H
     var m = SIZE * 0.04
     var top = SIZE * 0.14
     var areaW = W - 2 * m
@@ -196,50 +200,54 @@ func helpParagraphs()
     ]
 end
 
-## Cuts the help into lines no wider than the area, at the largest size that fits under the title.
+## The help cut into lines no wider than areaW, with the font size already set: a blank line ends each paragraph.
+func wrapHelp(size, areaW)
+    graphics.fontSize(size)
+    var lines = []
+    for text in helpParagraphs() do
+        var line = ""
+        for word in text.split(" ") do
+            var tryLine = word
+            if line <> "" then
+                tryLine = line + " " + word
+            end
+            var tw = graphics.textSize(tryLine)
+            if tw > areaW and line <> "" then
+                lines.push(line)
+                line = word
+            else
+                line = tryLine
+            end
+        end
+        lines.push(line)
+        lines.push("")
+    end
+    return lines
+end
+
+## The help at the largest size that fits under the title.
 func helpCompute()
     var help = game.help
-    if W == help.w and H == help.h then
+    if not areaChanged(help) then
         return
     end
-    help.w = W
-    help.h = H
     var m = SIZE * 0.06
     var areaW = W - 2 * m
-    var areaH = H - SIZE * 0.16 - m
+    var areaH = H - SIZE * 0.14 - m
     var size = math.floor(SIZE * 0.04)
-    while true do
-        graphics.fontSize(size)
-        var lines = []
-        for text in helpParagraphs() do
-            var line = ""
-            for word in text.split(" ") do
-                var tryLine = word
-                if line <> "" then
-                    tryLine = line + " " + word
-                end
-                var tw = graphics.textSize(tryLine)
-                if tw > areaW and line <> "" then
-                    lines.push(line)
-                    line = word
-                else
-                    line = tryLine
-                end
-            end
-            lines.push(line)
-            lines.push("")
-        end
-        var height = len(lines) * size * 1.35
-        if height <= areaH or size <= 10 then
-            help.size = size
-            help.lines = lines
-            break
-        end
+    var lines = wrapHelp(size, areaW)
+    while len(lines) * size * 1.35 > areaH and size > 10 do
         size -= 1
+        lines = wrapHelp(size, areaW)
     end
+    help.x = m
+    help.y = SIZE * 0.14
+    help.size = size
+    help.lines = lines
 end
 
 func showScreen(name)
+    assert(name == "game" or screens[name] <> nil, "unknown screen")
     game.screen = name
     game.screenTick = game.tick
 end
@@ -635,18 +643,8 @@ func pressAt(id, x, y)
     if game.tick == game.screenTick then
         return
     end
-    if game.screen == "pieces" or game.screen == "help" then
-        showScreen("options")
-        return
-    end
-    if game.screen == "options" then
-        for i, entry in config.menu do
-            var rx, ry, rw, rh = optionRect(i)
-            if inRect(x, y, rx, ry, rw, rh) then
-                showScreen(entry.goes)
-                return
-            end
-        end
+    if game.screen <> "game" then
+        screens[game.screen].press(x, y)
         return
     end
     layoutCompute()
@@ -785,14 +783,14 @@ func drawGear(x, y, s)
     graphics.fill(config.button[1], config.button[2], config.button[3])
     graphics.rect(x, y, s, s, s * 0.22)
     graphics.fill(config.onButton[1], config.onButton[2], config.onButton[3])
-    for k = 0, 7 do
-        graphics.push()
-        graphics.translate(x + s / 2, y + s / 2)
-        graphics.rotate(k * 45)
-        graphics.rectMode("center")
+    graphics.push()
+    graphics.translate(x + s / 2, y + s / 2)
+    graphics.rectMode("center")
+    for k = 1, 8 do
         graphics.rect(0, -s * 0.30, s * 0.13, s * 0.15)
-        graphics.pop()
+        graphics.rotate(45)
     end
+    graphics.pop()
     graphics.circle(x + s / 2, y + s / 2, s * 0.24)
     graphics.fill(config.button[1], config.button[2], config.button[3])
     graphics.circle(x + s / 2, y + s / 2, s * 0.10)
@@ -923,33 +921,48 @@ func drawOver()
     drawButton("New game", L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
-## The options menu: a title and one button per entry of config.menu.
+## The title of a screen that replaces the game: the background is already painted.
+func drawScreenTitle(title)
+    drawText(title, CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+end
+
+## The options menu: one button per entry of config.menu.
 func drawOptions()
-    graphics.noStroke()
-    graphics.fill(config.paper)
-    graphics.rect(0, 0, W, H)
-    drawText("OPTIONS", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+    drawScreenTitle("OPTIONS")
     for i, entry in config.menu do
         var x, y, w, h = optionRect(i)
         var fill = config.button
-        if entry.goes == "game" then
+        if entry.primary then
             fill = config.buttonPrimary
         end
         drawButton(entry.label, x, y, w, h, fill, h * 0.4)
     end
 end
 
+## A press on the options menu: the entry under it, if any.
+func pressOptions(x, y)
+    for i, entry in config.menu do
+        var rx, ry, rw, rh = optionRect(i)
+        if inRect(x, y, rx, ry, rw, rh) then
+            showScreen(entry.goes)
+            return
+        end
+    end
+end
+
+func backToOptions(x, y)
+    showScreen("options")
+end
+
 func drawHelp()
     helpCompute()
     var help = game.help
-    graphics.noStroke()
-    graphics.fill(config.paper)
-    graphics.rect(0, 0, W, H)
-    drawText("HOW TO PLAY", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
-    var x = SIZE * 0.06
-    var y = SIZE * 0.14
+    drawScreenTitle("HOW TO PLAY")
+    var y = help.y
     for line in help.lines do
-        drawText(line, x, y, help.size, "left", "top", config.ink)
+        if line <> "" then
+            drawText(line, help.x, y, help.size, "left", "top", config.ink)
+        end
         y += help.size * 1.35
     end
     drawText("tap anywhere to go back", CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
@@ -957,10 +970,7 @@ end
 
 func drawGallery()
     sheetCompute()
-    graphics.noStroke()
-    graphics.fill(config.paper)
-    graphics.rect(0, 0, W, H)
-    drawText("ALL PIECES", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+    drawScreenTitle("ALL PIECES")
     drawText("{len(pieces.shapes)} shapes, tap anywhere to go back", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
     var u = game.sheet.u
     for item in game.sheet.items do
@@ -970,6 +980,13 @@ func drawGallery()
         end
     end
 end
+
+## The screens that replace the game, by name: how each is drawn and what a press on it does.
+global screens = {
+    options: {draw: drawOptions, press: pressOptions},
+    help: {draw: drawHelp, press: backToOptions},
+    pieces: {draw: drawGallery, press: backToOptions}
+}
 
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
 
@@ -1008,6 +1025,10 @@ end
 func draw()
     layoutCompute()
     graphics.clear(config.paper)
+    if game.screen <> "game" then
+        screens[game.screen].draw()
+        return
+    end
     drawHeader()
     drawBoard()
     drawPreview()
@@ -1021,11 +1042,4 @@ func draw()
     end
     drawFloaters()
     drawOver()
-    if game.screen == "options" then
-        drawOptions()
-    elseif game.screen == "pieces" then
-        drawGallery()
-    elseif game.screen == "help" then
-        drawHelp()
-    end
 end
