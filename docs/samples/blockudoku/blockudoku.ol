@@ -43,6 +43,7 @@ global config = {
     cellLight: 0.91,                    ## the empty cells, in two greys that alternate by 3x3 box
     cellDark: 0.83,
     menu: [                             ## the options screen, top to bottom: a label and where the entry leads
+        {label: "How to play", goes: "help"},
         {label: "All pieces", goes: "pieces"},
         {label: "Back to game", goes: "game"}
     ],
@@ -72,12 +73,13 @@ global game = {
     layout: {sx: [0, 0, 0], sy: [0, 0, 0]},
     layoutW: 0,
     layoutH: 0,
-    screen: "game",             ## what is shown: the game, the options menu, or the catalogue of every piece
+    screen: "game",             ## what is shown: the game, the options menu, the help or the catalogue of every piece
     screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
     sheet: {u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
     sheetW: 0,
-    sheetH: 0
+    sheetH: 0,
+    help: {w: 0, h: 0, size: 0, lines: []}   ## the help text cut into lines for this area, computed again when W or H change
 }
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
@@ -180,6 +182,61 @@ func sheetCompute()
     game.sheet.ox = m
     game.sheet.oy = top + (areaH - used) / 2
     game.sheet.items = items
+end
+
+## What the help says, one string per paragraph. The figures come from config, so the text cannot drift from the rules.
+func helpParagraphs()
+    return [
+        "Drag one of the three pieces onto the grid and let go to place it. A piece cannot be turned.",
+        "Fill a whole row, a whole column or a whole {BOX}x{BOX} box and it is cleared. Several at once are cleared together.",
+        "Each cell you place scores {config.pointsPerCell}. Each zone you clear scores {GRID * config.pointsPerClearedCell}, and clearing several zones at once multiplies that by their number.",
+        "Clear something on consecutive turns and you build a streak: each turn of the streak adds {config.streakBonus} more points than the one before.",
+        "A faded piece fits nowhere on the grid right now. The game is over when none of the three pieces can be placed.",
+        "Your game is saved as you play, and your best score is kept."
+    ]
+end
+
+## Cuts the help into lines no wider than the area, at the largest size that fits under the title.
+func helpCompute()
+    var help = game.help
+    if W == help.w and H == help.h then
+        return
+    end
+    help.w = W
+    help.h = H
+    var m = SIZE * 0.06
+    var areaW = W - 2 * m
+    var areaH = H - SIZE * 0.16 - m
+    var size = math.floor(SIZE * 0.04)
+    while true do
+        graphics.fontSize(size)
+        var lines = []
+        for text in helpParagraphs() do
+            var line = ""
+            for word in text.split(" ") do
+                var tryLine = word
+                if line <> "" then
+                    tryLine = line + " " + word
+                end
+                var tw = graphics.textSize(tryLine)
+                if tw > areaW and line <> "" then
+                    lines.push(line)
+                    line = word
+                else
+                    line = tryLine
+                end
+            end
+            lines.push(line)
+            lines.push("")
+        end
+        var height = len(lines) * size * 1.35
+        if height <= areaH or size <= 10 then
+            help.size = size
+            help.lines = lines
+            break
+        end
+        size -= 1
+    end
 end
 
 func showScreen(name)
@@ -578,7 +635,7 @@ func pressAt(id, x, y)
     if game.tick == game.screenTick then
         return
     end
-    if game.screen == "pieces" then
+    if game.screen == "pieces" or game.screen == "help" then
         showScreen("options")
         return
     end
@@ -882,6 +939,22 @@ func drawOptions()
     end
 end
 
+func drawHelp()
+    helpCompute()
+    var help = game.help
+    graphics.noStroke()
+    graphics.fill(config.paper)
+    graphics.rect(0, 0, W, H)
+    drawText("HOW TO PLAY", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+    var x = SIZE * 0.06
+    var y = SIZE * 0.14
+    for line in help.lines do
+        drawText(line, x, y, help.size, "left", "top", config.ink)
+        y += help.size * 1.35
+    end
+    drawText("tap anywhere to go back", CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
+end
+
 func drawGallery()
     sheetCompute()
     graphics.noStroke()
@@ -952,5 +1025,7 @@ func draw()
         drawOptions()
     elseif game.screen == "pieces" then
         drawGallery()
+    elseif game.screen == "help" then
+        drawHelp()
     end
 end
