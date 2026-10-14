@@ -24,16 +24,12 @@ for code in LANGUAGES do
         assert(len(text) > 0, "{code}: an empty paragraph")
         assert(text.find("\{") == nil, "{code}: a placeholder was not replaced in: {text}")
     end
-end
-
-## The figures of the rules reach the help of every language.
-for code in LANGUAGES do
-    setLanguage(code)
-    var all = tr("help")(rules).join(" ")
+    var all = paragraphs.join(" ")
     assert(all.find("3x3") <> nil and all.find("90") <> nil and all.find("50") <> nil, "{code}: the help lost a figure of the rules")
 end
 
-assert(setLanguage("xx") == false and i18n.lang == LANGUAGES[#LANGUAGES], "an unknown language changes nothing")
+setLanguage("en")
+assert(setLanguage("xx") == false and i18n.lang == "en", "an unknown language changes nothing")
 assert(setLanguage("fr") and tr("newGame") == "Nouvelle partie", "switching back to French")
 setLanguage("en")
 assert(tr("newGame") == "New game", "switching to English")

@@ -2,8 +2,7 @@
 ## complete row, column or box is cleared. The game ends when none of the pieces left fits anywhere.
 ##
 ## board.ol holds the rules, pieces.ol the shapes, sounds.ol the sound, texts.ol the words in French and
-## English; this file is the game: its
-## state, its input, its animations and its drawing. The layout follows the orientation of the area
+## English; this file is the game: its state, its input, its animations and its drawing. The layout follows the orientation of the area
 ## (graphics.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
 ##
 ## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs.
@@ -79,7 +78,7 @@ global game = {
     screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
     sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
-    help: {w: 0, h: 0, x: 0, y: 0, size: 0, lines: []}    ## the help text cut into lines, computed again when W or H change
+    help: {w: 0, h: 0, lang: "", x: 0, y: 0, size: 0, lines: []}   ## the help text cut into lines, computed again when W, H or the language change
 }
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
@@ -195,8 +194,7 @@ end
 ## What the help says, one string per paragraph, in the current language. The figures come from config, so the text
 ## cannot drift from the rules.
 func helpParagraphs()
-    var write = tr("help")
-    return write({box: BOX, cell: config.pointsPerCell, zone: GRID * config.pointsPerClearedCell, streak: config.streakBonus})
+    return tr("help")({box: BOX, cell: config.pointsPerCell, zone: GRID * config.pointsPerClearedCell, streak: config.streakBonus})
 end
 
 ## The help cut into lines no wider than areaW, with the font size already set: a blank line ends each paragraph.
@@ -227,9 +225,11 @@ end
 ## The help at the largest size that fits under the title.
 func helpCompute()
     var help = game.help
-    if not areaChanged(help) then
+    var moved = areaChanged(help)
+    if not moved and help.lang == i18n.lang then
         return
     end
+    help.lang = i18n.lang
     var m = SIZE * 0.06
     var areaW = W - 2 * m
     var areaH = H - SIZE * 0.14 - m
@@ -806,9 +806,9 @@ end
 func drawHeader()
     var L = game.layout
     var c = L.c
-    drawText(tr("scoreHeader"), L.scoreX, L.scoreY, c * 0.36, "left", "top", config.muted)
+    drawText(tr("score").upper(), L.scoreX, L.scoreY, c * 0.36, "left", "top", config.muted)
     drawText("{math.round(game.display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * game.display.pop, "left", "top", config.ink)
-    drawText(tr("bestHeader"), L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
+    drawText(tr("best").upper(), L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
     drawText("{game.best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", config.ink)
     drawButton(tr("newGame"), L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
     drawGear(L.gearX, L.gearY, L.gearS)
@@ -919,18 +919,18 @@ func drawOver()
     graphics.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
     drawText(tr("gameOver"), mx, L.by + 2.3 * c, fitSize(tr("gameOver"), c * 1.1, L.bs * 0.95), "center", "center", config.ink, game.fade.a)
-    drawText("{tr("finalScore")} {game.score}", mx, L.by + 3.6 * c, c * 0.7, "center", "center", config.ink, game.fade.a)
+    drawText("{tr("score")} {game.score}", mx, L.by + 3.6 * c, c * 0.7, "center", "center", config.ink, game.fade.a)
     if game.newBest then
         drawText(tr("newBest"), mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.gold, game.fade.a)
     else
-        drawText("{tr("bestOver")} {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
+        drawText("{tr("best")} {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
     end
     drawButton(tr("newGame"), L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
 ## The title of a screen that replaces the game: the background is already painted.
 func drawScreenTitle(title)
-    drawText(title, CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
+    drawText(title.upper(), CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
 end
 
 ## The buttons of a menu screen, top to bottom: {label, primary, and where a press leads (goes) or the language it picks}.
@@ -962,12 +962,10 @@ func drawEntries(entries)
     end
 end
 
-## Picks a language and keeps it for the next launch. The help is cut into lines again, in the new language.
+## Picks a language and keeps it for the next launch.
 func chooseLanguage(code)
-    if setLanguage(code) then
-        data.set(config.langKey, code)
-        game.help.w = 0
-    end
+    setLanguage(code)
+    data.set(config.langKey, code)
 end
 
 ## A press on a menu: the entry under it, if any.
@@ -985,22 +983,17 @@ func pressEntries(entries, x, y)
     end
 end
 
-func drawOptions()
-    drawScreenTitle(tr("optionsTitle"))
-    drawEntries(optionEntries())
-end
-
-func pressOptions(x, y)
-    pressEntries(optionEntries(), x, y)
-end
-
-func drawLanguage()
-    drawScreenTitle(tr("languageTitle"))
-    drawEntries(languageEntries())
-end
-
-func pressLanguage(x, y)
-    pressEntries(languageEntries(), x, y)
+## A screen made of a menu: its title, and the entries that make its buttons.
+func menuScreen(titleKey, entries)
+    return {
+        draw: func()
+            drawScreenTitle(tr(titleKey))
+            drawEntries(entries())
+        end,
+        press: func(x, y)
+            pressEntries(entries(), x, y)
+        end
+    }
 end
 
 func backToOptions(x, y)
@@ -1010,7 +1003,7 @@ end
 func drawHelp()
     helpCompute()
     var help = game.help
-    drawScreenTitle(tr("helpTitle"))
+    drawScreenTitle(tr("menuHelp"))
     var y = help.y
     for line in help.lines do
         if line <> "" then
@@ -1023,8 +1016,8 @@ end
 
 func drawGallery()
     sheetCompute()
-    drawScreenTitle(tr("piecesTitle"))
-    drawText("{len(pieces.shapes)} {tr("piecesHint")}", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
+    drawScreenTitle(tr("menuPieces"))
+    drawText("{len(pieces.shapes)} {tr("shapes")}, {tr("tapBack")}", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
     var u = game.sheet.u
     for item in game.sheet.items do
         var s = item.shape
@@ -1036,10 +1029,10 @@ end
 
 ## The screens that replace the game, by name: how each is drawn and what a press on it does.
 global screens = {
-    options: {draw: drawOptions, press: pressOptions},
+    options: menuScreen("options", optionEntries),
     help: {draw: drawHelp, press: backToOptions},
     pieces: {draw: drawGallery, press: backToOptions},
-    language: {draw: drawLanguage, press: pressLanguage}
+    language: menuScreen("menuLanguage", languageEntries)
 }
 
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
@@ -1049,7 +1042,7 @@ func setup()
     graphics.fitArea()
     buildShapes()
     buildSounds()
-    setLanguage(data.get(config.langKey, LANGUAGES[1]))
+    setLanguage(data.get(config.langKey, i18n.lang))
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then
         newGame()

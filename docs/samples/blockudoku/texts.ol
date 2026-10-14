@@ -2,33 +2,29 @@
 ## strings are the translation the game asks for, not a slip in the language of the repository.
 ##
 ## Every language has the same keys, which tests/blockudoku_texts_test.ol checks. A text is a string, except
-## the help, which is a function of the figures of the rules: they live in the game's config, not here.
+## the help, which is a function of the figures of the rules: they live in the game's config, not here. A title is
+## the text of its menu entry in capitals: the game does that when it draws it.
 
 const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default
 
-global i18n = {lang: "fr"}
+global i18n = {lang: LANGUAGES[1]}
 
 const TEXTS = {
     fr: {
         name: "Français",
-        scoreHeader: "SCORE",
-        bestHeader: "MEILLEUR",
+        score: "Score",
+        best: "Meilleur",
         newGame: "Nouvelle partie",
-        optionsTitle: "OPTIONS",
+        options: "Options",
         menuHelp: "Comment jouer",
         menuPieces: "Toutes les pièces",
         menuLanguage: "Langue",
         menuBack: "Retour au jeu",
-        helpTitle: "COMMENT JOUER",
-        piecesTitle: "TOUTES LES PIÈCES",
-        languageTitle: "LANGUE",
         back: "Retour",
+        shapes: "formes",
         tapBack: "touchez n'importe où pour revenir",
-        piecesHint: "formes, touchez n'importe où pour revenir",
         gameOver: "PARTIE TERMINÉE",
-        finalScore: "Score",
         newBest: "Nouveau record !",
-        bestOver: "Meilleur",
         help: func(r)
             return [
                 "Faites glisser l'une des trois pièces sur la grille et relâchez pour la poser. Une pièce ne peut pas être tournée.",
@@ -42,24 +38,19 @@ const TEXTS = {
     },
     en: {
         name: "English",
-        scoreHeader: "SCORE",
-        bestHeader: "BEST",
+        score: "Score",
+        best: "Best",
         newGame: "New game",
-        optionsTitle: "OPTIONS",
+        options: "Options",
         menuHelp: "How to play",
         menuPieces: "All pieces",
         menuLanguage: "Language",
         menuBack: "Back to game",
-        helpTitle: "HOW TO PLAY",
-        piecesTitle: "ALL PIECES",
-        languageTitle: "LANGUAGE",
         back: "Back",
+        shapes: "shapes",
         tapBack: "tap anywhere to go back",
-        piecesHint: "shapes, tap anywhere to go back",
         gameOver: "GAME OVER",
-        finalScore: "Score",
         newBest: "New best!",
-        bestOver: "Best",
         help: func(r)
             return [
                 "Drag one of the three pieces onto the grid and let go to place it. A piece cannot be turned.",
