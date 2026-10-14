@@ -924,17 +924,33 @@ function renderGhRail() {
   ghRailBody.appendChild(repo)
 }
 
+// The directories every path starts with, "a/b/" for ["a/b/x.ol", "a/b/y.ol"]: the rail leaves them out,
+// since they say the same thing on every row and use up the width the file name needs.
+function commonDir(paths) {
+  if (!paths.length) return ''
+  const dirs = paths.map(p => p.split('/').slice(0, -1))
+  let n = dirs[0].length
+  for (const d of dirs) {
+    let i = 0
+    while (i < n && i < d.length && d[i] === dirs[0][i]) i++
+    n = i
+  }
+  return n ? dirs[0].slice(0, n).join('/') + '/' : ''
+}
+
 function renderFiles() {
   fileRail.innerHTML = ''
   if (!currentProject) return
-  for (const path of scripts(currentProject)) {
+  const paths = scripts(currentProject)
+  const shared = commonDir(paths)
+  for (const path of paths) {
     const isEntry = path === currentProject.entry
     const row = document.createElement('div')
     row.className = 'file-item' + (path === currentFile && currentRes === null ? ' active' : '')
     row.title = path
     const label = document.createElement('span')
     label.className = 'file-name'
-    label.textContent = path
+    label.textContent = path.slice(shared.length)
     if (isEntry) row.classList.add('entry')
     row.appendChild(label)
 
