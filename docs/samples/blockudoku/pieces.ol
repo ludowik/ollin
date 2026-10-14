@@ -69,7 +69,7 @@ func packShapes(u, areaW)
     var first = 1
     for s in pieces.shapes do
         if x > 0 and x + s.w * u > areaW then
-            closeRow(items, first, (areaW - (x - u)) / 2, rowH, u)
+            closeRow(items, first, x, areaW, rowH, u)
             y += rowH + u
             x = 0
             rowH = 0
@@ -79,12 +79,14 @@ func packShapes(u, areaW)
         x += (s.w + 1) * u
         rowH = math.max(rowH, s.h * u)
     end
-    closeRow(items, first, (areaW - (x - u)) / 2, rowH, u)
+    closeRow(items, first, x, areaW, rowH, u)
     return items, y + rowH
 end
 
-## Centres a finished row: shifts it sideways by dx and each piece down to the middle of the row's height.
-func closeRow(items, first, dx, rowH, u)
+## Centres a finished row, whose cursor stopped at x (one cell of air past its last piece): sideways in areaW,
+## and each piece down to the middle of the row's height.
+func closeRow(items, first, x, areaW, rowH, u)
+    var dx = (areaW - (x - u)) / 2
     for i = first, len(items) do
         var item = items[i]
         item.x += dx
