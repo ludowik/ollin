@@ -107,6 +107,7 @@ func boardFull(g)
         for i in z do
             if g[i] == 0 then
                 full = false
+                break
             end
         end
         if full then
@@ -134,7 +135,7 @@ func boardPreview(g, shape, r, c)
     for i = 1, CELLS do
         copy[i] = g[i]
     end
-    boardPlace(copy, shape, r, c, 1)
+    boardPlace(copy, shape, r, c)
     var cleared = boardFull(copy)
     return cleared
 end

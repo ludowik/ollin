@@ -49,8 +49,8 @@ const SPECS = {
     viewport: { width: 600, height: 640 },
     seed: {
       'blockudoku.game': 's1240|1|' +
-        '000000500' + '220000550' + '280033000' + '880130000' + '000110070' +
-        '600000777' + '660040000' + '600044200' + '000000220' + '|###/.#.,##/##,###/#../#..',
+        '000000100' + '110000110' + '110011000' + '110110000' + '000110010' +
+        '100000111' + '110010000' + '100011100' + '000000110' + '|###/.#.,##/##,###/#../#..',
       'blockudoku.best': 'i2480',
     },
     crop: { x: 61, y: 122, side: 475 },
@@ -79,12 +79,13 @@ function serve() {
 
 // Centre-crops a picture to a square and scales it, in a page of its own so the example's page is not
 // disturbed. Returns the PNG as a data URL and how much the picture's brightness varies.
-async function toIcon(tool, pngBase64, crop, cssWidth) {
-  return tool.evaluate(async ([b64, size, crop, cssWidth]) => {
+async function toIcon(tool, pngBase64, spec) {
+  return tool.evaluate(async ([b64, size, spec]) => {
+    const crop = spec && spec.crop
     const img = new Image()
     img.src = 'data:image/png;base64,' + b64
     await img.decode()
-    const k = crop ? img.width / cssWidth : 1
+    const k = crop ? img.width / spec.viewport.width : 1
     const side = crop ? crop.side * k : Math.min(img.width, img.height)
     const sx = crop ? crop.x * k : (img.width - side) / 2
     const sy = crop ? crop.y * k : (img.height - side) / 2
@@ -104,7 +105,7 @@ async function toIcon(tool, pngBase64, crop, cssWidth) {
     }
     const mean = sum / n
     return { url: c.toDataURL('image/png'), spread: Math.sqrt(Math.max(sum2 / n - mean * mean, 0)) }
-  }, [pngBase64, SIZE, crop || null, cssWidth || 0])
+  }, [pngBase64, SIZE, spec || null])
 }
 
 async function capture(browser, base, tool, file) {
@@ -114,10 +115,10 @@ async function capture(browser, base, tool, file) {
   const page = await ctx.newPage()
   try {
     if (spec) {
+      // The key and the encoding are the host's (dataKey in lib/pg-run.js, the 'sample:' scope in
+      // views/playground.js, the type prefixes of src/modules/data_module.cpp): redo this if they change.
       await page.addInitScript(([key, seed]) => {
-        const stored = {}
-        for (const k in seed) stored[k] = seed[k]
-        try { localStorage.setItem(key, JSON.stringify(stored)) } catch (_) {}
+        try { localStorage.setItem(key, JSON.stringify(seed)) } catch (_) {}
       }, ['ollin-data:p:sample:' + file, spec.seed])
     }
     await page.addInitScript(() => {
@@ -141,7 +142,7 @@ async function capture(browser, base, tool, file) {
     const errs = await page.evaluate(() => window.__errs)
     if (errs.length) return { skip: 'error: ' + errs[0] }
     const png = (await page.locator('#canvas').screenshot()).toString('base64')
-    const icon = await toIcon(tool, png, spec && spec.crop, spec && spec.viewport.width)
+    const icon = await toIcon(tool, png, spec)
     if (icon.spread < FLAT) return { skip: 'flat picture (spread ' + icon.spread.toFixed(1) + ')' }
     return { url: icon.url }
   } finally {

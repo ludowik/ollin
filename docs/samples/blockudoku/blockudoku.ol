@@ -32,7 +32,10 @@ global config = {
     floatTint: [0.60, 0.75, 0.95, 1],   ## a gained point: light enough for its dark outline to read
     streakTint: [0.98, 0.85, 0.40, 1],
     blue: [0.22, 0.45, 0.85],           ## the one colour of every block; the rules only make it lighter
-    paper: [1, 1, 1],                   ## the background
+    paper: 1,                           ## the background
+    button: [0.22, 0.27, 0.40],         ## the fill of a button
+    buttonPrimary: [0.30, 0.55, 0.95],  ## the one that matters on the end screen
+    invalid: [0.95, 0.25, 0.25],        ## where a held piece cannot go
     ink: [0.13, 0.15, 0.21, 1],
     muted: [0.45, 0.49, 0.58, 1],
     gold: [0.80, 0.58, 0.05, 1],
@@ -42,11 +45,12 @@ global config = {
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
 config.floatLife = config.floatPop + config.floatHold + config.floatFlight
+config.blueStuck = config.blue.map(func(v) return v + (1 - v) * config.stuckLight end)
 
 ## Everything that changes while the game runs.
 global game = {
     grid: [],
-    cells: [],                  ## what is SHOWN per cell: colour, scale, flash — the grid holds the rules
+    cells: [],                  ## what is SHOWN per cell: filled, scale, flash — the grid holds the rules
     slots: [],                  ## the three pieces on offer; nil once placed
     state: "play",              ## play, clearing (an animation holds the input), over
     score: 0,
@@ -220,6 +224,11 @@ func saveGame()
     data.set(config.saveKey, "{game.score}|{game.streak}|{game.grid.join()}|{keys.join(",")}")
 end
 
+## A piece on offer, in its tray (or on its way there when `moving`).
+func newSlot(shape, x, y, moving)
+    return {shape: shape, x: x, y: y, size: game.layout.tc, moving: moving, lift: 0, stuck: false}
+end
+
 ## Puts a saved game back; false (and nothing resumed) when there is none, when it does not read, or when it
 ## was already lost. Every part is checked before anything is touched.
 func loadGame()
@@ -244,10 +253,7 @@ func loadGame()
         if v == nil or v < 0 then
             return false
         end
-        if v > 0 then
-            v = 1
-        end
-        g[i] = v
+        g[i] = math.min(v, 1)
     end
     var picks = []
     for key in keys do
@@ -274,14 +280,10 @@ func loadGame()
         if picks[i] == nil then
             game.slots[i] = nil
         else
-            game.slots[i] = {shape: picks[i], x: L.sx[i], y: L.sy[i], size: L.tc, moving: false, lift: 0, stuck: false}
+            game.slots[i] = newSlot(picks[i], L.sx[i], L.sy[i], false)
         end
     end
-    if allSlotsEmpty() then
-        dealPieces()
-    else
-        refreshStuck()
-    end
+    settleHand()
     return not isGameOver()
 end
 
@@ -308,6 +310,7 @@ func dealPieces()
         for s in picks do
             if boardAnyMove(game.grid, s) then
                 playable = true
+                break
             end
         end
         if playable then
@@ -316,7 +319,7 @@ func dealPieces()
     end
     layoutCompute()
     for i = 1, 3 do
-        var p = {shape: picks[i], x: L.sx[i], y: H + 3 * L.c, size: L.tc, moving: true, lift: 0, stuck: false}
+        var p = newSlot(picks[i], L.sx[i], H + 3 * L.c, true)
         game.slots[i] = p
         tween.to(p, {y: L.sy[i]}, 0.35, "easeOutBack", func()
             p.moving = false
@@ -336,21 +339,27 @@ func refreshStuck()
     end
 end
 
+## Reads the marks of refreshStuck, so it is only right once the hand is settled.
 func isGameOver()
     for i = 1, 3 do
-        if game.slots[i] <> nil and boardAnyMove(game.grid, game.slots[i].shape) then
+        if game.slots[i] <> nil and not game.slots[i].stuck then
             return false
         end
     end
     return true
 end
 
-func finishTurn()
+## A new hand when the last piece is placed, and every piece marked: the hand is up to date for the game.
+func settleHand()
     if allSlotsEmpty() then
         dealPieces()
     else
         refreshStuck()
     end
+end
+
+func finishTurn()
+    settleHand()
     if isGameOver() then
         gameOver()
     else
@@ -380,6 +389,9 @@ func spawnFloater(row, col, v, tint, delay)
 end
 
 func updateFloaters()
+    if len(game.floaters) == 0 then
+        return
+    end
     var flying = []
     for f in game.floaters do
         f.age += deltaTime
@@ -503,8 +515,14 @@ func updateTarget()
     var L = game.layout
     var left = game.held.x - game.held.shape.w * L.c / 2
     var top = game.held.y - game.held.shape.h * L.c / 2
-    game.target.c = math.round((left - L.bx) / L.c) + 1
-    game.target.r = math.round((top - L.by) / L.c) + 1
+    var c = math.round((left - L.bx) / L.c) + 1
+    var r = math.round((top - L.by) / L.c) + 1
+    if c == game.target.c and r == game.target.r and game.held.shape == game.target.shape then
+        return
+    end
+    game.target.c = c
+    game.target.r = r
+    game.target.shape = game.held.shape
     game.target.valid = boardCanPlace(game.grid, game.held.shape, game.target.r, game.target.c)
     game.target.near = false
     for off in game.held.shape.cells do
@@ -532,6 +550,7 @@ func grab(id, slot, x, y)
     game.held = game.slots[slot]
     game.heldSlot = slot
     game.dragId = id
+    game.target.shape = nil          ## the grid may have changed since the last drag: nothing is remembered
     ## A finger emulates the mouse, so the press may arrive as "mouse": the contacts say what it was.
     game.held.lift = config.liftTouch
     if touch.count() == 0 then
@@ -649,13 +668,12 @@ func cellRect(x, y, s)
     graphics.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
 end
 
-func lighten(col, k)
-    return [col[1] + (1 - col[1]) * k, col[2] + (1 - col[2]) * k, col[3] + (1 - col[3]) * k, 1]
-end
-
-## A block: the one blue, `light` of the way to white.
-func drawCell(x, y, s, alpha = 1, light = 0)
-    var col = lighten(config.blue, light)
+## A block: the one blue, or the washed-out one of a piece that fits nowhere.
+func drawCell(x, y, s, alpha = 1, stuck = false)
+    var col = config.blue
+    if stuck then
+        col = config.blueStuck
+    end
     var g = s * 0.05
     var inner = s - 2 * g
     graphics.noStroke()
@@ -666,21 +684,17 @@ func drawCell(x, y, s, alpha = 1, light = 0)
 end
 
 func drawPiece(p, alpha = 1, stuck = false)
-    var light = 0
-    if stuck then
-        light = config.stuckLight
-    end
     var x0 = p.x - p.shape.w * p.size / 2
     var y0 = p.y - p.shape.h * p.size / 2
     for off in p.shape.cells do
-        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, alpha, light)
+        drawCell(x0 + off[2] * p.size, y0 + off[1] * p.size, p.size, alpha, stuck)
     end
 end
 
-func drawButton(label, x, y, w, h, red, green, blue, textSize, alpha = 1)
+func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
     var L = game.layout
     graphics.noStroke()
-    graphics.fill(red, green, blue, alpha)
+    graphics.fill(fill[1], fill[2], fill[3], alpha)
     graphics.rect(x, y, w, h, L.c * 0.3)
     drawText(label, x + w / 2, y + h / 2, textSize, "center", "center", config.onButton, alpha)
 end
@@ -692,8 +706,8 @@ func drawHeader()
     drawText("{math.round(game.display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * game.display.pop, "left", "top", config.ink)
     drawText("BEST", L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
     drawText("{game.best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", config.ink)
-    drawButton("New game", L.btnX, L.btnY, L.btnW, L.btnH, 0.22, 0.27, 0.40, c * 0.42)
-    drawButton("Pieces", L.galX, L.galY, L.galW, L.galH, 0.22, 0.27, 0.40, L.galText)
+    drawButton("New game", L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
+    drawButton("Pieces", L.galX, L.galY, L.galW, L.galH, config.button, L.galText)
 end
 
 ## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
@@ -731,20 +745,24 @@ func drawBoard()
         for col = 1, GRID do
             var tint = ((r - 1) // BOX + (col - 1) // BOX) % 2
             var grey = config.cellLight - (config.cellLight - config.cellDark) * tint
-            graphics.fill(grey, grey, grey)
+            graphics.fill(grey)
             cellRect(L.bx + (col - 1) * c, L.by + (r - 1) * c, c)
         end
     end
-    for i = 1, CELLS do
-        var cell = game.cells[i]
-        if cell.v <> 0 and cell.s > 0.01 then
-            var size = c * cell.s
-            var x = L.bx + (boardCol(i) - 1) * c + (c - size) / 2
-            var y = L.by + (boardRow(i) - 1) * c + (c - size) / 2
-            drawCell(x, y, size)
-            if cell.f > 0.01 then
-                graphics.fill(1, 1, 1, cell.f * 0.9)
-                cellRect(x, y, size)
+    var i = 0
+    for r = 1, GRID do
+        for col = 1, GRID do
+            i += 1
+            var cell = game.cells[i]
+            if cell.v <> 0 and cell.s > 0.01 then
+                var size = c * cell.s
+                var x = L.bx + (col - 1) * c + (c - size) / 2
+                var y = L.by + (r - 1) * c + (c - size) / 2
+                drawCell(x, y, size)
+                if cell.f > 0.01 then
+                    graphics.fill(1, 1, 1, cell.f * 0.9)
+                    cellRect(x, y, size)
+                end
             end
         end
     end
@@ -766,7 +784,7 @@ func drawPreview()
             drawCell(x, y, c, 0.38)
         elseif boardInside(rr, cc) then
             graphics.noStroke()
-            graphics.fill(0.95, 0.25, 0.25, 0.55)
+            graphics.fill(config.invalid[1], config.invalid[2], config.invalid[3], 0.55)
             cellRect(x, y, c)
         end
     end
@@ -793,7 +811,7 @@ func drawOver()
     end
     var c = L.c
     graphics.noStroke()
-    graphics.fill(config.paper[1], config.paper[2], config.paper[3], 0.85 * game.fade.a)
+    graphics.fill(config.paper, 0.85 * game.fade.a)
     graphics.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
     drawText("GAME OVER", mx, L.by + 2.3 * c, c * 1.1, "center", "center", config.ink, game.fade.a)
@@ -803,7 +821,7 @@ func drawOver()
     else
         drawText("Best {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
     end
-    drawButton("New game", L.overX, L.overY, L.overW, L.overH, 0.30, 0.55, 0.95, c * 0.55, game.fade.a)
+    drawButton("New game", L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
 func drawGallery()
@@ -812,7 +830,7 @@ func drawGallery()
     end
     sheetCompute()
     graphics.noStroke()
-    graphics.fill(config.paper[1], config.paper[2], config.paper[3])
+    graphics.fill(config.paper)
     graphics.rect(0, 0, W, H)
     drawText("ALL PIECES", CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
     drawText("{len(pieces.shapes)} shapes, tap anywhere to close", CX, SIZE * 0.11, SIZE * 0.027, "center", "center", config.muted)
@@ -861,7 +879,7 @@ end
 
 func draw()
     layoutCompute()
-    graphics.clear(config.paper[1], config.paper[2], config.paper[3])
+    graphics.clear(config.paper)
     drawHeader()
     drawBoard()
     drawPreview()
