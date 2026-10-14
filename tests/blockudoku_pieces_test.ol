@@ -84,4 +84,42 @@ end
 g[boardIdx(6, 5)] = 0
 assert(boardAnyMove(g, shapeFromKey("#/#")) and boardAnyMove(g, shapeFromKey("#")), "a domino fits two stacked holes")
 assert(not boardAnyMove(g, shapeFromKey("##")), "a horizontal domino does not fit two stacked holes")
+## boardFull finds every full zone at once and lists a shared cell once; boardPreview shows what a placement would clear
+## without touching the grid.
+func fillCells(grid, list)
+    for pair in list do
+        grid[boardIdx(pair[1], pair[2])] = 1
+    end
+end
+var f = boardNew()
+var none, nzones = boardFull(f)
+assert(len(none) == 0 and nzones == 0, "an empty grid has no full zone")
+for c = 1, 8 do
+    f[boardIdx(1, c)] = 1
+end
+none, nzones = boardFull(f)
+assert(nzones == 0, "a row missing one cell is not full")
+f[boardIdx(1, 9)] = 1
+var row, rzones = boardFull(f)
+assert(len(row) == 9 and rzones == 1, "a full row clears nine cells: {len(row)} in {rzones}")
+for r = 2, 9 do
+    f[boardIdx(r, 1)] = 1
+end
+var cross, czones = boardFull(f)
+assert(len(cross) == 17 and czones == 2, "a row and a column share their corner: {len(cross)} in {czones}")
+var box = boardNew()
+for r = 1, 3 do
+    for c = 1, 3 do
+        box[boardIdx(r, c)] = 1
+    end
+end
+var boxed, bzones = boardFull(box)
+assert(len(boxed) == 9 and bzones == 1, "a full 3x3 box clears nine cells: {len(boxed)} in {bzones}")
+var before = boardNew()
+for c = 2, 9 do
+    before[boardIdx(5, c)] = 1
+end
+var preview = boardPreview(before, shapeFromKey("#"), 5, 1)
+assert(len(preview) == 9, "placing the last cell of a row would clear it: {len(preview)}")
+assert(before[boardIdx(5, 1)] == 0, "the preview must leave the grid as it was")
 print("blockudoku pieces ok")
