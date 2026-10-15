@@ -4,6 +4,7 @@
 
 import "../docs/samples/blockudoku/board.ol"
 import "../docs/samples/blockudoku/pieces.ol"
+import "../docs/samples/blockudoku/sounds.ol"
 
 buildShapes()
 
@@ -117,4 +118,9 @@ end
 var preview = boardPreview(before, shapeFromKey("#"), 5, 1)
 assert(len(preview) == 9, "placing the last cell of a row would clear it: {len(preview)}")
 assert(before[boardIdx(5, 1)] == 0, "the preview must leave the grid as it was")
+assert(sounds.on and audio.volume() == 1, "the sound starts on")
+setSound(false)
+assert(not sounds.on and audio.volume() == 0, "switching the sound off mutes the master volume")
+setSound(true)
+assert(sounds.on and audio.volume() == 1, "switching the sound back on restores it")
 print("blockudoku pieces ok")

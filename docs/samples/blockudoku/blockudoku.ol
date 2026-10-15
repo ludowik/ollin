@@ -26,6 +26,7 @@ global config = {
     liftMouse: 0.6,
     bestKey: "blockudoku.best",
     langKey: "blockudoku.lang",
+    soundKey: "blockudoku.sound",
     saveKey: "blockudoku.game",
     floatPop: 0.18,             ## seconds for a gained point to appear where it was earned
     floatHold: 0.12,            ## seconds it stays there before being drawn into the score
@@ -49,6 +50,7 @@ global config = {
         {text: "menuHelp", goes: "help"},
         {text: "menuPieces", goes: "pieces"},
         {text: "menuLanguage", goes: "language"},
+        {sound: true},                  ## shows the sound on or off, and a press switches it
         {text: "menuBack", goes: "game", primary: true}
     ],
     margin: 0.04,                       ## fractions of SIZE: the margin of a screen, the band its title takes, the margin of a text
@@ -957,11 +959,15 @@ func drawScreenTitle(title)
     drawText(title.upper(), CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
 end
 
-## The buttons of a menu screen, top to bottom: {label, primary, and where a press leads (goes) or the language it picks}.
+## The buttons of a menu screen, top to bottom: {label, primary, and what a press does: lead somewhere (goes), pick a language (lang) or switch the sound}.
 func optionEntries()
     var entries = []
     for entry in config.menu do
-        entries.push({label: tr(entry.text), goes: entry.goes, primary: entry.primary})
+        var key = entry.text
+        if entry.sound then
+            key = sounds.on and "menuSoundOn" or "menuSoundOff"
+        end
+        entries.push({label: tr(key), goes: entry.goes, sound: entry.sound, primary: entry.primary})
     end
     return entries
 end
@@ -992,6 +998,12 @@ func chooseLanguage(code)
     data.set(config.langKey, code)
 end
 
+## Switches the sound and keeps the choice for the next launch.
+func toggleSound()
+    setSound(not sounds.on)
+    data.set(config.soundKey, sounds.on)
+end
+
 ## A press on a menu: the entry under it, if any.
 func pressEntries(entries, x, y)
     for i, entry in entries do
@@ -999,6 +1011,8 @@ func pressEntries(entries, x, y)
         if inRect(x, y, rx, ry, rw, rh) then
             if entry.lang <> nil then
                 chooseLanguage(entry.lang)
+            elseif entry.sound then
+                toggleSound()
             else
                 showScreen(entry.goes)
             end
@@ -1064,6 +1078,7 @@ func setup()
     buildShapes()
     buildSounds()
     setLanguage(data.get(config.langKey, i18n.lang))
+    setSound(data.get(config.soundKey, true))
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then
         newGame()
