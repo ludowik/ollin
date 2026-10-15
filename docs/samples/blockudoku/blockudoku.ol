@@ -1005,6 +1005,9 @@ func toggleSound()
     game.screenTick = game.tick
     setSound(not sounds.on)
     data.set(config.soundKey, sounds.on)
+    if sounds.on then
+        sounds.confirm.play()
+    end
 end
 
 ## A press on a menu: the entry under it, if any.
