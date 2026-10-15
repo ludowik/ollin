@@ -1,7 +1,7 @@
 ## A minimal rally car: pedal and steering in, position and heading out. Deliberately generic — no
 ## terrain, no camera, no drawing, no keyboard reading — so any future third-person driving game can
-## reuse it the way samples/lib/trackball.ol is reused for an orbit camera. rally.ol wires the three
-## together. The speed comes from real forces (engine.ol's drive force against drag, rolling
+## reuse it the way samples/lib/trackball.ol is reused for an orbit camera. rally.ol wires it to the
+## terrain, the camera and the controls. The speed comes from real forces (engine.ol's drive force against drag, rolling
 ## resistance and the brakes, limited by what the tyres can grip), so the top speed, the acceleration
 ## and the gear changes are consequences of the engine and not numbers set here.
 import "engine.ol"
