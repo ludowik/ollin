@@ -1,6 +1,6 @@
 ## The shapes of the Blockudoku sample: the bounding box (w, h) is what centres a piece in its tray and
 ## under the finger, so it must be the real one — a row written without its trailing "." made the
-## box one column too narrow and the piece sat half a cell off.
+## box one column too narrow and the piece sat half a cell off. Also the rules of the board and the sound switch.
 
 import "../docs/samples/blockudoku/board.ol"
 import "../docs/samples/blockudoku/pieces.ol"
