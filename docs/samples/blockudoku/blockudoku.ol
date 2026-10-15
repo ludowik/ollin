@@ -81,7 +81,7 @@ global game = {
     previewCells: [],
     layout: {w: 0, h: 0, sx: [0, 0, 0], sy: [0, 0, 0]},   ## where everything goes, computed again when W or H change
     screen: "game",             ## what is shown: the game, the options menu, the help, the languages or the catalogue of every piece
-    screenTick: -1,             ## the tick of the last change: the second path of the same gesture is ignored
+    screenTick: -1,             ## the tick of the last change of screen or of sound: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
     sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
     help: {w: 0, h: 0, lang: "", x: 0, y: 0, size: 0, lines: []}   ## the help text cut into lines, computed again when W, H or the language change
@@ -998,8 +998,11 @@ func chooseLanguage(code)
     data.set(config.langKey, code)
 end
 
-## Switches the sound and keeps the choice for the next launch.
+## Switches the sound and keeps the choice for the next launch. A tap arrives twice in the same frame
+## (touch, then the mouse the system emulates from it), and a switch is the one press that is not
+## idempotent: the gesture is marked as handled, as a change of screen does.
 func toggleSound()
+    game.screenTick = game.tick
     setSound(not sounds.on)
     data.set(config.soundKey, sounds.on)
 end
