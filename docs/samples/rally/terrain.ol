@@ -5,9 +5,8 @@
 
 ## The road: a closed loop of hand-placed waypoints, so the circuit is a recognisable shape
 ## rather than a wandering noise field.
-## Four times the first draft's scale — a track this small barely gave a car room to turn.
-## TRACK_WIDTH only doubled, not quadrupled: a real stage is a narrow ribbon across a big
-## landscape, not a road as wide as the terrain grew.
+## TRACK_WIDTH is small next to the circuit: a real stage is a narrow ribbon across a big landscape,
+## not a road as wide as the terrain.
 global TRACK = [
     { x: 200,  z: 0    },
     { x: 168,  z: 104  },
@@ -39,8 +38,7 @@ func distanceToTrack(x, z)
         var abz = b.z - a.z
         var len2 = abx * abx + abz * abz
         var t = ((x - a.x) * abx + (z - a.z) * abz) / len2
-        if t < 0 then t = 0 end
-        if t > 1 then t = 1 end
+        t = math.clamp(t, 0, 1)
         var px = a.x + abx * t
         var pz = a.z + abz * t
         var dx = x - px
@@ -63,12 +61,8 @@ end
 ## the distance already computed by the caller when it has one (bakeTerrain's lattice), so the
 ## same distanceToTrack pass serves the height AND the color below instead of running twice.
 func heightFromDist(x, z, d)
-    var h = rawHeight(x, z)
-    if d >= TRACK_WIDTH then
-        return h
-    end
-    var t = d / TRACK_WIDTH     ## 0 on the centreline, 1 at the verge
-    return h * t + 1.0 * (1 - t)
+    var t = math.min(d / TRACK_WIDTH, 1.0)     ## 0 on the centreline, 1 at the verge and beyond
+    return rawHeight(x, z) * t + 1.0 * (1 - t)
 end
 
 func heightAt(x, z)
@@ -87,13 +81,7 @@ end
 ## interpolates the resulting colour across each triangle, so the road's edge follows the actual
 ## position inside a cell.
 func roadMixAt(d)
-    if d <= TRACK_WIDTH then
-        return 1.0
-    end
-    if d >= TRACK_WIDTH + FEATHER then
-        return 0.0
-    end
-    return 1.0 - (d - TRACK_WIDTH) / FEATHER
+    return math.clamp(1.0 - (d - TRACK_WIDTH) / FEATHER, 0.0, 1.0)
 end
 
 ## The ground colour at a lattice point of height h, d away from the track: grass tinted by altitude,
@@ -130,9 +118,8 @@ end
 ## the whole world through the vertex shader. The circuit never changes, so this runs once from
 ## setup(), not every frame.
 ##
-## One mesh vertex per lattice point, shared by the four cells around it: a cube per cell was tried
-## (and, before it, blocky pillars that looked exactly like a Minecraft grid) and cost 24 vertices a
-## cell for a top face of four. Neighbouring cells, and neighbouring blocks, share the SAME lattice
+## One mesh vertex per lattice point, shared by the four cells around it (a cube per cell would cost
+## 24 vertices for a top face of four). Neighbouring cells, and neighbouring blocks, share the SAME lattice
 ## point and therefore the SAME height, slope and colour, so the surface is continuous — no crack,
 ## no step, no visible block edge — and surfaceAt asks the engine for the height of those same
 ## triangles.

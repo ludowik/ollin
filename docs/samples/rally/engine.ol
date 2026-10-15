@@ -41,8 +41,7 @@ class Engine
         end
         for i = 2, #r do
             if rpm <= r[i] then
-                var k = (rpm - r[i - 1]) / (r[i] - r[i - 1])
-                return t[i - 1] + (t[i] - t[i - 1]) * k
+                return math.map(rpm, r[i - 1], r[i], t[i - 1], t[i])
             end
         end
         return t[#t]
@@ -54,6 +53,11 @@ class Engine
             return self.reverseRatio * self.finalDrive
         end
         return self.ratios[g] * self.finalDrive
+    end
+
+    ## The speed, in m/s, at which the top gear reaches the limiter.
+    func topSpeed()
+        return self.limiter / 9.5493 * self.wheelRadius / (self.ratios[#self.ratios] * self.finalDrive)
     end
 
     ## One step. `speed` is the car's speed along its direction of travel (never negative),

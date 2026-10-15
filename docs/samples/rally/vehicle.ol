@@ -55,12 +55,7 @@ class Vehicle
         var force = self.engine.update(dt, math.max(self.speed * dir, 0.0), pedal, dir < 0, brake)
         force = math.min(force, self.mass * self.gripAccel) * dir
 
-        var sign = 0
-        if self.speed > 0 then
-            sign = 1
-        elseif self.speed < 0 then
-            sign = -1
-        end
+        var sign = math.sign(self.speed)
         var v = math.abs(self.speed)
         var resist = 0.5 * 1.2 * self.dragArea * v * v + self.rolling * self.mass * 9.81
                      + brake * self.brakeDecel * self.mass

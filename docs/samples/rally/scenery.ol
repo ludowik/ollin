@@ -6,6 +6,7 @@ import "terrain.ol"
 
 global POST_SPACING = 9.0
 global POST_OFFSET = TRACK_WIDTH + 2.0    ## from the centreline: just outside the road bed
+global POST_CLEARANCE = TRACK_WIDTH + 1.5  ## a post nearer than this to some stretch of the road is skipped
 global POST_SIZE = 0.4
 global POST_HEIGHT = 1.4
 global POST_SEE = 160.0                   ## beyond this distance a post is not drawn
@@ -35,7 +36,7 @@ func bakePosts()
             for side = -1, 1, 2 do
                 var x = px + nx * POST_OFFSET * side
                 var z = pz + nz * POST_OFFSET * side
-                if distanceToTrack(x, z) > TRACK_WIDTH + 1.5 then
+                if distanceToTrack(x, z) > POST_CLEARANCE then
                     posts.push({ x: x, y: surfaceAt(x, z), z: z, color: POST_COLORS[count % 2 + 1] })
                 end
             end

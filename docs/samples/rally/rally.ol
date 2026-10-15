@@ -23,8 +23,7 @@ import "../lib/tilt.ol"
 ## What the camera does with speed, since the screen is the only place speed can be felt. The view
 ## widens (more of the road streams past the edges) and the camera sinks towards the ground (what
 ## passes beneath it moves faster, the angular speed of the ground being the speed over the height).
-## TOP_SPEED is the car's fifth-gear limit, engine.ol's 50 m/s, where both reach their full effect.
-global TOP_SPEED = 50.0
+## Both reach their full effect at the car's top speed, which the engine knows (Engine.topSpeed).
 global FOV_SPEED_GAIN = 12.0
 global FOV_CAP = 85.0
 global CHASE_HEIGHT = 5.5
@@ -136,11 +135,9 @@ func carPose(x, z, heading)
     var mean = (hFL + hFR + hBL + hBR) / 4
     var slopeF = ((hFL + hFR) - (hBL + hBR)) / (4 * HALF_BASE)
     var slopeR = ((hFL + hBL) - (hFR + hBR)) / (4 * HALF_TRACK)
-    var lift = 0.0
-    lift = math.max(lift, hFL - (mean + slopeF * HALF_BASE + slopeR * HALF_TRACK))
-    lift = math.max(lift, hFR - (mean + slopeF * HALF_BASE - slopeR * HALF_TRACK))
-    lift = math.max(lift, hBL - (mean - slopeF * HALF_BASE + slopeR * HALF_TRACK))
-    lift = math.max(lift, hBR - (mean - slopeF * HALF_BASE - slopeR * HALF_TRACK))
+    ## What the plane misses at the wheels is +twist on two diagonal wheels and -twist on the other two,
+    ## so the worst wheel is |twist| above it.
+    var lift = math.abs(hFL - hFR - hBL + hBR) / 4
     return mean + lift, math.atan(slopeF), math.atan(slopeR)
 end
 
@@ -211,7 +208,7 @@ func update(dt)
     car.update(dt, throttle, math.clamp(steer, -1, 1))
     engineSound.update(car.engine)
 
-    speedFeel = approach(speedFeel, math.clamp(math.abs(car.speed) / TOP_SPEED, 0, 1), SPEED_FEEL_RATE, dt)
+    speedFeel = approach(speedFeel, math.clamp(math.abs(car.speed) / car.engine.topSpeed(), 0, 1), SPEED_FEEL_RATE, dt)
     chase.height = CHASE_HEIGHT + (CHASE_HEIGHT_FAST - CHASE_HEIGHT) * speedFeel
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
@@ -239,9 +236,7 @@ func drawCar()
     var groundY, pitch, roll = carPose(car.x, car.z, car.heading)
     graphics.push()
     ## The car's local origin sits at AXLE height: a wheel drawn at local y=0 (see drawWheel calls
-    ## below) then has its bottom exactly WHEEL_R below, right at the ground. This offset and the
-    ## wheel's own radius used to be two unrelated numbers (0.55 here, 0.42 in drawWheel) — out of
-    ## sync by WHEEL_R, which is exactly how much of the car sat buried in the terrain.
+    ## below) has its bottom exactly WHEEL_R below, right at the ground.
     graphics.translate(car.x, groundY + WHEEL_R, car.z)
     graphics.rotateY(math.deg(car.heading))
     ## rotateX lowers +Z for a positive angle and rotateZ raises +X, hence the pitch's minus.
@@ -263,13 +258,12 @@ end
 ## copy underneath so the white stays readable over the grass, the road and the sky.
 func hudRow(value, unit, xr, y, size)
     graphics.fontSize(size)
-    var gap = size * 0.3
-    graphics.stroke(HUD_SHADOW)
-    graphics.textMode("right", "top")
-    graphics.text(value, xr + 2, y + 2)
-    graphics.textMode("left", "top")
-    graphics.text(unit, xr + gap + 2, y + 2)
-    graphics.stroke(HUD_TEXT)
+    hudCopy(value, unit, xr + 2, y + 2, size * 0.3, HUD_SHADOW)
+    hudCopy(value, unit, xr, y, size * 0.3, HUD_TEXT)
+end
+
+func hudCopy(value, unit, xr, y, gap, color)
+    graphics.stroke(color)
     graphics.textMode("right", "top")
     graphics.text(value, xr, y)
     graphics.textMode("left", "top")
