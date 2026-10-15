@@ -318,6 +318,7 @@ end
 
 func draw()
     graphics.clear(SKY_COLOR)
+    graphics.noStroke()    ## a solid is also outlined while a stroke is on, and the engine starts every frame with one
     graphics.begin3d(cam)
     for block in ground do
         if graphics.inFrustum(block.x, block.y, block.z, block.r) then
