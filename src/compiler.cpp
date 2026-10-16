@@ -396,6 +396,48 @@ bool Compiler::const_value(const Expr& e, Value& out) {
     return literal_value(e, out) || fold_enum_member(e, out);
 }
 
+// The form of `op` that reads its RIGHT operand from the constant pool, or HALT when it has none.
+static Op k_form(Op op) {
+    switch (op) {
+    case Op::ADD:
+        return Op::ADDK;
+    case Op::SUB:
+        return Op::SUBK;
+    case Op::MUL:
+        return Op::MULK;
+    case Op::EQ:
+        return Op::EQK;
+    case Op::NEQ:
+        return Op::NEQK;
+    case Op::GT:
+        return Op::GTK;
+    case Op::LT:
+        return Op::LTK;
+    case Op::GE:
+        return Op::GEK;
+    case Op::LE:
+        return Op::LEK;
+    default:
+        return Op::HALT;
+    }
+}
+
+// Switches `op` to its K form when the right operand is known at compile time and its index fits the field:
+// the literal then costs no LOAD_K. Only the RIGHT side: `a + b` is not `b + a` for a string or an instance
+// with __add.
+bool Compiler::const_operand(Op& op, const Expr& right, PoolIdx& index) {
+    Op k = k_form(op);
+    Value v;
+    if (k == Op::HALT || !const_value(right, v))
+        return false;
+    PoolIdx idx = chunk.add_constant(v);
+    if (idx > k_field_max)
+        return false;
+    op = k;
+    index = idx;
+    return true;
+}
+
 void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
     // The direct paths below need dest < reg_top_, so that operand temporaries never overlap it.
     if (dest_at_top)
@@ -420,9 +462,13 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
         int r_l = last_reg_;
         if (reg_top_ <= r_l) // protects r_l from a 0-argument call (see visit(BinaryExpr))
             reserve_regs_to(r_l + 1);
-        bin->right->accept(*this);
-        int r_r = last_reg_;
-        chunk.emit(make_abc(binary_arith_opcode(bin->op), dest, r_l, r_r));
+        Op op = binary_arith_opcode(bin->op);
+        PoolIdx rhs;
+        if (!const_operand(op, *bin->right, rhs)) {
+            bin->right->accept(*this);
+            rhs = last_reg_;
+        }
+        chunk.emit(make_abc(op, dest, r_l, rhs));
         reg_top_ = saved;
         last_reg_ = dest;
     } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
@@ -854,11 +900,15 @@ void Compiler::visit(const SwitchStmt& s) {
     for (size_t ai = 0; ai < s.cases.size(); ++ai)
         for (auto& ve : s.cases[ai].values) {
             reg_top_ = above_subj;
-            ve->accept(*this);
-            int val_r = last_reg_;
+            Op op = Op::EQ;
+            PoolIdx val;
+            if (!const_operand(op, *ve, val)) {
+                ve->accept(*this);
+                val = last_reg_;
+            }
             int cond_r = alloc_reg();
             reg_top_ = above_subj; // frees the temporary after EQ
-            chunk.emit(make_abc(Op::EQ, cond_r, subj_r, val_r));
+            chunk.emit(make_abc(op, cond_r, subj_r, val));
             size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, cond_r);
             arm_patches[ai].push_back(chunk.emit_jump(Op::JUMP));
             chunk.patch_jump(skip, chunk.current_pos());
@@ -957,10 +1007,14 @@ void Compiler::visit(const AssignStmt& s) {
             } else {
                 // Compound: rhs is fully evaluated before writing back to dest
                 int saved = reg_top_;
-                s.value->accept(*this);
-                int rhs = last_reg_;
-                // Emit op directly into dest — safe: rhs is already in a register
-                chunk.emit(make_abc(binary_arith_opcode(s.op), dest, dest, rhs));
+                Op op = binary_arith_opcode(s.op);
+                PoolIdx rhs;
+                if (!const_operand(op, *s.value, rhs)) {
+                    s.value->accept(*this);
+                    rhs = last_reg_;
+                }
+                // Emit op directly into dest — safe: rhs is already in a register (or in the pool)
+                chunk.emit(make_abc(op, dest, dest, rhs));
                 reg_top_ = saved;
             }
             return;
@@ -977,11 +1031,15 @@ void Compiler::visit(const AssignStmt& s) {
             } else {
                 int cur = alloc_reg();
                 chunk.emit(make_abc(Op::GET_UPVAL, cur, uv, 0));
-                s.value->accept(*this);
-                int rhs = last_reg_;
+                Op op = binary_arith_opcode(s.op);
+                PoolIdx rhs;
+                if (!const_operand(op, *s.value, rhs)) {
+                    s.value->accept(*this);
+                    rhs = last_reg_;
+                }
                 int res = alloc_reg();
                 bump_reg_count();
-                chunk.emit(make_abc(binary_arith_opcode(s.op), res, cur, rhs));
+                chunk.emit(make_abc(op, res, cur, rhs));
                 chunk.emit(make_abc(Op::SET_UPVAL, res, uv, 0));
             }
             reg_top_ = saved;
@@ -997,11 +1055,15 @@ void Compiler::visit(const AssignStmt& s) {
         } else {
             int cur = alloc_reg();
             chunk.emit(make_abx(Op::LOAD_GLOBAL, cur, chunk.add_identifier(s.name)));
-            s.value->accept(*this);
-            int rhs = last_reg_;
+            Op op = binary_arith_opcode(s.op);
+            PoolIdx rhs;
+            if (!const_operand(op, *s.value, rhs)) {
+                s.value->accept(*this);
+                rhs = last_reg_;
+            }
             int res = alloc_reg();
             bump_reg_count();
-            chunk.emit(make_abc(binary_arith_opcode(s.op), res, cur, rhs));
+            chunk.emit(make_abc(op, res, cur, rhs));
             chunk.emit(make_abx(Op::STORE_GLOBAL, res, chunk.add_identifier(s.name)));
         }
         reg_top_ = saved;
@@ -1397,12 +1459,16 @@ void Compiler::visit(const BinaryExpr& e) {
     // reg_top_ <= r_l — would otherwise see the right operand overwrite it.
     if (reg_top_ <= r_l)
         reserve_regs_to(r_l + 1);
-    e.right->accept(*this);
-    int r_r = last_reg_;
+    Op op = binary_arith_opcode(e.op);
+    PoolIdx rhs;
+    if (!const_operand(op, *e.right, rhs)) {
+        e.right->accept(*this);
+        rhs = last_reg_;
+    }
     last_reg_ = reg_top_++;
     bump_reg_count();
 
-    chunk.emit(make_abc(binary_arith_opcode(e.op), last_reg_, r_l, r_r));
+    chunk.emit(make_abc(op, last_reg_, r_l, rhs));
 }
 
 // a < b < c: each operand in its own register, comparisons taken pairwise, AND at the end.
@@ -2058,11 +2124,15 @@ void Compiler::visit(const IndexAssignStmt& s) {
         // Compound assignment: get current, apply op, store back
         int cur_r = alloc_reg();
         chunk.emit(make_abc(Op::GET_INDEX, cur_r, obj_r, key_r));
-        int rhs_r = alloc_reg();
-        compile_into(*s.value, rhs_r);
+        Op op = token_to_op(s.op);
+        PoolIdx rhs;
+        if (!const_operand(op, *s.value, rhs)) {
+            rhs = alloc_reg();
+            compile_into(*s.value, rhs);
+        }
         int result_r = alloc_reg();
         bump_reg_count();
-        chunk.emit(make_abc(token_to_op(s.op), result_r, cur_r, rhs_r));
+        chunk.emit(make_abc(op, result_r, cur_r, rhs));
         chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, result_r));
     }
     reg_top_ = saved;

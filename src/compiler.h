@@ -92,6 +92,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     bool fold_enum_member(const Expr& e, Value& out);
     // A value known at compile time: a literal, or such an enum member.
     bool const_value(const Expr& e, Value& out);
+    // True when `right` can be read from the pool: `op` then becomes its K form and `index` the constant's.
+    // Neither is touched otherwise.
+    bool const_operand(Op& op, const Expr& right, PoolIdx& index);
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
     // dynamic class, which would recurse forever in a hierarchy of three levels or more.

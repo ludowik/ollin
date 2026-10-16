@@ -380,6 +380,7 @@ prétexte de cette colonne.
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `tests/check_func_limit.sh` | Claude | **garde-fou du plafond de fonctions** : un programme de N fonctions est ENGENDRÉ par le script, car le plafond lui-même interdit d'en committer un — et chacune doit être appelable PAR SON NOM, la dernière comprise. Rien du plafond n'y est écrit : il est cherché (doublement puis bissection), donc la garde survit à son déplacement. ⚠ Une boucle de closures ne l'exerce PAS (un `func` du texte = un proto, et une closure s'appelle par `CALL_DYN`) |
+| `tests/check_const_operands.sh` | Claude | **garde-fou du repli des opérandes constants** : au-delà de 65 535 constantes, un littéral à droite d'un opérateur retombe sur `LOAD_K` + l'opcode générique — programme ENGENDRÉ, le plafond étant la largeur d'un champ |
 | `tests/check_samples.sh` | Claude | **garde-fou du catalogue** : `docs/samples/index.json` est le seul lien entre le menu du playground et les fichiers — un renommage y laissait une entrée morte que RIEN ne détectait, la panne n'apparaissant qu'à l'ouverture du menu dans le navigateur |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutorial.html` | Claude | tutoriel HTML (vue de la web app monopage) |
@@ -852,6 +853,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | SWITCH        | ABx    | A=sujet, Bx=table          | saut indexé par l'entier de `R[A]` dans `chunk.switch_tables[Bx]` (cf. « Table de sauts du `switch` ») |
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
+| ADDK/SUBK/MULK/EQK/NEQK/GTK/LTK/GEK/LEK | ABC | A=dst, B=lhs, C=index de constante | comme `ADD`… mais l'opérande DROIT est `constants[C]` : un littéral n'a plus de `LOAD_K` (cf. « Opérande constant à droite ») |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Commentaires : un BLANC, jeté au découpage
@@ -875,6 +877,36 @@ réponses (`'end' expected near 'print'`), mesuré.
 
 Gain : **−6,8 %** d'instructions sur un fichier de 3 000 commentaires, −0,5 % sur
 `tests/syntax.ol`. Le vrai motif n'est pas là : ce sont les 59 pièges et le nœud inutile.
+
+## Opérande constant à droite (`ADDK`, `LTK`…)
+
+Quand l'opérande DROIT d'un `+ - * == <> < <= > >=` est un littéral (ou un membre d'enum figé),
+le compilateur émet la forme `…K` qui lit `constants[C]` : le littéral ne coûte plus un `LOAD_K`.
+Un seul point de décision, `Compiler::const_operand`, appelé par tous les sites qui ont une expression à
+droite : `visit(BinaryExpr)`, `compile_into`, les affectations composées (`n += 1`, `self.n += 1`) sur
+locale, upvalue, globale ou champ, et les `case` d'un `switch`. Les émetteurs sans expression à confier
+(morceaux littéraux d'une chaîne interpolée, borne ouverte d'un intervalle, comparaison enchaînée) gardent
+`LOAD_K`. Au-delà de 65 535 constantes le champ C ne peut plus nommer l'index : repli silencieux sur
+`LOAD_K` + opcode générique.
+
+- **Droite seulement** : `a + b` n'est pas `b + a` pour une chaîne ou une instance avec `__add`.
+- **Un seul corps par opérateur, deux instanciations** : chaque gestionnaire (`BINARY_HANDLER_ADD`…) est
+  une macro à un paramètre, l'opérande droit, instanciée pour `op_ADD` (`regs[base + C]`) et pour
+  `op_ADDK` (`ch->constants[C]`). Le code engendré est identique à celui de deux copies écrites à la
+  main (mesuré : mêmes comptes d'instructions, à quelques dizaines près sur 500 millions), donc promotion, débordement, chaînes et
+  méta-méthodes sont ceux du chemin à registres sans rien à tenir en accord. `tests/check_const_operands.sh`
+  exerce le repli au-delà de 65 535 constantes, sur un programme engendré. `constOperandCheck`
+  (`tests/regressions.ol`) passe à l'identique sur l'ancien binaire et sur le nouveau.
+- **Mesuré (`bash bench/icount.sh` et les huit autres scripts de `bench/` sous callgrind, instructions
+  exécutées, avant → après)** : `fib` −20,4 %, `float` −12,4 %, `objects` −4,3 %, `strings` −3,7 %,
+  `classes` −2,5 %, `boucle` −1,9 %, `calls` −1,9 %, `closures` −1,5 %, `map` −1,1 %, `iter` −0,3 %.
+  **Une seule hausse : `array` +2,4 %**, alors que ses boucles n'exécutent AUCUN opcode `…K` (bytecode
+  identique) : c'est l'allocation de registres de `run_goto`, déjà documentée pour `LEN` et `SWITCH`.
+  Déplacer les nouveaux gestionnaires (avant `op_HALT`, puis au milieu des opérations binaires) ne l'a
+  pas fait bouger : ne pas y chercher une cause dans le placement.
+- **Choix** : la forme à entier immédiat de 16 bits (`ADDI`, comme Lua) n'a pas été essayée : sa voie
+  lente exigerait de reconstruire une `Value` dans un gestionnaire computed-goto, alors que l'index de
+  constante réutilise le corps des gestionnaires tel quel et couvre aussi flottants et chaînes.
 
 ## Décodage d'une instruction (macro `NEXT`, vm.cpp)
 

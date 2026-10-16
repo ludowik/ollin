@@ -125,6 +125,16 @@ enum class Op : OpByte {
     CLOSE_UPVALS,  // A: closes the open upvalues whose register is >= A, at the end of a scope
     LEN,           // AB: R[A] = length of R[B] — the '#' operator
     SWITCH,        // ABx: jumps through switch_tables[Bx], indexed by the integer in R[A]
+    // The right operand is a constant of the pool, C its index: a literal no longer costs a LOAD_K.
+    ADDK,
+    SUBK,
+    MULK,
+    EQK,
+    NEQK,
+    GTK,
+    LTK,
+    GEK,
+    LEK,
     HALT,
 };
 

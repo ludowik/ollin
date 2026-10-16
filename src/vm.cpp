@@ -867,6 +867,230 @@ void VM::run_goto(size_t stop_depth) {
 #define C i_c(_i)
 #define Bx i_bx(_i)
 
+// The handlers of the binary operators whose right operand may be a register or, in the K form, a constant of
+// the pool: ONE body each, instantiated twice, so that the two forms cannot drift apart.
+#define BINARY_HANDLER_ADD(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int + int */ \
+            regs[base + A] = Value(bv.as_int() + cv.as_int()); \
+            NEXT(); \
+        } \
+        if (bv.is_string() || cv.is_string()) { \
+            { \
+                /* Copy the operands BEFORE value_to_string: if one is an instance with __str, */ \
+                /* invoke_str reallocates regs and the bv/cv references would dangle. */ \
+                /* Inner block, so the Values (non-trivial destructors) leave scope before */ \
+                /* NEXT(). */ \
+                Value b2 = bv; \
+                Value c2 = cv; \
+                regs[base + A] = Value(value_to_string(b2) + value_to_string(c2)); \
+            } \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { \
+            if (uint32_t addr = try_meta_binary(MK().add_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        regs[base + A] = Value(as_double(bv) + as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_SUB(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int - int */ \
+            regs[base + A] = Value(bv.as_int() - cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { \
+            if (uint32_t addr = try_meta_binary(MK().sub_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        regs[base + A] = Value(as_double(bv) - as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_MUL(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int * int */ \
+            regs[base + A] = Value(bv.as_int() * cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { \
+            if (uint32_t addr = try_meta_binary(MK().mul_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        regs[base + A] = Value(as_double(bv) * as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_EQ(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int == int */ \
+            regs[base + A] = Value::make_bool(bv.as_int() == cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { \
+            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        regs[base + A] = Value::make_bool(values_equal(bv, cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_NEQ(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        /* a <> b goes through __eq then negates, otherwise == and <> could both be true. */ \
+        if (is_instance(bv)) { \
+            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv, /*negate=*/true)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        regs[base + A] = Value::make_bool(!values_equal(bv, cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_GT(RHS) \
+    { \
+        /* GT(a,b) == LT(b,a): check __lt on rhs */ \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int > int */ \
+            regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(cv)) { /* the instance on the right: a > b is b < a, hence b.__lt(a) */ \
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } else if (is_instance(bv)) { /* the instance on the left: a > b is not(a <= b), hence not a.__le(b) */ \
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv, /*negate=*/true)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
+            regs[base + A] = Value::make_bool(bv.as_string() > cv.as_string()); \
+            NEXT(); \
+        } \
+        regs[base + A] = Value::make_bool(as_double(bv) > as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_LT(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int < int */ \
+            regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { /* the instance on the left: a < b is a.__lt(b) */ \
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } else if (is_instance(cv)) { /* the instance on the right: a < b is not(b <= a), hence not b.__le(a) */ \
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv, /*negate=*/true)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
+            regs[base + A] = Value::make_bool(bv.as_string() < cv.as_string()); \
+            NEXT(); \
+        } \
+        regs[base + A] = Value::make_bool(as_double(bv) < as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_GE(RHS) \
+    { \
+        /* GE(a,b) == LE(b,a): check __le on rhs */ \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int >= int */ \
+            regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(cv)) { /* the instance on the right: a >= b is b <= a, hence b.__le(a) */ \
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } else if (is_instance(bv)) { /* the instance on the left: a >= b is not(a < b), hence not a.__lt(b) */ \
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv, /*negate=*/true)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
+            regs[base + A] = Value::make_bool(bv.as_string() >= cv.as_string()); \
+            NEXT(); \
+        } \
+        regs[base + A] = Value::make_bool(as_double(bv) >= as_double(cv)); \
+        NEXT(); \
+    }
+
+#define BINARY_HANDLER_LE(RHS) \
+    { \
+        const Value& bv = regs[base + B]; \
+        const Value& cv = RHS; \
+        if (bv.is_integer() && cv.is_integer()) { /* the hot path: int <= int */ \
+            regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int()); \
+            NEXT(); \
+        } \
+        if (is_instance(bv)) { /* the instance on the left: a <= b is a.__le(b) */ \
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } else if (is_instance(cv)) { /* the instance on the right: a <= b is not(b < a), hence not b.__lt(a) */ \
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv, /*negate=*/true)) { \
+                ip = addr; \
+                base = call_stack.back().reg_base; \
+                NEXT(); \
+            } \
+        } \
+        if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
+            regs[base + A] = Value::make_bool(bv.as_string() <= cv.as_string()); \
+            NEXT(); \
+        } \
+        regs[base + A] = Value::make_bool(as_double(bv) <= as_double(cv)); \
+        NEXT(); \
+}
+
     static const void* const dt[] = {
         &&op_LOAD_K,
         &&op_LOAD_NIL,
@@ -934,6 +1158,15 @@ void VM::run_goto(size_t stop_depth) {
         &&op_CLOSE_UPVALS,
         &&op_LEN,
         &&op_SWITCH,
+        &&op_ADDK,
+        &&op_SUBK,
+        &&op_MULK,
+        &&op_EQK,
+        &&op_NEQK,
+        &&op_GTK,
+        &&op_LTK,
+        &&op_GEK,
+        &&op_LEK,
         &&op_HALT,
     };
 
@@ -974,71 +1207,14 @@ dispatch_loop:
         globals_init[Bx] = true;
         NEXT();
 
-    op_ADD: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int + int
-            regs[base + A] = Value(bv.as_int() + cv.as_int());
-            NEXT();
-        }
-        if (bv.is_string() || cv.is_string()) {
-            {
-                // Copy the operands BEFORE value_to_string: if one is an instance with __str,
-                // invoke_str reallocates regs and the bv/cv references would dangle.
-                // Inner block, so the Values (non-trivial destructors) leave scope before
-                // NEXT().
-                Value b2 = bv;
-                Value c2 = cv;
-                regs[base + A] = Value(value_to_string(b2) + value_to_string(c2));
-            }
-            NEXT();
-        }
-        if (is_instance(bv)) {
-            if (uint32_t addr = try_meta_binary(MK().add_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value(as_double(bv) + as_double(cv));
-        NEXT();
-    }
+    op_ADD:
+        BINARY_HANDLER_ADD(regs[base + C])
 
-    op_SUB: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int - int
-            regs[base + A] = Value(bv.as_int() - cv.as_int());
-            NEXT();
-        }
-        if (is_instance(bv)) {
-            if (uint32_t addr = try_meta_binary(MK().sub_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value(as_double(bv) - as_double(cv));
-        NEXT();
-    }
+    op_SUB:
+        BINARY_HANDLER_SUB(regs[base + C])
 
-    op_MUL: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int * int
-            regs[base + A] = Value(bv.as_int() * cv.as_int());
-            NEXT();
-        }
-        if (is_instance(bv)) {
-            if (uint32_t addr = try_meta_binary(MK().mul_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value(as_double(bv) * as_double(cv));
-        NEXT();
-    }
+    op_MUL:
+        BINARY_HANDLER_MUL(regs[base + C])
 
     op_DIV: {
         if (is_instance(regs[base + B])) {
@@ -1142,152 +1318,50 @@ dispatch_loop:
         regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) || !is_falsy(regs[base + C]));
         NEXT();
 
-    op_EQ: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int == int
-            regs[base + A] = Value::make_bool(bv.as_int() == cv.as_int());
-            NEXT();
-        }
-        if (is_instance(bv)) {
-            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value::make_bool(values_equal(bv, cv));
-        NEXT();
-    }
+    op_EQ:
+        BINARY_HANDLER_EQ(regs[base + C])
 
-    op_NEQ: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        // a <> b goes through __eq then negates, otherwise == and <> could both be true.
-        if (is_instance(bv)) {
-            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv, /*negate=*/true)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value::make_bool(!values_equal(bv, cv));
-        NEXT();
-    }
+    op_NEQ:
+        BINARY_HANDLER_NEQ(regs[base + C])
 
-    op_GT: {
-        // GT(a,b) == LT(b,a): check __lt on rhs
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int > int
-            regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int());
-            NEXT();
-        }
-        if (is_instance(cv)) { // the instance on the right: a > b is b < a, hence b.__lt(a)
-            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        } else if (is_instance(bv)) { // the instance on the left: a > b is not(a <= b), hence not a.__le(b)
-            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv, /*negate=*/true)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        if (bv.is_string() && cv.is_string()) { // lexicographic order
-            regs[base + A] = Value::make_bool(bv.as_string() > cv.as_string());
-            NEXT();
-        }
-        regs[base + A] = Value::make_bool(as_double(bv) > as_double(cv));
-        NEXT();
-    }
+    op_GT:
+        BINARY_HANDLER_GT(regs[base + C])
 
-    op_LT: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int < int
-            regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int());
-            NEXT();
-        }
-        if (is_instance(bv)) { // the instance on the left: a < b is a.__lt(b)
-            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        } else if (is_instance(cv)) { // the instance on the right: a < b is not(b <= a), hence not b.__le(a)
-            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv, /*negate=*/true)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        if (bv.is_string() && cv.is_string()) { // lexicographic order
-            regs[base + A] = Value::make_bool(bv.as_string() < cv.as_string());
-            NEXT();
-        }
-        regs[base + A] = Value::make_bool(as_double(bv) < as_double(cv));
-        NEXT();
-    }
+    op_LT:
+        BINARY_HANDLER_LT(regs[base + C])
 
-    op_GE: {
-        // GE(a,b) == LE(b,a): check __le on rhs
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int >= int
-            regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int());
-            NEXT();
-        }
-        if (is_instance(cv)) { // the instance on the right: a >= b is b <= a, hence b.__le(a)
-            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        } else if (is_instance(bv)) { // the instance on the left: a >= b is not(a < b), hence not a.__lt(b)
-            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv, /*negate=*/true)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        if (bv.is_string() && cv.is_string()) { // lexicographic order
-            regs[base + A] = Value::make_bool(bv.as_string() >= cv.as_string());
-            NEXT();
-        }
-        regs[base + A] = Value::make_bool(as_double(bv) >= as_double(cv));
-        NEXT();
-    }
+    op_GE:
+        BINARY_HANDLER_GE(regs[base + C])
 
-    op_LE: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // the hot path: int <= int
-            regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int());
-            NEXT();
-        }
-        if (is_instance(bv)) { // the instance on the left: a <= b is a.__le(b)
-            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        } else if (is_instance(cv)) { // the instance on the right: a <= b is not(b < a), hence not b.__lt(a)
-            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv, /*negate=*/true)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        if (bv.is_string() && cv.is_string()) { // lexicographic order
-            regs[base + A] = Value::make_bool(bv.as_string() <= cv.as_string());
-            NEXT();
-        }
-        regs[base + A] = Value::make_bool(as_double(bv) <= as_double(cv));
-        NEXT();
-    }
+    op_LE:
+        BINARY_HANDLER_LE(regs[base + C])
+
+    op_ADDK:
+        BINARY_HANDLER_ADD(ch->constants[C])
+
+    op_SUBK:
+        BINARY_HANDLER_SUB(ch->constants[C])
+
+    op_MULK:
+        BINARY_HANDLER_MUL(ch->constants[C])
+
+    op_EQK:
+        BINARY_HANDLER_EQ(ch->constants[C])
+
+    op_NEQK:
+        BINARY_HANDLER_NEQ(ch->constants[C])
+
+    op_GTK:
+        BINARY_HANDLER_GT(ch->constants[C])
+
+    op_LTK:
+        BINARY_HANDLER_LT(ch->constants[C])
+
+    op_GEK:
+        BINARY_HANDLER_GE(ch->constants[C])
+
+    op_LEK:
+        BINARY_HANDLER_LE(ch->constants[C])
 
     op_JUMP:
         ip = Bx;
@@ -2025,6 +2099,15 @@ dispatch_loop:
 #undef B
 #undef C
 #undef Bx
+#undef BINARY_HANDLER_ADD
+#undef BINARY_HANDLER_SUB
+#undef BINARY_HANDLER_MUL
+#undef BINARY_HANDLER_EQ
+#undef BINARY_HANDLER_NEQ
+#undef BINARY_HANDLER_GT
+#undef BINARY_HANDLER_LT
+#undef BINARY_HANDLER_GE
+#undef BINARY_HANDLER_LE
 }
 
 void VM::execute(Chunk chunk) {
