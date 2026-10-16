@@ -904,6 +904,12 @@ locale, upvalue, globale ou champ, et les `case` d'un `switch`. Les émetteurs s
   identique) : c'est l'allocation de registres de `run_goto`, déjà documentée pour `LEN` et `SWITCH`.
   Déplacer les nouveaux gestionnaires (avant `op_HALT`, puis au milieu des opérations binaires) ne l'a
   pas fait bouger : ne pas y chercher une cause dans le placement.
+- **Mesuré en TEMPS (tourniquet, le meilleur temps de chaque binaire, 7 tours ; 21 pour les trois
+  petits scripts)** : `fib` −22,6 %, `calls` −13,7 %, `float` −13,6 %, `objects` −8,0 %, `closures` −6,0 %,
+  `classes` −2,9 %, `strings` −2,6 %. `array` (+0,5 % sur 21 tours, la hausse de 2,4 % en instructions ne
+  se voit pas), `loop` (+3,0 %) et `iter` (−2,1 %) sont dans le bruit : ces scripts durent 0,05 à 0,08 s,
+  et `iter` a même affiché +11,9 % sur 7 tours avant de retomber à −2,1 % sur 21. Ne jamais conclure sur
+  un script de cette durée avec peu de tours.
 - **Choix** : la forme à entier immédiat de 16 bits (`ADDI`, comme Lua) n'a pas été essayée : sa voie
   lente exigerait de reconstruire une `Value` dans un gestionnaire computed-goto, alors que l'index de
   constante réutilise le corps des gestionnaires tel quel et couvre aussi flottants et chaînes.
