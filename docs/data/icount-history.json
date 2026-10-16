@@ -443,6 +443,38 @@
       "loop": 31121439,
       "map": 56154935,
       "subject": "Pool accessors: namespace-scope inline variables, not function-local statics"
+    },
+    {
+      "date": "2026-09-22",
+      "commit": "547c970",
+      "fib": 75365261,
+      "loop": 31139850,
+      "map": 56052596,
+      "subject": "map: pseudo-methods on the map itself (m.keys()), and typeof tells a module apart"
+    },
+    {
+      "date": "2026-09-23",
+      "commit": "c99ad47",
+      "fib": 75290354,
+      "loop": 31139963,
+      "map": 56052715,
+      "subject": "simplify: factor the 5 fixed-capacity pools onto one FixedPool<T,CAP>"
+    },
+    {
+      "date": "2026-09-25",
+      "commit": "6a97853",
+      "fib": 75290812,
+      "loop": 31140438,
+      "map": 56053234,
+      "subject": "Add the SIZE engine global: min(W, H)"
+    },
+    {
+      "date": "2026-10-16",
+      "commit": "30538d6",
+      "fib": 59913857,
+      "loop": 30543166,
+      "map": 55456095,
+      "subject": "Constant right operands: ADDK, SUBK, MULK, EQK, NEQK, GTK, LTK, GEK, LEK read a literal from the pool instead of a LOAD_K"
     }
   ]
 }
