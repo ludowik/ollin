@@ -908,8 +908,13 @@ locale, upvalue, globale ou champ, et les `case` d'un `switch`. Les émetteurs s
   « not inlinable … max-inline-insns-single limit reached » après. Ce n'est donc PAS l'allocation de
   registres invoquée pour `LEN` et `SWITCH`, et déplacer les gestionnaires ne pouvait rien y changer
   (essayé : avant `op_HALT`, puis au milieu des opérations binaires). Pourquoi le seuil est atteint
-  maintenant, `Array::set` étant inchangé, n'est pas établi. Pas corrigé : forcer la mise en ligne
-  (`always_inline`) reste à essayer et à mesurer.
+  maintenant, `Array::set` étant inchangé, n'est pas établi.
+  **`[[gnu::always_inline]]` sur `Array::set` a été ESSAYÉ puis RETIRÉ, mesure à l'appui** : `array` −3,9 %
+  en instructions (−4,7 % en temps, 15 tours), mais **`strings` +2,8 %** (+1,7 % en temps) et `closures`
+  +0,4 % (+3,7 % en temps) : callgrind sur `strings` montre une fonction de `std::string` (+70 M) qui
+  cesse d'être mise en ligne et `value_to_string_plain` qui perd 25,2 M. Bilan sur les huit scripts :
+  +0,4 % d'instructions, donc l'inlining perdu a seulement changé de place. Ne pas refaire sans une
+  idée qui ne déplace pas le seuil de GCC.
 - **Mesuré en TEMPS (tourniquet, le meilleur temps de chaque binaire, 7 tours ; 21 pour les trois
   petits scripts)** : `fib` −22,6 %, `calls` −13,7 %, `float` −13,6 %, `objects` −8,0 %, `closures` −6,0 %,
   `classes` −2,9 %, `strings` −2,6 %. `array` (+0,5 % sur 21 tours, la hausse de 2,4 % en instructions ne
