@@ -14,8 +14,14 @@
 ## called, and comes back to the line that called them. Each token that comes out is filed in the
 ## stream below, and the program's text is underlined in the colour of the token it became.
 ##
-## Space plays and pauses, the arrows step by one line (left/right) and change the speed (up/down),
-## 1 to 4 pick a program, R restarts. A tap pauses and resumes. The menu does the same with the finger.
+## It plays by itself, and a tap pauses and resumes it. STEP BY STEP is the other way to read it:
+## nothing moves until you ask, and every tap (or the Next button, or the right arrow) runs the
+## next line of the lexer, Back (or the left arrow) goes back one. The Step button, the S key and
+## the menu switch the mode on and off; Play leaves it.
+##
+## Keys: space plays and pauses, s steps by tap, left/right go back and forward one line, up/down
+## change the speed, 1 to 4 pick a program, r restarts. The menu and the buttons at the bottom do
+## the same with a finger.
 
 import "tracer.ol"
 import "programs.ol"
@@ -43,11 +49,12 @@ const KIND_COLORS = {
 const PUNCTUATION = ["COMMA", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACKET", "RBRACKET", "COLON",
                      "SEMICOLON", "DOT", "DOT_DOT_DOT", "QUESTION"]
 
-global state = {pos: 0.0, playing: true, speed: 1.0, prog: 1, name: nil, hold: 0.0}
+global state = {pos: 0.0, playing: true, stepping: false, goal: 0.0, speed: 1.0, prog: 1, name: nil, hold: 0.0}
 global run = nil          ## the trace of the program on show
 global durations = []     ## how long each step lasts, in seconds at speed 1
 global emitted = []       ## emitted[i]: how many tokens exist once step i is done
 global noteAt = []        ## noteAt[i]: the last sentence said up to step i
+global hits = []          ## the buttons drawn at the bottom, for the taps
 global keywordTypes = {}
 global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
 global stream = {key: nil, chips: []}
@@ -92,6 +99,7 @@ func loadProgram(index)
     state.prog = index
     state.name = PROGRAMS[index].name
     state.pos = 0.0
+    state.goal = 0.0
     state.hold = 0.0
     run = trace(PROGRAMS[index].source)
 
@@ -154,18 +162,55 @@ func current()
     return i, t
 end
 
+## Step by step: nothing moves by itself, and `goal` is how far the next taps have asked it to go.
+func setStepping(on)
+    state.stepping = on
+    if on then
+        state.playing = false
+        state.goal = state.pos
+    else
+        state.playing = true
+        state.hold = 0.0
+    end
+end
+
+func onStepping(on)
+    setStepping(on)
+end
+
+func onPlaying(on)
+    if on and state.stepping then
+        setStepping(false)
+    end
+end
+
+func togglePlay()
+    if state.stepping then
+        setStepping(false)
+    else
+        state.playing = not state.playing
+    end
+end
+
+## Runs the line that is under way to its end, or the next one when it is done.
 func stepForward()
-    state.playing = false
-    state.pos = math.min(math.floor(state.pos + 0.000001) + 1, #run.steps)
+    if not state.stepping then
+        setStepping(true)
+    end
+    state.goal = math.min(math.floor(state.goal + 0.000001) + 1, #run.steps)
 end
 
 func stepBack()
-    state.playing = false
-    state.pos = math.max(math.ceil(state.pos - 0.000001) - 1, 0)
+    if not state.stepping then
+        setStepping(true)
+    end
+    state.goal = math.max(math.ceil(state.goal - 0.000001) - 1, 0)
+    state.pos = state.goal
 end
 
 func restart()
     state.pos = 0.0
+    state.goal = 0.0
     state.hold = 0.0
 end
 
@@ -187,10 +232,11 @@ func setup()
     state.name = names[1]
     var menu = ui.menu("Lexer")
     menu.list("Program", names, ref state.name, onProgram)
-    menu.checkbox("Playing", ref state.playing)
+    menu.checkbox("Playing", ref state.playing, onPlaying)
+    menu.checkbox("Step by step", ref state.stepping, onStepping)
     menu.slider("Speed", ref state.speed, 0.25, 8, 1.0)
-    menu.button("Step back", stepBack)
-    menu.button("Step forward", stepForward)
+    menu.button("Back", stepBack)
+    menu.button("Next", stepForward)
     menu.button("Restart", restart)
     ui.show(menu)
     ui.close()    ## folded to its handle: the animation has the whole screen
@@ -200,7 +246,9 @@ end
 
 func keyboard.keypressed(key)
     if key == "space" then
-        state.playing = not state.playing
+        togglePlay()
+    elseif key == "s" then
+        setStepping(not state.stepping)
     elseif key == "right" then
         stepForward()
     elseif key == "left" then
@@ -219,28 +267,68 @@ func keyboard.keypressed(key)
     end
 end
 
-func mouse.pressed(x, y)
-    state.playing = not state.playing
+func hitAt(x, y)
+    for h in hits do
+        if x >= h.x and x <= h.x + h.w and y >= h.y and y <= h.y + h.h then
+            return h.id
+        end
+    end
+    return nil
 end
 
-func update(dt)
-    var n = #run.steps
-    if not state.playing then
-        return
+## A tap on a button does what it says. Anywhere else it pauses and resumes, or in step by step
+## runs the next line.
+func mouse.pressed(x, y)
+    var id = hitAt(x, y)
+    if id == "play" then
+        togglePlay()
+    elseif id == "step" then
+        setStepping(not state.stepping)
+    elseif id == "back" then
+        stepBack()
+    elseif id == "next" then
+        stepForward()
+    elseif state.stepping then
+        stepForward()
+    else
+        state.playing = not state.playing
     end
-    var budget = dt * state.speed
-    while budget > 0 and state.pos < n do
+end
+
+## Moves the program forward by `budget` seconds, not beyond `limit`. When it is paced by hand
+## every line takes the same short time, a token a little longer.
+func advance(budget, limit, byHand)
+    while budget > 0 and state.pos < limit do
         var i = math.floor(state.pos) + 1
-        var left = (i - state.pos) * durations[i]
+        var d = durations[i]
+        if byHand then
+            d = 0.2
+            if run.steps[i].tok then
+                d = 0.5
+            end
+        end
+        var stop = math.min(i, limit)
+        var left = (stop - state.pos) * d
         if budget >= left then
-            state.pos = i
+            state.pos = stop
             budget -= left
         else
-            state.pos += budget / durations[i]
+            state.pos += budget / d
             budget = 0
         end
     end
-    if state.pos >= n then
+end
+
+func update(dt)
+    if state.stepping then
+        advance(dt, state.goal, true)
+        return
+    end
+    if not state.playing then
+        return
+    end
+    advance(dt * state.speed, #run.steps, false)
+    if state.pos >= #run.steps then
         ## the end of a program: a pause to take it in, then on to the next one
         state.hold += dt
         if state.hold > 3 then
@@ -284,10 +372,12 @@ end
 func computeLayout()
     var m = SIZE * 0.025
     var top = m + SIZE * 0.1
-    var availH = H - top - SIZE * 0.045 - m
+    var footH = math.max(SIZE * 0.075, 38)
+    var availH = H - top - footH - SIZE * 0.06 - m
     ## the source panel is as tall as its lines need, and no more
     var srcH = math.min(availH * 0.4, titleHeight() + SIZE * 0.045 + run.lines * SIZE * 0.1)
-    var L = {m: m}
+    ## the strip under the buttons belongs to the memory and frame counter the engine draws
+    var L = {m: m, footH: footH, footY: H - footH - SIZE * 0.06}
     if W >= H * 1.1 then
         var lw = (W - 3 * m) * 0.38
         var rw = W - 3 * m - lw
@@ -707,6 +797,50 @@ func drawHeader(L)
     box(L.m, barY, (W - 2 * L.m) * state.pos / n, SIZE * 0.006, 2, CARET)
 end
 
+func drawFooter(L, i)
+    hits = []
+    var gap = L.m * 0.6
+    var bw = math.clamp((W - 2 * L.m - 3 * gap) / 4, 60, SIZE * 0.2)
+    var play = "Pause"
+    if not state.playing then
+        play = "Play"
+    end
+    var buttons = [{id: "play", text: play, on: false}, {id: "step", text: "Step", on: state.stepping},
+                   {id: "back", text: "Back", on: false}, {id: "next", text: "Next", on: false}]
+    graphics.font("sans")
+    var fs = math.clamp(SIZE * 0.028, 11, 22)
+    for k, b in buttons do
+        var x = L.m + (k - 1) * (bw + gap)
+        if b.on then
+            graphics.fill(Color(CARET.r, CARET.g, CARET.b, 0.22))
+            graphics.stroke(CARET, 2)
+        else
+            graphics.fill(PANEL)
+            graphics.stroke(EDGE, 1.5)
+        end
+        graphics.rect(x, L.footY, bw, L.footH, SIZE * 0.012)
+        graphics.fontSize(fs)
+        graphics.textMode("center", "center")
+        label(b.text, x + bw / 2, L.footY + L.footH / 2, TEXT)
+        hits.push({id: b.id, x: x, y: L.footY, w: bw, h: L.footH})
+    end
+    graphics.textMode("left", "top")
+
+    ## under the buttons: where the program is, and what a tap does. The right of that strip belongs to
+    ## the memory and frame counter the engine draws.
+    var status = "step {i} / {#run.steps}"
+    if state.stepping then
+        status = status + "   -   tap: next line"
+    elseif state.playing then
+        status = status + "   -   tap: pause"
+    else
+        status = status + "   -   tap: play"
+    end
+    graphics.fontSize(math.max(fs * 0.85, 10))
+    label(status, L.m, L.footY + L.footH + SIZE * 0.012, DIM)
+    graphics.textMode("left", "top")
+end
+
 func draw()
     graphics.clear(BG)
     if monoRatio == nil then
@@ -722,21 +856,5 @@ func draw()
     drawStream(L.stream, i, t, s, info)
     drawCode(L.code, i, t, s)
     drawNote(L.note, s, i)
-    var status = "step {i} / {#run.steps}"
-    if not state.playing then
-        status += "  (paused)"
-    end
-    graphics.font("sans")
-    graphics.fontSize(math.max(SIZE * 0.02, 9))
-    label(status, L.m, H - SIZE * 0.04, TEXT)
-    ## the keys when they fit beside the status, else the gesture a finger has
-    var hint = "space: play/pause   left/right: step   up/down: speed   1-4: program   r: restart"
-    ## the right corner belongs to the memory and frame counter the engine draws
-    var edge = W - L.m - SIZE * 0.2
-    if graphics.textSize(hint) > edge - L.m - graphics.textSize(status) - SIZE * 0.05 then
-        hint = "tap: play/pause   menu: more"
-    end
-    graphics.textMode("right", "top")
-    label(hint, edge, H - SIZE * 0.04, DIM)
-    graphics.textMode("left", "top")
+    drawFooter(L, i)
 end
