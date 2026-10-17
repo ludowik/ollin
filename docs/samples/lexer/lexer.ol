@@ -288,6 +288,8 @@ func mouse.pressed(x, y)
         stepBack()
     elseif id == "next" then
         stepForward()
+    elseif id == "restart" then
+        restart()
     elseif state.stepping then
         stepForward()
     else
@@ -800,13 +802,14 @@ end
 func drawFooter(L, i)
     hits = []
     var gap = L.m * 0.6
-    var bw = math.clamp((W - 2 * L.m - 3 * gap) / 4, 60, SIZE * 0.2)
+    var bw = math.clamp((W - 2 * L.m - 4 * gap) / 5, 60, SIZE * 0.2)
     var play = "Pause"
     if not state.playing then
         play = "Play"
     end
     var buttons = [{id: "play", text: play, on: false}, {id: "step", text: "Step", on: state.stepping},
-                   {id: "back", text: "Back", on: false}, {id: "next", text: "Next", on: false}]
+                   {id: "back", text: "Back", on: false}, {id: "next", text: "Next", on: false},
+                   {id: "restart", text: "Restart", on: false}]
     graphics.font("sans")
     var fs = math.clamp(SIZE * 0.028, 11, 22)
     for k, b in buttons do
