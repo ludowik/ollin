@@ -37,6 +37,7 @@ run_pass tests/regressions.ol
 run_pass tests/blockudoku_pieces_test.ol
 run_pass tests/blockudoku_texts_test.ol
 run_pass tests/lexer_trace_test.ol
+run_pass tests/parser_trace_test.ol
 
 # Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
 # rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a
@@ -92,8 +93,8 @@ if ! bash tests/check_samples.sh; then
     fails=$((fails + 1))
 fi
 
-echo "── guard: lexer animation ────────────────────────"
-if ! bash tests/check_lexer_source.sh; then
+echo "── guard: trace animations ────────────────────────"
+if ! bash tests/check_trace_source.sh; then
     fails=$((fails + 1))
 fi
 

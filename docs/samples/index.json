@@ -4,6 +4,7 @@
   { "group": "Language",    "name": "Closure",        "file": "closure.ol" },
   { "group": "Language",    "name": "Vec2 class",     "file": "vec2.ol" },
   { "group": "Language",    "name": "How the lexer works", "file": "lexer/lexer.ol", "icon": "icons/lexer.png" },
+  { "group": "Language",    "name": "How the parser works", "file": "parser/parser.ol", "icon": "icons/parser.png" },
 
   { "group": "2D drawing",  "name": "Primitives 2D",  "file": "primitives.ol", "icon": "icons/primitives.png" },
   { "group": "2D drawing",  "name": "Perlin noise (per pixel)", "file": "pixels.ol", "icon": "icons/pixels.png" },

@@ -29,6 +29,7 @@ const SETTLE_LONG = {                  // the heavier ones bake a world or load 
   'rally/rally.ol': 9000,
   'transforms_3d/transforms_3d.ol': 7000,
   'primitives_3d/primitives_3d.ol': 7000,
+  'parser/parser.ol': 27000,         // the tree is only worth a picture once a few nodes are in it
 }
 // Examples whose picture is no use as an icon, though they draw: the generated tile reads better.
 const NO_ICON = {

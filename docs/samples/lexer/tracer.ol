@@ -2,7 +2,7 @@
 ## lexer rules on a program, one C++ line at a time, and returns the list of steps the animation
 ## replays — each step is the line the lexer is on — together with the tokens it produced.
 ## tests/lexer_trace_test.ol checks that the tokens are exactly the ones the C++ lexer gives, and
-## tests/check_lexer_source.sh that every line named below is the line of lexer.cpp it claims to be.
+## tests/check_trace_source.sh that every line named below is the line of lexer.cpp it claims to be.
 ##
 ## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index`
 ## counts the lines of that function in cpp_source.ol (generated from lexer.cpp), and the text is
@@ -70,14 +70,16 @@ const TAB = string.fromCode(9)
 const CR = string.fromCode(13)
 const BACKSLASH = string.fromCode(92)
 
-## The text of the lexer functions: cpp_source.ol with its quotes put back, and each line trimmed.
-func loadCpp()
+## The text of C++ functions, from a table of cpp_source.ol: its quotes put back, the dashes and arrows
+## the engine's font has no glyph for turned into ASCII, and each line trimmed. The parser example
+## loads its own table the same way.
+func loadCpp(table)
     var out = {}
-    for name, f in CPP_SOURCE do
+    for name, f in table do
         var lines = []
         var trimmed = []
         for l in f.lines do
-            var restored = l.replace("`", QUOTE)
+            var restored = l.replace("¤", QUOTE).replace("—", "-").replace("→", "->").replace("…", "...")
             lines.push(restored)
             trimmed.push(restored.trim())
         end
@@ -86,7 +88,7 @@ func loadCpp()
     return out
 end
 
-global CPP = loadCpp()
+global CPP = loadCpp(CPP_SOURCE)
 
 ## Where each `case` label of Lexer::tokenize, and its `default:`, is. Found by the text of the line.
 func loadCases()
@@ -201,7 +203,7 @@ class Tracer
     ## ── recording ────────────────────────────────────────────────────────────
 
     ## Records the line `index` of function `fn`, which the lexer has just run. `start` is how that
-    ## line begins: checked here, and by tests/check_lexer_source.sh for every call.
+    ## line begins: checked here, and by tests/check_trace_source.sh for every call.
     func run(fn, index, start, extra)
         var trimmed = CPP[fn].trimmed
         if not trimmed[index].startsWith(start) then
