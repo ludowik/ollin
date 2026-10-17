@@ -36,6 +36,7 @@ run_pass tests/syntax.ol
 run_pass tests/regressions.ol
 run_pass tests/blockudoku_pieces_test.ol
 run_pass tests/blockudoku_texts_test.ol
+run_pass tests/lexer_trace_test.ol
 
 # Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
 # rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a
