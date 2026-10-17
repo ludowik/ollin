@@ -2,6 +2,7 @@
 ## holds that copy to the engine's lexer: every expected token below was checked against the C++
 ## lexer's own output, so a drift in either one shows here.
 import "../docs/samples/lexer/tracer.ol"
+import "trace_path.ol"
 
 ## The tokens of a program, as "TYPE:lexeme" separated by spaces.
 func cut(source)
@@ -66,11 +67,7 @@ assert(cut("0b1 0o7 1e5 1_2.5 a.b") == "NUMBER:0b1 NUMBER:0o7 NUMBER:1e5 NUMBER:
 ## called it, then goes round the loop once more to find the end of the source. Each step is given as
 ## the function and how its line begins, so the test does not depend on where the lines sit in lexer.cpp.
 func followsPath(source, expected)
-    var got = trace(source).steps.map(func(s) return s.fn + "|" + CPP[s.fn].trimmed[s.at] end)
-    for k, want in expected do
-        assert(got[k] and got[k].startsWith(want), "step {k} should be '{want}', it is '{got[k]}'")
-    end
-    assert(#got == #expected, "{#got} steps, {#expected} expected")
+    assertPath(trace(source).steps, CPP, expected)
 end
 
 followsPath("a", [

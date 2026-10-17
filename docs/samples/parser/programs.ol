@@ -6,10 +6,6 @@
 
 import "../lexer/tracer.ol"
 
-func program(name, lines)
-    return {name: name, source: unquote(lines.join(NEWLINE))}
-end
-
 const PROGRAMS = [
     program("Precedence", [
         "var total = 1 + 2 * 3"

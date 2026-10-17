@@ -33,8 +33,6 @@ const LINE = 1.5         ## the height of a line of text, in font sizes
 ## The operators the parser writes as one character, as they are spelled in a program.
 const OP_NAMES = {"|": "or", "&": "and", "o": "|", "x": "~", "b": "&", "l": "<<", "r": ">>", "q": "//",
                   "p": "^", "=": "==", "G": ">=", "L": "<=", "N": "<>", "!": "not"}
-const TOKEN_SYMBOLS = {EQUALS: "=", PLUS_EQUAL: "+=", MINUS_EQUAL: "-=", STAR_EQUAL: "*=", SLASH_EQUAL: "/=",
-                       PERCENT_EQUAL: "%="}
 
 ## The colour group of each kind of node, in the colours of the tokens; statements are the rest.
 const NODE_GROUPS = {
@@ -99,9 +97,9 @@ func nodeDetail(n)
         return a.name + " " + a.op + "="
     elseif k == "IndexAssignStmt" then
         if a.obj == "" then
-            return TOKEN_SYMBOLS[a.op]
+            return ASSIGN_OPS[a.op] + "="
         end
-        return a.obj + " " + TOKEN_SYMBOLS[a.op]
+        return a.obj + " " + ASSIGN_OPS[a.op] + "="
     elseif k == "FuncDeclStmt" then
         if a.name == "" then
             return ""
@@ -240,7 +238,6 @@ func buildRun(index)
         end
         st.tree = tree
     end
-    prepareSteps(r, paceOf)
     return r
 end
 
@@ -252,10 +249,11 @@ end
 ## What the parser is looking at, and its locals, as a debugger would list them.
 func watchLine(s)
     var tok = run.tokens[s.p1]
-    var parts = ["peek() = {tok.type}"]
+    var head = "peek() = {tok.type}"
     if tok.lexeme <> "" then
-        parts[1] = "peek() = {tok.type} " + QUOTE + clip(tok.lexeme, 12) + QUOTE
+        head += " " + QUOTE + clip(tok.lexeme, 12) + QUOTE
     end
+    var parts = [head]
     for pair in s.w do
         parts.push(pair[1] + " = " + clip(pair[2], 20))
     end
@@ -272,28 +270,8 @@ func chipLayout(width)
     end
     var pad = SIZE * 0.02
     var fs = math.min(SIZE * 0.026, width / 34)
-    var tfs = fs * 0.7
-    var chips = []
-    var x = 0
-    var y = 0
-    var chipH = fs + tfs + SIZE * 0.03
-    var rowH = chipH + fs * 2.0
-    var availW = width - 2 * pad
-    graphics.font("mono")
-    for k, tok in run.tokens do
-        graphics.fontSize(fs)
-        var w1 = graphics.textSize(tokenLabel(tok))
-        graphics.fontSize(tfs)
-        var w2 = graphics.textSize(tok.type)
-        var w = math.max(w1, w2) + SIZE * 0.022
-        if x > 0 and x + w > availW then
-            x = 0
-            y += rowH
-        end
-        chips[k] = {x: x, y: y, w: w, h: chipH}
-        x += w + SIZE * 0.012
-    end
-    tokenChips = {w: W, h: H, prog: state.prog, chips: chips, fs: fs, tfs: tfs, pad: pad, height: y + rowH}
+    var laid = layoutChips(run.tokens, fs, width - 2 * pad, fs * 2.0)
+    tokenChips = {w: W, h: H, prog: state.prog, chips: laid.chips, fs: fs, tfs: laid.tfs, pad: pad, height: laid.bottom}
     return tokenChips
 end
 
@@ -502,11 +480,12 @@ func setup()
     stage.owner = "Parser"
     stage.watch = watchLine
     stage.errorNote = errorNote
+    stage.pace = paceOf
+    stage.keywords = KEYWORD_TYPES
     stage.columns = 96
     stage.skip = true
-    state.speed = 2.0
+    stage.speed = 2.0
     graphics.canvas(W, H, "How the parser works")
-    keywordTypes = KEYWORD_TYPES
     openMenu()
     loadProgram(1)
 end

@@ -6,6 +6,7 @@
 ## A tree is written as text: the kind, its plain fields as name:value, and the nodes it holds grouped
 ## by field. An apostrophe stands for a double quote, in the programs and in the trees alike.
 import "../docs/samples/parser/tracer.ol"
+import "trace_path.ol"
 
 func check(text, want)
     var r = parseTrace(unquote(text))
@@ -376,11 +377,7 @@ notCovered("var x = ]1; 3]")
 ## Each step is given as the function and how its line begins, so the test does not depend on where
 ## the lines sit in parser.cpp.
 func followsPath(text, expected)
-    var got = parseTrace(unquote(text)).steps.map(func(s) return s.fn + "|" + PCPP[s.fn].trimmed[s.at] end)
-    for k, want in expected do
-        assert(got[k] and got[k].startsWith(want), "step {k} should be '{want}', it is '{got[k]}'")
-    end
-    assert(#got == #expected, "{#got} steps, {#expected} expected")
+    assertPath(parseTrace(unquote(text)).steps, PCPP, expected)
 end
 
 followsPath("break", [

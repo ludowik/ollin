@@ -12,12 +12,12 @@
 ##                    carries `fn`, `at`, `span` (the line it lights in the code panel, and how many
 ##                    more lines its statement covers), `also` (a second line to mark), `stack` (the
 ##                    calls in progress), `note` (a sentence, said from there on), `err` (the message
-##                    when the engine gives up), and what the example needs besides. prepareSteps()
-##                    adds `dur`, `hand`, `said` and `noteId`.
+##                    when the engine gives up), and what the example needs besides. The stage adds
+##                    `dur`, `hand`, `said` and `noteId`.
 ##   stage.cpp        the engine's text, by function: {first, lines, trimmed}
 ##
-## setup() fills `stage` (all of it but `skip` is needed), sets `keywordTypes` (to KEYWORD_TYPES of the
-## lexer's tracer), then calls openMenu() and loadProgram(1). draw() begins with beginFrame(), takes its
+## setup() fills `stage` (all of it but `skip` and `speed` is needed), then calls openMenu() and
+## loadProgram(1). draw() begins with beginFrame(), takes its
 ## room from baseLayout() and adds its own panels to the header, the code panel, the explanation and
 ## the buttons (drawHeader, drawCode, drawNote, drawFooter). Both examples are written that way: copy one.
 ## A step also gets `event` (true when the line changed something, which SKIP runs up to) from the
@@ -70,7 +70,6 @@ global state = {pos: 0.0, playing: true, stepping: false, goal: 0.0, speed: 1.0,
 global run = nil          ## the trace of the program on show
 global loaded = {}        ## the traces already made, by program: a trace never changes
 global hits = []          ## the buttons drawn at the bottom, for the taps
-global keywordTypes = {}  ## the token types that are keywords, filled by the example
 global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
 global noteCache = {prog: 0, id: 0, w: 0, h: 0, lines: [], size: 0}   ## the sentence, wrapped for one size
 global codeCache = {}
@@ -78,10 +77,11 @@ global codeCache = {}
 ## What an example hands over, besides the programs and the engine's text above: `title` heads the
 ## screen, `menu` names the menu, `file` and `owner` name the C++ in the code panel, `columns` is how
 ## many columns of a line of C++ are shown (a longer line is cut with a "~"), `watch(step)` writes the
-## line of locals, `errorNote(step)` the sentence that follows a refusal, and `skip` adds the button
-## that runs to the next step flagged `event`.
+## line of locals, `errorNote(step)` the sentence that follows a refusal, `pace(step)` how long a line
+## takes (see prepareSteps), `keywords` the token types that are keywords, `speed` the speed it starts
+## at, and `skip` adds the button that runs to the next step flagged `event`.
 global stage = {title: "", menu: "", programs: [], lessons: [], build: nil, cpp: {}, file: "", owner: "",
-                columns: 82, watch: nil, errorNote: nil, skip: false}
+                columns: 82, watch: nil, errorNote: nil, skip: false, keywords: {}, speed: 1.0, pace: nil}
 
 func lerp(a, b, t)
     return a + (b - a) * t
@@ -117,7 +117,7 @@ func clipLeft(text, max)
 end
 
 func kindOf(ty)
-    if keywordTypes[ty] then
+    if stage.keywords[ty] then
         return "keyword"
     elseif ty == "IDENTIFIER" then
         return "name"
@@ -169,6 +169,7 @@ end
 func loadProgram(index)
     if loaded[index] == nil then
         loaded[index] = stage.build(index)
+        prepareSteps(loaded[index], stage.pace)
     end
     run = loaded[index]
     state.prog = index
@@ -274,6 +275,7 @@ end
 func openMenu()
     var names = stage.programs.map(func(p) return p.name end)
     state.name = names[1]
+    state.speed = stage.speed
     var menu = ui.menu(stage.menu)
     menu.list("Program", names, ref state.name, onProgram)
     menu.checkbox("Playing", ref state.playing, onPlaying)
@@ -443,6 +445,31 @@ func tokenLabel(tok)
         end
     end
     return tok.label
+end
+
+## The chips of the tokens in rows of width `availW`: a chip is as wide as the wider of its two texts,
+## and `rowGap` is the room left under a row. `bottom` is where the rows end.
+func layoutChips(tokens, fs, availW, rowGap)
+    var tfs = fs * 0.7
+    var chipH = fs + tfs + SIZE * 0.03
+    var chips = []
+    var x = 0
+    var y = 0
+    graphics.font("mono")
+    for k, tok in tokens do
+        graphics.fontSize(fs)
+        var w1 = graphics.textSize(tokenLabel(tok))
+        graphics.fontSize(tfs)
+        var w2 = graphics.textSize(tok.type)
+        var w = math.max(w1, w2) + SIZE * 0.022
+        if x > 0 and x + w > availW then
+            x = 0
+            y += chipH + rowGap
+        end
+        chips[k] = {x: x, y: y, w: w, h: chipH}
+        x += w + SIZE * 0.012
+    end
+    return {chips: chips, tfs: tfs, chipH: chipH, bottom: y + chipH + rowGap}
 end
 
 func drawChip(chip, tok, x, y, alpha, fs, tfs)

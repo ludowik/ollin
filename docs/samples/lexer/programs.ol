@@ -6,10 +6,6 @@
 
 import "tracer.ol"
 
-func program(name, lines)
-    return {name: name, source: unquote(lines.join(NEWLINE))}
-end
-
 const PROGRAMS = [
     program("Names and numbers", [
         "var total = 1_200 + x"

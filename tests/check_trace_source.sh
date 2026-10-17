@@ -11,9 +11,6 @@
 #   3. the keyword table of the lexer's tracer.ol is the one of lexer.cpp, entry for entry, and the
 #      tables the parser's tracer.ol copies (precedence levels, comparison and assignment operators,
 #      the tokens that end a block) are those of parser.cpp.
-#
-# The calls a tracer makes with a function name and a line that are computed (`li + 1`, a table of
-# lines) cannot be read here: tests/lexer_trace_test.ol and tests/parser_trace_test.ol run them.
 set -u
 here=$(dirname "$0")
 root=$(cd "$here/.." && pwd)
@@ -32,7 +29,6 @@ for name in g.TARGETS:
 
     # self.run("fn", 12, "start of the line" ...), the emit / fail / need variants that take the same
     # three, and file(token, "fn", 12, "start of the line" ...)
-    # the methods that take a function, a line and its start are found by their signature
     names = "|".join(re.findall(r'func (\w+)\(fn, index, start', tracer))
     calls = re.findall(r'self\.(?:' + names + r')\("(\w+)", (\d+), "((?:[^"\\]|\\.)*)"', tracer)
     calls += re.findall(r'self\.file\(\w+, "(\w+)", (\d+), "((?:[^"\\]|\\.)*)"', tracer)
@@ -126,8 +122,9 @@ def tracer_keys(name):
     return inner
 
 
-engine_cmp = dict(re.findall(r"TokenType::(\w+)\)\s*return '(.)';", body(pcpp, "static char cmp_char(")))
-engine_cmp["LESS"] = "<"
+cmp_body = body(pcpp, "static char cmp_char(")
+engine_cmp = dict(re.findall(r"TokenType::(\w+)\)\s*return '(.)';", cmp_body))
+engine_cmp["LESS"] = re.findall(r"return '(.)';", cmp_body)[-1]    # the token the other tests leave: LESS
 mine_cmp = dict(re.findall(r"(\w+): \"(.)\"", tracer_keys("CMP_CHARS")))
 if engine_cmp != mine_cmp:
     errs.append(f"the comparison characters: parser.cpp has {engine_cmp}, tracer.ol has {mine_cmp}")

@@ -3,7 +3,6 @@
 #include "value.h"
 #include "vm.h"
 #include <cctype>
-#include <cstdlib>
 #include <raylib.h>
 #include <string>
 #ifdef __EMSCRIPTEN__
@@ -78,9 +77,8 @@ static int key_code(std::string name) {
             return KEY_ZERO + (c - '0');
         return -1;
     }
-    if (name.size() > 1 && name[0] == 'f' && std::isdigit((unsigned char)name[1])) {
-        int n = std::atoi(name.c_str() + 1);
-        if (n >= 1 && n <= 12 && name == "f" + std::to_string(n))
+    for (int n = 1; n <= 12; n++) {
+        if (name == "f" + std::to_string(n))
             return KEY_F1 + (n - 1);
     }
     if (name == "space")     return KEY_SPACE;

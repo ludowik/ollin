@@ -69,7 +69,6 @@ func buildRun(index)
             count += 1
         end
     end
-    prepareSteps(r, paceOf)
     return r
 end
 
@@ -201,27 +200,8 @@ func chipLayout(r)
     end
     var pad = SIZE * 0.02
     var fs = math.min(SIZE * 0.032, r.w / 24)
-    var tfs = fs * 0.7
-    var chips = []
-    var x = 0
-    var y = 0
-    var rowH = fs + tfs + SIZE * 0.03
-    var availW = r.w - 2 * pad
-    graphics.font("mono")
-    for k, tok in run.tokens do
-        graphics.fontSize(fs)
-        var w1 = graphics.textSize(tokenLabel(tok))
-        graphics.fontSize(tfs)
-        var w2 = graphics.textSize(tok.type)
-        var w = math.max(w1, w2) + SIZE * 0.022
-        if x > 0 and x + w > availW then
-            x = 0
-            y += rowH + SIZE * 0.012
-        end
-        chips[k] = {x: x, y: y, w: w, h: rowH}
-        x += w + SIZE * 0.012
-    end
-    stream = {prog: state.prog, w: W, h: H, chips: chips, fs: fs, tfs: tfs, rowH: rowH, pad: pad}
+    var laid = layoutChips(run.tokens, fs, r.w - 2 * pad, SIZE * 0.012)
+    stream = {prog: state.prog, w: W, h: H, chips: laid.chips, fs: fs, tfs: laid.tfs, rowH: laid.chipH, pad: pad}
     return stream
 end
 
@@ -291,8 +271,9 @@ func setup()
     stage.owner = "Lexer"
     stage.watch = watchLine
     stage.errorNote = errorNote
+    stage.pace = paceOf
+    stage.keywords = KEYWORD_TYPES
     graphics.canvas(W, H, "How the lexer works")
-    keywordTypes = KEYWORD_TYPES
     openMenu()
     loadProgram(1)
 end

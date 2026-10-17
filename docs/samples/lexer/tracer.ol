@@ -86,6 +86,11 @@ func unquote(text)
     return text.replace("'", QUOTE)
 end
 
+## A program to show: its name and its text, written with apostrophes.
+func program(name, lines)
+    return {name: name, source: unquote(lines.join(NEWLINE))}
+end
+
 ## The text of C++ functions, from a table of cpp_source.ol: its quotes put back, the dashes and arrows
 ## the engine's font has no glyph for turned into ASCII, and each line trimmed. The parser example
 ## loads its own table the same way.
