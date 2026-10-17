@@ -187,9 +187,14 @@ end
 
 ## ── the player ───────────────────────────────────────────────────────────────
 
+## A position that falls exactly between two steps is the END of the one before: at rest the bar,
+## the highlighted number and the explanation then all speak of the line that has just run.
 func current()
     var n = #run.steps
-    var i = math.min(math.floor(state.pos) + 1, n)
+    var i = math.min(math.ceil(state.pos), n)
+    if i < 1 then
+        i = 1
+    end
     var t = math.clamp(state.pos - (i - 1), 0, 1)
     return i, t
 end
