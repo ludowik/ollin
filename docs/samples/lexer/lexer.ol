@@ -20,8 +20,9 @@
 ## the menu switch the mode on and off; Play leaves it.
 ##
 ## Keys: space plays and pauses, s steps by tap, left/right go back and forward one line, up/down
-## change the speed, 1 to 4 pick a program, r restarts. The menu and the buttons at the bottom do
-## the same with a finger.
+## change the speed, 1 to 4 pick a program, r restarts. F7, F8 and F9 stand for the Apple keyboard's
+## previous, play/pause and next keys (with fn, unless the system uses F-keys as standard). The menu
+## and the buttons at the bottom do the same with a finger.
 
 import "tracer.ol"
 import "programs.ol"
@@ -247,7 +248,7 @@ end
 
 ## What a button does, and what a key stands for.
 const ACTIONS = {play: togglePlay, step: toggleStepping, back: stepBack, next: stepForward, restart: restart}
-const KEYS = {space: "play", s: "step", left: "back", right: "next", r: "restart"}
+const KEYS = {space: "play", f8: "play", s: "step", left: "back", f7: "back", right: "next", f9: "next", r: "restart"}
 
 func onProgram(name)
     for i, p in PROGRAMS do

@@ -3,6 +3,7 @@
 #include "value.h"
 #include "vm.h"
 #include <cctype>
+#include <cstdlib>
 #include <raylib.h>
 #include <string>
 #ifdef __EMSCRIPTEN__
@@ -33,7 +34,7 @@ static bool query_blocked() {
 // plus a HELD-state builtin, for continuous movement:
 //   keyboard.isDown(key) -> whether the key is down right now.
 // `key` is a key NAME: "a".."z", "0".."9", "space", "return", "escape", "backspace", "tab",
-// "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", and so on.
+// "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", "f1".."f12", and so on.
 //
 // Detection happens in keyboard_poll(), called once per frame by the render loop
 // (graphics_module.cpp), so the keyboard only works during a graphics.run(...) — or through the
@@ -45,6 +46,8 @@ static std::string key_name(int key) {
         return std::string(1, (char)('a' + (key - KEY_A)));
     if (key >= KEY_ZERO && key <= KEY_NINE)
         return std::string(1, (char)('0' + (key - KEY_ZERO)));
+    if (key >= KEY_F1 && key <= KEY_F12)
+        return "f" + std::to_string(key - KEY_F1 + 1);
     switch (key) {
         case KEY_SPACE:                     return "space";
         case KEY_ENTER: case KEY_KP_ENTER:  return "return";
@@ -74,6 +77,11 @@ static int key_code(std::string name) {
         if (c >= '0' && c <= '9')
             return KEY_ZERO + (c - '0');
         return -1;
+    }
+    if (name.size() > 1 && name[0] == 'f' && std::isdigit((unsigned char)name[1])) {
+        int n = std::atoi(name.c_str() + 1);
+        if (n >= 1 && n <= 12 && name == "f" + std::to_string(n))
+            return KEY_F1 + (n - 1);
     }
     if (name == "space")     return KEY_SPACE;
     if (name == "return" || name == "enter") return KEY_ENTER;
