@@ -16,6 +16,21 @@
 ##                    adds `dur`, `hand`, `said` and `noteId`.
 ##   stage.cpp        the engine's text, by function: {first, lines, trimmed}
 ##
+## setup() fills `stage` (all of it but `skip` is needed), sets `keywordTypes` (to KEYWORD_TYPES of the
+## lexer's tracer), then calls openMenu() and loadProgram(1). draw() begins with beginFrame(), takes its
+## room from baseLayout() and adds its own panels to the header, the code panel, the explanation and
+## the buttons (drawHeader, drawCode, drawNote, drawFooter). Both examples are written that way: copy one.
+## A step also gets `event` (true when the line changed something, which SKIP runs up to) from the
+## example, and `watchText` from here.
+##
+## The player: a program plays by itself, and a tap pauses and resumes it. STEP BY STEP is the other
+## way to read it: nothing moves until you ask, every tap (or the Next button, or the right arrow) runs
+## the next line, and Back (or the left arrow) goes back one. The Step button, the S key and the menu
+## switch the mode on and off; Play leaves it. With `stage.skip`, SKIP (or the E key) runs up to the
+## next step flagged `event`. Keys: space plays and pauses, up/down change the speed, a digit picks a
+## program, r restarts. F7, F8 and F9 stand for the Apple keyboard's previous, play/pause and next keys
+## (with fn, unless the system uses F-keys as standard). The menu and the buttons do the same with a finger.
+##
 ## The callbacks that live here are update, keyboard.keypressed and mouse.pressed: a module can declare
 ## them, a class cannot. A const of the program that imports this file is not visible from here, which
 ## is why the example's own words come through `stage`.
@@ -166,11 +181,7 @@ end
 ## A position that falls exactly between two steps is the END of the one before: at rest the bar,
 ## the highlighted number and the explanation then all speak of the line that has just run.
 func current()
-    var n = #run.steps
-    var i = math.min(math.ceil(state.pos), n)
-    if i < 1 then
-        i = 1
-    end
+    var i = math.clamp(math.ceil(state.pos), 1, #run.steps)
     var t = math.clamp(state.pos - (i - 1), 0, 1)
     return i, t
 end

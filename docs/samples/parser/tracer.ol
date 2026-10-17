@@ -106,6 +106,12 @@ const DISPATCH = {
     WHILE: "while_stmt", DO: "do_stmt", IF: "if_stmt", BREAK: "break_stmt", CONTINUE: "continue_stmt",
     THROW: "throw_stmt", FOR: "for_stmt", FUNC: "func_decl_stmt", RETURN: "return_stmt"
 }
+## The unary operators, in the order unary() tries them, and its lines: the one that tests the token,
+## the one that reads it (none for `match`, which reads it as it tests) and the one that returns.
+const UNARY = [
+    {token: "MINUS", op: "-", test: 2, read: 3, ret: 4}, {token: "NOT", op: "!", test: 6, read: 7, ret: 8},
+    {token: "TILDE", op: "~", test: 10, read: 11, ret: 12}, {token: "HASH", op: "#", test: 14, read: 0, ret: 18}
+]
 const DECLARATIONS = {VAR: [false, false], GLOBAL: [true, false], CONSTANT: [false, true]}
 const NOT_COVERED = {TRY: "try", IMPORT: "import", CLASS: "class", ENUM: "enum", SWITCH: "switch"}
 
@@ -206,10 +212,10 @@ end
 
 global PCPP = loadCpp(PARSER_CPP_SOURCE)
 
-## Where each `case` label of Parser::parse_one_stmt is, by the token it names, and its `default:`.
-func loadParserCases()
+## Where each `case` label of a function of parser.cpp is, by the token it names, and its `default:`.
+func caseLines(fn)
     var at = {}
-    for i, l in PCPP["parse_one_stmt"].trimmed do
+    for i, l in PCPP[fn].trimmed do
         if l.startsWith("case TokenType::") then
             at[l.substr(17, #l).split(":")[1]] = i
         elseif l == "default:" then
@@ -219,7 +225,8 @@ func loadParserCases()
     return at
 end
 
-global PCASE = loadParserCases()
+global PCASE = caseLines("parse_one_stmt")
+global ACASE = caseLines("finish_assign_from_expr")
 
 ## The dispatch table above must name statement functions the switch really calls, on the line after
 ## each label: checked when the file is loaded, since the calls are made from the table.
@@ -235,15 +242,6 @@ end
 checkDispatch()
 
 ## ── the parser ───────────────────────────────────────────────────────────────
-
-func isKeywordType(ty)
-    for word, t in KEYWORDS do
-        if t == ty then
-            return true
-        end
-    end
-    return false
-end
 
 func isCmp(ty)
     return CMP_CHARS.has(ty)
@@ -290,7 +288,6 @@ class ParseTracer
         self.pending = []      ## the effects of the line about to be recorded
         self.nodes = {}
         self.nextId = 1
-        self.root = nil
     end
 
     ## ── the C++ helpers, stepped over ────────────────────────────────────────
@@ -319,7 +316,7 @@ class ParseTracer
 
     func atName()
         var ty = self.peek().type
-        return ty == "IDENTIFIER" or (isKeywordType(ty) and ty <> "TRUE" and ty <> "FALSE" and ty <> "NIL")
+        return ty == "IDENTIFIER" or (KEYWORD_TYPES.has(ty) and ty <> "TRUE" and ty <> "FALSE" and ty <> "NIL")
     end
 
     func atOptionalCall()
@@ -457,10 +454,7 @@ class ParseTracer
     ## Records the line `index` of function `fn`, which the parser has just run. `start` is how that
     ## line begins: checked here, and by tests/check_trace_source.sh for every call.
     func run(fn, index, start, extra)
-        var trimmed = PCPP[fn].trimmed
-        if not trimmed[index].startsWith(start) then
-            throw "{fn} line {index} is not '{start}': {trimmed[index]}"
-        end
+        checkLine(PCPP, fn, index, start)
         var f = extra or {}
         f.fn = fn
         f.at = index
@@ -502,7 +496,7 @@ class ParseTracer
 
     ## parse_body_until(out, stops): statements into the field `slot` of `parent`, up to a token of `stops`.
     func parseBodyUntil(parent, slot, stops)
-        self.enter("parse_body_until", nil, [])
+        self.enter("parse_body_until")
         self.run("parse_body_until", 2, "while (true)")
         while true do
             var done = self.check("EOF_T")
@@ -543,7 +537,7 @@ class ParseTracer
 
     ## parse_expr_list(out): one expression, then one more after each comma.
     func parseExprList(parent, slot)
-        self.enter("parse_expr_list", nil, [])
+        self.enter("parse_expr_list")
         self.run("parse_expr_list", 2, "out.push_back(expr());")
         var e = self.expr()
         self.put(parent, slot, e)
@@ -564,7 +558,7 @@ class ParseTracer
 
     ## parse_call_args(out): the arguments of a call whose '(' is already read, ')' included.
     func parseCallArgs(parent, slot)
-        self.enter("parse_call_args", nil, [])
+        self.enter("parse_call_args")
         var empty = self.check("RPAREN")
         self.run("parse_call_args", 2, "if (!check(TokenType::RPAREN))")
         if not empty then
@@ -579,7 +573,7 @@ class ParseTracer
 
     ## parse_params(params, defaults, variadic): "(" [ params ] ")", into the fields of `owner`.
     func parseParams(owner)
-        self.enter("parse_params", nil, [])
+        self.enter("parse_params")
         self.expectLine("parse_params", 3, "expect(TokenType::LPAREN);", "LPAREN")
         while true do
             var more = not self.check("RPAREN") and not self.check("EOF_T")
@@ -599,7 +593,7 @@ class ParseTracer
             self.add(owner, "params", name.lexeme)
             self.run("parse_params", 9, "params.push_back(expect(")
             var hasDefault = self.match("EQUALS")
-            self.run("parse_params", 10, "defaults.push_back(match(TokenType::EQUALS)", {span: 0})
+            self.run("parse_params", 10, "defaults.push_back(match(TokenType::EQUALS)")
             if hasDefault then
                 var d = self.expr()
                 self.put(owner, "defaults", d)
@@ -618,9 +612,8 @@ class ParseTracer
     ## ── Parser::parse and parse_one_stmt ─────────────────────────────────────
 
     func parse()
-        self.enter("parse", nil, [])
+        self.enter("parse")
         var prog = self.make("Program")
-        self.root = prog
         self.run("parse", 2, "Program prog;",
                  {note: "The parser starts a Program, an empty list of statements, and fills it from the tokens."})
         self.run("parse", 3, "while (true)")
@@ -639,10 +632,11 @@ class ParseTracer
         self.run("parse", 8, "prog.source_files =")
         self.run("parse", 9, "return prog;", {ret: prog})
         self.leave()
+        return prog
     end
 
     func parseOneStmt()
-        self.enter("parse_one_stmt", nil, [])
+        self.enter("parse_one_stmt")
         self.run("parse_one_stmt", 2, "if (depth_ >= 256)",
                  {note: "depth_ counts the statements and expressions being parsed inside each other: a runaway nesting is refused before it can overflow the stack."})
         self.run("parse_one_stmt", 4, "DepthGuard guard(depth_);")
@@ -654,7 +648,6 @@ class ParseTracer
                       "a statement cannot begin with '{self.peek().lexeme}' — such a line continues the expression above; give the value a name instead",
                       {span: 1})
         end
-        var st = nil
         if ty == "SEMICOLON" then
             self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE["SEMICOLON"]})
             self.fail("parse_one_stmt", 17, "fail(", "';' is not valid syntax — statements are terminated by newlines")
@@ -662,29 +655,30 @@ class ParseTracer
         if NOT_COVERED.has(ty) then
             self.notCovered(NOT_COVERED[ty])
         end
+        var known = DISPATCH.has(ty) or DECLARATIONS.has(ty) or ty == "IDENTIFIER"
+        var label = PCASE["default"]
         var note = "peek() is {ty}: the switch has no case for it, so the statement is an expression."
-        if DISPATCH.has(ty) or DECLARATIONS.has(ty) or ty == "IDENTIFIER" then
+        if known then
+            label = PCASE[ty]
             note = "peek() is {ty}: the switch jumps to its case."
         end
+        self.run("parse_one_stmt", 13, "switch (peek().type)", {also: label, note: note})
+        var st = nil
         if DISPATCH.has(ty) then
-            self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE[ty], note: note})
             var fn = DISPATCH[ty]
             var at = PCASE[ty] + 1
             self.run("parse_one_stmt", at, "return {fn}();")
             st = self.statement(fn)
             self.run("parse_one_stmt", at, "return {fn}();", {ret: st})
         elseif DECLARATIONS.has(ty) then
-            self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE[ty], note: note})
             var at = PCASE[ty] + 1
             var flags = DECLARATIONS[ty]
             self.run("parse_one_stmt", at, "return decl_stmt(")
             st = self.declStmt(flags[1], flags[2])
             self.run("parse_one_stmt", at, "return decl_stmt(", {ret: st})
         elseif ty == "IDENTIFIER" then
-            self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE["IDENTIFIER"], note: note})
             st = self.identifierStmt()
         else
-            self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE["default"], note: note})
             self.run("parse_one_stmt", 70, "break;")
             self.run("parse_one_stmt", 72, "return expr_stmt();")
             st = self.exprStmt()
@@ -712,8 +706,10 @@ class ParseTracer
             return self.forStmt()
         elseif fn == "func_decl_stmt" then
             return self.funcDeclStmt()
+        elseif fn == "return_stmt" then
+            return self.returnStmt()
         end
-        return self.returnStmt()
+        throw "no function of the trace for {fn}"
     end
 
     ## The case of an identifier: an assignment, a multiple assignment or an expression statement.
@@ -755,7 +751,7 @@ class ParseTracer
     ## ── the statements ───────────────────────────────────────────────────────
 
     func exprStmt()
-        self.enter("expr_stmt", nil, [])
+        self.enter("expr_stmt")
         var line = self.peek().line
         self.run("expr_stmt", 2, "int line = peek().line;")
         self.run("expr_stmt", 3, "auto e = expr();")
@@ -773,7 +769,7 @@ class ParseTracer
 
     ## Turns an already parsed target and the assignment operator into a statement.
     func finishAssign(target, line)
-        self.enter("finish_assign_from_expr", nil, [])
+        self.enter("finish_assign_from_expr")
         self.local("line", line)
         var opt = self.advance().type
         self.local("opt", opt)
@@ -793,15 +789,14 @@ class ParseTracer
             self.set(s, "name", target.attrs.name)
             self.run("finish_assign_from_expr", 8, "s->name = ve->name;")
             var op = ASSIGN_OPS[opt]
-            var cases = {PLUS_EQUAL: 10, MINUS_EQUAL: 13, STAR_EQUAL: 16, SLASH_EQUAL: 19, PERCENT_EQUAL: 22}
             self.run("finish_assign_from_expr", 9, "switch (opt)")
-            if cases.has(opt) then
+            if ACASE.has(opt) then
                 self.set(s, "op", op)
-                self.run("finish_assign_from_expr", cases[opt] + 1, "s->op = '", {also: cases[opt]})
-                self.run("finish_assign_from_expr", cases[opt] + 2, "break;")
+                self.run("finish_assign_from_expr", ACASE[opt] + 1, "s->op = '", {also: ACASE[opt]})
+                self.run("finish_assign_from_expr", ACASE[opt] + 2, "break;")
             else
-                self.run("finish_assign_from_expr", 26, "s->op = '", {also: 25})
-                self.run("finish_assign_from_expr", 27, "break;")
+                self.run("finish_assign_from_expr", ACASE["default"] + 1, "s->op = '", {also: ACASE["default"]})
+                self.run("finish_assign_from_expr", ACASE["default"] + 2, "break;")
             end
             self.put(s, "value", value)
             self.run("finish_assign_from_expr", 29, "s->value = std::move(value);")
@@ -893,7 +888,7 @@ class ParseTracer
     end
 
     func whileStmt()
-        self.enter("while_stmt", nil, [])
+        self.enter("while_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("while_stmt", 2, "int line = peek().line;")
@@ -918,7 +913,7 @@ class ParseTracer
     end
 
     func doStmt()
-        self.enter("do_stmt", nil, [])
+        self.enter("do_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("do_stmt", 2, "int line = peek().line;")
@@ -938,7 +933,7 @@ class ParseTracer
     end
 
     func ifStmt()
-        self.enter("if_stmt", nil, [])
+        self.enter("if_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("if_stmt", 2, "int line = peek().line;")
@@ -1006,7 +1001,7 @@ class ParseTracer
     end
 
     func throwStmt()
-        self.enter("throw_stmt", nil, [])
+        self.enter("throw_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("throw_stmt", 2, "int line = peek().line;")
@@ -1025,7 +1020,7 @@ class ParseTracer
     end
 
     func funcDeclStmt()
-        self.enter("func_decl_stmt", nil, [])
+        self.enter("func_decl_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("func_decl_stmt", 2, "int line = peek().line;")
@@ -1096,7 +1091,7 @@ class ParseTracer
     end
 
     func returnStmt()
-        self.enter("return_stmt", nil, [])
+        self.enter("return_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("return_stmt", 2, "int line = peek().line;")
@@ -1202,7 +1197,7 @@ class ParseTracer
     end
 
     func forStmt()
-        self.enter("for_stmt", nil, [])
+        self.enter("for_stmt")
         var line = self.peek().line
         self.local("line", line)
         self.run("for_stmt", 2, "int line = peek().line;")
@@ -1281,7 +1276,7 @@ class ParseTracer
     ## ── the expressions ──────────────────────────────────────────────────────
 
     func expr()
-        self.enter("expr", nil, [])
+        self.enter("expr")
         self.run("expr", 2, "if (depth_ >= 256)")
         self.run("expr", 4, "DepthGuard guard(depth_);")
         self.run("expr", 5, "return binary_level(0);",
@@ -1365,7 +1360,7 @@ class ParseTracer
 
     ## A comparison, which can be chained: a < b < c.
     func comparison()
-        self.enter("comparison", nil, [])
+        self.enter("comparison")
         self.run("comparison", 2, "auto first = binary_level(CMP_LEVEL + 1);")
         var first = self.binaryLevel(CMP_LEVEL + 1)
         self.local("first", first)
@@ -1423,28 +1418,26 @@ class ParseTracer
 
     ## Unary operators, then a power.
     func unary()
-        self.enter("unary", nil, [])
-        ## token, operator, the line that tests it, the line that reads it (none for `match`), the line that returns
-        var table = [["MINUS", "-", 2, 3, 4], ["NOT", "!", 6, 7, 8], ["TILDE", "~", 10, 11, 12], ["HASH", "#", 14, 0, 18]]
-        for entry in table do
-            var hit = self.check(entry[1])
-            if entry[4] == 0 then
-                self.run("unary", entry[3], "if (match(TokenType::{entry[1]}))")
+        self.enter("unary")
+        for u in UNARY do
+            var hit = self.check(u.token)
+            if u.read == 0 then
+                self.run("unary", u.test, "if (match(TokenType::{u.token}))")
             else
-                self.run("unary", entry[3], "if (check(TokenType::{entry[1]}))")
+                self.run("unary", u.test, "if (check(TokenType::{u.token}))")
             end
             if hit then
                 self.advance()
-                if entry[4] > 0 then
-                    self.run("unary", entry[4], "advance();",
+                if u.read > 0 then
+                    self.run("unary", u.read, "advance();",
                              {note: "'{self.toks[self.pos - 1].lexeme}' is a unary operator: it applies to what follows, which is parsed by a call to unary() again."})
                 end
-                self.run("unary", entry[5], "return std::make_unique<UnaryExpr>('")
+                self.run("unary", u.ret, "return std::make_unique<UnaryExpr>('")
                 var operand = self.unary()
                 var node = self.make("UnaryExpr")
-                self.set(node, "op", entry[2])
+                self.set(node, "op", u.op)
                 self.put(node, "operand", operand)
-                self.run("unary", entry[5], "return std::make_unique<UnaryExpr>('", {ret: node})
+                self.run("unary", u.ret, "return std::make_unique<UnaryExpr>('", {ret: node})
                 self.leave()
                 return node
             end
@@ -1463,7 +1456,7 @@ class ParseTracer
 
     ## A primary, and the power that may follow it. '^' binds tighter than unary minus.
     func power()
-        self.enter("power", nil, [])
+        self.enter("power")
         self.run("power", 2, "auto left = primary();")
         var left = self.primary()
         self.local("left", left)
@@ -1603,7 +1596,7 @@ class ParseTracer
 
     ## A number, a string, a name, a call, a literal, a parenthesis: the leaves and the brackets.
     func primary()
-        self.enter("primary", nil, [])
+        self.enter("primary")
         var number = self.check("NUMBER")
         self.run("primary", 2, "if (check(TokenType::NUMBER))",
                  {note: "primary() tries each kind of token in turn: the first test that matches decides."})
@@ -1949,30 +1942,21 @@ end
 
 ## ── the whole parse ──────────────────────────────────────────────────────────
 
-## The tokens the C++ parser would receive: the final stream of the lexer, each with the line it is on.
-func parserTokens(lexed)
-    var out = []
-    for tok in lexed.tokens do
-        out.push({type: tok.type, lexeme: tok.lexeme, line: lexed.steps[tok.step].line, from: tok.from, to: tok.to})
-    end
-    return out
-end
-
-## Runs the parser on a program. Returns {steps, tokens, tree, error, errorLine, nodes, nodeCount, source,
-## lexed}: the tree is the Program node, nil when the parse failed; `error` is the refusal, nil when
-## there is none; `nodes` are the nodes alive at the end, `nodeCount` how many were ever made.
+## Runs the parser on a program. Returns {steps, tokens, tree, error, errorLine, nodes, nodeCount}:
+## the tokens are the final stream of the lexer, each with the line it is on; the tree is the Program
+## node, nil when the parse failed; `error` is the refusal, nil when there is none; `nodes` are the
+## nodes alive at the end, `nodeCount` how many were ever made.
 func parseTrace(source)
     var lexed = trace(source)
-    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil, source: source, lexed: lexed}
+    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil}
     if lexed.error then
         result.error = lexed.error
         return result
     end
-    result.tokens = parserTokens(lexed)
+    result.tokens = lexed.tokens
     var t = ParseTracer(result.tokens, result)
     try
-        t.parse()
-        result.tree = t.root
+        result.tree = t.parse()
     catch e
         if e <> "parse error" then
             throw e

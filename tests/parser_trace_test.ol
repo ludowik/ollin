@@ -7,29 +7,17 @@
 ## by field. An apostrophe stands for a double quote, in the programs and in the trees alike.
 import "../docs/samples/parser/tracer.ol"
 
-func program(text)
-    return text.replace("'", QUOTE)
-end
-
-func tree(text)
-    var r = parseTrace(program(text))
-    assert(r.error == nil, "'{text}' is refused: {r.error}")
-    return sexp(r.tree).replace(QUOTE, "'")
-end
-
-func refusal(text)
-    var r = parseTrace(program(text))
-    assert(r.tree == nil, "'{text}' should be refused")
-    return "{r.errorLine}: {r.error}"
-end
-
 func check(text, want)
-    var got = tree(text)
+    var r = parseTrace(unquote(text))
+    assert(r.error == nil, "'{text}' is refused: {r.error}")
+    var got = sexp(r.tree).replace(QUOTE, "'")
     assert(got == want, "the tree of '{text}'" + NEWLINE + "  is  {got}" + NEWLINE + "  not {want}")
 end
 
 func refuses(text, want)
-    var got = refusal(text)
+    var r = parseTrace(unquote(text))
+    assert(r.tree == nil, "'{text}' should be refused")
+    var got = "{r.errorLine}: {r.error}"
     assert(got == want, "'{text}' is refused with '{got}', not '{want}'")
 end
 
@@ -366,7 +354,7 @@ refuses("var x = 1 +" + NEWLINE, "2: unexpected token ''")
 func notCovered(text)
     var message = ""
     try
-        parseTrace(program(text))
+        parseTrace(unquote(text))
     catch e
         message = e
     end
@@ -388,7 +376,7 @@ notCovered("var x = ]1; 3]")
 ## Each step is given as the function and how its line begins, so the test does not depend on where
 ## the lines sit in parser.cpp.
 func followsPath(text, expected)
-    var got = parseTrace(program(text)).steps.map(func(s) return s.fn + "|" + PCPP[s.fn].trimmed[s.at] end)
+    var got = parseTrace(unquote(text)).steps.map(func(s) return s.fn + "|" + PCPP[s.fn].trimmed[s.at] end)
     for k, want in expected do
         assert(got[k] and got[k].startsWith(want), "step {k} should be '{want}', it is '{got[k]}'")
     end
@@ -408,7 +396,7 @@ followsPath("break", [
 
 ## every line the trace names exists, a refusal is the last step, and the position never goes back
 func checkTrace(text)
-    var r = parseTrace(program(text))
+    var r = parseTrace(unquote(text))
     var count = #r.tokens
     var before = 1
     for k, s in r.steps do

@@ -7,7 +7,7 @@
 import "tracer.ol"
 
 func program(name, lines)
-    return {name: name, source: lines.join(NEWLINE).replace("'", QUOTE)}
+    return {name: name, source: unquote(lines.join(NEWLINE))}
 end
 
 const PROGRAMS = [

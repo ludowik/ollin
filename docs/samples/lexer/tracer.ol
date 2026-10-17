@@ -42,6 +42,17 @@ const KEYWORDS = {
     "case": "CASE", "enum": "ENUM", "ref": "REF"
 }
 
+## The token types of the keywords, to ask whether a type is one.
+func keywordTypesOf(table)
+    var types = {}
+    for word, ty in table do
+        types[ty] = true
+    end
+    return types
+end
+
+const KEYWORD_TYPES = keywordTypesOf(KEYWORDS)
+
 ## One character, one token.
 const SINGLE = {
     ",": "COMMA", "(": "LPAREN", ")": "RPAREN", ";": "SEMICOLON", "&": "AMP", "|": "PIPE",
@@ -70,6 +81,11 @@ const TAB = string.fromCode(9)
 const CR = string.fromCode(13)
 const BACKSLASH = string.fromCode(92)
 
+## A program is written with an apostrophe where it needs a quote: Ollin strings have no escapes.
+func unquote(text)
+    return text.replace("'", QUOTE)
+end
+
 ## The text of C++ functions, from a table of cpp_source.ol: its quotes put back, the dashes and arrows
 ## the engine's font has no glyph for turned into ASCII, and each line trimmed. The parser example
 ## loads its own table the same way.
@@ -89,6 +105,13 @@ func loadCpp(table)
 end
 
 global CPP = loadCpp(CPP_SOURCE)
+
+## A line a tracer names must be the line of the C++ it claims to be. `cpp` is loadCpp's table.
+func checkLine(cpp, fn, index, start)
+    if not cpp[fn].trimmed[index].startsWith(start) then
+        throw "{fn} line {index} is not '{start}': {cpp[fn].trimmed[index]}"
+    end
+end
 
 ## Where each `case` label of Lexer::tokenize, and its `default:`, is. Found by the text of the line.
 func loadCases()
@@ -205,10 +228,7 @@ class Tracer
     ## Records the line `index` of function `fn`, which the lexer has just run. `start` is how that
     ## line begins: checked here, and by tests/check_trace_source.sh for every call.
     func run(fn, index, start, extra)
-        var trimmed = CPP[fn].trimmed
-        if not trimmed[index].startsWith(start) then
-            throw "{fn} line {index} is not '{start}': {trimmed[index]}"
-        end
+        checkLine(CPP, fn, index, start)
         var f = extra or {}
         f.fn = fn
         f.at = index
@@ -239,6 +259,7 @@ class Tracer
         self.run(fn, index, start, f)
         if self.depth == 0 then
             tok.step = #self.result.steps
+            tok.line = self.line
             self.result.tokens.push(tok)
         end
     end

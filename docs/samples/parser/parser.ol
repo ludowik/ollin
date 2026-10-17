@@ -16,15 +16,9 @@
 ## src/parser.cpp into cpp_source.ol, and the bar in it is the line the parser is running: it goes
 ## down into expr(), binary_level()... as they are called, and comes back to the line that called them.
 ##
-## It plays by itself, and a tap pauses and resumes it. STEP BY STEP is the other way to read it:
-## nothing moves until you ask, and every tap (or the Next button, or the right arrow) runs the next
-## line of the parser, Back (or the left arrow) goes back one. SKIP (or the E key) runs up to the next
-## line that reads a token or changes the tree: a single expression takes a few hundred lines.
-##
-## Keys: space plays and pauses, s steps by tap, left/right go back and forward one line, e skips to the
-## next event, up/down change the speed, 1 to 5 pick a program, r restarts. F7, F8 and F9 stand for the
-## Apple keyboard's previous, play/pause and next keys (with fn, unless the system uses F-keys as
-## standard). The menu and the buttons at the bottom do the same with a finger.
+## The player, the keys and the buttons are those of lib/stage.ol, where they are described. Here, 1 to 5
+## pick a program, and SKIP (or the E key) runs up to the next line that reads a token or changes the
+## tree: a single expression takes a few hundred lines.
 
 import "../lib/stage.ol"
 import "tracer.ol"
@@ -236,11 +230,15 @@ func buildRun(index)
         throw "the program does not get as far as the parser: {r.error}"
     end
     var nodes = {}
+    var tree = nil
     for st in r.steps do
         for e in st.fx do
             applyEffect(nodes, e)
         end
-        st.tree = layoutForest(nodes, r.nodeCount)
+        if tree == nil or #st.fx > 0 then
+            tree = layoutForest(nodes, r.nodeCount)    ## most lines change nothing: they share the tree before them
+        end
+        st.tree = tree
     end
     prepareSteps(r, paceOf)
     return r
@@ -295,8 +293,7 @@ func chipLayout(width)
         chips[k] = {x: x, y: y, w: w, h: chipH}
         x += w + SIZE * 0.012
     end
-    tokenChips = {w: W, h: H, prog: state.prog, chips: chips, fs: fs, tfs: tfs, chipH: chipH, rowH: rowH, pad: pad,
-                  height: y + rowH}
+    tokenChips = {w: W, h: H, prog: state.prog, chips: chips, fs: fs, tfs: tfs, pad: pad, height: y + rowH}
     return tokenChips
 end
 
@@ -509,9 +506,7 @@ func setup()
     stage.skip = true
     state.speed = 2.0
     graphics.canvas(W, H, "How the parser works")
-    for k, v in KEYWORDS do
-        keywordTypes[v] = true
-    end
+    keywordTypes = KEYWORD_TYPES
     openMenu()
     loadProgram(1)
 end

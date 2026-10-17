@@ -14,15 +14,8 @@
 ## called, and comes back to the line that called them. Each token that comes out is filed in the
 ## stream below, and the program's text is underlined in the colour of the token it became.
 ##
-## It plays by itself, and a tap pauses and resumes it. STEP BY STEP is the other way to read it:
-## nothing moves until you ask, and every tap (or the Next button, or the right arrow) runs the
-## next line of the lexer, Back (or the left arrow) goes back one. The Step button, the S key and
-## the menu switch the mode on and off; Play leaves it.
-##
-## Keys: space plays and pauses, s steps by tap, left/right go back and forward one line, up/down
-## change the speed, 1 to 4 pick a program, r restarts. F7, F8 and F9 stand for the Apple keyboard's
-## previous, play/pause and next keys (with fn, unless the system uses F-keys as standard). The menu
-## and the buttons at the bottom do the same with a finger.
+## The player, the keys and the buttons are those of lib/stage.ol, where they are described. Here, 1 to 4
+## pick a program.
 
 import "../lib/stage.ol"
 import "tracer.ol"
@@ -299,9 +292,7 @@ func setup()
     stage.watch = watchLine
     stage.errorNote = errorNote
     graphics.canvas(W, H, "How the lexer works")
-    for k, v in KEYWORDS do
-        keywordTypes[v] = true
-    end
+    keywordTypes = KEYWORD_TYPES
     openMenu()
     loadProgram(1)
 end
