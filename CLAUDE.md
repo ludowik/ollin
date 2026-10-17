@@ -901,9 +901,15 @@ locale, upvalue, globale ou champ, et les `case` d'un `switch`. Les émetteurs s
   exécutées, avant → après)** : `fib` −20,4 %, `float` −12,4 %, `objects` −4,3 %, `strings` −3,7 %,
   `classes` −2,5 %, `boucle` −1,9 %, `calls` −1,9 %, `closures` −1,5 %, `map` −1,1 %, `iter` −0,3 %.
   **Une seule hausse : `array` +2,4 %**, alors que ses boucles n'exécutent AUCUN opcode `…K` (bytecode
-  identique) : c'est l'allocation de registres de `run_goto`, déjà documentée pour `LEN` et `SWITCH`.
-  Déplacer les nouveaux gestionnaires (avant `op_HALT`, puis au milieu des opérations binaires) ne l'a
-  pas fait bouger : ne pas y chercher une cause dans le placement.
+  identique). Cause ISOLÉE, par callgrind comparant les deux binaires : `Array::set` (appelé par
+  `op_SET_INDEX`) n'est plus mis en ligne dans `run_goto` — `run_goto` perd 35,0 M d'instructions et
+  l'appel hors ligne en coûte 47,0 M, soit +12,0 M (+12 par écriture indexée, exactement l'écart).
+  GCC le dit : `-fopt-info-inline-all` rend « Inlined … Array::set into run_goto » avant et
+  « not inlinable … max-inline-insns-single limit reached » après. Ce n'est donc PAS l'allocation de
+  registres invoquée pour `LEN` et `SWITCH`, et déplacer les gestionnaires ne pouvait rien y changer
+  (essayé : avant `op_HALT`, puis au milieu des opérations binaires). Pourquoi le seuil est atteint
+  maintenant, `Array::set` étant inchangé, n'est pas établi. Pas corrigé : forcer la mise en ligne
+  (`always_inline`) reste à essayer et à mesurer.
 - **Mesuré en TEMPS (tourniquet, le meilleur temps de chaque binaire, 7 tours ; 21 pour les trois
   petits scripts)** : `fib` −22,6 %, `calls` −13,7 %, `float` −13,6 %, `objects` −8,0 %, `closures` −6,0 %,
   `classes` −2,9 %, `strings` −2,6 %. `array` (+0,5 % sur 21 tours, la hausse de 2,4 % en instructions ne
