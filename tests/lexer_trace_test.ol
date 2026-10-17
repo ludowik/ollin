@@ -3,17 +3,9 @@
 ## lexer's own output, so a drift in either one shows here.
 import "../docs/samples/lexer/tracer.ol"
 
-const Q = string.fromCode(34)
-const NL = string.fromCode(10)
-
 ## The tokens of a program, as "TYPE:lexeme" separated by spaces.
 func cut(source)
-    var r = trace(source)
-    var parts = []
-    for tok in r.tokens do
-        parts.push(tok.type + ":" + tok.lexeme)
-    end
-    return parts.join(" ")
+    return trace(source).tokens.map(func(tok) return tok.type + ":" + tok.lexeme end).join(" ")
 end
 
 func failure(source)
@@ -38,15 +30,15 @@ assert(cut("f(...) . x") == "IDENTIFIER:f LPAREN:( DOT_DOT_DOT:... RPAREN:) DOT:
 assert(cut("#a") == "HASH:# IDENTIFIER:a EOF_T:")
 
 ## a comment is dropped, a block comment included, and a line break is not a token
-assert(cut("a ## gone" + NL + "b") == "IDENTIFIER:a IDENTIFIER:b EOF_T:")
-assert(cut("a ### gone" + NL + "still ### b") == "IDENTIFIER:a IDENTIFIER:b EOF_T:")
+assert(cut("a ## gone" + NEWLINE + "b") == "IDENTIFIER:a IDENTIFIER:b EOF_T:")
+assert(cut("a ### gone" + NEWLINE + "still ### b") == "IDENTIFIER:a IDENTIFIER:b EOF_T:")
 
 ## a string with no hole is one token; a hole cuts it, and a second lexer reads the hole
-assert(cut(Q + "plain" + Q) == "STRING:plain EOF_T:")
-assert(cut(Q + "n = \{x}!" + Q) == "INTERP_START:n =  IDENTIFIER:x INTERP_END:! EOF_T:")
-assert(cut(Q + "\{a}\{b}" + Q) == "INTERP_START: IDENTIFIER:a INTERP_MID: IDENTIFIER:b INTERP_END: EOF_T:")
-assert(cut(Q + "pi \{x:.2f}" + Q) == "INTERP_START:pi  IDENTIFIER:__fmt LPAREN:( IDENTIFIER:x COMMA:, STRING:.2f RPAREN:) INTERP_END: EOF_T:")
-assert(cut(Q + "a {} {1} b" + Q) == "STRING:a {} {1} b EOF_T:")   ## positional slots stay in the text
+assert(cut(QUOTE + "plain" + QUOTE) == "STRING:plain EOF_T:")
+assert(cut(QUOTE + "n = \{x}!" + QUOTE) == "INTERP_START:n =  IDENTIFIER:x INTERP_END:! EOF_T:")
+assert(cut(QUOTE + "\{a}\{b}" + QUOTE) == "INTERP_START: IDENTIFIER:a INTERP_MID: IDENTIFIER:b INTERP_END: EOF_T:")
+assert(cut(QUOTE + "pi \{x:.2f}" + QUOTE) == "INTERP_START:pi  IDENTIFIER:__fmt LPAREN:( IDENTIFIER:x COMMA:, STRING:.2f RPAREN:) INTERP_END: EOF_T:")
+assert(cut(QUOTE + "a {} {1} b" + QUOTE) == "STRING:a {} {1} b EOF_T:")   ## positional slots stay in the text
 
 ## what the lexer refuses, and the message it gives
 assert(failure("x = 3x") == "invalid number literal")
@@ -55,8 +47,8 @@ assert(failure("1_") == "invalid number literal")
 assert(failure("a ** b") == "'**' no longer exists — use '^' for exponentiation")
 assert(failure("1..2") == "invalid number literal")
 assert(failure("a .. b") == "'..' is not valid syntax (use [a;b] for ranges)")
-assert(failure(Q + "open") == "unterminated string")
-assert(failure(Q + "a \{b") == "unclosed brace in interpolation")
+assert(failure(QUOTE + "open") == "unterminated string")
+assert(failure(QUOTE + "a \{b") == "unclosed brace in interpolation")
 assert(failure("### open") == "unterminated block comment")
 assert(failure("x = $") == "unexpected character '$'")
 assert(failure("var ok = 1") == nil)
@@ -71,21 +63,42 @@ assert(cut("0b1 0o7 1e5 1_2.5 a.b") == "NUMBER:0b1 NUMBER:0o7 NUMBER:1e5 NUMBER:
 
 ## the trace itself, line by line. `a` is the shortest program with a token: the lexer reads its way
 ## through tokenize() to the default case, steps into identifier() and comes back to the line that
-## called it, then goes round the loop once more to find the end of the source.
-func path(source)
-    var r = trace(source)
-    var parts = []
-    for s in r.steps do
-        parts.push(s.fn + ":" + s.at)
+## called it, then goes round the loop once more to find the end of the source. Each step is given as
+## the function and how its line begins, so the test does not depend on where the lines sit in lexer.cpp.
+func followsPath(source, expected)
+    var got = trace(source).steps.map(func(s) return s.fn + "|" + CPP[s.fn].trimmed[s.at] end)
+    for k, want in expected do
+        assert(got[k] and got[k].startsWith(want), "step {k} should be '{want}', it is '{got[k]}'")
     end
-    return parts.join(" ")
+    assert(#got == #expected, "{#got} steps, {#expected} expected")
 end
 
-assert(path("a") == "tokenize:1 tokenize:2 tokenize:3 tokenize:5 tokenize:6 skip_whitespace:2 skip_whitespace:3 "
-       + "skip_whitespace:4 skip_whitespace:5 tokenize:7 tokenize:10 tokenize:11 tokenize:125 tokenize:129 "
-       + "tokenize:130 identifier:2 identifier:3 identifier:5 identifier:6 identifier:7 tokenize:130 tokenize:131 "
-       + "tokenize:6 skip_whitespace:2 skip_whitespace:3 skip_whitespace:4 skip_whitespace:5 tokenize:7 "
-       + "tokenize:8 tokenize:138 tokenize:139")
+followsPath("a", [
+    "tokenize|std::vector<Token> Lexer", "tokenize|std::vector<Token> tokens", "tokenize|tokens.reserve",
+    "tokenize|for (;;)", "tokenize|skip_whitespace();",
+    "skip_whitespace|while (true)", "skip_whitespace|char c = peek();", "skip_whitespace|if (c != ' '",
+    "skip_whitespace|return;",
+    "tokenize|if (at_end())", "tokenize|char c = advance();", "tokenize|switch (c)",
+    "tokenize|if (is_dec(c))", "tokenize|if (is_alpha(c)", "tokenize|emit(tokens, identifier());",
+    "identifier|int start", "identifier|while (is_alnum", "identifier|std::string lex", "identifier|auto it",
+    "identifier|return ",
+    "tokenize|emit(tokens, identifier());", "tokenize|break;", "tokenize|skip_whitespace();",
+    "skip_whitespace|while (true)", "skip_whitespace|char c = peek();", "skip_whitespace|if (c != ' '",
+    "skip_whitespace|return;",
+    "tokenize|if (at_end())", "tokenize|break;", "tokenize|emit(tokens,", "tokenize|return tokens;"])
+
+## lexer.cpp has a `case` for each of these characters, and none of them may fall to the default and be
+## refused: a case added to the engine and left out of the tracer would show here
+for label, at in CASE_AT do
+    if label.startsWith("case '") then
+        var key = label.substr(7, #label - 8)
+        if key == "\n" then
+            key = NEWLINE
+        end
+        var error = trace(key).error
+        assert(error == nil or not error.startsWith("unexpected character"), "the tracer has no case for {label}")
+    end
+end
 
 ## every step names a line that exists, a token points back at the step that made it, and the run
 ## ends on EOF_T or on an error
@@ -95,7 +108,7 @@ func checkTrace(source)
     for k, s in r.steps do
         assert(s.p0 >= 1 and s.p0 <= last and s.p1 >= 1 and s.p1 <= last, "head out of the source at step {k}")
         assert(CPP.has(s.fn), "step {k} runs a function that is not shown: {s.fn}")
-        assert(s.at >= 1 and s.at + (s.span or 0) <= #CPP[s.fn].lines, "step {k} runs a line that does not exist")
+        assert(s.at >= 1 and s.at + s.span <= #CPP[s.fn].lines, "step {k} runs a line that does not exist")
         assert(s.stack.startsWith("tokenize") and s.stack.endsWith(s.fn), "step {k} is not on top of its own call stack")
     end
     for tok in r.tokens do
@@ -111,15 +124,14 @@ end
 
 checkTrace("var total = 1_200 + x")
 checkTrace("if n >= .5 then ## small")
-checkTrace(Q + "n = \{x}!" + Q)
-checkTrace(Q + "pi \{x:.2f} and \{y}" + Q)
-checkTrace("var ok = 1" + NL + "var 3x = 2")
-checkTrace("a ### block" + NL + "comment ### b")
+checkTrace(QUOTE + "pi \{x:.2f} and \{y}" + QUOTE)
+checkTrace("var ok = 1" + NEWLINE + "var 3x = 2")
+checkTrace("a ### block" + NEWLINE + "comment ### b")
 checkTrace("0x1F_FF 0b1 1e+5 .5")
 
 ## a hole is read by a second lexer, called from interp_string() and reading the same text; its
 ## tokens only reach the stream when interp_string() hands them over
-var hole = checkTrace(Q + "n = \{x}!" + Q)
+var hole = checkTrace(QUOTE + "n = \{x}!" + QUOTE)
 var nested = false
 for s in hole.steps do
     if s.stack == "tokenize > interp_string > tokenize" then
@@ -137,7 +149,7 @@ for k = 2, #chain.steps do
 end
 
 ## the line is the one the lexer counts
-var lines = trace("a" + NL + "b" + NL + "c")
+var lines = trace("a" + NEWLINE + "b" + NEWLINE + "c")
 assert(lines.tokens[3].lexeme == "c" and lines.steps[lines.tokens[3].step].line == 3)
 
 print("lexer trace ok")

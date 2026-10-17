@@ -7,6 +7,7 @@
 #   2. every line tracer.ol names — `self.run("number", 21, "advance();")`, a function, a line of
 #      it and how that line begins — must be that line of lexer.cpp. The calls whose index is
 #      computed (`li + 1`) are checked when they run, by tests/lexer_trace_test.ol.
+#   3. the keyword table of tracer.ol is the one of lexer.cpp, entry for entry.
 set -u
 here=$(dirname "$0")
 root=$(cd "$here/.." && pwd)
@@ -22,8 +23,10 @@ import gen_lexer_source as g
 listing = {name: lines for name, first, lines in g.extract()}
 tracer = open("docs/samples/lexer/tracer.ol", encoding="utf-8").read()
 
-# self.run("fn", 12, "start of the line" ...), and the emit / fail variants that take the same three
+# self.run("fn", 12, "start of the line" ...), the emit / fail variants that take the same three, and
+# file(token, "fn", 12, "start of the line" ...)
 calls = re.findall(r'self\.(?:run|emit|fail)\("(\w+)", (\d+), "((?:[^"\\]|\\.)*)"', tracer)
+calls += re.findall(r'self\.file\(\w+, "(\w+)", (\d+), "((?:[^"\\]|\\.)*)"', tracer)
 errs = []
 for fn, index, start in calls:
     index = int(index)
@@ -43,4 +46,19 @@ if errs:
         print("  " + e)
     sys.exit(1)
 print(f"OK   lexer trace ({len(calls)} lines named by tracer.ol are lines of lexer.cpp)")
+
+# the keywords: `{"var", TokenType::VAR},` in lexer.cpp, `"var": "VAR"` in tracer.ol
+cpp = open("src/lexer.cpp", encoding="utf-8").read()
+table = cpp[cpp.index("s_keywords = {"):]
+table = table[:table.index("};")]
+engine = dict(re.findall(r'\{"(\w+)", TokenType::(\w+)\}', table))
+block = tracer[tracer.index("const KEYWORDS = {"):]
+block = dict(re.findall(r'"(\w+)": "(\w+)"', block[:block.index("}")]))
+if engine != block:
+    print("LEXER TRACE: the keyword table of tracer.ol is not the one of lexer.cpp")
+    for k in sorted(set(engine) | set(block)):
+        if engine.get(k) != block.get(k):
+            print(f"  {k}: lexer.cpp has {engine.get(k)}, tracer.ol has {block.get(k)}")
+    sys.exit(1)
+print(f"OK   lexer keywords ({len(engine)} entries, the same in tracer.ol and lexer.cpp)")
 PYEOF

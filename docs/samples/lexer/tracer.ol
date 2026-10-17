@@ -56,6 +56,7 @@ const PAIRS = {
     "+": {next: {"=": "PLUS_EQUAL"}, alone: "PLUS"},
     "-": {next: {"=": "MINUS_EQUAL"}, alone: "MINUS"},
     "%": {next: {"=": "PERCENT_EQUAL"}, alone: "PERCENT"},
+    "/": {next: {"=": "SLASH_EQUAL", "/": "SLASH_SLASH"}, alone: "SLASH"},
     ">": {next: {"=": "GREATER_EQUAL", ">": "RSHIFT"}, alone: "GREATER"},
     "<": {next: {"=": "LESS_EQUAL", ">": "NOT_EQUAL", "<": "LSHIFT"}, alone: "LESS"}
 }
@@ -69,21 +70,36 @@ const TAB = string.fromCode(9)
 const CR = string.fromCode(13)
 const BACKSLASH = string.fromCode(92)
 
-## The text of the lexer functions: cpp_source.ol with its quotes put back.
+## The text of the lexer functions: cpp_source.ol with its quotes put back, and each line trimmed.
 func loadCpp()
     var out = {}
     for name, f in CPP_SOURCE do
         var lines = []
+        var trimmed = []
         for l in f.lines do
-            var restored, n = l.replace("`", QUOTE)
+            var restored = l.replace("`", QUOTE)
             lines.push(restored)
+            trimmed.push(restored.trim())
         end
-        out[name] = {first: f.first, lines: lines}
+        out[name] = {first: f.first, lines: lines, trimmed: trimmed}
     end
     return out
 end
 
 global CPP = loadCpp()
+
+## Where each `case` label of Lexer::tokenize, and its `default:`, is. Found by the text of the line.
+func loadCases()
+    var at = {}
+    for i, l in CPP["tokenize"].trimmed do
+        if l.startsWith("case '") or l == "default:" then
+            at[l] = i
+        end
+    end
+    return at
+end
+
+global CASE_AT = loadCases()
 
 func isDec(c)
     return c >= "0" and c <= "9"
@@ -126,6 +142,7 @@ class Tracer
         self.line = line
         self.result = result
         self.stack = stack
+        self.stackText = stack.join(" > ")
         self.tokens = []    ## the vector this lexer's tokenize() returns
         self.mark = lo      ## where the read head was when the last step was recorded
         self.from = nil     ## where the lexeme being built began
@@ -162,20 +179,22 @@ class Tracer
         return true
     end
 
+    ## The characters a..b-1.
     func text(a, b)
-        var out = ""
-        for i = a, b - 1 do
-            out = out + self.chars[i]
+        if b <= a then
+            return ""
         end
-        return out
+        return self.result.source.substr(a, b - a)
     end
 
     func enter(fn)
         self.stack.push(fn)
+        self.stackText = self.stack.join(" > ")
     end
 
     func leave()
         self.stack.pop()
+        self.stackText = self.stack.join(" > ")
         self.w = nil
     end
 
@@ -184,15 +203,15 @@ class Tracer
     ## Records the line `index` of function `fn`, which the lexer has just run. `start` is how that
     ## line begins: checked here, and by tests/check_lexer_source.sh for every call.
     func run(fn, index, start, extra)
-        var listing = CPP[fn].lines
-        if not listing[index].trim().startsWith(start) then
-            throw "{fn} line {index} is not '{start}': {listing[index].trim()}"
+        var trimmed = CPP[fn].trimmed
+        if not trimmed[index].startsWith(start) then
+            throw "{fn} line {index} is not '{start}': {trimmed[index]}"
         end
         var f = extra or {}
         f.fn = fn
         f.at = index
-        f.stack = self.stack.join(" > ")
-        f.depth = self.depth
+        f.span = f.span or 0
+        f.stack = self.stackText
         f.line = self.line
         f.p0 = f.p0 or self.mark
         f.p1 = f.p1 or self.pos
@@ -206,10 +225,9 @@ class Tracer
         return f
     end
 
-    ## The line that hands a token to emit(). The token goes into this lexer's own vector; a
+    ## The line that files a token this lexer has built. The token goes into this lexer's own vector; a
     ## lexer at depth 0 owns the final stream, so there it reaches the animation too.
-    func emit(fn, index, start, type, lexeme, extra)
-        var tok = {type: type, lexeme: lexeme, from: self.from, to: self.pos, depth: self.depth}
+    func file(tok, fn, index, start, extra)
         self.tokens.push(tok)
         var f = extra or {}
         f.made = tok
@@ -221,6 +239,11 @@ class Tracer
             tok.step = #self.result.steps
             self.result.tokens.push(tok)
         end
+    end
+
+    ## The line that hands the token just read to emit().
+    func emit(fn, index, start, type, lexeme, extra)
+        self.file({type: type, lexeme: lexeme, from: self.from, to: self.pos, depth: self.depth}, fn, index, start, extra)
     end
 
     func fail(fn, index, start, msg, extra)
@@ -255,27 +278,24 @@ class Tracer
 
     ## ── Lexer::tokenize ──────────────────────────────────────────────────────
 
-    ## The index of the line `case 'c':` in tokenize.
+    ## The index of the line `case 'c':` in tokenize, or 0 when the switch has none.
     func caseLine(c)
         var key = c
         if c == NEWLINE then
             key = "\n"
         end
         var want = "case '" + key + "':"
-        var listing = CPP["tokenize"].lines
-        for i, l in listing do
-            if l.trim() == want then
-                return i
-            end
+        if CASE_AT.has(want) then
+            return CASE_AT[want]
         end
-        throw "no case for '{c}' in Lexer::tokenize"
+        return 0
     end
 
     ## The first line from `index` on that starts with `start`.
     func lineFrom(index, start)
-        var listing = CPP["tokenize"].lines
-        for i = index, #listing do
-            if listing[i].trim().startsWith(start) then
+        var trimmed = CPP["tokenize"].trimmed
+        for i = index, #trimmed do
+            if trimmed[i].startsWith(start) then
                 return i
             end
         end
@@ -316,45 +336,29 @@ class Tracer
     ## The switch: it jumps straight to the statement under the matching `case`, and the label it went
     ## through is marked beside it.
     func dispatch(c)
-        var li = 0
-        if c == NEWLINE or SINGLE.has(c) or PAIRS.has(c) or c == "." or c == QUOTE or c == "#" or c == "*" or c == "/" then
-            li = self.caseLine(c)
-        end
-        var shownChar = c
+        var li = self.caseLine(c)
+        var seen = c
         if c == NEWLINE then
-            shownChar = "the line break"
+            seen = "the line break"
         end
+        var note = "No case for '{seen}': the switch falls to default."
         if li > 0 then
-            self.run("tokenize", 11, "switch (c)", {note: "The switch jumps to the case of '{shownChar}'."})
-        else
-            self.run("tokenize", 11, "switch (c)", {note: "No case for '{shownChar}': the switch falls to default."})
+            note = "The switch jumps to the case of '{seen}'."
         end
+        self.run("tokenize", 11, "switch (c)", {note: note})
         if c == NEWLINE then
             self.line += 1
             self.run("tokenize", li + 1, "line++;", {also: li, drop: true, note: "A line break is not a token: the lexer only counts the line."})
             self.run("tokenize", li + 2, "break;")
-        elseif c == "=" or c == "+" or c == "-" then
-            var matched = self.accept("=")
-            var type = PAIRS[c].alone
-            var lexeme = c
-            if matched then
-                type = PAIRS[c].next["="]
-                lexeme = c + "="
+        elseif c == "=" or c == "+" or c == "-" or c == "%" then
+            var type, lexeme = self.glue(c, "=")
+            var span = 0
+            if c == "%" then
+                span = 1    ## its statement covers two lines
             end
-            self.emit("tokenize", li + 1, "emit(tokens, match('='", type, lexeme, {also: li,
+            self.emit("tokenize", li + 1, "emit(tokens,", type, lexeme, {also: li, span: span,
                       note: "match('=') eats the next character only when it is '='. Here the token is '{lexeme}'."})
-            self.run("tokenize", li + 2, "break;")
-        elseif c == "%" then
-            var matched = self.accept("=")
-            var type = "PERCENT"
-            var lexeme = "%"
-            if matched then
-                type = "PERCENT_EQUAL"
-                lexeme = "%="
-            end
-            self.emit("tokenize", li + 1, "emit(tokens,", type, lexeme, {also: li, span: 1,
-                      note: "match('=') eats the next character only when it is '='. Here the token is '{lexeme}'."})
-            self.run("tokenize", li + 3, "break;")
+            self.run("tokenize", self.lineFrom(li, "break;"), "break;")
         elseif c == "*" then
             self.star(li)
         elseif c == "/" then
@@ -381,6 +385,14 @@ class Tracer
         end
     end
 
+    ## match(second) for the character c just read: the token that comes out, and its text.
+    func glue(c, second)
+        if self.accept(second) then
+            return PAIRS[c].next[second], c + second
+        end
+        return PAIRS[c].alone, c
+    end
+
     func star(li)
         var matched = self.accept("=")
         self.run("tokenize", li + 1, "if (match('='))", {also: li})
@@ -398,59 +410,41 @@ class Tracer
     end
 
     func slash(li)
-        var matched = self.accept("=")
+        var type, lexeme = self.glue("/", "=")
         self.run("tokenize", li + 1, "if (match('='))", {also: li})
-        if matched then
-            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::SLASH_EQUAL", "SLASH_EQUAL", "/=")
+        if #lexeme == 2 then
+            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::SLASH_EQUAL", type, lexeme)
         else
-            var again = self.accept("/")
-            var type = "SLASH"
-            var lexeme = "/"
-            if again then
-                type = "SLASH_SLASH"
-                lexeme = "//"
-            end
+            type, lexeme = self.glue("/", "/")
             self.emit("tokenize", li + 4, "emit(tokens,", type, lexeme, {span: 1})
         end
         self.run("tokenize", li + 6, "break;")
     end
 
     func greater(li)
-        var matched = self.accept("=")
+        var type, lexeme = self.glue(">", "=")
         self.run("tokenize", li + 1, "if (match('='))", {also: li})
-        if matched then
-            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::GREATER_EQUAL", "GREATER_EQUAL", ">=")
+        if #lexeme == 2 then
+            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::GREATER_EQUAL", type, lexeme)
         else
-            var shifted = self.accept(">")
-            var type = "GREATER"
-            var lexeme = ">"
-            if shifted then
-                type = "RSHIFT"
-                lexeme = ">>"
-            end
+            type, lexeme = self.glue(">", ">")
             self.emit("tokenize", li + 4, "emit(tokens, match('>')", type, lexeme)
         end
         self.run("tokenize", li + 5, "break;")
     end
 
     func less(li)
-        var matched = self.accept("=")
+        var type, lexeme = self.glue("<", "=")
         self.run("tokenize", li + 1, "if (match('='))", {also: li})
-        if matched then
-            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::LESS_EQUAL", "LESS_EQUAL", "<=")
+        if #lexeme == 2 then
+            self.emit("tokenize", li + 2, "emit(tokens, \{TokenType::LESS_EQUAL", type, lexeme)
         else
-            var different = self.accept(">")
+            type, lexeme = self.glue("<", ">")
             self.run("tokenize", li + 3, "else if (match('>'))")
-            if different then
-                self.emit("tokenize", li + 4, "emit(tokens, \{TokenType::NOT_EQUAL", "NOT_EQUAL", "<>")
+            if #lexeme == 2 then
+                self.emit("tokenize", li + 4, "emit(tokens, \{TokenType::NOT_EQUAL", type, lexeme)
             else
-                var shifted = self.accept("<")
-                var type = "LESS"
-                var lexeme = "<"
-                if shifted then
-                    type = "LSHIFT"
-                    lexeme = "<<"
-                end
+                type, lexeme = self.glue("<", "<")
                 self.emit("tokenize", li + 6, "emit(tokens, match('<')", type, lexeme)
             end
         end
@@ -506,7 +500,7 @@ class Tracer
     end
 
     func defaultCase(c)
-        var li = self.lineFrom(1, "default:")
+        var li = CASE_AT["default:"]
         var digit = isDec(c)
         self.run("tokenize", li + 1, "if (is_dec(c))", {also: li})
         if digit then
@@ -585,13 +579,9 @@ class Tracer
         var prefix = nil
         self.run("number", 13, "if (!leading_dot && src[start] == '0')")
         if not leadingDot and first == "0" then
-            var nxt = self.peek()
-            if nxt == "x" or nxt == "X" then
-                prefix = "x"
-            elseif nxt == "o" or nxt == "O" then
-                prefix = "o"
-            elseif nxt == "b" or nxt == "B" then
-                prefix = "b"
+            var nxt = self.peek().lower()
+            if BASES.has(nxt) then
+                prefix = nxt
             end
             self.run("number", 14, "char pl =", {span: 3})
             self.run("number", 18, "if (pl != '\0')")
@@ -890,10 +880,7 @@ class Tracer
                          {note: "A backslash: only " + BACKSLASH + "\{ is an escape (a literal brace). Any other backslash stays as it is."})
                 self.run("interp_string", 19, "continue;")
             else
-                var held = self.hole(strLine, literal, hasInterp)
-                literal = held[1]
-                hasInterp = held[2]
-                self.w = ["literal", literal]
+                literal, hasInterp = self.hole(strLine, literal, hasInterp)
             end
         end
         var broken = self.atEnd() or self.peek() == NEWLINE
@@ -915,7 +902,7 @@ class Tracer
         self.leave()
     end
 
-    ## The head has just eaten a '{' inside a string. Returns the literal and has_interp as the loop
+    ## The head has just eaten a '\{' inside a string. Returns the literal and has_interp as the loop
     ## goes on with them.
     func hole(strLine, literal, hasInterp)
         var depth = 1
@@ -1019,7 +1006,7 @@ class Tracer
             self.run("interp_string", 63, "literal += inner;")
             self.run("interp_string", 64, "literal += '}';")
             self.run("interp_string", 65, "continue;")
-            return [literal, hasInterp]
+            return literal, hasInterp
         end
         var exprEnd = innerEnd
         if specAt then
@@ -1050,28 +1037,20 @@ class Tracer
         else
             self.emitSub(84, innerStart, exprEnd - 1, strLine)
         end
-        return ["", true]
+        return "", true
     end
 
     ## The lambda emit_sub: a brand-new lexer reads only the text between the braces, and what it
     ## returns goes into this lexer's own vector.
     func emitSub(callIndex, lo, hi, strLine)
-        if callIndex == 84 then
-            self.run("interp_string", 84, "emit_sub(std::move(expr_src));")
-        else
-            self.run("interp_string", 89, "emit_sub(std::move(expr_src));")
-        end
+        self.run("interp_string", callIndex, "emit_sub(std::move(expr_src));")
         var here = self.pos
         self.run("interp_string", 76, "Lexer sub(std::move(code)", {p0: here, p1: lo,
                  note: "A second Lexer is built on the text between the braces. It reads that text alone."})
         self.mark = lo
         self.run("interp_string", 77, "sub.line = str_line;")
         self.run("interp_string", 78, "for (auto& t : sub.tokenize())")
-        var stack = []
-        for s in self.stack do
-            stack.push(s)
-        end
-        var inner = Tracer(self.chars, lo, hi, self.depth + 1, strLine, self.result, stack)
+        var inner = Tracer(self.chars, lo, hi, self.depth + 1, strLine, self.result, self.stack)
         var made = inner.tokenize()
         self.mark = inner.mark
         for t in made do
@@ -1080,16 +1059,8 @@ class Tracer
             self.run("interp_string", 79, "if (t.type != TokenType::EOF_T)")
             if keep then
                 var copy = {type: t.type, lexeme: t.lexeme, from: t.from, to: t.to, depth: t.depth}
-                self.tokens.push(copy)
-                var f = {made: copy, from: t.from, hl: t.to, p0: self.pos, p1: self.pos}
-                if self.depth == 0 then
-                    f.tok = copy
-                end
-                self.run("interp_string", 80, "emit(out, std::move(t));", f)
-                if self.depth == 0 then
-                    copy.step = #self.result.steps
-                    self.result.tokens.push(copy)
-                end
+                self.file(copy, "interp_string", 80, "emit(out, std::move(t));",
+                          {from: t.from, hl: t.to, p0: self.pos, p1: self.pos})
             end
         end
         self.run("interp_string", 78, "for (auto& t : sub.tokenize())", {p0: self.pos, p1: self.pos})
@@ -1101,7 +1072,7 @@ func trace(source)
     for c in source do
         chars.push(c)
     end
-    var result = {steps: [], tokens: [], chars: chars, error: nil}
+    var result = {steps: [], tokens: [], chars: chars, source: source, error: nil}
     var t = Tracer(chars, 1, #chars, 0, 1, result, [])
     try
         t.tokenize()

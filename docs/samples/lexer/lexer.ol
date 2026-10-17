@@ -46,19 +46,26 @@ const KIND_COLORS = {
     ending: Color(0.72, 0.74, 0.80)
 }
 
+const CODE_INK = Color(0.80, 0.83, 0.92)
+const CARET_FILL = Color(CARET.r, CARET.g, CARET.b, 0.22)   ## the line the lexer is on, a button that is on
+const ALSO_FILL = Color(0.6, 0.7, 1.0, 0.12)                ## the `case` label the switch went through
+const MIN_SPEED = 0.25
+const MAX_SPEED = 8
+const CODE_LEADING = 1.55    ## the height of a line of code, in font sizes
+const NOTE_LEADING = 1.4
+
 const PUNCTUATION = ["COMMA", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACKET", "RBRACKET", "COLON",
                      "SEMICOLON", "DOT", "DOT_DOT_DOT", "QUESTION"]
 
 global state = {pos: 0.0, playing: true, stepping: false, goal: 0.0, speed: 1.0, prog: 1, name: nil, hold: 0.0}
 global run = nil          ## the trace of the program on show
-global durations = []     ## how long each step lasts, in seconds at speed 1
-global emitted = []       ## emitted[i]: how many tokens exist once step i is done
-global noteAt = []        ## noteAt[i]: the last sentence said up to step i
+global loaded = {}        ## the traces already made, by program: a trace never changes
 global hits = []          ## the buttons drawn at the bottom, for the taps
 global keywordTypes = {}
 global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
-global stream = {key: nil, chips: []}
-global noteCache = {key: nil, lines: [], size: 0}
+global stream = {prog: 0, w: 0, h: 0, chips: []}              ## the chips, laid out for one size
+global noteCache = {prog: 0, id: 0, w: 0, h: 0, lines: [], size: 0}   ## the sentence, wrapped for one size
+global codeCache = {}
 
 func lerp(a, b, t)
     return a + (b - a) * t
@@ -66,6 +73,23 @@ end
 
 func ease(t)
     return t * t * (3 - 2 * t)
+end
+
+## 0 until `from`, 1 from `to`, eased in between.
+func ramp(t, from, to)
+    return ease(math.clamp((t - from) / (to - from), 0, 1))
+end
+
+func fade(c, alpha)
+    return Color(c.r, c.g, c.b, alpha)
+end
+
+## A text cut to `max` characters, with a "~" where it was cut.
+func clip(text, max)
+    if #text > max then
+        return text.substr(1, max - 1) + "~"
+    end
+    return text
 end
 
 func kindOf(ty)
@@ -86,7 +110,10 @@ func kindOf(ty)
 end
 
 func tokenColor(tok)
-    return KIND_COLORS[kindOf(tok.type)]
+    if tok.color == nil then
+        tok.color = KIND_COLORS[kindOf(tok.type)]
+    end
+    return tok.color
 end
 
 func rectOf(x, y, w, h)
@@ -95,63 +122,67 @@ end
 
 ## ── loading a program ────────────────────────────────────────────────────────
 
-func loadProgram(index)
-    state.prog = index
-    state.name = PROGRAMS[index].name
-    state.pos = 0.0
-    state.goal = 0.0
-    state.hold = 0.0
-    run = trace(PROGRAMS[index].source)
+## The trace of a program and what the view needs to know about each step.
+func buildRun(index)
+    var r = trace(PROGRAMS[index].source)
 
     ## Where each character sits in the text: its line, its column.
-    run.lineOf = []
-    run.colOf = []
-    run.maxCols = 1
+    r.lineOf = []
+    r.colOf = []
+    r.maxCols = 1
     var line = 1
     var col = 0
-    for i, c in run.chars do
-        if c == string.fromCode(10) then
-            col += 1
-            run.lineOf[i] = line
-            run.colOf[i] = col
+    for i, c in r.chars do
+        col += 1
+        r.lineOf[i] = line
+        r.colOf[i] = col
+        if c == NEWLINE then
             line += 1
             col = 0
-        else
-            col += 1
-            run.lineOf[i] = line
-            run.colOf[i] = col
         end
-        run.maxCols = math.max(run.maxCols, col + 1)
+        r.maxCols = math.max(r.maxCols, col + 1)
     end
-    run.lines = line
+    r.lines = line
 
-    ## A line takes a moment; a token to file, or a sentence to read, takes longer.
-    durations = []
-    emitted = []
-    noteAt = []
+    ## A line takes a moment; a token to file, or a sentence to read, takes longer. Paced by hand,
+    ## every line takes the same short time, a token a little longer.
     var count = 0
     var said = ""
-    for i, st in run.steps do
-        var d = 0.2
+    var noteId = 0
+    for st in r.steps do
+        st.before = count    ## the tokens filed before this step
+        st.dur = 0.2
+        st.hand = 0.2
         if st.p1 <> st.p0 then
-            d += 0.06
+            st.dur += 0.06
         end
         if st.tok then
-            d += 0.45
+            st.dur += 0.45
+            st.hand = 0.5
             count += 1
+        end
+        if st.note or st.err then
+            noteId += 1
         end
         if st.note then
             said = st.note
-            d += 0.3 + #st.note * 0.006
+            st.dur += 0.3 + #st.note * 0.006
         end
-        durations[i] = d
-        emitted[i] = count
-        noteAt[i] = said
+        st.said = said       ## the last sentence said up to this step
+        st.noteId = noteId   ## which sentence it is, to wrap it once
     end
-    stream.key = nil
-    noteCache.key = nil
+    return r
 end
 
+func loadProgram(index)
+    if loaded[index] == nil then
+        loaded[index] = buildRun(index)
+    end
+    run = loaded[index]
+    state.prog = index
+    state.name = PROGRAMS[index].name
+    restart()
+end
 
 ## ── the player ───────────────────────────────────────────────────────────────
 
@@ -172,10 +203,6 @@ func setStepping(on)
         state.playing = true
         state.hold = 0.0
     end
-end
-
-func onStepping(on)
-    setStepping(on)
 end
 
 func onPlaying(on)
@@ -214,6 +241,14 @@ func restart()
     state.hold = 0.0
 end
 
+func toggleStepping()
+    setStepping(not state.stepping)
+end
+
+## What a button does, and what a key stands for.
+const ACTIONS = {play: togglePlay, step: toggleStepping, back: stepBack, next: stepForward, restart: restart}
+const KEYS = {space: "play", s: "step", left: "back", right: "next", r: "restart"}
+
 func onProgram(name)
     for i, p in PROGRAMS do
         if p.name == name then
@@ -233,8 +268,8 @@ func setup()
     var menu = ui.menu("Lexer")
     menu.list("Program", names, ref state.name, onProgram)
     menu.checkbox("Playing", ref state.playing, onPlaying)
-    menu.checkbox("Step by step", ref state.stepping, onStepping)
-    menu.slider("Speed", ref state.speed, 0.25, 8, 1.0)
+    menu.checkbox("Step by step", ref state.stepping, setStepping)
+    menu.slider("Speed", ref state.speed, MIN_SPEED, MAX_SPEED, 1.0)
     menu.button("Back", stepBack)
     menu.button("Next", stepForward)
     menu.button("Restart", restart)
@@ -245,20 +280,12 @@ func setup()
 end
 
 func keyboard.keypressed(key)
-    if key == "space" then
-        togglePlay()
-    elseif key == "s" then
-        setStepping(not state.stepping)
-    elseif key == "right" then
-        stepForward()
-    elseif key == "left" then
-        stepBack()
+    if KEYS.has(key) then
+        ACTIONS[KEYS[key]]()
     elseif key == "up" then
-        state.speed = math.min(state.speed * 1.5, 8)
+        state.speed = math.min(state.speed * 1.5, MAX_SPEED)
     elseif key == "down" then
-        state.speed = math.max(state.speed / 1.5, 0.25)
-    elseif key == "r" then
-        restart()
+        state.speed = math.max(state.speed / 1.5, MIN_SPEED)
     else
         var n = string.number(key)
         if n and n >= 1 and n <= #PROGRAMS then
@@ -276,24 +303,30 @@ func hitAt(x, y)
     return nil
 end
 
-## A tap on a button does what it says. Anywhere else it pauses and resumes, or in step by step
-## runs the next line.
-func mouse.pressed(x, y)
-    var id = hitAt(x, y)
-    if id == "play" then
-        togglePlay()
-    elseif id == "step" then
-        setStepping(not state.stepping)
-    elseif id == "back" then
-        stepBack()
-    elseif id == "next" then
-        stepForward()
-    elseif id == "restart" then
-        restart()
-    elseif state.stepping then
+## A tap anywhere else pauses and resumes, or in step by step runs the next line.
+func tap()
+    if state.stepping then
         stepForward()
     else
-        state.playing = not state.playing
+        togglePlay()
+    end
+end
+
+func tapHint()
+    if state.stepping then
+        return "tap: next line"
+    elseif state.playing then
+        return "tap: pause"
+    end
+    return "tap: play"
+end
+
+func mouse.pressed(x, y)
+    var id = hitAt(x, y)
+    if id then
+        ACTIONS[id]()
+    else
+        tap()
     end
 end
 
@@ -302,12 +335,9 @@ end
 func advance(budget, limit, byHand)
     while budget > 0 and state.pos < limit do
         var i = math.floor(state.pos) + 1
-        var d = durations[i]
+        var d = run.steps[i].dur
         if byHand then
-            d = 0.2
-            if run.steps[i].tok then
-                d = 0.5
-            end
+            d = run.steps[i].hand
         end
         var stop = math.min(i, limit)
         var left = (stop - state.pos) * d
@@ -352,23 +382,26 @@ func label(value, x, y, color)
     graphics.text(value, x, y)
 end
 
+## Where the title of a panel sits, and the height it takes: the content starts below it.
+func titleTop()
+    return SIZE * 0.016 * 0.7
+end
+
+func titleHeight()
+    return titleTop() + clampSize(SIZE * 0.02) + SIZE * 0.012
+end
+
 func panel(r, title)
-    var pad = SIZE * 0.016
     graphics.fill(PANEL)
     graphics.stroke(EDGE, 1.5)
     graphics.rect(r.x, r.y, r.w, r.h, SIZE * 0.014)
     graphics.font("sans")
     graphics.fontSize(clampSize(SIZE * 0.02))
-    label(title, r.x + pad, r.y + pad * 0.7, DIM)
+    label(title, r.x + SIZE * 0.016, r.y + titleTop(), DIM)
 end
 
 func clampSize(size)
     return math.max(size, 9)
-end
-
-## The height reserved for a panel's title.
-func titleHeight()
-    return SIZE * 0.016 * 0.7 + clampSize(SIZE * 0.02) + SIZE * 0.012
 end
 
 func computeLayout()
@@ -400,7 +433,7 @@ end
 
 ## ── the source ───────────────────────────────────────────────────────────────
 
-func drawSource(r, i, t, s)
+func drawSource(r, t, s)
     panel(r, "SOURCE")
     var pad = SIZE * 0.02
     var chars = run.chars
@@ -408,18 +441,15 @@ func drawSource(r, i, t, s)
     graphics.font("mono")
     var availW = r.w - 2 * pad
     var availH = r.h - titleHeight() - pad
-    var fs = math.min(availW / (run.maxCols * monoRatio), availH / (run.lines * 1.55), SIZE * 0.07)
+    var fs = math.min(availW / (run.maxCols * monoRatio), availH / (run.lines * CODE_LEADING), SIZE * 0.07)
     var cw = fs * monoRatio
-    var lh = fs * 1.55
+    var lh = fs * CODE_LEADING
     var ox = r.x + pad
     var oy = r.y + titleHeight() + pad * 0.3
 
     ## the read head, sweeping from where the step began to where it ends
-    var head = lerp(s.p0, s.p1, ease(math.clamp(t / 0.8, 0, 1)))
-    var upto = head
-    if s.hl then
-        upto = s.hl
-    end
+    var head = lerp(s.p0, s.p1, ramp(t, 0, 0.8))
+    var upto = s.hl or head
     var lo = s.from or s.p1
 
     ## the lexeme under construction: grey when it is thrown away, in its own colour when it
@@ -430,8 +460,7 @@ func drawSource(r, i, t, s)
     elseif s.drop then
         tint = Color(0.6, 0.62, 0.7, 0.30)
     elseif s.made then
-        var c = tokenColor(s.made)
-        tint = Color(c.r, c.g, c.b, 0.12 + 0.28 * ease(math.clamp((t - 0.4) / 0.4, 0, 1)))
+        tint = fade(tokenColor(s.made), 0.12 + 0.28 * ramp(t, 0.4, 0.8))
     end
     if s.from then
         for idx = s.from, math.min(math.ceil(upto) - 1, n) do
@@ -446,10 +475,7 @@ func drawSource(r, i, t, s)
     end
 
     ## the tokens already cut, underlined in their colour
-    var before = 0
-    if i > 1 then
-        before = emitted[i - 1]
-    end
+    var before = s.before
     var shown = before
     if s.tok and t >= 0.5 then
         shown += 1
@@ -457,22 +483,21 @@ func drawSource(r, i, t, s)
     for k = 1, shown do
         var tok = run.tokens[k]
         if tok.from and tok.type <> "INTERP_START" and tok.type <> "INTERP_MID" then
-            var c = tokenColor(tok)
             var x = ox + (run.colOf[tok.from] - 1) * cw
             var y = oy + (run.lineOf[tok.from] - 1) * lh + lh * 0.9 + tok.depth * fs * 0.1
             var alpha = 1.0
             if k > before then
-                alpha = ease(math.clamp((t - 0.5) / 0.3, 0, 1))
+                alpha = ramp(t, 0.5, 0.8)
             end
             box(x + cw * 0.05, y, (tok.to - tok.from) * cw - cw * 0.1, math.max(fs * 0.07, 2), 1,
-                Color(c.r, c.g, c.b, alpha))
+                fade(tokenColor(tok), alpha))
         end
     end
 
     ## the text itself: what is behind the lexeme is dimmed, what is ahead stays bright
     graphics.fontSize(fs)
     for idx, c in chars do
-        if c <> string.fromCode(10) then
+        if c <> NEWLINE then
             var ink = TEXT
             if idx < lo then
                 ink = PROCESSED
@@ -499,21 +524,22 @@ end
 ## ── the stream of tokens ─────────────────────────────────────────────────────
 
 func tokenLabel(tok)
-    if tok.type == "EOF_T" then
-        return "end"
-    elseif tok.lexeme == "" then
-        return "-"
-    elseif #tok.lexeme > 12 then
-        return tok.lexeme.substr(1, 11) + "~"
+    if tok.label == nil then
+        if tok.type == "EOF_T" then
+            tok.label = "end"
+        elseif tok.lexeme == "" then
+            tok.label = "-"
+        else
+            tok.label = clip(tok.lexeme, 12)
+        end
     end
-    return tok.lexeme
+    return tok.label
 end
 
 ## Where every chip sits in the stream, computed once per size and program: a chip never moves when
 ## a new one arrives.
 func chipLayout(r)
-    var key = "{W}x{H}/{state.prog}"
-    if stream.key == key then
+    if stream.prog == state.prog and stream.w == W and stream.h == H then
         return stream
     end
     var pad = SIZE * 0.02
@@ -535,40 +561,31 @@ func chipLayout(r)
             x = 0
             y += rowH + SIZE * 0.012
         end
-        chips[k] = {x: x, y: y, w: w, h: rowH, row: y}
+        chips[k] = {x: x, y: y, w: w, h: rowH}
         x += w + SIZE * 0.012
     end
-    stream.key = key
-    stream.chips = chips
-    stream.fs = fs
-    stream.tfs = tfs
-    stream.rowH = rowH
-    stream.pad = pad
-    stream.height = y + rowH
+    stream = {prog: state.prog, w: W, h: H, chips: chips, fs: fs, tfs: tfs, rowH: rowH, pad: pad}
     return stream
 end
 
 func drawChip(chip, tok, x, y, alpha, fs, tfs)
     var c = tokenColor(tok)
-    graphics.fill(Color(c.r, c.g, c.b, 0.16 * alpha))
-    graphics.stroke(Color(c.r, c.g, c.b, alpha), 1.5)
+    graphics.fill(fade(c, 0.16 * alpha))
+    graphics.stroke(fade(c, alpha), 1.5)
     graphics.rect(x, y, chip.w, chip.h, SIZE * 0.01)
     graphics.font("mono")
     graphics.textMode("center", "top")
     graphics.fontSize(tfs)
-    label(tok.type, x + chip.w / 2, y + SIZE * 0.008, Color(c.r, c.g, c.b, alpha))
+    label(tok.type, x + chip.w / 2, y + SIZE * 0.008, fade(c, alpha))
     graphics.fontSize(fs)
-    label(tokenLabel(tok), x + chip.w / 2, y + SIZE * 0.008 + tfs * 1.35, Color(TEXT.r, TEXT.g, TEXT.b, alpha))
+    label(tokenLabel(tok), x + chip.w / 2, y + SIZE * 0.008 + tfs * 1.35, fade(TEXT, alpha))
     graphics.textMode("left", "top")
 end
 
-func drawStream(r, i, t, s, srcInfo)
+func drawStream(r, t, s, srcInfo)
     panel(r, "TOKENS FOR THE PARSER")
     var L = chipLayout(r)
-    var before = 0
-    if i > 1 then
-        before = emitted[i - 1]
-    end
+    var before = s.before
     var total = before
     if s.tok then
         total += 1
@@ -579,17 +596,17 @@ func drawStream(r, i, t, s, srcInfo)
     ## scrolls so that the newest row stays in view
     var top = r.y + titleHeight()
     var room = r.h - titleHeight() - L.pad * 0.5
-    var scroll = math.max(0, L.chips[total].row + L.rowH - room)
+    var scroll = math.max(0, L.chips[total].y + L.rowH - room)
     for k = 1, total do
         var chip = L.chips[k]
         var x = r.x + L.pad + chip.x
-        var y = top + chip.row - scroll
+        var y = top + chip.y - scroll
         if y >= top - 1 and y + chip.h <= top + room + 1 then
             if k <= before then
                 drawChip(chip, run.tokens[k], x, y, 1.0, L.fs, L.tfs)
             else
                 ## the new token flies in from the text it was cut from
-                var u = ease(math.clamp((t - 0.5) / 0.5, 0, 1))
+                var u = ramp(t, 0.5, 1)
                 if u > 0 then
                     var tok = run.tokens[k]
                     var sx = srcInfo.ox + (run.colOf[tok.from or 1] - 1) * srcInfo.cw - chip.w / 2
@@ -605,11 +622,26 @@ end
 
 const CODE_COLUMNS = 82   ## the columns of a line that are shown; a longer line is cut with a "~"
 
+## What the code panel shows of a function, prepared once: each line cut to the columns that fit,
+## whether it is a comment, and its number in lexer.cpp.
+func codeLines(fn)
+    if not codeCache.has(fn) then
+        var listing = CPP[fn]
+        var rows = []
+        for j, code in listing.lines do
+            rows.push({text: clip(code, CODE_COLUMNS), comment: listing.trimmed[j].startsWith("//"),
+                       number: "{listing.first + j - 1}"})
+        end
+        codeCache[fn] = rows
+    end
+    return codeCache[fn]
+end
+
 ## The first line of the listing that is on show when the lexer is on `step`: it keeps the line being
 ## run in the upper part of the panel, and never scrolls past the ends of the function.
 func codeTop(step, rows)
     var total = #CPP[step.fn].lines
-    var middle = step.at + (step.span or 0) / 2
+    var middle = step.at + step.span / 2
     return math.clamp(middle - rows * 0.4, 1, math.max(total - rows + 1, 1))
 end
 
@@ -627,34 +659,29 @@ func watchLine(s)
         parts.push("c = '{showChar(s.c)}'")
     end
     if s.w then
-        var v = s.w[2]
-        var cut = ""
-        for ch in v do
-            cut = cut + showChar(ch)
-        end
-        if #cut > 18 then
-            cut = cut.substr(1, 17) + "~"
-        end
-        parts.push(s.w[1] + " = " + QUOTE + cut + QUOTE)
+        parts.push(s.w[1] + " = " + QUOTE + clip(s.w[2].replace(NEWLINE, "\n"), 18) + QUOTE)
     end
     return parts.join("   ")
 end
 
 func drawCode(r, i, t, s)
-    var listing = CPP[s.fn]
+    var listing = codeLines(s.fn)
     panel(r, "src/lexer.cpp  -  Lexer::" + s.fn + "()")
     var pad = SIZE * 0.02
     graphics.font("mono")
     var gutter = 5
     var fs = math.max(math.min((r.w - 2 * pad) / ((CODE_COLUMNS + gutter) * monoRatio), SIZE * 0.034), 7)
     var cw = fs * monoRatio
-    var lh = fs * 1.55
+    var lh = fs * CODE_LEADING
     var y0 = r.y + titleHeight()
 
     ## what is being called, and the locals
     graphics.fontSize(fs)
     label(s.stack, r.x + pad, y0, CARET)
-    label(watchLine(s), r.x + pad, y0 + lh, DIM)
+    if s.watch == nil then
+        s.watch = watchLine(s)    ## a step never changes
+    end
+    label(s.watch, r.x + pad, y0 + lh, DIM)
     var top = y0 + lh * 2 + pad * 0.4
     var bottom = r.y + r.h - pad * 0.5
     var rows = math.max(math.floor((bottom - top) / lh), 1)
@@ -663,43 +690,39 @@ func drawCode(r, i, t, s)
     var e = ease(math.clamp(t / 0.45, 0, 1))
     var first = codeTop(s, rows)
     var barLine = s.at
-    var barSpan = s.span or 0
+    var barSpan = s.span
     if i > 1 and run.steps[i - 1].fn == s.fn then
         var before = run.steps[i - 1]
         first = lerp(codeTop(before, rows), first, e)
         barLine = lerp(before.at, s.at, e)
-        barSpan = lerp(before.span or 0, s.span or 0, e)
+        barSpan = lerp(before.span, s.span, e)
     end
 
     var barY = top + (barLine - first) * lh
     if barY >= top - 1 and barY + lh * (1 + barSpan) <= bottom + 1 then
-        box(r.x + pad * 0.5, barY - lh * 0.08, r.w - pad, lh * (1 + barSpan), fs * 0.2, Color(1.0, 0.84, 0.30, 0.22))
+        box(r.x + pad * 0.5, barY - lh * 0.08, r.w - pad, lh * (1 + barSpan), fs * 0.2, CARET_FILL)
         box(r.x + pad * 0.5, barY - lh * 0.08, fs * 0.22, lh * (1 + barSpan), 1, CARET)
     end
     if s.also then
         var y = top + (s.also - first) * lh
         if y >= top - 1 and y + lh <= bottom + 1 then
-            box(r.x + pad * 0.5, y - lh * 0.08, r.w - pad, lh, fs * 0.2, Color(0.6, 0.7, 1.0, 0.12))
+            box(r.x + pad * 0.5, y - lh * 0.08, r.w - pad, lh, fs * 0.2, ALSO_FILL)
         end
     end
 
     for j = math.floor(first), math.ceil(first) + rows do
         var y = top + (j - first) * lh
-        if j >= 1 and j <= #listing.lines and y >= top - 1 and y + lh <= bottom + 1 then
-            var code = listing.lines[j]
-            if #code > CODE_COLUMNS then
-                code = code.substr(1, CODE_COLUMNS - 1) + "~"
-            end
-            var active = j >= s.at and j <= s.at + (s.span or 0)
-            var ink = Color(0.80, 0.83, 0.92)
+        if j >= 1 and j <= #listing and y >= top - 1 and y + lh <= bottom + 1 then
+            var row = listing[j]
+            var active = j >= s.at and j <= s.at + s.span
+            var ink = CODE_INK
             if active then
                 ink = TEXT
-            elseif code.trim().startsWith("//") then
+            elseif row.comment then
                 ink = PROCESSED
             end
-            var number = "{listing.first + j - 1}"
-            label(number, r.x + pad + (4 - #number) * cw, y, active and CARET or PROCESSED)
-            label(code, r.x + pad + gutter * cw, y, ink)
+            label(row.number, r.x + pad + (4 - #row.number) * cw, y, active and CARET or PROCESSED)
+            label(row.text, r.x + pad + gutter * cw, y, ink)
         end
     end
 end
@@ -728,15 +751,14 @@ func wrap(text, width)
     return lines
 end
 
-func drawNote(r, s, i)
+func drawNote(r, s)
     panel(r, "WHAT HAPPENS")
     var pad = SIZE * 0.02
     var width = r.w - 2 * pad
     var avail = r.h - titleHeight() - pad
-    var key = "{state.prog}/{i}/{W}x{H}"
-    if noteCache.key <> key then
+    if noteCache.prog <> state.prog or noteCache.id <> s.noteId or noteCache.w <> W or noteCache.h <> H then
         ## when the lexer gives up, the sentence is followed by the message it would print
-        var parts = [{text: noteAt[i], ink: TEXT}]
+        var parts = [{text: s.said, ink: TEXT}]
         if s.err then
             parts.push({text: "Error on line {s.line}: {s.err}. The lexer stops here: the parser never sees a token after this point.",
                         ink: ERROR})
@@ -752,21 +774,19 @@ func drawNote(r, s, i)
                     lines.push({text: l, ink: part.ink})
                 end
             end
-            if #lines * fs * 1.4 <= avail or fs <= 8 then
+            if #lines * fs * NOTE_LEADING <= avail or fs <= 8 then
                 break
             end
             fs *= 0.92
         end
-        noteCache.key = key
-        noteCache.lines = lines
-        noteCache.size = fs
+        noteCache = {prog: state.prog, id: s.noteId, w: W, h: H, lines: lines, size: fs}
     end
     graphics.font("sans")
     graphics.fontSize(noteCache.size)
     var y = r.y + titleHeight() + pad * 0.2
     for l in noteCache.lines do
         label(l.text, r.x + pad, y, l.ink)
-        y += noteCache.size * 1.4
+        y += noteCache.size * NOTE_LEADING
     end
 end
 
@@ -779,7 +799,8 @@ func drawHeader(L)
     label("Inside the lexer", L.m, L.m * 0.8, TEXT)
     ## the program and what it teaches, shrunk to leave the right end to the menu's handle
     var text = PROGRAMS[state.prog].name + "  -  " + LESSONS[state.prog]
-    var fs = math.max(SIZE * 0.026, 10)
+    var base = math.max(SIZE * 0.026, 10)
+    var fs = base
     graphics.fontSize(fs)
     var room = W - 2 * L.m - SIZE * 0.2
     var w = graphics.textSize(text)
@@ -788,8 +809,7 @@ func drawHeader(L)
         graphics.fontSize(fs)
         if fs < 9 then
             text = PROGRAMS[state.prog].name   ## too long for a narrow screen: the lesson is left out
-            fs = math.max(SIZE * 0.026, 10)
-            graphics.fontSize(fs)
+            graphics.fontSize(base)
         end
     end
     label(text, L.m, L.m * 0.8 + SIZE * 0.065, DIM)
@@ -803,11 +823,7 @@ func drawFooter(L, i)
     hits = []
     var gap = L.m * 0.6
     var bw = math.clamp((W - 2 * L.m - 4 * gap) / 5, 60, SIZE * 0.2)
-    var play = "Pause"
-    if not state.playing then
-        play = "Play"
-    end
-    var buttons = [{id: "play", text: play, on: false}, {id: "step", text: "Step", on: state.stepping},
+    var buttons = [{id: "play", text: state.playing and "Pause" or "Play", on: false}, {id: "step", text: "Step", on: state.stepping},
                    {id: "back", text: "Back", on: false}, {id: "next", text: "Next", on: false},
                    {id: "restart", text: "Restart", on: false}]
     graphics.font("sans")
@@ -815,7 +831,7 @@ func drawFooter(L, i)
     for k, b in buttons do
         var x = L.m + (k - 1) * (bw + gap)
         if b.on then
-            graphics.fill(Color(CARET.r, CARET.g, CARET.b, 0.22))
+            graphics.fill(CARET_FILL)
             graphics.stroke(CARET, 2)
         else
             graphics.fill(PANEL)
@@ -831,17 +847,8 @@ func drawFooter(L, i)
 
     ## under the buttons: where the program is, and what a tap does. The right of that strip belongs to
     ## the memory and frame counter the engine draws.
-    var status = "step {i} / {#run.steps}"
-    if state.stepping then
-        status = status + "   -   tap: next line"
-    elseif state.playing then
-        status = status + "   -   tap: pause"
-    else
-        status = status + "   -   tap: play"
-    end
     graphics.fontSize(math.max(fs * 0.85, 10))
-    label(status, L.m, L.footY + L.footH + SIZE * 0.012, DIM)
-    graphics.textMode("left", "top")
+    label("step {i} / {#run.steps}   -   {tapHint()}", L.m, L.footY + L.footH + SIZE * 0.012, DIM)
 end
 
 func draw()
@@ -855,9 +862,9 @@ func draw()
     var i, t = current()
     var s = run.steps[i]
     drawHeader(L)
-    var info = drawSource(L.src, i, t, s)
-    drawStream(L.stream, i, t, s, info)
+    var info = drawSource(L.src, t, s)
+    drawStream(L.stream, t, s, info)
     drawCode(L.code, i, t, s)
-    drawNote(L.note, s, i)
+    drawNote(L.note, s)
     drawFooter(L, i)
 end

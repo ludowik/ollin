@@ -4,12 +4,10 @@
 ## Ollin strings have no escape for the double quote, so a program is written with an apostrophe
 ## where it needs one and the apostrophes are turned into quotes when the program is built.
 
-const PROGRAM_QUOTE = string.fromCode(34)
-const PROGRAM_NEWLINE = string.fromCode(10)
+import "tracer.ol"
 
 func program(name, lines)
-    var text, n = lines.join(PROGRAM_NEWLINE).replace("'", PROGRAM_QUOTE)
-    return {name: name, source: text}
+    return {name: name, source: lines.join(NEWLINE).replace("'", QUOTE)}
 end
 
 const PROGRAMS = [
