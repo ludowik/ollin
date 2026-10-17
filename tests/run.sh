@@ -92,6 +92,11 @@ if ! bash tests/check_samples.sh; then
     fails=$((fails + 1))
 fi
 
+echo "── guard: lexer animation ────────────────────────"
+if ! bash tests/check_lexer_source.sh; then
+    fails=$((fails + 1))
+fi
+
 echo "── guard: constant operands ──────────────────────"
 if ! bash tests/check_const_operands.sh; then
     fails=$((fails + 1))

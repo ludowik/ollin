@@ -160,6 +160,8 @@ ollin/
 │                      convert_helmet_glb.py (idem pour docs/samples/helmet.glb — Damaged Helmet,
 │                      crédit obligatoire et NON commercial, cf. plus bas),
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
+│                      gen_lexer_source.py (engendre docs/samples/lexer/cpp_source.ol — le texte des fonctions de
+│                      lexer.cpp que l'exemple suit ligne à ligne ; ne pas l'éditer à la main, cf. check_lexer_source.sh),
 │                      gen_sample_icons.js (engendre les vignettes de l'écran principal, docs/samples/icons/ —
 │                      lancé à la MAIN, cf. « Écran principal »),
 │                      ollin-vscode/ (extension VS Code, colorisation)
@@ -382,6 +384,7 @@ prétexte de cette colonne.
 | `tests/check_func_limit.sh` | Claude | **garde-fou du plafond de fonctions** : un programme de N fonctions est ENGENDRÉ par le script, car le plafond lui-même interdit d'en committer un — et chacune doit être appelable PAR SON NOM, la dernière comprise. Rien du plafond n'y est écrit : il est cherché (doublement puis bissection), donc la garde survit à son déplacement. ⚠ Une boucle de closures ne l'exerce PAS (un `func` du texte = un proto, et une closure s'appelle par `CALL_DYN`) |
 | `tests/check_const_operands.sh` | Claude | **garde-fou du repli des opérandes constants** : au-delà de 65 535 constantes, un littéral à droite d'un opérateur retombe sur `LOAD_K` + l'opcode générique — programme ENGENDRÉ, le plafond étant la largeur d'un champ |
 | `tests/check_samples.sh` | Claude | **garde-fou du catalogue** : `docs/samples/index.json` est le seul lien entre le menu du playground et les fichiers — un renommage y laissait une entrée morte que RIEN ne détectait, la panne n'apparaissant qu'à l'ouverture du menu dans le navigateur |
+| `tests/check_lexer_source.sh` | Claude | **garde-fou de l'exemple « lexer »** : `cpp_source.ol` doit être à jour avec `src/lexer.cpp` (`tools/gen_lexer_source.py --check`), et chaque ligne que `tracer.ol` nomme (`self.run("number", 21, "advance();")`) doit être cette ligne de `lexer.cpp` — un lexer modifié ne laisse pas l'animation allumer une mauvaise ligne en silence |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutorial.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique), plus la section « This window » : tout ce que la page sait de sa fenêtre, seule preuve exploitable quand la mise en page est fausse sur une machine hors d'atteinte |

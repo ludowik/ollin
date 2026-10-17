@@ -8,12 +8,14 @@
 ## it cuts a program into exactly the tokens the C++ lexer gives.
 ##
 ## The caret is the read head: the character the lexer is about to read. The highlighted span is the
-## lexeme being built, and the panel on the right lights up the line of lexer.cpp that is running.
-## Each token that comes out is filed in the stream below, and the program's text is underlined in
-## the colour of the token it became.
+## lexeme being built. The panel on the right shows the engine's own code, copied verbatim from
+## src/lexer.cpp into cpp_source.ol, and the bar in it is the line the lexer is running: it moves
+## from line to line as the program does, goes down into identifier(), number()... when they are
+## called, and comes back to the line that called them. Each token that comes out is filed in the
+## stream below, and the program's text is underlined in the colour of the token it became.
 ##
-## Space plays and pauses, the arrows step (left/right) and change the speed (up/down), 1 to 4
-## pick a program, R restarts. A tap pauses and resumes. The menu does the same with the finger.
+## Space plays and pauses, the arrows step by one line (left/right) and change the speed (up/down),
+## 1 to 4 pick a program, R restarts. A tap pauses and resumes. The menu does the same with the finger.
 
 import "tracer.ol"
 import "programs.ol"
@@ -45,6 +47,7 @@ global state = {pos: 0.0, playing: true, speed: 1.0, prog: 1, name: nil, hold: 0
 global run = nil          ## the trace of the program on show
 global durations = []     ## how long each step lasts, in seconds at speed 1
 global emitted = []       ## emitted[i]: how many tokens exist once step i is done
+global noteAt = []        ## noteAt[i]: the last sentence said up to step i
 global keywordTypes = {}
 global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
 global stream = {key: nil, chips: []}
@@ -114,19 +117,28 @@ func loadProgram(index)
     end
     run.lines = line
 
-    ## A step lasts longer when it carries more to read, to sweep, or a token to file.
+    ## A line takes a moment; a token to file, or a sentence to read, takes longer.
     durations = []
     emitted = []
+    noteAt = []
     var count = 0
-    for i, s in run.steps do
-        var sweep = math.min(math.abs(s.p1 - s.p0), 14)
-        var d = 0.7 + #s.note * 0.008 + sweep * 0.05
-        if s.tok then
-            d += 0.25
+    var said = ""
+    for i, st in run.steps do
+        var d = 0.2
+        if st.p1 <> st.p0 then
+            d += 0.06
+        end
+        if st.tok then
+            d += 0.45
             count += 1
+        end
+        if st.note then
+            said = st.note
+            d += 0.3 + #st.note * 0.006
         end
         durations[i] = d
         emitted[i] = count
+        noteAt[i] = said
     end
     stream.key = nil
     noteCache.key = nil
@@ -176,7 +188,7 @@ func setup()
     var menu = ui.menu("Lexer")
     menu.list("Program", names, ref state.name, onProgram)
     menu.checkbox("Playing", ref state.playing)
-    menu.slider("Speed", ref state.speed, 0.5, 4, 1.0)
+    menu.slider("Speed", ref state.speed, 0.25, 8, 1.0)
     menu.button("Step back", stepBack)
     menu.button("Step forward", stepForward)
     menu.button("Restart", restart)
@@ -194,9 +206,9 @@ func keyboard.keypressed(key)
     elseif key == "left" then
         stepBack()
     elseif key == "up" then
-        state.speed = math.min(state.speed * 1.5, 4)
+        state.speed = math.min(state.speed * 1.5, 8)
     elseif key == "down" then
-        state.speed = math.max(state.speed / 1.5, 0.5)
+        state.speed = math.max(state.speed / 1.5, 0.25)
     elseif key == "r" then
         restart()
     else
@@ -277,19 +289,19 @@ func computeLayout()
     var srcH = math.min(availH * 0.4, titleHeight() + SIZE * 0.045 + run.lines * SIZE * 0.1)
     var L = {m: m}
     if W >= H * 1.1 then
-        var lw = (W - 3 * m) * 0.5
+        var lw = (W - 3 * m) * 0.38
         var rw = W - 3 * m - lw
         L.src = rectOf(m, top, lw, srcH)
         L.stream = rectOf(m, top + srcH + m, lw, availH - srcH - m)
-        L.code = rectOf(2 * m + lw, top, rw, availH * 0.5)
+        L.code = rectOf(2 * m + lw, top, rw, availH * 0.76)
         L.note = rectOf(2 * m + lw, top + L.code.h + m, rw, availH - L.code.h - m)
     else
         var w = W - 2 * m
         var room = availH - 3 * m - srcH
         L.src = rectOf(m, top, w, srcH)
-        L.note = rectOf(m, top + srcH + m, w, room * 0.27)
-        L.code = rectOf(m, L.note.y + L.note.h + m, w, room * 0.3)
-        L.stream = rectOf(m, L.code.y + L.code.h + m, w, room - L.note.h - L.code.h)
+        L.code = rectOf(m, top + srcH + m, w, room * 0.5)
+        L.note = rectOf(m, L.code.y + L.code.h + m, w, room * 0.14)
+        L.stream = rectOf(m, L.note.y + L.note.h + m, w, room - L.code.h - L.note.h)
     end
     return L
 end
@@ -311,7 +323,11 @@ func drawSource(r, i, t, s)
     var oy = r.y + titleHeight() + pad * 0.3
 
     ## the read head, sweeping from where the step began to where it ends
-    var head = lerp(s.p0, s.p1, ease(math.clamp(t / 0.6, 0, 1)))
+    var head = lerp(s.p0, s.p1, ease(math.clamp(t / 0.8, 0, 1)))
+    var upto = head
+    if s.hl then
+        upto = s.hl
+    end
     var lo = s.from or s.p1
 
     ## the lexeme under construction: grey when it is thrown away, in its own colour when it
@@ -321,17 +337,17 @@ func drawSource(r, i, t, s)
         tint = Color(1.0, 0.35, 0.35, 0.40)
     elseif s.drop then
         tint = Color(0.6, 0.62, 0.7, 0.30)
-    elseif s.tok then
-        var c = tokenColor(s.tok)
+    elseif s.made then
+        var c = tokenColor(s.made)
         tint = Color(c.r, c.g, c.b, 0.12 + 0.28 * ease(math.clamp((t - 0.4) / 0.4, 0, 1)))
     end
     if s.from then
-        for idx = s.from, math.min(math.ceil(head) - 1, n) do
+        for idx = s.from, math.min(math.ceil(upto) - 1, n) do
             var x = ox + (run.colOf[idx] - 1) * cw
             var y = oy + (run.lineOf[idx] - 1) * lh
             var w = cw
-            if idx + 1 > head then
-                w = cw * (head - idx)
+            if idx + 1 > upto then
+                w = cw * (upto - idx)
             end
             box(x, y, w, lh * 0.92, fs * 0.12, tint)
         end
@@ -495,32 +511,104 @@ end
 
 ## ── the code of lexer.cpp ────────────────────────────────────────────────────
 
-func drawCode(r, s)
-    var ex = EXCERPTS[s.fn]
-    panel(r, "src/lexer.cpp  -  " + ex.title)
-    var pad = SIZE * 0.02
-    var total = #ex.lines
-    var widest = 1
-    for l in ex.lines do
-        widest = math.max(widest, #l)
+const CODE_COLUMNS = 82   ## the columns of a line that are shown; a longer line is cut with a "~"
+
+## The first line of the listing that is on show when the lexer is on `step`: it keeps the line being
+## run in the upper part of the panel, and never scrolls past the ends of the function.
+func codeTop(step, rows)
+    var total = #CPP[step.fn].lines
+    var middle = step.at + (step.span or 0) / 2
+    return math.clamp(middle - rows * 0.4, 1, math.max(total - rows + 1, 1))
+end
+
+func showChar(c)
+    if c == NEWLINE then
+        return "\n"
     end
-    graphics.font("mono")
-    var fs = math.min((r.w - 2 * pad) / (widest * monoRatio), SIZE * 0.03)
-    fs = math.max(fs, 7)
-    var lh = fs * 1.55
-    var rows = math.max(math.floor((r.h - titleHeight() - pad) / lh), 1)
-    var first = math.clamp(s.at - math.floor(rows / 2), 1, math.max(total - rows + 1, 1))
-    var y = r.y + titleHeight() + pad * 0.3
-    graphics.fontSize(fs)
-    for j = first, math.min(total, first + rows - 1) do
-        if j == s.at then
-            box(r.x + pad * 0.5, y - lh * 0.1, r.w - pad, lh, fs * 0.2, Color(1.0, 0.84, 0.30, 0.20))
-            box(r.x + pad * 0.5, y - lh * 0.1, fs * 0.2, lh, 1, CARET)
-            label(ex.lines[j], r.x + pad, y, TEXT)
-        else
-            label(ex.lines[j], r.x + pad, y, DIM)
+    return c
+end
+
+## The locals worth watching, as a debugger would list them.
+func watchLine(s)
+    var parts = ["pos {s.pos}", "line {s.line}"]
+    if s.c then
+        parts.push("c = '{showChar(s.c)}'")
+    end
+    if s.w then
+        var v = s.w[2]
+        var cut = ""
+        for ch in v do
+            cut = cut + showChar(ch)
         end
-        y += lh
+        if #cut > 18 then
+            cut = cut.substr(1, 17) + "~"
+        end
+        parts.push(s.w[1] + " = " + QUOTE + cut + QUOTE)
+    end
+    return parts.join("   ")
+end
+
+func drawCode(r, i, t, s)
+    var listing = CPP[s.fn]
+    panel(r, "src/lexer.cpp  -  Lexer::" + s.fn + "()")
+    var pad = SIZE * 0.02
+    graphics.font("mono")
+    var gutter = 5
+    var fs = math.max(math.min((r.w - 2 * pad) / ((CODE_COLUMNS + gutter) * monoRatio), SIZE * 0.034), 7)
+    var cw = fs * monoRatio
+    var lh = fs * 1.55
+    var y0 = r.y + titleHeight()
+
+    ## what is being called, and the locals
+    graphics.fontSize(fs)
+    label(s.stack, r.x + pad, y0, CARET)
+    label(watchLine(s), r.x + pad, y0 + lh, DIM)
+    var top = y0 + lh * 2 + pad * 0.4
+    var bottom = r.y + r.h - pad * 0.5
+    var rows = math.max(math.floor((bottom - top) / lh), 1)
+
+    ## the view and the bar glide from the previous line to this one, inside the same function
+    var e = ease(math.clamp(t / 0.45, 0, 1))
+    var first = codeTop(s, rows)
+    var barLine = s.at
+    var barSpan = s.span or 0
+    if i > 1 and run.steps[i - 1].fn == s.fn then
+        var before = run.steps[i - 1]
+        first = lerp(codeTop(before, rows), first, e)
+        barLine = lerp(before.at, s.at, e)
+        barSpan = lerp(before.span or 0, s.span or 0, e)
+    end
+
+    var barY = top + (barLine - first) * lh
+    if barY >= top - 1 and barY + lh * (1 + barSpan) <= bottom + 1 then
+        box(r.x + pad * 0.5, barY - lh * 0.08, r.w - pad, lh * (1 + barSpan), fs * 0.2, Color(1.0, 0.84, 0.30, 0.22))
+        box(r.x + pad * 0.5, barY - lh * 0.08, fs * 0.22, lh * (1 + barSpan), 1, CARET)
+    end
+    if s.also then
+        var y = top + (s.also - first) * lh
+        if y >= top - 1 and y + lh <= bottom + 1 then
+            box(r.x + pad * 0.5, y - lh * 0.08, r.w - pad, lh, fs * 0.2, Color(0.6, 0.7, 1.0, 0.12))
+        end
+    end
+
+    for j = math.floor(first), math.ceil(first) + rows do
+        var y = top + (j - first) * lh
+        if j >= 1 and j <= #listing.lines and y >= top - 1 and y + lh <= bottom + 1 then
+            var code = listing.lines[j]
+            if #code > CODE_COLUMNS then
+                code = code.substr(1, CODE_COLUMNS - 1) + "~"
+            end
+            var active = j >= s.at and j <= s.at + (s.span or 0)
+            var ink = Color(0.80, 0.83, 0.92)
+            if active then
+                ink = TEXT
+            elseif code.trim().startsWith("//") then
+                ink = PROCESSED
+            end
+            var number = "{listing.first + j - 1}"
+            label(number, r.x + pad + (4 - #number) * cw, y, active and CARET or PROCESSED)
+            label(code, r.x + pad + gutter * cw, y, ink)
+        end
     end
 end
 
@@ -556,7 +644,7 @@ func drawNote(r, s, i)
     var key = "{state.prog}/{i}/{W}x{H}"
     if noteCache.key <> key then
         ## when the lexer gives up, the sentence is followed by the message it would print
-        var parts = [{text: s.note, ink: TEXT}]
+        var parts = [{text: noteAt[i], ink: TEXT}]
         if s.err then
             parts.push({text: "Error on line {s.line}: {s.err}. The lexer stops here: the parser never sees a token after this point.",
                         ink: ERROR})
@@ -632,7 +720,7 @@ func draw()
     drawHeader(L)
     var info = drawSource(L.src, i, t, s)
     drawStream(L.stream, i, t, s, info)
-    drawCode(L.code, s)
+    drawCode(L.code, i, t, s)
     drawNote(L.note, s, i)
     var status = "step {i} / {#run.steps}"
     if not state.playing then

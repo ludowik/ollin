@@ -61,27 +61,74 @@ assert(failure("### open") == "unterminated block comment")
 assert(failure("x = $") == "unexpected character '$'")
 assert(failure("var ok = 1") == nil)
 
-## the trace itself: every step reads inside the source, a token points back at the step that made
-## it, and the run ends on EOF_T or on an error
+## every `case` of the switch, and so every line the dispatch names, runs at least once
+assert(cut("= == + += - -= * *= / /= // % %= > >= >> < <= <> << & | ^ ~ \{ } [ ] ( ) , : ; ? . ... #x")
+       == "EQUALS:= EQUAL_EQUAL:== PLUS:+ PLUS_EQUAL:+= MINUS:- MINUS_EQUAL:-= STAR:* STAR_EQUAL:*= SLASH:/ SLASH_EQUAL:/= "
+       + "SLASH_SLASH:// PERCENT:% PERCENT_EQUAL:%= GREATER:> GREATER_EQUAL:>= RSHIFT:>> LESS:< LESS_EQUAL:<= NOT_EQUAL:<> "
+       + "LSHIFT:<< AMP:& PIPE:| CARET:^ TILDE:~ LBRACE:\{ RBRACE:} LBRACKET:[ RBRACKET:] LPAREN:( RPAREN:) COMMA:, COLON:: "
+       + "SEMICOLON:; QUESTION:? DOT:. DOT_DOT_DOT:... HASH:# IDENTIFIER:x EOF_T:")
+assert(cut("0b1 0o7 1e5 1_2.5 a.b") == "NUMBER:0b1 NUMBER:0o7 NUMBER:1e5 NUMBER:12.5 IDENTIFIER:a DOT:. IDENTIFIER:b EOF_T:")
+
+## the trace itself, line by line. `a` is the shortest program with a token: the lexer reads its way
+## through tokenize() to the default case, steps into identifier() and comes back to the line that
+## called it, then goes round the loop once more to find the end of the source.
+func path(source)
+    var r = trace(source)
+    var parts = []
+    for s in r.steps do
+        parts.push(s.fn + ":" + s.at)
+    end
+    return parts.join(" ")
+end
+
+assert(path("a") == "tokenize:1 tokenize:2 tokenize:3 tokenize:5 tokenize:6 skip_whitespace:2 skip_whitespace:3 "
+       + "skip_whitespace:4 skip_whitespace:5 tokenize:7 tokenize:10 tokenize:11 tokenize:125 tokenize:129 "
+       + "tokenize:130 identifier:2 identifier:3 identifier:5 identifier:6 identifier:7 tokenize:130 tokenize:131 "
+       + "tokenize:6 skip_whitespace:2 skip_whitespace:3 skip_whitespace:4 skip_whitespace:5 tokenize:7 "
+       + "tokenize:8 tokenize:138 tokenize:139")
+
+## every step names a line that exists, a token points back at the step that made it, and the run
+## ends on EOF_T or on an error
 func checkTrace(source)
     var r = trace(source)
     var last = #r.chars + 1
     for k, s in r.steps do
         assert(s.p0 >= 1 and s.p0 <= last and s.p1 >= 1 and s.p1 <= last, "head out of the source at step {k}")
-        assert(s.note <> "" and s.fn <> nil and s.at >= 1, "step {k} does not say what it does")
+        assert(CPP.has(s.fn), "step {k} runs a function that is not shown: {s.fn}")
+        assert(s.at >= 1 and s.at + (s.span or 0) <= #CPP[s.fn].lines, "step {k} runs a line that does not exist")
+        assert(s.stack.startsWith("tokenize") and s.stack.endsWith(s.fn), "step {k} is not on top of its own call stack")
     end
     for tok in r.tokens do
         assert(r.steps[tok.step].tok == tok, "token {tok.type} does not point at its step")
     end
-    var end_step = r.steps[#r.steps]
-    assert(end_step.err or (end_step.tok and end_step.tok.type == "EOF_T"), "the trace does not end properly")
+    if r.error then
+        assert(r.steps[#r.steps].err == r.error, "the error is not the last step")
+    else
+        assert(r.tokens[#r.tokens].type == "EOF_T", "the tokens do not end on EOF_T")
+    end
     return r
 end
 
 checkTrace("var total = 1_200 + x")
 checkTrace("if n >= .5 then ## small")
 checkTrace(Q + "n = \{x}!" + Q)
+checkTrace(Q + "pi \{x:.2f} and \{y}" + Q)
 checkTrace("var ok = 1" + NL + "var 3x = 2")
+checkTrace("a ### block" + NL + "comment ### b")
+checkTrace("0x1F_FF 0b1 1e+5 .5")
+
+## a hole is read by a second lexer, called from interp_string() and reading the same text; its
+## tokens only reach the stream when interp_string() hands them over
+var hole = checkTrace(Q + "n = \{x}!" + Q)
+var nested = false
+for s in hole.steps do
+    if s.stack == "tokenize > interp_string > tokenize" then
+        nested = true
+    end
+end
+assert(nested, "no step runs the second lexer")
+var handed = hole.steps[hole.tokens[2].step]
+assert(hole.tokens[2].lexeme == "x" and handed.fn == "interp_string" and handed.stack == "tokenize > interp_string")
 
 ## without a string, the read head moves on from where the previous step left it
 var chain = trace("var total = 1_200 + x * .5 ## end")
