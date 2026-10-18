@@ -351,26 +351,32 @@ refuses("var x = 99999999999999999999" + NEWLINE, "1: numeric literal out of ran
 refuses("var x = f(1," + NEWLINE, "2: unexpected token ''")
 refuses("var x = a." + NEWLINE, "2: expected a field name, got ''")
 refuses("var x = 1 +" + NEWLINE, "2: unexpected token ''")
-## what this trace does not cover stops with an error of its own, instead of showing something wrong
-func notCovered(text)
-    var message = ""
-    try
-        parseTrace(unquote(text))
-    catch e
-        message = e
+## what this trace does not follow ends it on the step that reaches it, with no error and no tree, instead
+## of showing something wrong: the steps up to there are kept
+func notCovered(text, what)
+    var r = parseTrace(unquote(text))
+    var last = r.steps[#r.steps]
+    assert(r.stopped == what, "'{text}' should stop at {what}: '{r.stopped}'")
+    assert(last.stop == what and last.event and last.note.startsWith("The parser now reads"), "'{text}': the last step should say it")
+    assert(r.error == nil and r.tree == nil, "'{text}' is not a refusal")
+    for st in r.steps do
+        assert(st == last or st.stop == nil, "'{text}': only the last step stops")
     end
-    assert(message.startsWith("not covered by this trace"), "'{text}' should not be covered: '{message}'")
 end
 
-notCovered("try x = 1 catch e y = 2 end")
-notCovered("import 'lib'")
-notCovered("class A end")
-notCovered("enum E A end")
-notCovered("switch x case 1 y = 1 end")
-notCovered("var x = ref a")
-notCovered("var x = super.m()")
-notCovered("var x = [1; 3]")
-notCovered("var x = ]1; 3]")
+notCovered("try x = 1 catch e y = 2 end", "a try block")
+notCovered("import 'lib'", "an import")
+notCovered("class A end", "a class")
+notCovered("enum E A end", "an enum")
+notCovered("switch x case 1 y = 1 end", "a switch")
+notCovered("var x = ref a", "a ref")
+notCovered("var x = super.m()", "a super call")
+notCovered("var x = [1; 3]", "a range")
+notCovered("var x = ]1; 3]", "an open-left range")
+
+## the lines before the construct are followed as usual, here inside a block
+var inner = parseTrace(unquote("if x then" + NEWLINE + "    var y = 1" + NEWLINE + "    class A end" + NEWLINE + "end"))
+assert(inner.stopped == "a class" and #inner.steps > 40, "a class inside an if: {inner.stopped}, {#inner.steps} steps")
 
 ## the trace itself, line by line. `break` is the shortest statement: parse() asks parse_one_stmt() for a
 ## statement, whose switch sends it to break_stmt(); the result goes back up, and parse() finds the end.

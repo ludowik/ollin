@@ -12,9 +12,10 @@
 ## OVER, as a debugger's "next" would: their effect shows on the line that calls them. A line that
 ## calls a function of the parser is lit twice: when it calls, and when the result comes back.
 ##
-## What is NOT covered, and stops the trace with an error instead of showing something wrong: try,
-## import, class, enum and switch statements, `ref`, `super`, and ranges. They are the same recursive
-## descent as what is covered, and the example's programs do not use them.
+## What is NOT covered: try, import, class, enum and switch statements, `ref`, `super`, and ranges.
+## They are the same recursive descent as what is covered, and the example's programs do not use them.
+## The trace follows the program up to the line that reaches one, marks that step `stop` and ends there
+## (the tree as it stood), instead of showing something wrong.
 ##
 ## A step is a map:
 ##   fn, at, span   the function and the line (and how many more lines the statement covers)
@@ -25,6 +26,7 @@
 ##   ret            the node the line hands back to its caller
 ##   w              the locals worth watching, as [name, value] pairs
 ##   err, errLine   the refusal, and the line of the program it names
+##   stop           what the parser reached that this trace does not follow: the last step of its trace
 ##   note           a sentence, on the lines that deserve one
 ##   event          true when the line consumed a token, changed the tree, or failed
 ##
@@ -113,7 +115,7 @@ const UNARY = [
     {token: "TILDE", op: "~", test: 10, read: 11, ret: 12}, {token: "HASH", op: "#", test: 14, read: 0, ret: 18}
 ]
 const DECLARATIONS = {VAR: [false, false], GLOBAL: [true, false], CONSTANT: [false, true]}
-const NOT_COVERED = {TRY: "try", IMPORT: "import", CLASS: "class", ENUM: "enum", SWITCH: "switch"}
+const NOT_COVERED = {TRY: "a try block", IMPORT: "an import", CLASS: "a class", ENUM: "an enum", SWITCH: "a switch"}
 
 ## ── the tree ─────────────────────────────────────────────────────────────────
 
@@ -487,9 +489,14 @@ class ParseTracer
         self.failAt(fn, index, start, self.peek().line, msg, extra)
     end
 
-    ## A construct this trace does not cover.
+    ## A construct this trace does not follow: the line that reached it stays lit and says so, and the
+    ## trace ends there, with the tree as it stood.
     func notCovered(what)
-        throw "not covered by this trace: {what}"
+        var last = self.result.steps[#self.result.steps]
+        last.stop = what
+        last.event = true
+        last.note = "The parser now reads {what}, which this animation does not follow. It stops here: the tree is what had been built so far."
+        throw "stop"
     end
 
     ## ── the lists of a statement ─────────────────────────────────────────────
@@ -653,6 +660,7 @@ class ParseTracer
             self.fail("parse_one_stmt", 17, "fail(", "';' is not valid syntax — statements are terminated by newlines")
         end
         if NOT_COVERED.has(ty) then
+            self.run("parse_one_stmt", 13, "switch (peek().type)", {also: PCASE[ty]})
             self.notCovered(NOT_COVERED[ty])
         end
         var known = DISPATCH.has(ty) or DECLARATIONS.has(ty) or ty == "IDENTIFIER"
@@ -1445,7 +1453,7 @@ class ParseTracer
         var isRef = self.check("REF")
         self.run("unary", 20, "if (check(TokenType::REF))")
         if isRef then
-            self.notCovered("ref")
+            self.notCovered("a ref")
         end
         self.run("unary", 22, "return power();")
         var p = self.power()
@@ -1747,7 +1755,7 @@ class ParseTracer
         var isSuper = name == "super"
         self.run("primary", 42, "if (name ==")
         if isSuper then
-            self.notCovered("super")
+            self.notCovered("a super call")
         end
         var optCall = self.atOptionalCall()
         self.run("primary", 60, "bool opt_call = at_optional_call();")
@@ -1948,7 +1956,7 @@ end
 ## nodes alive at the end, `nodeCount` how many were ever made.
 func parseTrace(source)
     var lexed = trace(source)
-    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil}
+    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil, stopped: nil}
     if lexed.error then
         result.error = lexed.error
         return result
@@ -1958,12 +1966,15 @@ func parseTrace(source)
     try
         result.tree = t.parse()
     catch e
-        if e <> "parse error" then
+        var last = result.steps[#result.steps]
+        if e == "stop" then
+            result.stopped = last.stop
+        elseif e == "parse error" then
+            result.error = last.err
+            result.errorLine = last.errLine
+        else
             throw e
         end
-        var last = result.steps[#result.steps]
-        result.error = last.err
-        result.errorLine = last.errLine
     end
     result.nodes = t.nodes
     result.nodeCount = t.nextId - 1

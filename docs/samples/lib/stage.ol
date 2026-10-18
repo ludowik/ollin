@@ -62,6 +62,9 @@ const MIN_SPEED = 0.25
 const MAX_SPEED = 8
 const CODE_LEADING = 1.55    ## the height of a line of code, in font sizes
 const NOTE_LEADING = 1.4
+const CODE_GUTTER = 5        ## the columns the line numbers take, in characters
+const MIN_CODE_FONT = 10     ## the smallest code a narrow screen is given, in pixels
+const MIN_CHIP_TYPE_FONT = 8.5   ## the smallest name of a token type on a chip
 
 const PUNCTUATION = ["COMMA", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACKET", "RBRACKET", "COLON",
                      "SEMICOLON", "DOT", "DOT_DOT_DOT", "QUESTION"]
@@ -450,7 +453,7 @@ end
 ## The chips of the tokens in rows of width `availW`: a chip is as wide as the wider of its two texts,
 ## and `rowGap` is the room left under a row. `bottom` is where the rows end.
 func layoutChips(tokens, fs, availW, rowGap)
-    var tfs = fs * 0.7
+    var tfs = math.max(fs * 0.7, MIN_CHIP_TYPE_FONT)
     var chipH = fs + tfs + SIZE * 0.03
     var chips = []
     var x = 0
@@ -490,17 +493,32 @@ end
 
 ## What the code panel shows of a function, prepared once: each line cut to the columns that fit,
 ## whether it is a comment, and its number in the C++ file.
-func codeLines(fn)
-    if not codeCache.has(fn) then
+func codeLines(fn, cols)
+    var key = "{cols}/{fn}"
+    if not codeCache.has(key) then
         var listing = stage.cpp[fn]
         var rows = []
         for j, code in listing.lines do
-            rows.push({text: clip(code, stage.columns), comment: listing.trimmed[j].startsWith("//"),
+            rows.push({text: clip(code, cols), comment: listing.trimmed[j].startsWith("//"),
                        number: "{listing.first + j - 1}"})
         end
-        codeCache[fn] = rows
+        codeCache[key] = rows
     end
-    return codeCache[fn]
+    return codeCache[key]
+end
+
+## The font size of the code and the columns it shows. The whole of `stage.columns` is shown when
+## it fits at a size that can be read; on a narrow screen the lines are cut instead, since a font
+## too small to read shows nothing.
+func codeFit(width)
+    var avail = width - 2 * SIZE * 0.02
+    var fs = math.min(avail / ((stage.columns + CODE_GUTTER) * monoRatio), SIZE * 0.034)
+    var cols = stage.columns
+    if W < H and fs < MIN_CODE_FONT then
+        fs = MIN_CODE_FONT
+        cols = math.max(math.floor(avail / (fs * monoRatio)) - CODE_GUTTER, 20)
+    end
+    return math.max(fs, 7), cols
 end
 
 ## The first line of the listing that is on show when the engine is on `step`: it keeps the line being
@@ -512,23 +530,23 @@ func codeTop(step, rows)
 end
 
 func drawCode(r, i, t, s)
-    var listing = codeLines(s.fn)
+    var fs, cols = codeFit(r.w)
+    var listing = codeLines(s.fn, cols)
     panel(r, stage.file + "  -  " + stage.owner + "::" + s.fn + "()")
     var pad = SIZE * 0.02
     graphics.font("mono")
-    var gutter = 5
-    var fs = math.max(math.min((r.w - 2 * pad) / ((stage.columns + gutter) * monoRatio), SIZE * 0.034), 7)
+    var gutter = CODE_GUTTER
     var cw = fs * monoRatio
     var lh = fs * CODE_LEADING
     var y0 = r.y + titleHeight()
 
     ## what is being called, and the locals
     graphics.fontSize(fs)
-    label(clipLeft(s.stack, stage.columns), r.x + pad, y0, CARET)
+    label(clipLeft(s.stack, cols), r.x + pad, y0, CARET)
     if s.watchText == nil then
         s.watchText = stage.watch(s)    ## a step never changes
     end
-    label(s.watchText, r.x + pad, y0 + lh, DIM)
+    label(clip(s.watchText, cols + gutter), r.x + pad, y0 + lh, DIM)
     var top = y0 + lh * 2 + pad * 0.4
     var bottom = r.y + r.h - pad * 0.5
     var rows = math.max(math.floor((bottom - top) / lh), 1)
