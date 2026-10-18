@@ -9,7 +9,7 @@ const BOX = 3
 const CELLS = GRID * GRID
 
 ## The 27 zones that clear when full: nine rows, nine columns, nine boxes, each a list of 9 indices.
-global board = {zones: []}
+global board = {zones: [], budget: 0}
 
 func boardIdx(r, c)
     return (r - 1) * GRID + c
@@ -129,15 +129,128 @@ func boardClear(g, cleared)
     end
 end
 
-## What placing the shape at (r, c) WOULD clear, on a copy: the grid is left as it is.
-func boardPreview(g, shape, r, c)
+func boardCopy(g)
     var copy = boardNew()
     for i = 1, CELLS do
         copy[i] = g[i]
     end
+    return copy
+end
+
+## What placing the shape at (r, c) WOULD clear, on a copy: the grid is left as it is.
+func boardPreview(g, shape, r, c)
+    var copy = boardCopy(g)
     boardPlace(copy, shape, r, c)
     var cleared = boardFull(copy)
     return cleared
+end
+
+## How many cells are filled.
+func boardFilled(g)
+    var n = 0
+    for i = 1, CELLS do
+        n += g[i]
+    end
+    return n
+end
+
+## Whether the shape can be placed so that it fills every empty cell of `gap` (the empty cells of one zone),
+## and so clears that zone. It is anchored on the first cell of the gap, one of its own cells at a time.
+func boardFillsGap(g, shape, gap)
+    var r0 = boardRow(gap[1])
+    var c0 = boardCol(gap[1])
+    for anchor in shape.cells do
+        var r = r0 - anchor[1]
+        var c = c0 - anchor[2]
+        if boardCanPlace(g, shape, r, c) then
+            var covered = 0
+            for off in shape.cells do
+                if gap.contains(boardIdx(r + off[1], c + off[2])) then
+                    covered += 1
+                end
+            end
+            if covered == len(gap) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+## The shapes, among `shapes`, that would clear a zone if placed well on this grid. Only a zone with few enough
+## empty cells for a shape to fill is looked at, so the search stays short.
+func boardCompleting(g, shapes)
+    var most = 0
+    for s in shapes do
+        most = math.max(most, s.n)
+    end
+    var gaps = []
+    for z in board.zones do
+        var gap = []
+        for i in z do
+            if g[i] == 0 then
+                gap.push(i)
+            end
+        end
+        if len(gap) > 0 and len(gap) <= most then
+            gaps.push(gap)
+        end
+    end
+    var out = []
+    for s in shapes do
+        for gap in gaps do
+            if len(gap) <= s.n and boardFillsGap(g, s, gap) then
+                out.push(s)
+                break
+            end
+        end
+    end
+    return out
+end
+
+## Whether every shape of the hand can be placed, one after the other in some order. A line cleared on the way
+## is not counted, which asks a little more than the game does; the search stops after PLAY_BUDGET placements
+## tried and then says no, which only makes the caller draw another hand.
+const PLAY_BUDGET = 120
+
+func boardPlayAll(g, shapes)
+    for s in shapes do
+        if not boardAnyMove(g, s) then
+            return false
+        end
+    end
+    board.budget = PLAY_BUDGET
+    return boardPlaysFrom(g, shapes)
+end
+
+func boardPlaysFrom(g, left)
+    if len(left) == 0 then
+        return true
+    end
+    for k, s in left do
+        var rest = []
+        for j, other in left do
+            if j <> k then
+                rest.push(other)
+            end
+        end
+        for r = 1, GRID do
+            for c = 1, GRID do
+                if boardCanPlace(g, s, r, c) then
+                    board.budget -= 1
+                    if board.budget < 0 then
+                        return false
+                    end
+                    var after = boardCopy(g)
+                    boardPlace(after, s, r, c)
+                    if boardPlaysFrom(after, rest) then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
 
 boardBuildZones()

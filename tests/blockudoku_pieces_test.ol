@@ -31,22 +31,21 @@ assert(len(pieces.shapes) == 43, "expected 43 shapes, got {len(pieces.shapes)}")
 assert(shapeFromKey("nope") == nil)
 
 ## The weights are those of the reference game: 83 draws, the single cell and the line of five at 1.
-assert(len(pieces.bag) == 83, "the bag holds {len(pieces.bag)} entries, expected 83")
-var counts = {}
-for s in pieces.bag do
-    counts[s.key] = (counts[s.key] or 0) + 1
-end
+var total = 0
 var light = []
 for s in pieces.shapes do
-    if counts[s.key] == 1 then
+    total += s.weight
+    if s.weight == 1 then
         light.push(s.key)
     else
-        assert(counts[s.key] == 2, "{s.key} weighs {counts[s.key]}")
+        assert(s.weight == 2, "{s.key} weighs {s.weight}")
     end
+    assert(shapeWeight(s, DIFFICULTY.helpEnd) == s.weight, "{s.key} must weigh its own weight at the reference level")
 end
+assert(total == 83, "the weights add up to {total}, expected 83")
 assert(len(light) == 3 and light.contains("#") and light.contains("#####") and light.contains("#/#/#/#/#"), "the weight-1 shapes are wrong")
 
-## randomShape follows the bag: over many draws the light shapes come about half as often as a heavy one.
+## randomShape follows the weights: over many draws the light shapes come about half as often as a heavy one.
 var drawn = {}
 for i = 1, 8300 do
     var k = randomShape().key

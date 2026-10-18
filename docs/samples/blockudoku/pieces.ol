@@ -1,31 +1,41 @@
 ## The PIECES of Blockudoku. A piece is never rotated by the player, so each orientation is a shape
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
-global pieces = {shapes: [], bag: []}
+global pieces = {shapes: [], tables: {}}
 
-## A family groups the orientations of one piece and optionally gives a weight: how many
-## times each of its shapes sits in the bag a hand is drawn from. Most shapes weigh DEFAULT_WEIGHT; the
+## How awkward a piece is to place; the draw favours the soft ones at the start of a game and the hard ones late.
+const SOFT = -1
+const NORMAL = 0
+const HARD = 1
+
+## A family groups the orientations of one piece, says how hard it is, and optionally gives a weight: the
+## chance each of its shapes has of being drawn at the reference level. Most shapes weigh DEFAULT_WEIGHT; the
 ## single cell and the line of five come half as often.
 const DEFAULT_WEIGHT = 2
 const SHAPE_FAMILIES = [
-    [[["#"]], 1],
-    [[["##"], ["#", "#"]]],
-    [[["###"], ["#", "#", "#"]]],
-    [[["####"], ["#", "#", "#", "#"]]],
-    [[["#####"], ["#", "#", "#", "#", "#"]], 1],
-    [[["##", "##"]]],
-    [[["#..", "#..", "###"], ["###", "#..", "#.."], ["###", "..#", "..#"], ["..#", "..#", "###"]]],
-    [[["##", "#."], ["##", ".#"], ["#.", "##"], [".#", "##"]]],
-    [[["#.", "#.", "##"], ["###", "#.."], ["##", ".#", ".#"], ["..#", "###"]]],
-    [[[".#", ".#", "##"], ["#..", "###"], ["##", "#.", "#."], ["###", "..#"]]],
-    [[["###", ".#."], [".#.", "###"], ["#.", "##", "#."], [".#", "##", ".#"]]],
-    [[[".##", "##."], ["#.", "##", ".#"]]],
-    [[["##.", ".##"], [".#", "##", "#."]]],
-    [[["###", "#.#"], ["#.#", "###"], ["##", "#.", "##"], ["##", ".#", "##"]]],
-    [[[".#.", "###", ".#."]]],
-    [[["#.", ".#"], [".#", "#."]]],
-    [[["#..", ".#.", "..#"], ["..#", ".#.", "#.."]]]
+    [[["#"]], SOFT, 1],
+    [[["##"], ["#", "#"]], SOFT],
+    [[["###"], ["#", "#", "#"]], SOFT],
+    [[["####"], ["#", "#", "#", "#"]], NORMAL],
+    [[["#####"], ["#", "#", "#", "#", "#"]], HARD, 1],
+    [[["##", "##"]], SOFT],
+    [[["#..", "#..", "###"], ["###", "#..", "#.."], ["###", "..#", "..#"], ["..#", "..#", "###"]], HARD],
+    [[["##", "#."], ["##", ".#"], ["#.", "##"], [".#", "##"]], SOFT],
+    [[["#.", "#.", "##"], ["###", "#.."], ["##", ".#", ".#"], ["..#", "###"]], NORMAL],
+    [[[".#", ".#", "##"], ["#..", "###"], ["##", "#.", "#."], ["###", "..#"]], NORMAL],
+    [[["###", ".#."], [".#.", "###"], ["#.", "##", "#."], [".#", "##", ".#"]], NORMAL],
+    [[[".##", "##."], ["#.", "##", ".#"]], HARD],
+    [[["##.", ".##"], [".#", "##", "#."]], HARD],
+    [[["###", "#.#"], ["#.#", "###"], ["##", "#.", "##"], ["##", ".#", "##"]], HARD],
+    [[[".#.", "###", ".#."]], HARD],
+    [[["#.", ".#"], [".#", "#."]], NORMAL],
+    [[["#..", ".#.", "..#"], ["..#", ".#.", "#.."]], HARD]
 ]
+
+## The difficulty, by level. The level is the score divided by pointsPerLevel. Up to helpEnd the game helps (see
+## deal.ol) and the soft shapes are drawn more often; helpEnd is the game as it was before levels, and from there
+## to hardEnd the hard shapes become more frequent. A level past hardEnd draws like hardEnd.
+const DIFFICULTY = {pointsPerLevel: 1000, helpEnd: 8, hardEnd: 13}
 
 func parseShape(rows)
     var cells = []
@@ -42,20 +52,61 @@ end
 
 func buildShapes()
     pieces.shapes = []
-    pieces.bag = []
+    pieces.tables = {}
     for family in SHAPE_FAMILIES do
         var weight = DEFAULT_WEIGHT
-        if len(family) > 1 then
-            weight = family[2]
+        if len(family) > 2 then
+            weight = family[3]
         end
         for rows in family[1] do
             var shape = parseShape(rows)
+            shape.hardness = family[2]
+            shape.weight = weight
             pieces.shapes.push(shape)
-            for i = 1, weight do
-                pieces.bag.push(shape)
-            end
         end
     end
+end
+
+func levelOf(score)
+    return score // DIFFICULTY.pointsPerLevel
+end
+
+## 1 at level 0, down to 0 at helpEnd: how much the game helps.
+func helpAt(level)
+    return math.clamp(1 - level / DIFFICULTY.helpEnd, 0, 1)
+end
+
+## 0 up to helpEnd, 1 from hardEnd: how far the hard shapes have been pushed.
+func hardAt(level)
+    return math.clamp((level - DIFFICULTY.helpEnd) / (DIFFICULTY.hardEnd - DIFFICULTY.helpEnd), 0, 1)
+end
+
+## What a shape weighs in the draw at this level. At helpEnd every shape weighs its own weight: the game before levels.
+func shapeWeight(shape, level)
+    var help = helpAt(level)
+    var hard = hardAt(level)
+    if shape.hardness == SOFT then
+        return shape.weight * (1 + 2 * help - 0.5 * hard)
+    elseif shape.hardness == HARD then
+        return shape.weight * (1 - 0.6 * help + 1.5 * hard)
+    end
+    return shape.weight
+end
+
+## The weights of every shape at a level, and their sum, worked out once per level.
+func weightTable(level)
+    var key = "{math.min(level, DIFFICULTY.hardEnd)}"
+    if not pieces.tables.has(key) then
+        var weights = []
+        var total = 0
+        for s in pieces.shapes do
+            var w = shapeWeight(s, level)
+            weights.push(w)
+            total += w
+        end
+        pieces.tables[key] = {weights: weights, total: total}
+    end
+    return pieces.tables[key]
 end
 
 ## Lays every shape out in rows, for a catalogue: a piece takes its bounding box at cell size u, one cell of air
@@ -103,6 +154,18 @@ func shapeFromKey(key)
     return nil
 end
 
-func randomShape()
-    return pieces.bag[math.randInt(1, len(pieces.bag))]
+## A shape drawn at random, by the weights of the level (helpEnd when none is given).
+func randomShape(level)
+    if level == nil then
+        level = DIFFICULTY.helpEnd
+    end
+    var table = weightTable(level)
+    var pick = math.rand() * table.total
+    for i, s in pieces.shapes do
+        pick -= table.weights[i]
+        if pick < 0 then
+            return s
+        end
+    end
+    return pieces.shapes[len(pieces.shapes)]
 end

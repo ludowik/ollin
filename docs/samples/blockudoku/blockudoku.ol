@@ -1,16 +1,17 @@
 ## Blockudoku: a 9x9 grid cut into nine 3x3 boxes. Drag one of the three pieces onto the grid; every
 ## complete row, column or box is cleared. The game ends when none of the pieces left fits anywhere.
 ##
-## board.ol holds the rules, pieces.ol the shapes, sounds.ol the sound, texts.ol the words in French and
-## English; this file is the game: its state, its input, its animations and its drawing. The layout follows
-## the orientation of the area (graphics.fitArea) and is computed again whenever it is needed, so nothing
-## has to be kept in step.
+## board.ol holds the rules, pieces.ol the shapes, deal.ol how a hand is drawn as the score rises, sounds.ol the
+## sound, texts.ol the words in French and English; this file is the game: its state, its input, its animations
+## and its drawing. The layout follows the orientation of the area (graphics.fitArea) and is computed again
+## whenever it is needed, so nothing has to be kept in step.
 ##
 ## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs.
 ## The other files keep theirs in one object each: `board`, `pieces`, `sounds`, `i18n`.
 
 import "board.ol"
 import "pieces.ol"
+import "deal.ol"
 import "sounds.ol"
 import "texts.ol"
 
@@ -381,27 +382,10 @@ func allSlotsEmpty()
     return true
 end
 
-## Three pieces, redrawn until at least one of them fits: a hand that cannot be played at all ends
-## the game on the spot, which is no fault of the player's.
+## Three pieces, drawn for the level the score has reached (see deal.ol).
 func dealPieces()
     var L = game.layout
-    var picks = []
-    for attempt = 1, 60 do
-        picks = []
-        for i = 1, 3 do
-            picks.push(randomShape())
-        end
-        var playable = false
-        for s in picks do
-            if boardAnyMove(game.grid, s) then
-                playable = true
-                break
-            end
-        end
-        if playable then
-            break
-        end
-    end
+    var picks = drawHand(game.grid, levelOf(game.score))
     layoutCompute()
     for i = 1, 3 do
         var p = newSlot(picks[i], L.sx[i], H + 3 * L.c, true)
