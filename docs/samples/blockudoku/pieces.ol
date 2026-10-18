@@ -1,7 +1,7 @@
 ## The PIECES of Blockudoku. A piece is never rotated by the player, so each orientation is a shape
 ## of its own. A shape is drawn as rows of text: "#" is a cell, "." is a hole in its bounding box.
 
-global pieces = {shapes: [], tables: {}}
+global pieces = {shapes: [], small: [], tables: {}}
 
 ## How awkward a piece is to place; the draw favours the soft ones at the start of a game and the hard ones late.
 const SOFT = -1
@@ -35,7 +35,15 @@ const SHAPE_FAMILIES = [
 ## The difficulty, by level. The level is the score divided by pointsPerLevel. Up to helpEnd the game helps (see
 ## deal.ol) and the soft shapes are drawn more often; helpEnd is the game as it was before levels, and from there
 ## to hardEnd the hard shapes become more frequent. A level past hardEnd draws like hardEnd.
-const DIFFICULTY = {pointsPerLevel: 1000, helpEnd: 8, hardEnd: 13}
+const DIFFICULTY = {
+    pointsPerLevel: 1000, helpEnd: 8, hardEnd: 13,
+    softBoost: 2, softFade: 0.5,      ## a soft shape weighs (1 + softBoost * help - softFade * hard) times its weight
+    hardEase: 0.6, hardBoost: 1.5,    ## a hard one (1 - hardEase * help + hardBoost * hard) times
+    dealAttempts: 8,                  ## helped hands tried, in each phase, before falling back on a plain draw
+    plainAttempts: 60,
+    reliefFill: 0.55, reliefSpread: 0.5   ## the share of filled cells from which a small piece is given: at level 0, then up to a full grid at helpEnd
+}
+const SMALL_CELLS = 2                 ## the shapes of this many cells or fewer fit almost anywhere
 
 func parseShape(rows)
     var cells = []
@@ -52,6 +60,7 @@ end
 
 func buildShapes()
     pieces.shapes = []
+    pieces.small = []
     pieces.tables = {}
     for family in SHAPE_FAMILIES do
         var weight = DEFAULT_WEIGHT
@@ -63,6 +72,9 @@ func buildShapes()
             shape.hardness = family[2]
             shape.weight = weight
             pieces.shapes.push(shape)
+            if shape.n <= SMALL_CELLS then
+                pieces.small.push(shape)
+            end
         end
     end
 end
@@ -86,9 +98,9 @@ func shapeWeight(shape, level)
     var help = helpAt(level)
     var hard = hardAt(level)
     if shape.hardness == SOFT then
-        return shape.weight * (1 + 2 * help - 0.5 * hard)
+        return shape.weight * (1 + DIFFICULTY.softBoost * help - DIFFICULTY.softFade * hard)
     elseif shape.hardness == HARD then
-        return shape.weight * (1 - 0.6 * help + 1.5 * hard)
+        return shape.weight * (1 - DIFFICULTY.hardEase * help + DIFFICULTY.hardBoost * hard)
     end
     return shape.weight
 end
@@ -154,11 +166,8 @@ func shapeFromKey(key)
     return nil
 end
 
-## A shape drawn at random, by the weights of the level (helpEnd when none is given).
+## A shape drawn at random, by the weights of the level.
 func randomShape(level)
-    if level == nil then
-        level = DIFFICULTY.helpEnd
-    end
     var table = weightTable(level)
     var pick = math.rand() * table.total
     for i, s in pieces.shapes do

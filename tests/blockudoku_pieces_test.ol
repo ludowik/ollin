@@ -48,7 +48,7 @@ assert(len(light) == 3 and light.contains("#") and light.contains("#####") and l
 ## randomShape follows the weights: over many draws the light shapes come about half as often as a heavy one.
 var drawn = {}
 for i = 1, 8300 do
-    var k = randomShape().key
+    var k = randomShape(DIFFICULTY.helpEnd).key
     drawn[k] = (drawn[k] or 0) + 1
 end
 assert(drawn["#"] > 0 and drawn["##"] > drawn["#"], "the single cell must be rarer than the domino")

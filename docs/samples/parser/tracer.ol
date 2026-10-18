@@ -1956,7 +1956,7 @@ end
 ## nodes alive at the end, `nodeCount` how many were ever made.
 func parseTrace(source)
     var lexed = trace(source)
-    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil, stopped: nil}
+    var result = {steps: [], tokens: [], tree: nil, error: nil, errorLine: nil}
     if lexed.error then
         result.error = lexed.error
         return result
@@ -1966,13 +1966,11 @@ func parseTrace(source)
     try
         result.tree = t.parse()
     catch e
-        var last = result.steps[#result.steps]
-        if e == "stop" then
-            result.stopped = last.stop
-        elseif e == "parse error" then
+        if e == "parse error" then
+            var last = result.steps[#result.steps]
             result.error = last.err
             result.errorLine = last.errLine
-        else
+        elseif e <> "stop" then
             throw e
         end
     end

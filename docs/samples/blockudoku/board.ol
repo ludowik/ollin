@@ -7,9 +7,11 @@
 const GRID = 9
 const BOX = 3
 const CELLS = GRID * GRID
+const HAND = 3                  ## the pieces on offer at once
+const PLAY_BUDGET = 120         ## placements boardPlayAll tries before saying no
 
 ## The 27 zones that clear when full: nine rows, nine columns, nine boxes, each a list of 9 indices.
-global board = {zones: [], budget: 0}
+global board = {zones: []}
 
 func boardIdx(r, c)
     return (r - 1) * GRID + c
@@ -211,19 +213,16 @@ end
 ## Whether every shape of the hand can be placed, one after the other in some order. A line cleared on the way
 ## is not counted, which asks a little more than the game does; the search stops after PLAY_BUDGET placements
 ## tried and then says no, which only makes the caller draw another hand.
-const PLAY_BUDGET = 120
-
 func boardPlayAll(g, shapes)
     for s in shapes do
         if not boardAnyMove(g, s) then
             return false
         end
     end
-    board.budget = PLAY_BUDGET
-    return boardPlaysFrom(g, shapes)
+    return boardPlaysFrom(g, shapes, {tries: PLAY_BUDGET})
 end
 
-func boardPlaysFrom(g, left)
+func boardPlaysFrom(g, left, budget)
     if len(left) == 0 then
         return true
     end
@@ -237,13 +236,13 @@ func boardPlaysFrom(g, left)
         for r = 1, GRID do
             for c = 1, GRID do
                 if boardCanPlace(g, s, r, c) then
-                    board.budget -= 1
-                    if board.budget < 0 then
+                    budget.tries -= 1
+                    if budget.tries < 0 then
                         return false
                     end
                     var after = boardCopy(g)
                     boardPlace(after, s, r, c)
-                    if boardPlaysFrom(after, rest) then
+                    if boardPlaysFrom(after, rest, budget) then
                         return true
                     end
                 end

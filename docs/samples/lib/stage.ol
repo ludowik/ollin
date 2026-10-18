@@ -535,7 +535,6 @@ func drawCode(r, i, t, s)
     panel(r, stage.file + "  -  " + stage.owner + "::" + s.fn + "()")
     var pad = SIZE * 0.02
     graphics.font("mono")
-    var gutter = CODE_GUTTER
     var cw = fs * monoRatio
     var lh = fs * CODE_LEADING
     var y0 = r.y + titleHeight()
@@ -546,7 +545,7 @@ func drawCode(r, i, t, s)
     if s.watchText == nil then
         s.watchText = stage.watch(s)    ## a step never changes
     end
-    label(clip(s.watchText, cols + gutter), r.x + pad, y0 + lh, DIM)
+    label(clip(s.watchText, cols + CODE_GUTTER), r.x + pad, y0 + lh, DIM)
     var top = y0 + lh * 2 + pad * 0.4
     var bottom = r.y + r.h - pad * 0.5
     var rows = math.max(math.floor((bottom - top) / lh), 1)
@@ -587,7 +586,7 @@ func drawCode(r, i, t, s)
                 ink = PROCESSED
             end
             label(row.number, r.x + pad + (4 - #row.number) * cw, y, active and CARET or PROCESSED)
-            label(row.text, r.x + pad + gutter * cw, y, ink)
+            label(row.text, r.x + pad + CODE_GUTTER * cw, y, ink)
         end
     end
 end

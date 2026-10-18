@@ -356,7 +356,6 @@ refuses("var x = 1 +" + NEWLINE, "2: unexpected token ''")
 func notCovered(text, what)
     var r = parseTrace(unquote(text))
     var last = r.steps[#r.steps]
-    assert(r.stopped == what, "'{text}' should stop at {what}: '{r.stopped}'")
     assert(last.stop == what and last.event and last.note.startsWith("The parser now reads"), "'{text}': the last step should say it")
     assert(r.error == nil and r.tree == nil, "'{text}' is not a refusal")
     for st in r.steps do
@@ -376,7 +375,7 @@ notCovered("var x = ]1; 3]", "an open-left range")
 
 ## the lines before the construct are followed as usual, here inside a block
 var inner = parseTrace(unquote("if x then" + NEWLINE + "    var y = 1" + NEWLINE + "    class A end" + NEWLINE + "end"))
-assert(inner.stopped == "a class" and #inner.steps > 40, "a class inside an if: {inner.stopped}, {#inner.steps} steps")
+assert(inner.steps[#inner.steps].stop == "a class" and #inner.steps > 40, "a class inside an if: {#inner.steps} steps")
 
 ## the trace itself, line by line. `break` is the shortest statement: parse() asks parse_one_stmt() for a
 ## statement, whose switch sends it to break_stmt(); the result goes back up, and parse() finds the end.
