@@ -38,11 +38,11 @@ tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de carac
 `tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
 `docs/vendor/`, `docs/wasm/`, `libs/robin_hood.h`).
 
-**Seule exception à l'anglais, voulue par l'utilisateur** : les textes localisés de Blockudoku
-(`docs/samples/blockudoku/texts.ol` et son test `tests/blockudoku_texts_test.ol`) sont en français
-À DESSEIN, le français étant la langue par défaut du jeu et l'anglais la seconde. Ne pas les traduire
-ni les signaler à la passe de dictionnaire. Les identifiants et les commentaires de ces fichiers
-restent en anglais.
+**Seule exception à l'anglais, voulue par l'utilisateur** : les textes localisés de Blockudoku et de
+Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et leurs tests
+`tests/blockudoku_texts_test.ol`, `tests/sudoku_texts_test.ol`) sont en français À DESSEIN, le français
+étant la langue par défaut de ces jeux et l'anglais la seconde. Ne pas les traduire ni les signaler à la
+passe de dictionnaire. Les identifiants et les commentaires de ces fichiers restent en anglais.
 
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans

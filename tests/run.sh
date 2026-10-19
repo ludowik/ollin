@@ -37,6 +37,8 @@ run_pass tests/regressions.ol
 run_pass tests/blockudoku_pieces_test.ol
 run_pass tests/blockudoku_deal_test.ol
 run_pass tests/blockudoku_texts_test.ol
+run_pass tests/sudoku_test.ol
+run_pass tests/sudoku_texts_test.ol
 run_pass tests/lexer_trace_test.ol
 run_pass tests/parser_trace_test.ol
 

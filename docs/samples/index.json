@@ -29,6 +29,7 @@
   { "group": "Games", "name": "Ollin Asteroids", "file": "asteroids/asteroids.ol", "icon": "icons/asteroids.png" },
   { "group": "Games", "name": "Rally", "file": "rally/rally.ol", "icon": "icons/rally.png" },
   { "group": "Games", "name": "Blockudoku", "file": "blockudoku/blockudoku.ol", "icon": "icons/blockudoku.png" },
+  { "group": "Games", "name": "Sudoku", "file": "sudoku/sudoku.ol", "icon": "icons/sudoku.png" },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }
