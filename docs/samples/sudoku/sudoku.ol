@@ -575,7 +575,7 @@ func drawBoard()
     var c = L.c
     var sel = game.selected
     var digit = game.armed
-    if sel <> 0 and game.grid[sel] <> 0 then
+    if digit == 0 and sel <> 0 then
         digit = game.grid[sel]
     end
     var peerCells = {}
