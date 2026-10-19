@@ -130,11 +130,11 @@ end
 assert(solverFill(rngNew(7)).join() == solverFill(rngNew(7)).join() and solverFill(rngNew(7)).join() <> solverFill(rngNew(8)).join())
 
 ## ── The logic and the grade ─────────────────────────────────────────────────────────────────────
-assert(logicSolve(g, false).solved, "the naked singles solve the easy puzzle")
+assert(logicSolve(g, false), "the naked singles solve the easy puzzle")
 assert(puzzleGrade(g).level == LEVEL_EASY)
 var inkala = parse(INKALA)
 assert(solverCount(inkala, 2, nil).count == 1, "Inkala's puzzle has one solution")
-assert(not logicSolve(inkala, true).solved, "the singles do not solve it")
+assert(not logicSolve(inkala, true), "the singles do not solve it")
 assert(puzzleGrade(inkala).level >= LEVEL_HARD, "and it is Hard or Expert")
 
 ## ── The hints ───────────────────────────────────────────────────────────────────────────────────

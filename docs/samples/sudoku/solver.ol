@@ -105,6 +105,37 @@ end
 
 ## ── The search ──────────────────────────────────────────────────────────────────────────────────
 
+## The empty cell with the fewest candidates, the first one when several tie: cell, mask, count (cell 0 and count N + 1
+## when there is no empty cell). The scan of every node of a search, so the tables are read into locals once.
+func stateBestCell(st)
+    var g = st.g
+    var row = st.row
+    var col = st.col
+    var box = st.box
+    var rowOf = board.rowOf
+    var colOf = board.colOf
+    var boxOf = board.boxOf
+    var counts = board.count
+    var best = 0
+    var bestMask = 0
+    var bestN = N + 1
+    for i = 1, CELLS do
+        if g[i] == 0 then
+            var m = ALL & ~(row[rowOf[i]] | col[colOf[i]] | box[boxOf[i]])
+            var n = counts[m + 1]
+            if n < bestN then
+                best = i
+                bestMask = m
+                bestN = n
+                if n <= 1 then
+                    break
+                end
+            end
+        end
+    end
+    return best, bestMask, bestN
+end
+
 ## Looks for the solutions of the state, on the cell with the fewest candidates, until `limit` are found. With an
 ## rng the digits are tried in a random order. `found` gets the count, the first solution, and how many cells were
 ## guessed on (a cell with more than one candidate).
@@ -116,23 +147,7 @@ func solverSearch(st, limit, found, rng)
         end
         return
     end
-    var best = 0
-    var bestMask = 0
-    var bestN = N + 1
-    for i = 1, CELLS do
-        if st.g[i] == 0 then
-            var m = stateCands(st, i)
-            var n = maskCount(m)
-            if n < bestN then
-                best = i
-                bestMask = m
-                bestN = n
-                if n <= 1 then
-                    break
-                end
-            end
-        end
-    end
+    var best, bestMask, bestN = stateBestCell(st)
     if bestN == 0 then
         return
     end
@@ -226,31 +241,29 @@ func nextSingle(st, hidden)
     return nil
 end
 
-## Solves a grid with singles alone: {solved, steps}.
+## Whether singles alone solve a grid.
 func logicSolve(g, hidden)
     var st = stateNew(g)
     if st == nil then
-        return {solved: false, steps: 0}
+        return false
     end
-    var steps = 0
     while true do
         var move = nextSingle(st, hidden)
         if move == nil then
             break
         end
         statePlace(st, move.cell, move.digit)
-        steps += 1
     end
-    return {solved: st.empty == 0, steps: steps}
+    return st.empty == 0
 end
 
 ## How hard a puzzle is: Easy when the naked singles solve it, Medium when the hidden ones are needed too, and
 ## otherwise Hard or Expert by how many cells the search has to guess on. {level, guesses}.
 func puzzleGrade(g)
-    if logicSolve(g, false).solved then
+    if logicSolve(g, false) then
         return {level: LEVEL_EASY, guesses: 0}
     end
-    if logicSolve(g, true).solved then
+    if logicSolve(g, true) then
         return {level: LEVEL_MEDIUM, guesses: 0}
     end
     var guesses = solverCount(g, 1, nil).guesses
@@ -274,16 +287,6 @@ func hintFor(g, solution)
     if move <> nil then
         return move
     end
-    var best = 0
-    var bestN = N + 1
-    for i = 1, CELLS do
-        if g[i] == 0 then
-            var n = maskCount(stateCands(st, i))
-            if n < bestN then
-                best = i
-                bestN = n
-            end
-        end
-    end
+    var best = stateBestCell(st)
     return {kind: "plain", cell: best, digit: solution[best]}
 end

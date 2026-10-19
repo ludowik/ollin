@@ -85,7 +85,12 @@ func generatePuzzle(seed, level)
     return job.result
 end
 
+## A calendar day as one number: 20261019.
+func dayNumber(year, month, day)
+    return year * 10000 + month * 100 + day
+end
+
 ## The seed of the puzzle of a day and a level: the date in the local calendar, each level its own.
 func dailySeed(year, month, day, level)
-    return (year * 10000 + month * 100 + day) * 8 + level
+    return dayNumber(year, month, day) * 8 + level
 end

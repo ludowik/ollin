@@ -37,6 +37,11 @@ func maskDigits(mask)
     return out
 end
 
+## Whether cells i and j share a row, a column or a box.
+func boardShares(i, j)
+    return board.rowOf[i] == board.rowOf[j] or board.colOf[i] == board.colOf[j] or board.boxOf[i] == board.boxOf[j]
+end
+
 func boardBuild()
     board.rowOf = []
     board.colOf = []
@@ -78,26 +83,16 @@ func boardBuild()
     for i = 1, CELLS do
         var list = []
         for j = 1, CELLS do
-            var shares = board.rowOf[j] == board.rowOf[i] or board.colOf[j] == board.colOf[i] or board.boxOf[j] == board.boxOf[i]
-            if j <> i and shares then
+            if j <> i and boardShares(i, j) then
                 list.push(j)
             end
         end
         board.peers.push(list)
     end
     for mask = 0, ALL + 1 do
-        var n = 0
-        var low = 0
-        for d = 1, N do
-            if (mask & (1 << d)) <> 0 then
-                n += 1
-                if low == 0 then
-                    low = d
-                end
-            end
-        end
-        board.count.push(n)
-        board.low.push(low)
+        var digits = maskDigits(mask)
+        board.count.push(len(digits))
+        board.low.push(len(digits) > 0 and digits[1] or 0)
     end
 end
 

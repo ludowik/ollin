@@ -11,7 +11,6 @@ global i18n = {lang: LANGUAGES[1]}
 const TEXTS = {
     fr: {
         name: "Français",
-        title: "Sudoku",
         level: "Niveau",
         levelEasy: "Facile",
         levelMedium: "Moyen",
@@ -20,7 +19,6 @@ const TEXTS = {
         newGame: "Nouvelle partie",
         chooseLevel: "Choisissez un niveau",
         daily: "Grille du jour",
-        dailyBadge: "Grille du jour",
         options: "Options",
         menuHelp: "Comment jouer",
         menuLanguage: "Langue",
@@ -72,7 +70,6 @@ const TEXTS = {
     },
     en: {
         name: "English",
-        title: "Sudoku",
         level: "Level",
         levelEasy: "Easy",
         levelMedium: "Medium",
@@ -81,7 +78,6 @@ const TEXTS = {
         newGame: "New game",
         chooseLevel: "Choose a level",
         daily: "Puzzle of the day",
-        dailyBadge: "Puzzle of the day",
         options: "Options",
         menuHelp: "How to play",
         menuLanguage: "Language",

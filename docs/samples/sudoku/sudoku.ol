@@ -42,7 +42,6 @@ global config = {
     conflictTint: [1.0, 0.82, 0.82, 1],
     hintTint: [1.0, 0.94, 0.72, 1],  ## the unit a hidden-single hint talks about
     thin: [0.74, 0.77, 0.84, 1],
-    thick: [0.13, 0.15, 0.21, 1],
     button: [0.22, 0.27, 0.40, 1],
     buttonOn: [0.30, 0.55, 0.95, 1],
     buttonOff: [0.78, 0.80, 0.86, 1],
@@ -72,14 +71,14 @@ global game = {
     input: "cell",                   ## "cell" (a cell, then a digit) or "digit" (a digit, then cells)
     state: "play",                   ## play, won
     screen: "play",                  ## what is shown: the game, or a menu, the help, the choice of a level, the wait
-    job: nil,                        ## the puzzle being generated
-    pending: nil,                    ## what the job is for: {level, daily}
+    job: nil,                        ## the puzzle being generated: the generator's job, plus the day it is for
     tick: 0,                         ## frames so far, which tells two gestures from one gesture that arrives twice
     pressTick: -1,
     pop: {cell: 0, s: 1},            ## the cell that grows a little when a digit is placed in it
     win: {t: 0, cell: 0},            ## the wave over the grid when it is solved
+    help: {key: "", size: 0, lines: []},   ## the wrapped help, see helpLayout
     done: {},                        ## the puzzles of the day solved: "20261019:2" -> true
-    layout: {w: 0, h: 0, c: 0, portrait: true, bx: 0, by: 0, pad: [], tools: []}
+    layout: {w: 0, h: 0, c: 0, bx: 0, by: 0, pad: [], tools: []}
 }
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
@@ -106,13 +105,13 @@ func layoutCompute()
     var rowW = 15.0
     var cp = math.min((W - 2 * m) / N, (H - 2 * m) / colH)
     var cl = math.min((W - 2 * m) / rowW, (H - 2 * m) / N)
-    L.portrait = cp >= cl
+    var portrait = cp >= cl
     var c = math.floor(math.max(cp, cl))
     L.c = c
     L.bs = N * c
     L.pad = []
     L.tools = []
-    if L.portrait then
+    if portrait then
         var top = (H - colH * c) / 2
         L.bx = (W - L.bs) / 2
         L.by = top + 1.9 * c
@@ -170,7 +169,6 @@ end
 
 func showScreen(name)
     game.screen = name
-    game.pressTick = game.tick
 end
 
 ## The rectangle of the i-th of n entries of a menu, centred in the area.
@@ -189,7 +187,7 @@ func levelName(level)
 end
 
 func dailyKey(date, level)
-    return "{date.year * 10000 + date.month * 100 + date.day}:{level}"
+    return "{dayNumber(date.year, date.month, date.day)}:{level}"
 end
 
 func today()
@@ -210,18 +208,14 @@ func clearHint()
     game.message = ""
 end
 
-func resetNotesAndUndo()
-    game.notes = notesNew()
-    game.undo = []
-end
-
 ## Puts a generated puzzle in play.
 func installPuzzle(made, level, daily)
     tween.cancelAll()
     game.puzzle = boardCopy(made.puzzle)
     game.grid = boardCopy(made.puzzle)
     game.solution = made.solution
-    resetNotesAndUndo()
+    game.notes = notesNew()
+    game.undo = []
     game.level = level
     game.daily = daily
     game.hints = HINTS
@@ -243,18 +237,16 @@ func startGame(level, daily)
         seed = dailySeed(daily.year, daily.month, daily.day, level)
     end
     game.job = generatorNew(seed, level)
-    game.pending = {level: level, daily: daily}
-    game.screen = "generating"
-    game.pressTick = game.tick
+    game.job.daily = daily
+    showScreen("generating")
     sounds.confirm.play()
 end
 
 func updateGenerating()
     if game.job <> nil and generatorStep(game.job, config.stepSeconds) then
-        var pending = game.pending
-        var made = game.job.result
+        var job = game.job
         game.job = nil
-        installPuzzle(made, pending.level, pending.daily)
+        installPuzzle(job.result, job.level, job.daily)
         saveGame()
     end
 end
@@ -342,12 +334,11 @@ func enterDigit(i, d)
     if game.state <> "play" or game.puzzle[i] <> 0 then
         return
     end
+    if game.pencil and game.grid[i] <> 0 then
+        return
+    end
     pushUndo(i)
     if game.pencil then
-        if game.grid[i] <> 0 then
-            game.undo.pop()
-            return
-        end
         notesToggle(game.notes, i, d)
         clearHint()
         sounds.place.play()
@@ -451,11 +442,7 @@ func saveGame()
 end
 
 func saveDone()
-    var keys = []
-    for k in game.done.keys() do
-        keys.push(k)
-    end
-    data.set(config.dailyKey, keys.join(","))
+    data.set(config.dailyKey, game.done.keys().join(","))
 end
 
 func loadDone()
@@ -575,17 +562,12 @@ func drawHeader()
     var c = L.c
     var label = tr("level").upper()
     if game.daily <> nil then
-        label = tr("dailyBadge").upper()
+        label = tr("daily").upper()
     end
     drawText(label, L.titleX, L.titleY + 0.05 * c, c * 0.36, "left", "top", config.muted)
     drawText(levelName(game.level), L.titleX, L.titleY + 0.55 * c, fitSize(levelName(game.level), c * 0.95, c * 4.2), "left", "top", config.ink)
     drawButton(tr("newGame"), L.newBtn, config.button, c * 0.42)
     drawGear(L.gear)
-end
-
-## The row, the column and the box of cell i hold cell j.
-func sharesUnit(i, j)
-    return board.rowOf[i] == board.rowOf[j] or board.colOf[i] == board.colOf[j] or board.boxOf[i] == board.boxOf[j]
 end
 
 func drawBoard()
@@ -595,6 +577,12 @@ func drawBoard()
     var digit = game.armed
     if sel <> 0 and game.grid[sel] <> 0 then
         digit = game.grid[sel]
+    end
+    var peerCells = {}
+    if sel <> 0 then
+        for j in board.peers[sel] do
+            peerCells[j] = true
+        end
     end
     var hintCells = {}
     if game.hint <> nil and game.hint.kind == "hidden" then
@@ -612,7 +600,7 @@ func drawBoard()
         if hintCells[i] then
             tint = config.hintTint
         end
-        if sel <> 0 and sharesUnit(sel, i) then
+        if peerCells[i] then
             tint = config.peerTint
         end
         if digit <> 0 and game.grid[i] == digit then
@@ -649,22 +637,32 @@ func drawBoard()
                 size = size * game.pop.s
             end
             drawText("{v}", x + c / 2, y + c / 2, size, "center", "center", col)
-        elseif game.notes[i] <> 0 then
-            for d in maskDigits(game.notes[i]) do
-                var col = config.muted
-                if d == digit then
-                    col = config.blue
+        end
+    end
+    graphics.fontSize(c * 0.27)
+    graphics.textMode("center", "center")
+    for i = 1, CELLS do
+        if game.grid[i] == 0 and game.notes[i] <> 0 then
+            var x, y = cellPos(i)
+            for d = 1, N do
+                if (game.notes[i] & (1 << d)) <> 0 then
+                    var col = config.muted
+                    if d == digit then
+                        col = config.blue
+                    end
+                    graphics.stroke(col[1], col[2], col[3], col[4])
+                    graphics.text("{d}", x + ((d - 1) % 3 + 0.5) * c / 3, y + ((d - 1) // 3 + 0.5) * c / 3)
                 end
-                drawText("{d}", x + ((d - 1) % 3 + 0.5) * c / 3, y + ((d - 1) // 3 + 0.5) * c / 3, c * 0.27, "center", "center", col)
             end
         end
     end
+    graphics.noStroke()
     for k = 0, N do
         var thick = k % BOX == 0
         var w = math.max(1, c * 0.02)
         if thick then
             w = math.max(2, c * 0.07)
-            fillC(config.thick)
+            fillC(config.ink)
         else
             fillC(config.thin)
         end
@@ -726,32 +724,39 @@ func drawTools()
     drawButton("{tr("hint")} {game.hints}", L.tools[4], hintFill, c * 0.4)
 end
 
-## The line under the grid, cut into the lines that fit.
+## A text cut into the lines that fit the width at the size, breaking between words.
+func wrapText(str, size, width)
+    var lines = []
+    var line = ""
+    graphics.fontSize(size)
+    for word in str.split(" ") do
+        var tryLine = word
+        if line <> "" then
+            tryLine = line + " " + word
+        end
+        if graphics.textSize(tryLine) > width and line <> "" then
+            lines.push(line)
+            line = word
+        else
+            line = tryLine
+        end
+    end
+    lines.push(line)
+    return lines
+end
+
+## The line under the grid.
 func drawMessage()
     var L = game.layout
     if game.message == "" then
         return
     end
     var size = L.c * 0.34
-    graphics.fontSize(size)
-    var words = game.message.split(" ")
-    var line = ""
     var y = L.msg.y
-    for word in words do
-        var tryLine = word
-        if line <> "" then
-            tryLine = line + " " + word
-        end
-        graphics.fontSize(size)
-        if graphics.textSize(tryLine) > L.msg.w and line <> "" then
-            drawText(line, L.msg.x, y, size, "left", "top", config.ink)
-            y += size * 1.25
-            line = word
-        else
-            line = tryLine
-        end
+    for line in wrapText(game.message, size, L.msg.w) do
+        drawText(line, L.msg.x, y, size, "left", "top", config.ink)
+        y += size * 1.25
     end
-    drawText(line, L.msg.x, y, size, "left", "top", config.ink)
 end
 
 func drawWon()
@@ -807,8 +812,8 @@ func drawGenerating()
     var dots = math.floor(elapsedTime * 3) % 4
     var text = tr("generating")
     drawText(text, CX, CY - SIZE * 0.03, fitSize(text, SIZE * 0.06, W * 0.9), "center", "center", config.ink)
-    drawText(".".repeat(dots), CX + 0, CY + SIZE * 0.05, SIZE * 0.08, "center", "center", config.muted)
-    drawText(levelName(game.pending.level), CX, CY + SIZE * 0.15, SIZE * 0.04, "center", "center", config.muted)
+    drawText(".".repeat(dots), CX, CY + SIZE * 0.05, SIZE * 0.08, "center", "center", config.muted)
+    drawText(levelName(game.job.level), CX, CY + SIZE * 0.15, SIZE * 0.04, "center", "center", config.muted)
 end
 
 ## ── The menus ───────────────────────────────────────────────────────────────────────────────────
@@ -899,41 +904,42 @@ end
 func helpLines(size, width)
     var lines = []
     for paragraph in tr("help")({box: BOX, size: N, hints: HINTS}) do
-        var line = ""
-        for word in paragraph.split(" ") do
-            var tryLine = word
-            if line <> "" then
-                tryLine = line + " " + word
-            end
-            graphics.fontSize(size)
-            if graphics.textSize(tryLine) > width and line <> "" then
-                lines.push(line)
-                line = word
-            else
-                line = tryLine
-            end
+        for line in wrapText(paragraph, size, width) do
+            lines.push(line)
         end
-        lines.push(line)
         lines.push("")
     end
     return lines
 end
 
+## The size and the lines of the help, wrapped again only when the area or the language changes.
+func helpLayout()
+    var key = "{W}x{H} {i18n.lang}"
+    var cache = game.help
+    if cache.key <> key then
+        var width = W - 2 * SIZE * config.textMargin
+        var size = SIZE * 0.04
+        var lines = helpLines(size, width)
+        while len(lines) * size * 1.3 > H - SIZE * 0.2 and size > 8 do
+            size = size * 0.92
+            lines = helpLines(size, width)
+        end
+        cache.key = key
+        cache.size = size
+        cache.lines = lines
+    end
+    return cache
+end
+
 func drawHelp()
     drawScreenTitle(tr("menuHelp"))
-    var width = W - 2 * SIZE * config.textMargin
-    var size = SIZE * 0.04
-    var lines = helpLines(size, width)
-    while len(lines) * size * 1.3 > H - SIZE * 0.2 and size > 8 do
-        size = size * 0.92
-        lines = helpLines(size, width)
-    end
+    var help = helpLayout()
     var y = SIZE * 0.12
-    for line in lines do
+    for line in help.lines do
         if line <> "" then
-            drawText(line, SIZE * config.textMargin, y, size, "left", "top", config.ink)
+            drawText(line, SIZE * config.textMargin, y, help.size, "left", "top", config.ink)
         end
-        y += size * 1.3
+        y += help.size * 1.3
     end
     drawText(tr("tapBack"), CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
 end
