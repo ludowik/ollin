@@ -1,6 +1,8 @@
 ## The texts of the Sudoku sample: both languages must speak about everything, since a key missing from one of them
 ## would show up in the game as nothing at all, and the first language is the one the game starts in.
 
+import "../docs/samples/sudoku/board.ol"
+import "../docs/samples/sudoku/solver.ol"
 import "../docs/samples/sudoku/texts.ol"
 
 assert(LANGUAGES[1] == "fr", "French is the default language")
@@ -35,6 +37,18 @@ for code in LANGUAGES do
     for key in ["unitRow", "unitColumn", "unitBox"] do
         assert(table[key](4).find("4") <> nil, "{code}: {key} lost its number")
     end
+end
+
+## The words of a hint leave the hint as the screen reads it: its unit stays a number.
+for code in LANGUAGES do
+    setLanguage(code)
+    var hidden = {kind: "hidden", cell: boardIdx(2, 5), digit: 7, unit: 11}
+    var said = hintText(hidden)
+    assert(hidden.unit == 11 and typeof(hidden.unit) == "int", "{code}: hintText changed the unit of the hint")
+    assert(said.find(tr("unitColumn")(2)) <> nil and said.find("7") <> nil, "{code}: the hidden-single words lost the unit or the digit: {said}")
+    var naked = hintText({kind: "naked", cell: boardIdx(2, 5), digit: 7})
+    assert(naked.find("2") <> nil and naked.find("5") <> nil and naked.find("7") <> nil, "{code}: the naked-single words lost a figure")
+    assert(hintText({kind: "mistake", cell: 1, digit: 1}) == tr("hintMistake"))
 end
 
 setLanguage("en")

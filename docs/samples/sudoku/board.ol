@@ -224,6 +224,15 @@ func boardDecode(text)
     return g
 end
 
+## The integer a text stands for, or nil: a saved number that is not a whole one is no number of ours.
+func wholeNumber(text)
+    var v = text.number()
+    if typeof(v) <> "int" then
+        return nil
+    end
+    return v
+end
+
 ## The game in progress, as one text: the clues, the grid, the notes, the hints left, the level, the day (a map with
 ## year, month and day, or nil for a puzzle of no particular day).
 func gameEncode(puzzle, grid, notes, hints, level, daily)
@@ -246,8 +255,8 @@ func gameDecode(text, maxHints, maxLevel)
     end
     var puzzle = boardDecode(parts[1])
     var grid = boardDecode(parts[2])
-    var hints = parts[4].number()
-    var level = parts[5].number()
+    var hints = wholeNumber(parts[4])
+    var level = wholeNumber(parts[5])
     if puzzle == nil or grid == nil or hints == nil or level == nil or hints < 0 or hints > maxHints or level < 1 or level > maxLevel then
         return nil
     end
@@ -257,7 +266,7 @@ func gameDecode(text, maxHints, maxLevel)
     end
     var notes = []
     for t in noteTexts do
-        var v = t.number()
+        var v = wholeNumber(t)
         if v == nil or v < 0 or v > ALL then
             return nil
         end
@@ -271,10 +280,10 @@ func gameDecode(text, maxHints, maxLevel)
     var daily = nil
     if parts[6] <> "-" then
         var d = parts[6].split(",")
-        if len(d) <> 3 or d[1].number() == nil or d[2].number() == nil or d[3].number() == nil then
+        if len(d) <> 3 or wholeNumber(d[1]) == nil or wholeNumber(d[2]) == nil or wholeNumber(d[3]) == nil then
             return nil
         end
-        daily = {year: d[1].number(), month: d[2].number(), day: d[3].number()}
+        daily = {year: wholeNumber(d[1]), month: wholeNumber(d[2]), day: wholeNumber(d[3])}
     end
     return {puzzle: puzzle, grid: grid, notes: notes, hints: hints, level: level, daily: daily}
 end

@@ -75,6 +75,11 @@ badNotes[2] = 1024
 assert(gameDecode(gameEncode(boardDecode(puzzleText), played, badNotes, 2, 3, nil), 3, 4) == nil, "a note outside the digits")
 assert(gameDecode(text.replace("2026,10,19", "2026,10"), 3, 4) == nil and gameDecode(text.replace("2026,10,19", "a,b,c"), 3, 4) == nil, "a day that is not one")
 assert(gameDecode(text + "|x", 3, 4) == nil, "a text with a part too many")
+assert(gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 1.5, 3, nil), 3, 4) == nil and gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 2, 2.5, nil), 3, 4) == nil, "a hint count or a level that is not whole")
+assert(gameDecode(text.replace("2026,10,19", "2026,10,1.5"), 3, 4) == nil, "a day that is not whole")
+var halfNotes = boardCopy(savedNotes)
+halfNotes[3] = 1.5
+assert(gameDecode(gameEncode(boardDecode(puzzleText), played, halfNotes, 2, 3, nil), 3, 4) == nil, "a note that is not whole")
 
 ## ── The solver ──────────────────────────────────────────────────────────────────────────────────
 var found = solverCount(g, 2, nil)

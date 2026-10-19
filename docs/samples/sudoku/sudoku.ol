@@ -234,7 +234,6 @@ func installPuzzle(made, level, daily)
     refreshConflicts()
     game.state = "play"
     game.screen = "play"
-    saveGame()
 end
 
 ## A new puzzle of a level, or the one of a day: the work is done a little each frame, with a wait screen.
@@ -256,6 +255,7 @@ func updateGenerating()
         var made = game.job.result
         game.job = nil
         installPuzzle(made, pending.level, pending.daily)
+        saveGame()
     end
 end
 
@@ -379,22 +379,6 @@ func eraseSelected()
     afterChange(i, 0)
 end
 
-## The words of a hint, for the player.
-func hintMessage(h)
-    h.row = board.rowOf[h.cell]
-    h.col = board.colOf[h.cell]
-    if h.kind == "mistake" then
-        return tr("hintMistake")
-    elseif h.kind == "naked" then
-        return tr("hintNaked")(h)
-    elseif h.kind == "hidden" then
-        var kind, n = unitInfo(h.unit)
-        h.unit = tr({row: "unitRow", column: "unitColumn", box: "unitBox"}[kind])(n)
-        return tr("hintHidden")(h)
-    end
-    return tr("hintPlain")(h)
-end
-
 ## A hint: a wrong digit is shown for nothing; otherwise one of the hints of the puzzle is spent.
 func askHint()
     if game.state <> "play" then
@@ -412,7 +396,7 @@ func askHint()
     end
     game.hint = h
     game.selected = h.cell
-    game.message = hintMessage(h)
+    game.message = hintText(h)
     sounds.confirm.play()
 end
 

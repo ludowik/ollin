@@ -138,6 +138,23 @@ func tr(key)
     return TEXTS[i18n.lang][key]
 end
 
+## The words of a hint ({kind, cell, digit, unit}, see hintFor), which is left as it is: the screen still reads its
+## unit as a number. Uses the tables of board.ol and unitInfo of solver.ol.
+func hintText(h)
+    if h.kind == "mistake" then
+        return tr("hintMistake")
+    end
+    var words = {digit: h.digit, row: board.rowOf[h.cell], col: board.colOf[h.cell]}
+    if h.kind == "naked" then
+        return tr("hintNaked")(words)
+    elseif h.kind == "hidden" then
+        var kind, n = unitInfo(h.unit)
+        words.unit = tr({row: "unitRow", column: "unitColumn", box: "unitBox"}[kind])(n)
+        return tr("hintHidden")(words)
+    end
+    return tr("hintPlain")(words)
+end
+
 ## Switches language; an unknown code changes nothing. Says whether it did.
 func setLanguage(code)
     if TEXTS[code] == nil then
