@@ -2,7 +2,7 @@
 # LINE COVERAGE of the engine by the whole test suite (gcc --coverage + gcov), in a build of its own:
 # build-cov/, ignored by git like every build*/ directory.
 #
-# Usage: bash tools/coverage.sh            the table, the lowest-covered files first
+# Usage: bash tools/coverage.sh            the table, the lowest-covered files first, then a synthesis (language, modules)
 #        bash tools/coverage.sh --check    also fails when the total falls under tools/coverage-floor
 #        bash tools/coverage.sh --floor    records the current total, less half a point, as the floor
 #
@@ -63,6 +63,49 @@ print(f"{'covered':>8}  {'lines':>6}  file")
 for name, (p, n) in sorted(files.items(), key=lambda kv: kv[1][0]):
     print(f"{p:7.1f}%  {n:6d}  {name}")
 print(f"{percent:7.1f}%  {total:6d}  TOTAL ({int(round(hit))} of {total} lines, {len(files)} files)")
+
+# The synthesis: the language (everything outside src/modules/), then one row per module, the stubs
+# together on the last row (a display module is a stub in this headless build, so its 0 % means nothing).
+LANGUAGE_ROWS = [
+    ("lexer", ["src/lexer.cpp"]),
+    ("parser", ["src/parser.cpp"]),
+    ("compiler", ["src/compiler.cpp", "src/chunk.cpp"]),
+    ("vm", ["src/vm.cpp"]),
+    ("collections", [f for f in files if f.startswith("src/collections/")]),
+    ("paths and sources", ["src/paths.cpp", "src/source_registry.cpp"]),
+    ("entry point", ["src/main.cpp"]),
+]
+named = {f for _, group in LANGUAGE_ROWS for f in group}
+other_language = sorted(f for f in files if not f.startswith("src/modules/") and f not in named)
+if other_language:
+    LANGUAGE_ROWS.append(("other", other_language))
+stubs = sorted(f for f in files if f.startswith("src/modules/") and f.endswith("_stub.cpp"))
+module_files = sorted(f for f in files if f.startswith("src/modules/") and f not in stubs)
+
+
+def row(label, names):
+    names = [n for n in names if n in files]
+    lines = sum(files[n][1] for n in names)
+    covered = sum(files[n][0] * files[n][1] / 100 for n in names)
+    return label, (100 * covered / lines if lines else 100.0), lines, int(round(lines - covered))
+
+
+def section(title, rows, counted=None):
+    print(f"\n{title}")
+    print(f"{'covered':>8}  {'lines':>6}  {'unrun':>5}  area")
+    for label, pct, n, miss in rows:
+        print(f"{pct:7.1f}%  {n:6d}  {miss:5d}  {label}")
+    counted = rows if counted is None else counted
+    lines = sum(r[2] for r in counted)
+    unrun = sum(r[3] for r in counted)
+    note = "subtotal" if counted is rows else "subtotal (stubs left out)"
+    print(f"{100 * (lines - unrun) / lines if lines else 100.0:7.1f}%  {lines:6d}  {unrun:5d}  {note}")
+
+
+print("\nSYNTHESIS")
+section("Language", [row(label, group) for label, group in LANGUAGE_ROWS])
+module_rows = [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in module_files]
+section("Modules", module_rows + [row(f"stubs ({len(stubs)}, expected low)", stubs)], counted=module_rows)
 
 if mode == "--floor":
     floor = round(percent - 0.5, 1)

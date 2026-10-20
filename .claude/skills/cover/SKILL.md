@@ -1,9 +1,9 @@
 ---
 name: cover
-description: Couverture de lignes du moteur par la suite de tests — lance tools/coverage.sh, dit ce qui est faible et quelles lignes ne s'exécutent jamais. Sans argument, le rapport global ; avec un fichier ou un module (data, color, src/vm.cpp), les lignes non exécutées de celui-là.
+description: Couverture de lignes du moteur par la suite de tests — lance tools/coverage.sh, rend un tableau de synthèse (langage, modules), dit ce qui est faible et quelles lignes ne s'exécutent jamais. Sans argument, le rapport global ; avec un fichier ou un module (data, color, src/vm.cpp), les lignes non exécutées de celui-là.
 ---
 
-`tools/coverage.sh → lecture du tableau → lignes non exécutées des fichiers faibles → pistes de tests`
+`tools/coverage.sh → tableau de synthèse → lecture → lignes non exécutées des fichiers faibles → pistes de tests`
 
 Ce skill LIT la couverture, il n'écrit aucun test : proposer où les mettre, attendre le GO (règle
 « plan ⇒ pas d'implémentation sans GO » de `CLAUDE.md`). La section « Couverture » de `CLAUDE.md`
@@ -13,23 +13,39 @@ reste la référence de ce que la mesure vaut.
 
 `bash tools/coverage.sh --check` depuis la racine. Une minute et demie au premier passage du
 conteneur (compilation instrumentée dans `build-cov/`), une demi-minute ensuite. Le script rend le
-tableau (moins couvert d'abord), le total, et échoue sous le plancher de `tools/coverage-floor`.
+tableau par fichier (moins couvert d'abord), le total, une section `SYNTHESIS` (le langage par
+étage, puis les modules un par un, les stubs sur une ligne), et échoue sous le plancher de
+`tools/coverage-floor`.
 
 Ne jamais lancer `--floor` de sa propre initiative : relever le plancher engage le dépôt. Le
 PROPOSER quand le total a monté durablement, et attendre.
 
-## Phase 2 — lire le tableau
+## Phase 2 — le tableau de synthèse, puis la lecture
 
-Rendre un compte rendu en français, en prose et listes, jamais le tableau brut collé :
+Le livrable commence par **un tableau de synthèse** : celui de la section `SYNTHESIS` du script,
+recopié en tableau Markdown (colonnes : zone, lignes, non exécutées, couverture), en deux blocs.
+C'est le seul tableau à rendre ; le tableau par fichier du script n'est jamais collé.
+
+- **Langage** : une ligne par étage (lexer, parser, compilateur, VM, collections, chemins et
+  sources, point d'entrée) et un sous-total.
+- **Modules** : une ligne par module, une ligne « stubs » à part (un 0 % y est ATTENDU, `graphics`
+  étant nil dans le build headless) et un sous-total **sans** les stubs.
+- Sous le tableau, deux lignes qui complètent le chiffre, tirées des gardes (elles durent moins
+  d'une seconde) : `bash tests/check_grammar_coverage.sh` (règles de la grammaire citées par
+  `syntax.ol`) et `bash tests/check_api_coverage.sh` (fonctions exposées nommées par un test).
+  Ce sont des couvertures de NOMS, pas de lignes : le dire.
+- Une colonne ou une note « évolution » seulement si l'état précédent est connu (relevé de la
+  même session, ou le chiffre de `CLAUDE.md`), et en nommant la base de comparaison.
+
+Puis un compte rendu en français, en prose et listes :
 
 - le total, le plancher, et si le contrôle passe ;
-- les fichiers sous 90 %, en trois familles :
+- les zones sous 90 %, en trois familles :
   1. **les modules de `src/modules/`** (`data`, `color`, `core`, `sound`…) : ce sont eux la cible ;
   2. **le cœur** (`vm.cpp`, `compiler.cpp`, `parser.cpp`, `lexer.cpp`, `paths.cpp`,
      `source_registry.cpp`, `collections/`) ;
-  3. **les stubs** (`*_stub.cpp`, `graphics_stub`, `image_stub`, `camera_stub`) : un 0 % y est
-     ATTENDU, `graphics` étant nil dans le build headless. Les signaler une fois, ne pas les
-     compter parmi les faiblesses.
+  3. **les stubs** (`*_stub.cpp`, `graphics_stub`, `image_stub`, `camera_stub`) : les signaler une
+     fois, ne pas les compter parmi les faiblesses.
 - ce que la mesure ne voit pas : les vrais modules graphiques (`graphics`, `image`, `camera`,
   `mouse`, `keyboard`) ne sont pas compilés en headless, donc absents du chiffre.
 
