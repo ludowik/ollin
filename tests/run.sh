@@ -44,55 +44,38 @@ if [ -x build-gfx/ollin ]; then
     fi
 fi
 
-echo "── error suite ───────────────────────────────────"
-if ! bash tests/test_errors.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: API naming ─────────────────────────────"
-if ! bash tests/check_naming.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: grammar coverage ───────────────────────"
-if ! bash tests/check_grammar_coverage.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: API coverage ───────────────────────────"
-if ! bash tests/check_api_coverage.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: markup nesting ─────────────────────────"
-if ! bash tests/check_html.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: function ceiling ───────────────────────"
-if ! bash tests/check_func_limit.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: sample catalogue ───────────────────────"
-if ! bash tests/check_samples.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: trace animations ────────────────────────"
-if ! bash tests/check_trace_source.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: constant operands ──────────────────────"
-if ! bash tests/check_const_operands.sh; then
-    fails=$((fails + 1))
-fi
-
-echo "── guard: data persistence ───────────────────────"
-if ! bash tests/check_data_persistence.sh; then
-    fails=$((fails + 1))
-fi
+# The error suite and the guards are independent and read-only (the ones that write work in a directory of their
+# own), so they run side by side; each report is printed whole, in this order.
+checks=(
+    "error suite|tests/test_errors.sh"
+    "guard: API naming|tests/check_naming.sh"
+    "guard: grammar coverage|tests/check_grammar_coverage.sh"
+    "guard: API coverage|tests/check_api_coverage.sh"
+    "guard: markup nesting|tests/check_html.sh"
+    "guard: function ceiling|tests/check_func_limit.sh"
+    "guard: sample catalogue|tests/check_samples.sh"
+    "guard: trace animations|tests/check_trace_source.sh"
+    "guard: constant operands|tests/check_const_operands.sh"
+    "guard: data persistence|tests/check_data_persistence.sh"
+)
+reports=$(mktemp -d)
+trap 'rm -rf "$reports"' EXIT
+for i in "${!checks[@]}"; do
+    (bash "${checks[$i]#*|}" >"$reports/$i.out" 2>&1; echo $? >"$reports/$i.rc") &
+done
+wait
+for i in "${!checks[@]}"; do
+    title="${checks[$i]%%|*}"
+    rule=""
+    for ((k = ${#title}; k < 46; k++)); do
+        rule="$rule─"
+    done
+    echo "── $title $rule"
+    cat "$reports/$i.out"
+    if [ "$(cat "$reports/$i.rc")" != 0 ]; then
+        fails=$((fails + 1))
+    fi
+done
 
 echo "──────────────────────────────────────────────────"
 if [ $fails -eq 0 ]; then

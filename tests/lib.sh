@@ -10,17 +10,24 @@ require_binary() {
     fi
 }
 
-## Prints OK or FAIL for the program $1 (with the end of its output); returns 1 when it failed.
-run_pass() {
-    local f="$1"
+## Runs the command $2... and prints OK or FAIL under the label $1 (with the end of its output); returns 1 when it
+## failed.
+run_cmd() {
+    local label="$1"
+    shift
     local out
-    out=$("$OLLIN" "$f" 2>&1)
+    out=$("$@" 2>&1)
     local rc=$?
     if [ $rc -eq 0 ]; then
-        echo "OK   $f"
+        echo "OK   $label"
         return 0
     fi
-    echo "FAIL $f (exit $rc)"
+    echo "FAIL $label (exit $rc)"
     echo "$out" | tail -3 | sed 's/^/     /'
     return 1
+}
+
+## The same for the .ol program $1 that must exit 0.
+run_pass() {
+    run_cmd "$1" "$OLLIN" "$1"
 }

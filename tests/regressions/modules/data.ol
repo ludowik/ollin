@@ -22,9 +22,6 @@ assert(data.get("bf") <> 0)
 assert(data.get("never_written", "defaut") == "defaut")
 data.set("bt", nil)
 assert(not data.has("bt"))
-data.set("bf", nil)
-data.set("bn", nil)
-data.set("bs", nil)
 
 ## ── data: the shared scope, keys, clear, floats and awkward strings ──
 ## The two scopes are separate stores with the same six operations. (What survives from one RUN to the
