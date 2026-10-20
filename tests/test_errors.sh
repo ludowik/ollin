@@ -773,6 +773,150 @@ check_error "printf with a first argument that is not a string" \
     'printf(42)' \
     "printf: first arg must be string"
 
+check_error "tween.to with a non-string key in the target map" \
+    'var o = {x: 0}
+var t = {}
+t[1] = 5
+tween.to(o, t, 1)' \
+    "tween.to: keys must be field names"
+
+check_error "tween.to with a curve argument of the wrong type" \
+    'var o = {x: 0}
+tween.to(o, {x: 1}, 1, 5)' \
+    "tween.to: argument 4 expected: curve name, function, or nil"
+
+check_error "tween.to with two completion callbacks" \
+    'var o = {x: 0}
+tween.to(o, {x: 1}, 1, func(t) return t end, func() end, func() end)' \
+    "tween.to: too many function arguments"
+
+check_error "tween.to with a tween as target" \
+    'var o = {x: 0}
+var h = tween.to(o, {x: 1}, 1)
+tween.to(o, h, 1)' \
+    "a tween cannot be a target"
+
+check_error "tween.to with too few arguments" \
+    'tween.to({x: 0}, {x: 1})' \
+    "tween.to: expected object, {field: target}, duration"
+
+check_error "tween.to on something that is not an object" \
+    'tween.to(5, {x: 1}, 1)' \
+    "tween.to: first argument must be an object"
+
+check_error "tween.to with a target that is not a map" \
+    'tween.to({x: 0}, 5, 1)' \
+    "tween.to: second argument must be a map {field: target}"
+
+check_error "tween.to with an empty target map" \
+    'tween.to({x: 0}, {}, 1)' \
+    "tween.to: no target value"
+
+check_error "tween.value with too few arguments" \
+    'tween.value(1, 2)' \
+    "tween.value: expected ref variable, target, duration"
+
+check_error "tween.value with a value that is not a reference" \
+    'tween.value(5, 10, 1)' \
+    "first argument must be a reference"
+
+check_error "tween.value on a string" \
+    'var s = "a"
+tween.value(ref s, 10, 1)' \
+    "tween.value: value not interpolable (string"
+
+check_error "tween.value between instances of different classes" \
+    'var a = Color(0)
+var b = {r: 1}
+tween.value(ref a, b, 1)' \
+    "both values must be instances of the same class"
+
+check_error "tween.value between instances with no numeric field" \
+    'class Name
+    func init(n)
+        self.n = n
+    end
+end
+var a = Name("a")
+var b = Name("b")
+tween.value(ref a, b, 1)' \
+    "no numeric field to animate"
+
+check_error "tween.sequence with too few arguments" \
+    'tween.sequence({x: 0})' \
+    "tween.sequence: expected object, [steps]"
+
+check_error "tween.sequence on something that is not an object" \
+    'tween.sequence(5, [{delay: 1}])' \
+    "tween.sequence: first argument must be an object"
+
+check_error "tween.sequence with an argument that is not a callback" \
+    'tween.sequence({x: 0}, [{delay: 1}], 5)' \
+    "expected: completion callback, or nil"
+
+check_error "tween.sequence with a non-string key in a step" \
+    'var st = {}
+st[1] = 2
+tween.sequence({x: 0}, [st])' \
+    "step 1: keys must be names"
+
+check_error "tween.sequence with a target that is not an object" \
+    'tween.sequence({x: 0}, [{delay: 1, to: {x: 1}, target: 5}])' \
+    "`target` must be an object"
+
+check_error "tween.sequence with a to that is not a map" \
+    'tween.sequence({x: 0}, [{delay: 1, to: 5}])' \
+    "`to` must be a non-empty map"
+
+check_error "tween.sequence with a curve of the wrong type" \
+    'tween.sequence({x: 0}, [{delay: 1, curve: 5}])' \
+    "expected a curve: a name or a function"
+
+check_error "tween.delay with a negative delay" \
+    'var h = tween.to({x: 0}, {x: 1}, 1)
+h.delay(-1)' \
+    "tween.delay: delay must be >= 0"
+
+check_error "a tween method on something that is not a tween" \
+    'var T = tween.to({x: 0}, {x: 1}, 1).__class__
+T.cancel({})' \
+    "tween.cancel: expected a tween"
+
+check_error "sound.sample without a time" \
+    'var s = sound.tone(100, 0.01)
+s.sample()' \
+    "sound.sample: expected a time in seconds"
+
+check_error "sound.rate with a non-number" \
+    'var s = sound.tone(100, 0.01)
+s.rate("fast")' \
+    "sound.rate: rate must be a number"
+
+check_error "sound.loop with a non-boolean" \
+    'var s = sound.tone(100, 0.01)
+s.loop(3)' \
+    "sound.loop: expected true, false, or no argument"
+
+check_error "a sound method on something that is not a sound" \
+    'var S = sound.tone(100, 0.01).__class__
+S.duration({})' \
+    "sound.duration: expected a sound"
+
+check_error "an oscillator method on something that is not an oscillator" \
+    'var O = sound.sine(100).__class__
+O.freq({})' \
+    "sound.freq: expected an oscillator"
+
+check_error "a sound used after its slot was taken back" \
+    'var held = []
+for i = 1, 40 do
+    held.push(sound.tone(100, 0.01))
+end
+for h in held do
+    h.duration()
+end' \
+    "this sound no longer exists"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

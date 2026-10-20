@@ -162,3 +162,62 @@ end
 var other = sound.sine(660)
 assert(other.isPlaying() == false)
 other.free()
+
+## ── Buffers: the waveforms of sound.tone, the slot table, loop, and an envelope longer than the sound ──
+## sound.tone samples the same shapes as an oscillator, once. At 100 Hz and 44.1 kHz a period is 441 samples,
+## so the phase at time t is 100 * t (up to the sample the time falls on).
+var toneSquare = sound.tone(100, 0.01, "square")
+assert(toneSquare.sample(0) == 1 and toneSquare.sample(0.007) == -1, "a square is high for the first half of the period")
+var toneSaw = sound.tone(100, 0.01, "saw")
+assert(math.abs(toneSaw.sample(0.001) + 0.8) < 0.01, "a saw rises from -1 with the phase: 2 * 0.1 - 1")
+var toneTri = sound.tone(100, 0.01, "triangle")
+assert(toneTri.sample(0) == -1 and math.abs(toneTri.sample(0.005) - 1) < 0.01, "a triangle goes from -1 to 1 at half a period")
+var toneNoise = sound.tone(100, 0.01, "noise")
+assert(toneNoise.peak() > 0.5 and toneNoise.peak() <= 1, "noise fills the range")
+assert(toneNoise.sample(0) <> toneNoise.sample(0.001), "and does not repeat itself")
+assert(sound.tone(100, 0.01, "noise").peak() == toneNoise.peak(), "the noise is the same sequence every time")
+
+## loop(false) switches it off; no argument switches it on; both return the sound.
+var loopS = sound.tone(100, 0.01)
+assert(loopS.loop(false) == loopS and loopS.loop() == loopS)
+
+## An envelope whose release is longer than the sound: nothing is held, the release starts at once.
+var shortS = sound.tone(100, 0.1)
+assert(shortS.envelope(0.01, 0.01, 0.5, 5) == shortS)
+assert(shortS.peak() < 0.01, "a release of five seconds on a tenth of a second never rises")
+
+## The table holds 32 sounds. When it is full the oldest ones are taken back and their handles go stale, so of
+## 40 new sounds at most 32 are still valid; the newest is intact.
+var heldS = []
+for i = 1, 40 do
+    heldS.push(sound.tone(100, 0.01))
+end
+var staleCount = 0
+for h in heldS do
+    try
+        h.duration()
+    catch e
+        staleCount += 1
+    end
+end
+assert(staleCount >= 8 and heldS[40].duration() == 0.01)
+
+## A sound that is PLAYING is never taken back: with all 32 playing, the next one is refused. Stopping frees them.
+var playingS = []
+for i = 1, 32 do
+    var p = sound.tone(100, 0.01)
+    p.play()
+    playingS.push(p)
+end
+var fullS = false
+try
+    sound.tone(100, 0.01)
+catch e
+    fullS = true
+    assert(e == "sound: no sound slot available (32 at a time)")
+end
+assert(fullS)
+for p in playingS do
+    p.stop()
+end
+assert(sound.tone(100, 0.01).duration() == 0.01, "once they stop, the table accepts new sounds")
