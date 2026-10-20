@@ -917,6 +917,62 @@ for h in held do
 end' \
     "this sound no longer exists"
 
+check_error "math.min without argument" \
+    'math.min()' \
+    "math.min: at least one argument required"
+
+check_error "math.max without argument" \
+    'math.max()' \
+    "math.max: at least one argument required"
+
+check_error "math.min with a non-number among floats" \
+    'math.min(1.5, "a")' \
+    "math.min"
+
+check_error "math.randInt without argument" \
+    'math.randInt()' \
+    "math.randInt: at least one argument required"
+
+check_error "math.randInt with a bound of zero" \
+    'math.randInt(0)' \
+    "math.randInt: argument must be > 0"
+
+check_error "math.randInt with lo above hi" \
+    'math.randInt(5, 1)' \
+    "math.randInt: lo must be <= hi"
+
+check_error "math.randInt with a bound past the integers" \
+    'math.randInt(1e30)' \
+    "math.randInt: integer argument out of range"
+
+check_error "math.noise without argument" \
+    'math.noise()' \
+    "math.noise: expects 1, 2 or 3 arguments"
+
+check_error "math.noise with four arguments" \
+    'math.noise(1, 2, 3, 4)' \
+    "math.noise: expects 1, 2 or 3 arguments"
+
+check_error "a for loop with a step of zero" \
+    'for i = 1, 5, 0 do
+end' \
+    "step cannot be 0"
+
+check_error "a range with a bound that is not a number" \
+    'var r = [1;"a"]' \
+    "range bound must be a number"
+
+check_error "len without argument" \
+    'print(len())' \
+    "len() requires 1 argument"
+
+check_error "a recursion without end" \
+    'func f(n)
+    return f(n + 1) + 1
+end
+f(1)' \
+    "stack overflow"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

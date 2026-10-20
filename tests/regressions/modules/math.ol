@@ -53,3 +53,36 @@ math.seed(7)
 assert(math.rand() == mathRandA and math.randInt(1, 1000) == mathRandB)
 math.seed(8)
 assert(math.rand() <> mathRandA, "another seed, another sequence")
+
+## ── math.min / math.max with a float among the arguments, and the forms of rand, randInt and noise ──
+## All integers stay integers; one float makes the result a float of the same value.
+assert(math.min(2, 1.5, 3) == 1.5 and math.max(2, 2.5) == 2.5)
+assert(math.min(3.5) == 3.5 and math.max(3.5) == 3.5, "a single argument is its own minimum and maximum")
+assert(math.min(5, 2.0, 9) == 2 and math.max(1, 7.0, 3) == 7)
+
+## rand(n) is in [0, n[ and rand(lo, hi) in [lo, hi[.
+for i = 1, 200 do
+    var one = math.rand(10)
+    var two = math.rand(5, 6)
+    assert(one >= 0 and one < 10, "rand(n) is in [0, n[")
+    assert(two >= 5 and two < 6, "rand(lo, hi) is in [lo, hi[")
+end
+
+## randInt(n) is in [1, n], randInt(lo, hi) in [lo, hi], and a one-value range has one answer.
+for i = 1, 200 do
+    var one = math.randInt(3)
+    var two = math.randInt(-2, 2)
+    assert(one >= 1 and one <= 3 and typeof(one) == "int")
+    assert(two >= -2 and two <= 2 and typeof(two) == "int")
+end
+assert(math.randInt(1) == 1 and math.randInt(7, 7) == 7)
+
+## noise takes one, two or three coordinates and always answers in [0, 1].
+for i = 0, 50 do
+    var n1 = math.noise(i * 0.37)
+    var n2 = math.noise(i * 0.37, i * 0.11)
+    var n3 = math.noise(i * 0.37, i * 0.11, i * 0.53)
+    assert(n1 >= 0 and n1 <= 1 and n2 >= 0 and n2 <= 1 and n3 >= 0 and n3 <= 1)
+end
+assert(math.noise(0.3, 0.7) == math.noise(0.3, 0.7), "the same point gives the same value")
+assert(math.noise(0.3) <> math.noise(0.3, 0.7), "a second coordinate is not ignored")
