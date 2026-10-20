@@ -1,5 +1,5 @@
 ## Regression tests — The audio module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/audio.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/audio.ol — it must finish without error.
 
 ## ── The audio module (the session) ─────────────────────────────────────────
 ## The module ALWAYS exists, device or no device: generating waves is pure computation, and the

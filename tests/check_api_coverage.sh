@@ -46,7 +46,7 @@ for path in sorted(glob.glob("src/modules/*.cpp")):
             if not m.group(1).startswith("__"):
                 names[stem].add(m.group(1))
 
-tests = (["tests/syntax.ol", "tests/test_errors.sh"] + glob.glob("tests/regressions/*.ol")
+tests = (["tests/syntax.ol", "tests/test_errors.sh"] + glob.glob("tests/regressions/*/*.ol")
          + glob.glob("tests/*_test.ol") + glob.glob("tests/gfx_*.ol")
          + glob.glob("docs/samples/**/*_test.ol", recursive=True))
 text = "\n".join(open(t, encoding="utf-8", errors="replace").read() for t in tests)

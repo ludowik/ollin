@@ -1,5 +1,5 @@
 ## Regression tests — Booleans.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/bool.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/bool.ol — it must finish without error.
 
 ## ── Booleans: a sealed type, but "empty is false" is kept ──────────────────
 ## Equality must test BOTH sides of the pair: testing only one would have let `true == 1` answer

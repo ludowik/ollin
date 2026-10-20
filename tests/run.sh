@@ -16,7 +16,7 @@ fails=0
 
 echo "── pass suites (.ol) ─────────────────────────────"
 run_pass tests/syntax.ol || fails=$((fails + 1))
-for f in tests/regressions/*.ol; do
+for f in tests/regressions/*/*.ol; do
     run_pass "$f" || fails=$((fails + 1))
 done
 

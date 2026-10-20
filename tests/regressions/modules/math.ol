@@ -1,5 +1,5 @@
 ## Regression tests — The math module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/math.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/math.ol — it must finish without error.
 
 ## ── math: int consistency (clamp, pow and logn folded as MATH1 and min/max), plus map and 0 ──
 assert(typeof(math.clamp(5, 0, 10)) == "int")   ## before: a float

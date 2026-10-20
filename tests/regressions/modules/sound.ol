@@ -1,5 +1,5 @@
 ## Regression tests — The sound module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/sound.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/sound.ol — it must finish without error.
 
 ## ── The sound module: oscillators ──────────────────────────────────────────
 ## With no device the whole API still answers: the voices exist, and their parameters can be read

@@ -1,5 +1,5 @@
 ## Regression tests — The data module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/data.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/data.ol — it must finish without error.
 
 ## ── data: a boolean survives persistence ───────────────────────────────────
 ## The regression: `encode_value` knew only integers, floats and strings, so `data.set(k, true)`

@@ -1,5 +1,5 @@
 ## Regression tests — Scopes: lexical scope, shadowing, globals, closures and upvalues, the loop variable.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/scopes.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/scopes.ol — it must finish without error.
 
 ## ── Compiler: the lexical scope of `var` starts at its declaration ─────────
 ## The bug: a `var` declared further down shadowed an earlier reference, which then read an

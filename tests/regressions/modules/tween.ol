@@ -1,5 +1,5 @@
 ## Regression tests — The tween module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/tween.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/tween.ol — it must finish without error.
 
 ## ── The tween module ───────────────────────────────────────────────────────
 ## Advancing by EXACT steps (0.25 × 4): a step of 0.1 accumulated ten times does not quite make

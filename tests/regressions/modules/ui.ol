@@ -1,5 +1,5 @@
 ## Regression tests — The ui module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/ui.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/ui.ol — it must finish without error.
 
 ## ── ui.list ────────────────────────────────────────────────────────────────
 ## With no graphics area, the declaration validates its arguments and initialises the selection:

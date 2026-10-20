@@ -1,0 +1,35 @@
+## Regression tests — Values and builtins: constants, numbers, static builtins.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/values.ol — it must finish without error.
+
+## ── chunk: constant dedup is STRICT about types ─────────────────────────────
+## int 0, float 0.0 and nil share the same zero bits but carry distinct tags, so they must NOT
+## be merged in the pool (nil would otherwise become 0, and so on).
+var ck_i = 0
+var ck_f = 0.0
+var ck_n = nil
+assert(not (ck_i == ck_n))   ## the int 0 is not nil
+assert(not (ck_f == ck_n))   ## the float 0.0 is not nil
+assert(ck_i == ck_f)         ## 0 == 0.0 numerically: two distinct constants, but equal
+assert(ck_n == nil)
+## identical strings are deduped: the same interned content, a single pool entry
+var ck_s1 = "dup-const"
+var ck_s2 = "dup-const"
+assert(ck_s1 == ck_s2)
+
+## ── value: num_value no longer casts undefined behaviour on a non-finite or out-of-range value
+## (math.* can produce inf and nan, and a huge float literal exceeds int64)
+assert(math.exp(1000) > 1000000000000000000)   ## inf stays a float, and stays comparable
+assert(math.sqrt(-1) <> math.sqrt(-1))          ## nan is not nan: it stays a float nan
+var big_f = 100000000000000000000.5
+assert(big_f > 1000000000000000000)             ## ~1e20 stays a float, with no undefined cast
+
+## ── a static builtin: the class and instance forms agree (as a Ollin `static func` does) ──
+## A builtin declared static does not receive self, so its first parameter sits in R[0] whether
+## the call is on the class or on an instance (before, self was injected on an instance, the
+## parameter was shifted, and the argument was read wrongly).
+var col_a = Color.gray(0.5)              ## a parameterised static factory, on the class
+assert(col_a.r == 0.5 and col_a.b == 0.5)
+var col_c = Color(1, 0, 0)
+var col_b = col_c.gray(0.25)            ## the SAME method, on an instance: the parameter sits in R[0]
+assert(col_b.r == 0.25 and col_b.g == 0.25)
+assert(Color.random().a == 1 and col_c.random().a == 1)  ## a static random, in both modes

@@ -33,7 +33,7 @@ dictionnaire américain refuse (`initialiser`, `recentre`, `DOM`, `CORS`). Cette
 l'utilisateur.
 
 **Ce qui reste accentué N'EST PAS du français** (vérifié, ne pas « corriger ») : les données
-de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions/string.ol` ; `"café"` et `"straße"` dans le
+de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions/modules/string.ol` ; `"café"` et `"straße"` dans le
 tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de caractères de
 `tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
 `docs/vendor/`, `docs/wasm/`, `libs/robin_hood.h`).
@@ -378,7 +378,7 @@ prétexte de cette colonne.
 | Fichier | Maintenu par | Rôle |
 |---|---|---|
 | `tests/syntax.ol` | Claude | **la FORME** : toute construction du langage y figure, avec l'assertion minimale qui montre qu'elle s'écrit et fonctionne |
-| `tests/regressions/` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…). **Un fichier par domaine** (`functions.ol`, `classes.ol`, `scopes.ol`, `string.ol`, `tween.ol`…), trouvés par `run.sh` sans liste : un test va dans le fichier de son domaine, et un domaine neuf est un fichier neuf |
+| `tests/regressions/` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…). **Deux dossiers, un fichier par domaine** : `language/` suit `grammar.ebnf` (`functions.ol`, `classes.ol`, `scopes.ol`, `errors.ol`, `control.ol`…), `modules/` suit `src/modules/` (`string.ol`, `math.ol`, `tween.ol`, `color.ol`, `array.ol`…). `run.sh` les trouve sans liste : un test va dans le fichier de son domaine, un module neuf est un fichier neuf dans `modules/` |
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
 | `tests/check_api_coverage.sh` | Claude | **garde-fou de couverture de l'API** : chaque fonction qu'un module expose aux scripts doit être NOMMÉE par un test (`.nom` ou `nom(`). Compare des noms, n'exécute rien ; les modules qui exigent un écran ou un périphérique (graphics, image, camera, mouse, keyboard) en sont exclus, `graphics` y étant nil. Il vient d'une mesure de couverture de lignes (gcov) qui avait trouvé dix fonctions `math`, deux méthodes de `Color` et `tween.curves()` jamais appelées, et le visiteur des comparaisons chaînées jamais exécuté |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
@@ -2045,7 +2045,7 @@ ou non). Il dépend du contexte de compilation, donc seule la question « quels 
 niveau module » vit sur le nœud (`exported_names`) — ne pas confondre les deux en
 voulant « généraliser ».
 
-**Filet de sécurité** : `tests/regressions/scopes.ol` déclare un `global` au fond de CHAQUE
+**Filet de sécurité** : `tests/regressions/language/scopes.ol` déclare un `global` au fond de CHAQUE
 sorte de construction et le lit depuis une fonction déclarée AVANT — une descente
 manquante fait échouer la compilation sur « undeclared variable ». Les 13 listes ont
 été cassées une par une pour vérifier que le test les détecte toutes. Un second jeu de

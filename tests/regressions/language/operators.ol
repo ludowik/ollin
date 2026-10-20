@@ -1,5 +1,5 @@
 ## Regression tests — Operators: the length operator, literal operands read from the constant pool.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/operators.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/operators.ol — it must finish without error.
 
 ## '#' is a real unary OPERATOR (the LEN opcode), not a call by name to `len`. It was desugared
 ## into len(x), resolved in the user's scope, so a variable called len intercepted it and the

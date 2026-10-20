@@ -1,5 +1,5 @@
 ## Regression tests — Formatting an interpolation and printf.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/format.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/format.ol — it must finish without error.
 
 ## ── Formatting {expr:spec} in an interpolation and {N:spec} in printf, sharing one engine ──
 ## The spec's ':' is the one at the TOP level: a nested map literal preserves it.

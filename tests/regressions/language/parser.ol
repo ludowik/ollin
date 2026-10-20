@@ -1,5 +1,5 @@
 ## Regression tests — The parser and the lexer: lvalues, keywords as names, comments and line breaks.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/parser.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/parser.ol — it must finish without error.
 
 ## ── Parser: chained and indexed lvalues ────────────────────────────────────
 ## #7 assignments to a chained target ("unexpected token '='" before)

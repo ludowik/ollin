@@ -1,5 +1,5 @@
 ## Regression tests — Passing by reference (ref).
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/ref.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/ref.ol — it must finish without error.
 
 ## ── ref (passing by reference) ──────────────────────────────────────────────
 ## `ref x` is desugared by the parser into {__ref, get, set}: two closures that read and write

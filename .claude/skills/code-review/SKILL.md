@@ -82,7 +82,7 @@ Dans cet ordre de gravité :
    code lu.
 4. **Tests** :
    - mode diff : un bug corrigé, un comportement nouveau ou un refus nouveau SANS test dans le bon
-     fichier — la FORME dans `tests/syntax.ol`, le COMPORTEMENT dans `tests/regressions/` (un fichier par domaine), l'ÉCHEC dans
+     fichier — la FORME dans `tests/syntax.ol`, le COMPORTEMENT dans `tests/regressions/` (`language/` et `modules/`, un fichier par domaine), l'ÉCHEC dans
      `tests/test_errors.sh` (cf. CLAUDE.md). Un diff qui change un comportement du moteur, de la web app ou
      d'un exemple sans toucher un fichier de test est un constat (pas un diff de documentation ou de consignes) ;
    - mode module : seulement un cas non couvert qui EXPLIQUE un constat.

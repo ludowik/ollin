@@ -1,5 +1,5 @@
 ## Regression tests — Functions: multiple returns, destructuring, varargs and spreading, the registers a call must not clobber.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/functions.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/functions.ol — it must finish without error.
 
 ## ── Compiler: multiple returns ──────────────────────────────────────────────
 ## #1 multiple returns from a CLOSURE (a segfault before: CALL_FUNC without upvals)

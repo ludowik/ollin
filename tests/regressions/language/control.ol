@@ -1,5 +1,5 @@
 ## Regression tests — Control flow: switch, break and continue, loops.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/control.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/control.ol — it must finish without error.
 
 ## a nested if in first position of an else branch (there is no "else if" sugar, only elseif)
 var ei = "?"

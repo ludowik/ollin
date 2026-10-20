@@ -1,5 +1,5 @@
 ## Regression tests — The string module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/string.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/string.ol — it must finish without error.
 
 ## ── string and math: the double-to-int cast is guarded (undefined behaviour, and a WASM trap, on a huge index before) ──
 assert(string.char("abc", 1e300) == "")         ## an index out of range gives "", and does not trap

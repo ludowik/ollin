@@ -1,5 +1,5 @@
 ## Regression tests — Errors: try/catch, the handler stack, errors crossing native frames, the message of assert.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/errors.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/errors.ol — it must finish without error.
 
 ## ── VM: try/catch of a runtime error raised by a CALLED function ────────────
 ## (before: `base` was not restored in the C++ catch, so the catch variable was wrong)

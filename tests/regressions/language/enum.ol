@@ -1,5 +1,5 @@
 ## Regression tests — Enumerations.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/enum.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/enum.ol — it must finish without error.
 
 ## ── enum ────────────────────────────────────────────────────────────────────
 ## Numbering: 1 by default, then +1 each time; an integer literal redefines what follows; a

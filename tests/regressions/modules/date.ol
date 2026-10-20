@@ -1,5 +1,5 @@
 ## Regression tests — The date module.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/date.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/modules/date.ol — it must finish without error.
 
 ## The `date` module. Only the UTC decoding is testable: it maps one epoch second to one and only
 ## one answer, whatever the machine's time zone. The local decoding is checked for RANGE alone,

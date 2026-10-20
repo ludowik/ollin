@@ -1,5 +1,5 @@
 ## Regression tests — Classes and instances: super, meta-methods, __str, constructors.
-## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/classes.ol — it must finish without error.
+## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/classes.ol — it must finish without error.
 
 ## ── Compiler: super ─────────────────────────────────────────────────────────
 ## #2 super across three levels (infinite recursion before: self.__class__.__parent__)
