@@ -6,11 +6,9 @@
 # the menu in the browser and gets nothing. Adding a sample without listing it is the symmetric
 # mistake: the example exists in the repository and is reachable from nowhere.
 #
-# TESTS live next to the sample they check: `<name>_test.ol` (run by tests/samples.sh), with the helpers
-# they share in `<name>_testlib.ol`. Neither is a sample: the catalogue must not list them, and the web
-# app never loads them (a sample is its entry file and what that imports, and nothing imports a test).
-# Each test must import a file of its own directory, so that it stays attached to its script.
-# A listed sample with no test is reported as a note, not as a failure.
+# TESTS are not samples (convention in tests/samples.sh): the catalogue must not list them. Each test must
+# import a file of its own directory, each helper (`*_testlib.ol`) must be imported by a test, and a listed
+# sample with no test is reported as a note, not as a failure.
 set -u
 here=$(dirname "$0")
 root=$(cd "$here/.." && pwd)
@@ -45,7 +43,7 @@ def path_normalise(p):
 def imported_by(paths):
     libs = set()
     for rel in paths:
-        base = rel.rsplit("/", 1)[0] + "/" if "/" in rel else ""
+        base = os.path.dirname(rel) + "/" if os.path.dirname(rel) else ""
         src = open(os.path.join("docs/samples", rel), encoding="utf-8").read()
         for imp in re.findall(r'(?m)^\s*import\s+["\']([^"\']+)', src):
             if not imp.endswith(".ol"):
@@ -61,9 +59,9 @@ errs = []
 # files of the same name in different directories no longer collide either.
 every = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
          for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
-is_test = lambda f: f.endswith("_test.ol") or f.endswith("_testlib.ol")
-on_disk = {f for f in every if not is_test(f)}
 tests = {f for f in every if f.endswith("_test.ol")}
+testlibs = {f for f in every if f.endswith("_testlib.ol")}
+on_disk = every - tests - testlibs
 LIBS = imported_by(on_disk)
 try:
     entries = json.load(open("docs/samples/index.json", encoding="utf-8"))
@@ -122,13 +120,15 @@ for f in sorted(LIBS - on_disk):
     errs.append(f"{f}: imported by a sample but the file does not exist")
 
 # A test imports what it checks, from its own directory, and only files that exist.
-directory = lambda f: f.rsplit("/", 1)[0] if "/" in f else ""
+directory = os.path.dirname
 for t in sorted(tests):
     imports = imported_by({t})
     for f in sorted(imports - every):
         errs.append(f"{t}: imports {f}, which does not exist")
     if not any(directory(f) == directory(t) and f in on_disk for f in imports):
         errs.append(f"{t}: imports no file of its own directory, so it is attached to no script")
+for f in sorted(testlibs - imported_by(tests)):
+    errs.append(f"{f}: a test helper that no test imports")
 
 
 # A group split in two by a stray entry in between would show TWICE in the menu, the order of the

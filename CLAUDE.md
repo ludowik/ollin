@@ -408,15 +408,16 @@ essentielle : sans elle, une modification C++ non compilée serait validée par 
 `git commit --no-verify` le contourne, à réserver aux cas où la suite ne peut pas tourner.
 
 **Tests des exemples** : un exemple qui porte de la logique isolable (règles, générateur, tirage…) a son
-test À CÔTÉ de son script — `<nom>_test.ol` (`sudoku_test.ol`, `texts_test.ol`), les aides partagées en
-`<nom>_testlib.ol` — et non dans `tests/`. `bash tests/samples.sh [dossier|fichier…]` les TROUVE (aucune
-liste à tenir) ; `tests/run.sh` ne les lance pas, et le hook `pre-commit` lance ceux de l'exemple modifié, ou
-tous quand le moteur, l'outillage, `tests/` ou `docs/samples/lib/` changent. Ce ne sont pas des exemples :
-`check_samples.sh` les écarte du catalogue, exige que chacun importe un fichier de son propre dossier (sinon il
-n'est attaché à aucun script), et signale en simple NOTE les exemples sans test. L'application web ne les charge
-jamais — un exemple est son fichier d'entrée et ce qu'il importe, et rien n'importe un test — mais GitHub
-Pages les sert, comme tout `docs/`. Le moteur n'a donc plus de test d'exemple : un test de LANGAGE reste dans
-`syntax.ol`, `regressions.ol` ou `test_errors.sh`.
+test À CÔTÉ de son script — `<nom>_test.ol` (`sudoku_test.ol`, `texts_test.ol`) —, les aides partagées en
+`<nom>_testlib.ol` (dans `docs/samples/lib/` quand plusieurs dossiers les partagent) — et non dans `tests/`,
+où le suffixe `_test.ol` désigne des fixtures du moteur. `bash tests/samples.sh` les TROUVE et les lance en
+parallèle ; `tests/run.sh` ne les lance pas : seul le hook `pre-commit` le fait, par `samples.sh --affected`
+(la règle « quels tests un changement peut casser » est dans `samples.sh`, pas dans le hook). Ce ne sont pas
+des exemples : `check_samples.sh` les écarte du catalogue, exige que chaque test importe un fichier de son
+dossier et que chaque aide soit importée par un test, et signale en simple NOTE les exemples sans test.
+L'application web ne les charge jamais — un exemple est son fichier d'entrée et ce qu'il importe, et rien
+n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de LANGAGE reste dans `syntax.ol`,
+`regressions.ol` ou `test_errors.sh`.
 
 ## Versionning
 

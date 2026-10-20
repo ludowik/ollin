@@ -6,35 +6,17 @@
 # The tests of the SAMPLES sit next to their script and run apart, by tests/samples.sh.
 # Usage: bash tests/run.sh   (the ./build/ollin binary must be compiled)
 set -u
-OLLIN=${OLLIN:-./build/ollin}
 here=$(dirname "$0")
 root=$(cd "$here/.." && pwd)
 cd "$root" || exit 2
-
-if [ ! -x "$OLLIN" ]; then
-    echo "error: $OLLIN not found — compile it first (cmake --build build --target ollin)"
-    exit 2
-fi
+. tests/lib.sh
+require_binary
 
 fails=0
 
-run_pass() {
-    local f="$1"
-    local out
-    out=$("$OLLIN" "$f" 2>&1)
-    local rc=$?
-    if [ $rc -eq 0 ]; then
-        echo "OK   $f"
-    else
-        echo "FAIL $f (exit $rc)"
-        echo "$out" | tail -3 | sed 's/^/     /'
-        fails=$((fails + 1))
-    fi
-}
-
 echo "── pass suites (.ol) ─────────────────────────────"
-run_pass tests/syntax.ol
-run_pass tests/regressions.ol
+run_pass tests/syntax.ol || fails=$((fails + 1))
+run_pass tests/regressions.ol || fails=$((fails + 1))
 
 # Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
 # rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a
@@ -42,7 +24,7 @@ run_pass tests/regressions.ol
 if [ -x build-gfx/ollin ]; then
     echo "── pass suites (.ol, raylib build) ───────────────"
     if bash tools/native-gfx.sh >/dev/null 2>&1; then
-        OLLIN=build-gfx/ollin run_pass tests/gfx_ui_test.ol
+        OLLIN=build-gfx/ollin run_pass tests/gfx_ui_test.ol || fails=$((fails + 1))
         if command -v xvfb-run >/dev/null 2>&1; then
             out=$(timeout 60 bash tools/run-headless.sh tests/gfx_ui_draw_test.ol 2>&1)
             rc=$?
