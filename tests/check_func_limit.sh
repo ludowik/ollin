@@ -7,7 +7,7 @@
 # a narrower type, so a call past the 255th function returned the WRONG function's value in
 # silence — `g299()` gave 43, which is 299 truncated to eight bits. No test could see it: the
 # ceiling itself forbids writing 300 functions in a committed file, which is also what forced the
-# six string checkers of regressions.ol to be merged into one.
+# six string checkers of the regression tests to be merged into one.
 #
 # So the program is GENERATED here, and nothing about the ceiling is written down: the script
 # searches for it, then checks both sides of it. It therefore keeps working the day the ceiling

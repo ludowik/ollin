@@ -1,5 +1,5 @@
 ### Fixture: a module declaring EVERY kind of exportable name.
-    Imported under an alias by regressions.ol, which checks that each one is filed
+    Imported under an alias by regressions/imports.ol, which checks that each one is filed
     into the module's map (a bug once seen: an enum was not exported).
 ###
 var expVar = 1

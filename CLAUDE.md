@@ -33,7 +33,7 @@ dictionnaire américain refuse (`initialiser`, `recentre`, `DOM`, `CORS`). Cette
 l'utilisateur.
 
 **Ce qui reste accentué N'EST PAS du français** (vérifié, ne pas « corriger ») : les données
-de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions.ol` ; `"café"` et `"straße"` dans le
+de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions/string.ol` ; `"café"` et `"straße"` dans le
 tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de caractères de
 `tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
 `docs/vendor/`, `docs/wasm/`, `libs/robin_hood.h`).
@@ -138,7 +138,7 @@ ollin/
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
-├── tests/             suite du MOTEUR (`bash tests/run.sh`) : syntax.ol, regressions.ol, test_errors.sh, les gardes + fixtures (utils_test*.ol, config.ol). Les tests des EXEMPLES n'y sont pas : cf. « Tests des exemples »
+├── tests/             suite du MOTEUR (`bash tests/run.sh`) : syntax.ol, regressions/ (un fichier par domaine), test_errors.sh, les gardes + fixtures (utils_test*.ol, config.ol). Les tests des EXEMPLES n'y sont pas : cf. « Tests des exemples »
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
@@ -378,7 +378,7 @@ prétexte de cette colonne.
 | Fichier | Maintenu par | Rôle |
 |---|---|---|
 | `tests/syntax.ol` | Claude | **la FORME** : toute construction du langage y figure, avec l'assertion minimale qui montre qu'elle s'écrit et fonctionne |
-| `tests/regressions.ol` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…) |
+| `tests/regressions/` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…). **Un fichier par domaine** (`functions.ol`, `classes.ol`, `scopes.ol`, `string.ol`, `tween.ol`…), trouvés par `run.sh` sans liste : un test va dans le fichier de son domaine, et un domaine neuf est un fichier neuf |
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
@@ -391,12 +391,12 @@ prétexte de cette colonne.
 | `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique), plus la section « This window » : tout ce que la page sait de sa fenêtre, seule preuve exploitable quand la mise en page est fausse sur une machine hors d'atteinte |
 | `tools/ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutorial.html` et `tools/ollin-vscode/`. **Répartition des tests, sans recouvrement** : la FORME dans `tests/syntax.ol` (une construction du langage y figure toujours — une forme couverte seulement ailleurs est un manque), le COMPORTEMENT dans `tests/regressions.ol` (sémantique fine, cas limites, ce qui a déjà été cassé), l'ÉCHEC dans `tests/test_errors.sh` (ce qui doit être refusé, et avec quel message) — un échec RATTRAPÉ par `try`/`catch` reste du comportement, `test_errors.sh` ne sait vérifier qu'un message rendu sur la sortie d'erreur. Un test de sémantique qui n'exhibe aucune forme nouvelle n'a rien à faire dans `syntax.ol`. **La couverture est vérifiée par `tests/check_grammar_coverage.sh`** (dans `run.sh`) : chaque section de `syntax.ol` porte une étiquette `## [grammar: forStmt, rangeLit]` citant les règles qu'elle exerce, et le script échoue si une règle de `grammar.ebnf` n'est citée nulle part — ou si une étiquette cite un nom qui n'existe pas. Il compare des NOMS, il ne lit pas le code : l'étiquette engage celui qui la pose. Ajouter une règle à la grammaire oblige donc à écrire son test. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutorial.html` et `tools/ollin-vscode/`. **Répartition des tests, sans recouvrement** : la FORME dans `tests/syntax.ol` (une construction du langage y figure toujours — une forme couverte seulement ailleurs est un manque), le COMPORTEMENT dans `tests/regressions/` (sémantique fine, cas limites, ce qui a déjà été cassé), l'ÉCHEC dans `tests/test_errors.sh` (ce qui doit être refusé, et avec quel message) — un échec RATTRAPÉ par `try`/`catch` reste du comportement, `test_errors.sh` ne sait vérifier qu'un message rendu sur la sortie d'erreur. Un test de sémantique qui n'exhibe aucune forme nouvelle n'a rien à faire dans `syntax.ol`. **La couverture est vérifiée par `tests/check_grammar_coverage.sh`** (dans `run.sh`) : chaque section de `syntax.ol` porte une étiquette `## [grammar: forStmt, rangeLit]` citant les règles qu'elle exerce, et le script échoue si une règle de `grammar.ebnf` n'est citée nulle part — ou si une étiquette cite un nom qui n'existe pas. Il compare des NOMS, il ne lit pas le code : l'étiquette engage celui qui la pose. Ajouter une règle à la grammaire oblige donc à écrire son test. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 **Règle (permanente) : exécuter `bash tests/run.sh` avant CHAQUE commit, sans exception.**
 Pas seulement après une évolution du moteur (VM, compilateur, modules natifs) : aussi pour un
 exemple `.ol`, la web app, un commentaire, la documentation. La suite couvre `syntax.ol`,
-`regressions.ol`, `test_errors.sh` et `check_naming.sh`, et dure quelques secondes — juger au
+`tests/regressions/`, `test_errors.sh` et `check_naming.sh`, et dure quelques secondes — juger au
 cas par cas qu'un changement « ne peut rien casser » est un pari qui coûte plus cher qu'elle.
 Un commit ne part que sur un « ALL GREEN ».
 
@@ -417,7 +417,7 @@ des exemples : `check_samples.sh` les écarte du catalogue, exige que chaque tes
 dossier et que chaque aide soit importée par un test, et signale en simple NOTE les exemples sans test.
 L'application web ne les charge jamais — un exemple est son fichier d'entrée et ce qu'il importe, et rien
 n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de LANGAGE reste dans `syntax.ol`,
-`regressions.ol` ou `test_errors.sh`.
+`tests/regressions/` ou `test_errors.sh`.
 
 ## Versionning
 
@@ -912,7 +912,7 @@ locale, upvalue, globale ou champ, et les `case` d'un `switch`. Les émetteurs s
   main (mesuré : mêmes comptes d'instructions, à quelques dizaines près sur 500 millions), donc promotion, débordement, chaînes et
   méta-méthodes sont ceux du chemin à registres sans rien à tenir en accord. `tests/check_const_operands.sh`
   exerce le repli au-delà de 65 535 constantes, sur un programme engendré. `constOperandCheck`
-  (`tests/regressions.ol`) passe à l'identique sur l'ancien binaire et sur le nouveau.
+  (`tests/regressions/`) passe à l'identique sur l'ancien binaire et sur le nouveau.
 - **Mesuré (`bash bench/icount.sh` et les huit autres scripts de `bench/` sous callgrind, instructions
   exécutées, avant → après)** : `fib` −20,4 %, `float` −12,4 %, `objects` −4,3 %, `strings` −3,7 %,
   `classes` −2,5 %, `boucle` −1,9 %, `calls` −1,9 %, `closures` −1,5 %, `map` −1,1 %, `iter` −0,3 %.
@@ -1513,7 +1513,7 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
   `assert(false, 42)` perdait son message.
 - **Le type du message d'`assert` est vérifié même quand l'assertion TIENT** : le contrôler
   seulement à l'échec cacherait la faute jusqu'au jour où l'assertion casse. Figé dans
-  `test_errors.sh` (les deux refus) et dans `regressions.ol` (un message chaîne remonte
+  `test_errors.sh` (les deux refus) et dans `tests/regressions/` (un message chaîne remonte
   intact, l'absence de message donne « assertion failed »).
 - **`graphics.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
   `print`, méta-méthode `__str` comprise. Auparavant un non-string devenait la chaîne vide :
@@ -2031,7 +2031,7 @@ ou non). Il dépend du contexte de compilation, donc seule la question « quels 
 niveau module » vit sur le nœud (`exported_names`) — ne pas confondre les deux en
 voulant « généraliser ».
 
-**Filet de sécurité** : `tests/regressions.ol` déclare un `global` au fond de CHAQUE
+**Filet de sécurité** : `tests/regressions/scopes.ol` déclare un `global` au fond de CHAQUE
 sorte de construction et le lit depuis une fonction déclarée AVANT — une descente
 manquante fait échouer la compilation sur « undeclared variable ». Les 13 listes ont
 été cassées une par une pour vérifier que le test les détecte toutes. Un second jeu de
@@ -2079,7 +2079,7 @@ pas les recopier ici, deux textes finissent toujours par diverger.
 ⚠ **Une comparaison de deux builds n'a de sens qu'à `CMAKE_BUILD_TYPE` égal** : un relevé donnait
 la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en `Release`.
 
-⚠ **Compilation seule et total ne répondent pas à la même question** : sur `regressions.ol` la
+⚠ **Compilation seule et total ne répondent pas à la même question** : sur l'ancien fichier unique `regressions.ol` (aujourd'hui le dossier `tests/regressions/`) la
 compilation ne pèse que 25 M d'instructions sur 99 M, si bien que le même écart se lit +19,3 %
 sur l'une et +5,0 % sur l'autre. Dire lequel on cite.
 
@@ -2134,7 +2134,7 @@ et la closure du dernier tour rendait `{function}` après un `break`). Les deux 
 avaient ces deux points depuis toujours ; le `while` n'en avait aucun. **Réserver les registres au lieu de
 fermer a été essayé et retiré** : la réserve s'accumulait sur tout un fichier et faisait dépasser
 le plafond de registres (255 à l'époque, cf. `k_max_reg`). Fermer ne dé-partage rien : deux closures d'un même registre continuent de
-voir les écritures l'une de l'autre (figé dans `regressions.ol`).
+voir les écritures l'une de l'autre (figé dans `tests/regressions/`).
 
 **« Ce corps porte-t-il une fonction ? » est MÉMOÏSÉ** par l'adresse du corps
 (`body_carries_func`). Le parcours est récursif et la même question est posée trois à quatre
@@ -2155,7 +2155,7 @@ niveau comme un global tout en le liant comme une locale, et son registre restai
 
 **Désucrage** : `for i = a, b[, step]` est réécrit par le parser en `for i in [a;b[;step]]` (RangeExpr inclus aux deux bornes). Il n'existe qu'un nœud AST : `ForIterStmt`.
 
-**Portée des variables de boucle** : `var1`/`var2` sont **locales à la boucle** — pas collectées par `collectLocals` ; le compilateur les lie dans `local_regs_` le temps du corps puis **restaure** l'ancienne liaison (ou la supprime) → pas de fuite après la boucle (y référer = « undeclared variable »), une variable externe de même nom est masquée puis restaurée. Recyclage des registres : si `bodyHasFunc(body)` (une closure du corps peut capturer la variable via upvalue ouverte), les registres de boucle restent **réservés** après la sortie pour ne pas être réécrits (closures → valeur finale, cohérent) ; sinon ils sont recyclés. La réserve couvre **aussi les locales du corps** (`keep_captured_regs` garde le plus haut de la réservation de boucle et de celle que `compile_block` a posée) : elles sont capturables comme la variable de boucle, et les redescendre au niveau des seules variables de boucle rendait leur registre aux temporaires — l'appel suivant écrasait alors la valeur sous une upvalue encore ouverte (cas figé dans `regressions.ol`).
+**Portée des variables de boucle** : `var1`/`var2` sont **locales à la boucle** — pas collectées par `collectLocals` ; le compilateur les lie dans `local_regs_` le temps du corps puis **restaure** l'ancienne liaison (ou la supprime) → pas de fuite après la boucle (y référer = « undeclared variable »), une variable externe de même nom est masquée puis restaurée. Recyclage des registres : si `bodyHasFunc(body)` (une closure du corps peut capturer la variable via upvalue ouverte), les registres de boucle restent **réservés** après la sortie pour ne pas être réécrits (closures → valeur finale, cohérent) ; sinon ils sont recyclés. La réserve couvre **aussi les locales du corps** (`keep_captured_regs` garde le plus haut de la réservation de boucle et de celle que `compile_block` a posée) : elles sont capturables comme la variable de boucle, et les redescendre au niveau des seules variables de boucle rendait leur registre aux temporaires — l'appel suivant écrasait alors la valeur sous une upvalue encore ouverte (cas figé dans `tests/regressions/`).
 
 **Une variable par ITÉRATION** : quand `body_has_func(body)` est vrai, les deux boucles émettent `CLOSE_UPVALS <premier registre du bloc>` en **deux points** — à l'adresse où reboucle l'itération (donc aussi la cible des `continue`) et à l'adresse de sortie (fin normale, itérateur épuisé, `break`). Fermer une upvalue la fige dans sa valeur et la **retire** de `frame.open_upvals` ; `MAKE_CLOSURE` n'en réutilise donc plus pour ce registre et le tour suivant en crée une neuve → chaque closure garde la valeur de SON tour (modèle Lua 5.4 / `let`). Deux closures d'un même tour continuent de partager la variable (une seule upvalue par registre et par tour). Aucune instruction n'est émise quand le corps ne contient pas de fonction, donc **aucun** coût pour les boucles ordinaires. `close_upvals()` (tout le frame, chemin CHAUD des retours) et `close_upvals_above(seuil)` restent **deux fonctions distinctes** : les fondre grossissait le code de `RETURN` et coûtait 5 % sur `bench_fib` (30 M de retours), mesuré, pour un partage de trois lignes.
 
@@ -2200,7 +2200,7 @@ Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 sont les upvalues qui font tout le travail, y compris la capture d'une locale.
 
 - Le paramètre du setter s'appelle `__ref_v` : avec `v`, `ref v` générait
-  `func(v) v = v end`, une écriture sans effet (cas figé dans `regressions.ol`).
+  `func(v) v = v end`, une écriture sans effet (cas figé dans `tests/regressions/`).
 - Le getter et le setter ont chacun leur propre arbre d'accès (`make_access(n)`) : un
   `unique_ptr` ne se duplique pas.
 - `__ref` sert à la VALIDATION côté natif : une map avec `get`/`set` n'est pas forcément
@@ -2223,7 +2223,7 @@ qu'aux enums qui n'ont qu'une valeur possible pour tout le programme, et **quatr
 conditions** sont exigées, chacune pour un cas réel :
 - **déclaré une seule fois** — deux `enum E` sous le même nom n'ont pas de valeur unique ;
 - **jamais réaffecté** — le gel porte sur le CONTENU, pas sur le nom, donc `E = 5` est légal
-  (figé dans `regressions.ol`) ;
+  (figé dans `tests/regressions/`) ;
 - **déclaré là où l'instruction s'exécute à COUP SÛR**, c'est-à-dire au premier niveau du
   programme. Un `enum` dans une fonction ou sous un `if` peut ne jamais s'exécuter, et le
   figeage rendrait alors une valeur à du code qui échouait sur un enum `nil`. Un `import`
@@ -2260,7 +2260,7 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 - Le gel est **superficiel** : un objet/tableau contenu dans l'enum reste modifiable.
 
 **Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`/`ClosurePool`/`UpvaluePool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`/`release_upvals()`/`val = Value()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array/closure **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
-⚠ `mem()` sous Valgrind (memcheck) peut rendre 0 : `assert(mem() > 0)` de `regressions.ol` y échoue, AVANT comme APRÈS l'ajout de `ClosurePool`/`UpvaluePool` — vérifié sur les deux binaires. C'est l'allocateur remplacé par Valgrind qui fausse la lecture, pas un bug du moteur ; la suite qui compte (`tests/run.sh`, natif) n'y est pas exposée.
+⚠ `mem()` sous Valgrind (memcheck) peut rendre 0 : `assert(mem() > 0)` de `tests/regressions/` y échoue, AVANT comme APRÈS l'ajout de `ClosurePool`/`UpvaluePool` — vérifié sur les deux binaires. C'est l'allocateur remplacé par Valgrind qui fausse la lecture, pas un bug du moteur ; la suite qui compte (`tests/run.sh`, natif) n'y est pas exposée.
 
 ## Accès membre : `GET_INDEX`, pseudo-méthodes et inline cache
 
@@ -2271,7 +2271,7 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 - **pseudo-méthodes des maps** (`len`, `keys`, `values`, `has`, `delete`, module `map`, `map_module.cpp`) : un **repli tout-froid** (rien trouvé dans la data propre ni la chaîne, et jamais tenté sur une **instance** — `!has_class_key(obj)`, même restriction que `len` a toujours eue) — cherché dans `map_module_` via `module_member()`, comme `array_module_`/`string_module_`. Ça ne peut pas être une simple entrée de map servie par lookup, puisqu'une entrée définie par la map elle-même doit toujours gagner (`{len: 42}.len == 42`).
 
 **Injection de `self` (`CALL_METHOD`)** : instances, chaînes, tableaux → `self` injecté sans condition (fermés : rien d'autre ne peut vivre sous `arr.foo`, `SET_INDEX` refuse même une clé de tableau non entière). Maps → **non** en général (un module ne se reçoit pas : `math`, `string`, `graphics`… SONT des maps), **sauf** quand la fonction résolue est l'une des cinq pseudo-méthodes du module `map`, reconnues par **pointeur** (`is_map_module_fn`, map_module.h) — jamais par le type du receveur, ce qui protège `{f: math.sin}.f(0)` (une map qui range un builtin SANS RAPPORT reste appelée telle quelle, `math.sin` n'étant aucune des cinq).
-⚠ **Sans exclure aussi un receveur MODULE (`recv.mptr->kind != Map::MODULE`), `map.len(m)` casse** : `len` est une clé RÉELLE du module `map` (trouvée dans sa data propre, pas par le repli), donc `map.len(m)` s'analyse comme un appel de méthode SUR `map` — sans cette garde, `self` s'injecte avec `map` (5 clés : les cinq pseudo-méthodes) et `m` glisse en second argument non désiré ; `map.len(m)` rendait alors `map.len()` (5) au lieu de `m.len()`. Régression réelle, débusquée en écrivant les tests plutôt que devinée — bissectée puis figée dans `regressions.ol`.
+⚠ **Sans exclure aussi un receveur MODULE (`recv.mptr->kind != Map::MODULE`), `map.len(m)` casse** : `len` est une clé RÉELLE du module `map` (trouvée dans sa data propre, pas par le repli), donc `map.len(m)` s'analyse comme un appel de méthode SUR `map` — sans cette garde, `self` s'injecte avec `map` (5 clés : les cinq pseudo-méthodes) et `m` glisse en second argument non désiré ; `map.len(m)` rendait alors `map.len()` (5) au lieu de `m.len()`. Régression réelle, débusquée en écrivant les tests plutôt que devinée — bissectée puis figée dans `tests/regressions/`.
 
 **`Map::kind == MODULE`** (`collections/map.h`) marque la racine d'un module (posé une fois par `make_builtin_module`), et sert en DEUX endroits seulement : ce garde-fou de `CALL_METHOD`, et `Value::type_name` (`typeof(math)` rend `"module"`, `typeof({})` rend `"map"`). Ce n'est **pas** un tag de `Value` — `is_map()` reste vrai partout ailleurs (`proto_chain_get`, le `switch` de retain/release, `SET_INDEX`…) — et ça ne se propage **jamais** à ce qu'un module contient, ce qui est tout l'intérêt : un tag DISTINCT (`T_MODULE`) a été essayé pour ce même problème et supprimé le 20/07 après quatre correctifs en chaîne (une instance `Color` tenue par un module perdait son identité propre, un marquage récursif puis limité à la racine, des vérifications `Color` du module graphique qui testaient le mauvais tag…) — un module n'est pas fermé comme un tableau, il doit pouvoir contenir n'importe quelle valeur, donc la distinction ne peut PAS vivre dans le tag sans se répercuter partout où ce tag est testé. `kind` reste sur l'OBJET map racine, jamais sur ce qu'il référence, donc rien de tout ça ne se reproduit.
 
@@ -2317,7 +2317,7 @@ risque, aucun bytecode n'étant sérialisé sur disque.
   aucun opcode n'a eu à changer.
 - **Égalité** : `values_equal` teste les DEUX côtés (`av.is_bool() || bv.is_bool()`).
   N'en tester qu'un laissait `false == false` tomber dans le cas par défaut et répondre
-  FAUX — cas réellement rencontré, figé dans `regressions.ol`.
+  FAUX — cas réellement rencontré, figé dans `tests/regressions/`.
 - **Clés de map** : `ValueHash`/`ValueEqual` ont leur cas `T_BOOL`, et le hash est décalé
   d'une constante pour que `true` ne collisionne pas avec l'entier 1. Le couple
   INTEGER/FLOAT reste volontairement confondu ; le booléen, non.
@@ -2481,7 +2481,7 @@ s'il s'agit d'un `switch`.
 - ⚠ **Les `POP_TRY` d'un `return` sont émis APRÈS l'évaluation des valeurs**, jamais avant : le
 gestionnaire doit vivre pendant le calcul de ce qu'on renvoie. Émis avant, `return x.champ` écrit
 dans un `try` échouait **hors de son propre `try`** — alors que le même code coupé en `var v =
-x.champ` puis `return v` était attrapé. Figé dans `regressions.ol`, dans les trois formes de
+x.champ` puis `return v` était attrapé. Figé dans `tests/regressions/`, dans les trois formes de
 retour.
 
 **Sortir d'un `try` émet un `POP_TRY` par bloc quitté** (`pop_crossed_tries` pour
@@ -2555,7 +2555,7 @@ encore `false` pour l'ancien `is_ctor`, et ce `false` est allé dans `return_des
 d'une méta-méthode partait donc dans le registre 0. Le compilateur C++ ne peut rien y voir, un
 booléen se convertissant en entier. Symptôme observé : `E(1) <> E(1)` rendait `true` quand
 l'expression servait d'ARGUMENT d'appel, et `false` quand elle était rangée dans une variable
-(figé dans `regressions.ol` par les tests de `__eq`).
+(figé dans `tests/regressions/` par les tests de `__eq`).
 
 ### CALL_DYN sur T_CLASS (instanciation)
 
@@ -2610,14 +2610,14 @@ cas en `3:4:5`).
 est une donnée pour le programme — `assert(false, "kaboom")` s'attrape en `"kaboom"` — alors que
 la position s'adresse au développeur qui lit un plantage. C'était auparavant asymétrique : les
 erreurs du moteur portaient une position, celles d'un builtin non. Les deux formes sont figées
-dans `regressions.ol`.
+dans `tests/regressions/`.
 
 ⚠ Le type, et non le texte, est ce qui empêche une **double** position : `run_goto` est réentrant
 (un rappel natif rappelle du code Ollin), donc une erreur peut traverser deux fois la boucle.
 
 **Sondé une fois pour toutes, sur les DIX endroits où le moteur rappelle du code Ollin** :
 `array.map`/`filter`/`reduce`/`sort`, `sound.generate` et les rappels de `tween` sans graphisme
-(figés dans `regressions.ol`) ; `image.mapPixel`, `ui.list` — dont les libellés appellent `__str`
+(figés dans `tests/regressions/`) ; `image.mapPixel`, `ui.list` — dont les libellés appellent `__str`
 dès la DÉCLARATION, et non à l'ouverture — et un `draw()` qui lève, sous Xvfb ; un
 `func mouse.pressed` qui lève, au navigateur. Partout le même comportement : l'erreur est
 attrapée UNE fois par le `try` englobant avec le message tel qu'il a été levé, ou signalée une
@@ -2689,7 +2689,7 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   variadique relisait `1, 1, 9` au lieu de `7, 8, 9` — d'abord recouverts par le relèvement des
   varargs de la méthode, puis par la zone de varargs du troisième cadre. Les destinations sont
   posées **au-dessus de toutes les sources**, sans quoi une zone atterrirait sur une zone pas
-  encore déplacée. Figé dans `regressions.ol` (`vaThreeDeep`), et le test échoue bien sur le
+  encore déplacée. Figé dans `tests/regressions/` (`vaThreeDeep`), et le test échoue bien sur le
   binaire d'avant.
 - **Le filtre devant ce relèvement est un `va_low_` en O(1)**, la plus basse zone de varargs des
   cadres vivants. La marche, elle, est en O(profondeur d'appel) : l'appeler sans condition coûte

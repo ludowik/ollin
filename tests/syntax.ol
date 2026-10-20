@@ -447,7 +447,7 @@ var lo, hi = minmax(7, 3)
 assert(lo == 3 and hi == 7)
 
 ## the same values, assigned to targets ALREADY declared — a variable, a map field, an array
-## element (the spreading itself is exercised in `regressions.ol`).
+## element (the spreading itself is exercised in `tests/regressions/`).
 var target = {}
 var tab = [0, 0]
 lo, target.min, tab[2] = minmax(5, 1)
@@ -846,7 +846,7 @@ assert(fifo.dequeue() == 20)
 
 ## string methods: the `string` module's functions can also be called ON the string, which then
 ## becomes the first argument. Counting by character, and bounds outside the string, are
-## behaviour, hence `regressions.ol`.
+## behaviour, hence `tests/regressions/`.
 assert("Ollin".len() == 5)
 assert("Ollin".upper() == "OLLIN")
 assert("OLLIN".lower() == "ollin")
@@ -980,7 +980,7 @@ ctr.increment()
 assert(ctr.value() == 3)
 
 ## meta-methods: one language operator per method. The derived comparisons (`>`, `>=`, `<>`) and
-## their symmetry are semantics, hence `regressions.ol`.
+## their symmetry are semantics, hence `tests/regressions/`.
 class Num
     func init(v)
         self.v = v

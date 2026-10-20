@@ -16,7 +16,9 @@ fails=0
 
 echo "── pass suites (.ol) ─────────────────────────────"
 run_pass tests/syntax.ol || fails=$((fails + 1))
-run_pass tests/regressions.ol || fails=$((fails + 1))
+for f in tests/regressions/*.ol; do
+    run_pass "$f" || fails=$((fails + 1))
+done
 
 # Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
 # rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a

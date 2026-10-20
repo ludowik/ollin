@@ -8,6 +8,7 @@ package-lock.json
 docs/samples/*.data.json
 docs/samples/**/*.data.json
 tests/*.data.json
+tests/regressions/*.data.json
 ## Screenshots and probe scripts written by the xvfb / browser checks. They are working files, and
 ## five of them reached a commit through a `git add -A` before this line existed.
 /*.png
