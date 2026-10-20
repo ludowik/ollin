@@ -420,7 +420,7 @@ L'application web ne les charge jamais — un exemple est son fichier d'entrée 
 n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de LANGAGE reste dans `syntax.ol`,
 `tests/regressions/` ou `test_errors.sh`.
 
-**Couverture** : `bash tools/coverage.sh` compile le moteur avec `--coverage` dans `build-cov/` (ignoré), lance
+**Couverture** (la commande `/cover` lance le script et lit le rapport) : `bash tools/coverage.sh` compile le moteur avec `--coverage` dans `build-cov/` (ignoré), lance
 `tests/run.sh` et `tests/samples.sh` avec ce binaire, et imprime le pourcentage de lignes de chaque fichier
 `src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
 (un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
