@@ -16,7 +16,7 @@
 //     Lookup is one probe whatever the depth; entering costs a copy of the ENTIRE enclosing scope.
 //
 // Measured on the compilation alone (callgrind, both builds in Release, 2026-09-06): the flat
-// form costs +19,3 % on tests/regressions.ol, +13,7 % on tests/syntax.ol, +1,8 % on
+// form costs +19,3 % on the former single file tests/regressions.ol (now tests/regressions/), +13,7 % on tests/syntax.ol, +1,8 % on
 // docs/samples/voxel_world/voxel_world.ol and +0,9 % on docs/samples/invaders/invaders.ol. Hence
 // the default. The spread is not noise: it follows the SHAPE of the file, since what a flat scope
 // copies on entering a block is the whole scope above it — a file with a very large top-level

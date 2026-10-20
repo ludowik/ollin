@@ -28,14 +28,16 @@ data.set("bs", nil)
 
 ## ── data: the shared scope, keys, clear, floats and awkward strings ──
 ## The two scopes are separate stores with the same six operations. (What survives from one RUN to the
-## next — the sidecar file — is guarded by tests/check_data_persistence.sh: it needs two processes.)
+## next — the sidecar file — is guarded by tests/check_data_persistence.sh: it needs two processes, and
+## it is also where shared.clear() is run, with a HOME of its own: the shared store is ONE file in the
+## real home directory, and this test must never empty what other programs keep there.)
 data.set("pk", "project")
-data.shared.set("sk", "shared")
-assert(data.get("pk") == "project" and not data.has("sk"), "a key of one scope is not seen by the other")
-assert(data.shared.get("sk") == "shared" and not data.shared.has("pk"))
-assert(data.shared.get("none", 7) == 7)
-data.shared.set("sk", nil)
-assert(not data.shared.has("sk"))
+data.shared.set("ollin_test_sk", "shared")
+assert(data.get("pk") == "project" and not data.has("ollin_test_sk"), "a key of one scope is not seen by the other")
+assert(data.shared.get("ollin_test_sk") == "shared" and not data.shared.has("pk"))
+assert(data.shared.get("ollin_test_none", 7) == 7)
+data.shared.set("ollin_test_sk", nil)
+assert(not data.shared.has("ollin_test_sk"))
 
 ## Floats keep every digit, and keep their type next to the integers.
 data.set("pf", 0.1)
@@ -60,5 +62,3 @@ data.delete("never_existed")
 assert(len(data.keys()) == before - 1, "deleting an absent key is harmless")
 data.clear()
 assert(len(data.keys()) == 0 and not data.has("pk"))
-data.shared.clear()
-assert(len(data.shared.keys()) == 0)
