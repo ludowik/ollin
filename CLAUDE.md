@@ -384,6 +384,7 @@ prétexte de cette colonne.
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `tests/check_func_limit.sh` | Claude | **garde-fou du plafond de fonctions** : un programme de N fonctions est ENGENDRÉ par le script, car le plafond lui-même interdit d'en committer un — et chacune doit être appelable PAR SON NOM, la dernière comprise. Rien du plafond n'y est écrit : il est cherché (doublement puis bissection), donc la garde survit à son déplacement. ⚠ Une boucle de closures ne l'exerce PAS (un `func` du texte = un proto, et une closure s'appelle par `CALL_DYN`) |
+| `tests/check_data_persistence.sh` | Claude | **garde-fou de la persistance de `data`** : ce qu'un lancement écrit, le suivant doit le relire (chaînes à caractères spéciaux, flottants, deux portées) ; le chargement du fichier précède le script, aucun script ne peut donc le tester seul. `HOME` est détourné vers un dossier jetable |
 | `tests/check_const_operands.sh` | Claude | **garde-fou du repli des opérandes constants** : au-delà de 65 535 constantes, un littéral à droite d'un opérateur retombe sur `LOAD_K` + l'opcode générique — programme ENGENDRÉ, le plafond étant la largeur d'un champ |
 | `tests/check_samples.sh` | Claude | **garde-fou du catalogue** : `docs/samples/index.json` est le seul lien entre le menu du playground et les fichiers — un renommage y laissait une entrée morte que RIEN ne détectait, la panne n'apparaissant qu'à l'ouverture du menu dans le navigateur |
 | `tests/check_trace_source.sh` | Claude | **garde-fou des animations « lexer » et « parser »** : un `lexer.cpp` ou un `parser.cpp` modifié ne doit pas laisser l'animation allumer une mauvaise ligne ou couper un mot-clé en silence (le détail est en tête du script) |
@@ -425,11 +426,11 @@ n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de
 `src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
 (un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
 monte durablement. Hors de `run.sh` : la compilation instrumentée prend une minute et demie au premier passage.
-Dernier relevé : **90,3 %** des lignes (lexer 98 %, parser 97 %, compilateur 95 %, VM 89 %). C'est le build
+Dernier relevé : **92,1 %** des lignes (lexer 98 %, parser 97 %, compilateur 95 %, VM 89 %). C'est le build
 HEADLESS : les modules graphiques n'y sont que des stubs, leur code réel n'est pas dans le chiffre. Les
 en-têtes sont exclus, leur code en ligne étant compté par unité de compilation. La mesure trouve ce que la
 garde de grammaire ne peut pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
-n'était exécuté par aucun test. Reste faible : `data_module` (58 %), `color_module` (62 %), `paths.cpp` (68 %).
+n'était exécuté par aucun test. Reste faible : `paths.cpp` (68 %), `core_module` (formatage). Le rechargement du fichier de `data` ne se teste qu'avec deux processus : c'est `tests/check_data_persistence.sh`.
 Une ligne exécutée n'est pas une ligne vérifiée : seule une mutation (casser la ligne, voir la suite échouer)
 le prouve.
 

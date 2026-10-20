@@ -698,6 +698,52 @@ check_error "date.utc with a non-number instant" \
     'var d = date.utc([])' \
     "date.utc: argument 1 expected number"
 
+check_error "data.get with a non-string key" \
+    'data.get(1)' \
+    "data.get: expected a string key"
+
+check_error "data.set without a value" \
+    'data.set("k")' \
+    "data.set: expected a string key and a value"
+
+check_error "data.set with a non-string key" \
+    'data.set(1, 2)' \
+    "data.set: expected a string key and a value"
+
+check_error "data.set with a value that is not a scalar" \
+    'data.set("k", [1])' \
+    "data: value must be a number, string or boolean"
+
+check_error "data.has with a non-string key" \
+    'data.has(nil)' \
+    "data.has: expected a string key"
+
+check_error "data.delete with a non-string key" \
+    'data.delete(1)' \
+    "data.delete: expected a string key"
+
+check_error "Color with a component that is not a number" \
+    'var c = Color("red", 0, 0)' \
+    "Color: expected a number or a Color"
+
+check_error "Color without argument" \
+    'var c = Color()' \
+    "Color: expected 1 to 4 numbers (or a Color)"
+
+check_error "Color.gray without argument" \
+    'var c = Color.gray()' \
+    "Color.gray: expected a value"
+
+check_error "Color.gray with a non-number" \
+    'var c = Color.gray("x")' \
+    "Color.gray must be a number"
+
+check_error "Color method on an instance that lost a field" \
+    'var c = Color(1, 0, 0)
+c.r = nil
+var d = c.pastel()' \
+    "Color: missing field 'r'"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

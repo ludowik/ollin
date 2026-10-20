@@ -25,3 +25,40 @@ assert(not data.has("bt"))
 data.set("bf", nil)
 data.set("bn", nil)
 data.set("bs", nil)
+
+## ── data: the shared scope, keys, clear, floats and awkward strings ──
+## The two scopes are separate stores with the same six operations. (What survives from one RUN to the
+## next — the sidecar file — is guarded by tests/check_data_persistence.sh: it needs two processes.)
+data.set("pk", "project")
+data.shared.set("sk", "shared")
+assert(data.get("pk") == "project" and not data.has("sk"), "a key of one scope is not seen by the other")
+assert(data.shared.get("sk") == "shared" and not data.shared.has("pk"))
+assert(data.shared.get("none", 7) == 7)
+data.shared.set("sk", nil)
+assert(not data.shared.has("sk"))
+
+## Floats keep every digit, and keep their type next to the integers.
+data.set("pf", 0.1)
+data.set("pi3", 3)
+assert(data.get("pf") == 0.1 and typeof(data.get("pi3")) == "int")
+data.set("pf", 1 / 3)
+assert(data.get("pf") == 1 / 3, "17 significant digits: the float comes back identical")
+
+## A string is stored raw: quotes, backslashes, newlines, tabs and control characters change nothing.
+var weird = "q" + string.fromCode(34) + string.fromCode(92) + string.fromCode(10) + string.fromCode(13) + string.fromCode(9) + string.fromCode(1) + string.fromCode(27) + "é"
+data.set("pw", weird)
+assert(data.get("pw") == weird)
+assert(data.get("pw").len() == weird.len())
+data.set("pe", "")
+assert(data.has("pe") and data.get("pe") == "", "an empty string is a value, not an absence")
+
+## keys lists what is there, delete removes one key and clear all of them.
+var before = len(data.keys())
+data.delete("pe")
+assert(len(data.keys()) == before - 1 and not data.has("pe"))
+data.delete("never_existed")
+assert(len(data.keys()) == before - 1, "deleting an absent key is harmless")
+data.clear()
+assert(len(data.keys()) == 0 and not data.has("pk"))
+data.shared.clear()
+assert(len(data.shared.keys()) == 0)
