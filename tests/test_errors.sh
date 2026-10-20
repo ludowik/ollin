@@ -1,6 +1,6 @@
 #!/bin/bash
 # Checks that the compiler rejects illegal redeclarations and assignments
-OLLIN=./build/ollin
+OLLIN=${OLLIN:-./build/ollin}
 PASS=0
 FAIL=0
 

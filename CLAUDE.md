@@ -420,18 +420,18 @@ L'application web ne les charge jamais — un exemple est son fichier d'entrée 
 n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de LANGAGE reste dans `syntax.ol`,
 `tests/regressions/` ou `test_errors.sh`.
 
-**Couverture (mesure ponctuelle, pas une garde)** : `bash tests/run.sh` ne dit pas ce que la suite exécute.
-Le relevé se fait avec un build à part, hors du dépôt : `cmake -S . -B <dir> -DCMAKE_BUILD_TYPE=Debug
--DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage`, puis `cmake --build <dir> --target ollin`,
-`syntax.ol`, chaque fichier de `tests/regressions/`, `test_errors.sh` (qui écrit `./build/ollin` en dur : le
-copier en remplaçant ce chemin) et les tests d'exemples avec CE binaire, puis `gcov -n` sur chaque `.gcda`.
-Premier relevé : **86 %** des lignes du moteur, avec le lexer à 98 %, le parser à 96 %, le compilateur à 94 %,
-la VM à 89 %. Les modules graphiques ne sont pas dans la mesure (le build headless ne les compile pas), et les
-en-têtes comptent mal (leur code est compté par unité de compilation). La mesure a trouvé ce que la garde de
-grammaire ne pouvait pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
-n'était exécuté par aucun test. Reste faible : `color_module` (40 %), `data_module` (58 %), `tween_curves.h`
-(20 %). Une ligne exécutée n'est pas une ligne vérifiée : seule une mutation (casser la ligne, voir la suite
-échouer) le prouve.
+**Couverture** : `bash tools/coverage.sh` compile le moteur avec `--coverage` dans `build-cov/` (ignoré), lance
+`tests/run.sh` et `tests/samples.sh` avec ce binaire, et imprime le pourcentage de lignes de chaque fichier
+`src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
+(un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
+monte durablement. Hors de `run.sh` : la compilation instrumentée prend une minute et demie au premier passage.
+Dernier relevé : **90,3 %** des lignes (lexer 98 %, parser 97 %, compilateur 95 %, VM 89 %). C'est le build
+HEADLESS : les modules graphiques n'y sont que des stubs, leur code réel n'est pas dans le chiffre. Les
+en-têtes sont exclus, leur code en ligne étant compté par unité de compilation. La mesure trouve ce que la
+garde de grammaire ne peut pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
+n'était exécuté par aucun test. Reste faible : `data_module` (58 %), `color_module` (62 %), `paths.cpp` (68 %).
+Une ligne exécutée n'est pas une ligne vérifiée : seule une mutation (casser la ligne, voir la suite échouer)
+le prouve.
 
 ## Versionning
 

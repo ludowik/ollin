@@ -13,7 +13,7 @@
 #
 # What it does NOT do: it compares NAMES, it does not run anything. It sees a function nobody mentions,
 # not a function whose test asserts the wrong thing; and `.play(` anywhere in a test names every `play` of
-# every module. The numbers of a real line-coverage run are the other half (see CLAUDE.md, "Couverture").
+# every module. The numbers of a real line-coverage run are the other half (tools/coverage.sh).
 #
 # EXCLUDED, with the reason: the modules that need a display or a device and are `nil` or inert in the
 # headless build this suite runs on — graphics (2D, 3D, quaternions), image, camera, mouse, keyboard — and
