@@ -110,16 +110,15 @@ assert(idTab <> 1)
 assert(1 == 1.0)
 
 ## ── map: a closure is a key by identity ──
-## ValueHash and ValueEqual had no closure case under test: only classes, ranges and builtins.
-func makeCounter(start)
-    var n = start
+## ValueHash and ValueEqual had no closure case under test: only classes, ranges and builtins. (A function that
+## captures nothing is not a closure: it is the same value everywhere, hence the captured `start`.)
+func makeReader(start)
     return func()
-        n += 1
-        return n
+        return start
     end
 end
-var ckA = makeCounter(0)
-var ckB = makeCounter(0)
+var ckA = makeReader(0)
+var ckB = makeReader(0)
 var ckMap = {}
 ckMap[ckA] = "a"
 ckMap[ckB] = "b"
