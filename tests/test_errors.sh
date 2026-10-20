@@ -744,6 +744,35 @@ c.r = nil
 var d = c.pastel()' \
     "Color: missing field 'r'"
 
+check_error "format with a character the allowlist does not know" \
+    'var v = 1
+print("{v:5$d}")' \
+    "format: invalid character in spec"
+
+check_error "format %d of a string" \
+    'print("{"x":d}")' \
+    "format: '%d' expects a number"
+
+check_error "format %c of a string" \
+    'print("{"x":c}")' \
+    "format: '%c' expects a number"
+
+check_error "format with a width past what C can render" \
+    'print("{(1):99999999999d}")' \
+    "format: invalid spec"
+
+check_error "printf with an index below 1" \
+    'printf("{0}", 1)' \
+    "printf: index is 1-based, must be >= 1 (got 0)"
+
+check_error "printf with an index that is not an integer" \
+    'printf("{99999999999}", 1)' \
+    "printf: invalid index '{99999999999}'"
+
+check_error "printf with a first argument that is not a string" \
+    'printf(42)' \
+    "printf: first arg must be string"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

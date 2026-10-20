@@ -108,3 +108,24 @@ assert(idFerm <> faireFerm(1))   ## two distinct closures of the same function
 assert(idTab <> {})
 assert(idTab <> 1)
 assert(1 == 1.0)
+
+## ── map: a closure is a key by identity ──
+## ValueHash and ValueEqual had no closure case under test: only classes, ranges and builtins.
+func makeCounter(start)
+    var n = start
+    return func()
+        n += 1
+        return n
+    end
+end
+var ckA = makeCounter(0)
+var ckB = makeCounter(0)
+var ckMap = {}
+ckMap[ckA] = "a"
+ckMap[ckB] = "b"
+assert(ckMap[ckA] == "a" and ckMap[ckB] == "b", "two closures of the same function are two keys")
+assert(len(ckMap) == 2)
+ckMap[ckA] = "a2"
+assert(ckMap[ckA] == "a2" and len(ckMap) == 2, "writing through the same closure reuses its entry")
+ckMap[ckA] = nil
+assert(ckMap[ckA] == nil and len(ckMap) == 1, "a nil value removes it")

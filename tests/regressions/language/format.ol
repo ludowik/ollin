@@ -29,3 +29,30 @@ catch e
     fmt_err = true
 end
 assert(fmt_err)
+
+## ── the conversions the engine coerces, and printf's positional slots ──
+## %c writes the character of a code; it takes a number, and a float is truncated like for %d.
+assert("{(65):c}" == "A")
+assert("{(66.9):c}" == "B")
+assert("{(65):3c}" == "  A", "a width applies to %c")
+assert("{3.5:g}" == "3.5" and "{(1.5):e}" == "1.500000e+00")
+
+## typeof() with no argument is "nil", like typeof(nil).
+assert(typeof() == "nil")
+
+## printf only prints (nothing to capture), so these check that the slots are accepted: automatic and
+## explicit indexes, a spec, an index past the arguments (an empty slot).
+printf("{} {} {:5.1f}", 1, "two", 3.14159)
+printf("{2} {1} {2:5s}", "a", "b")
+printf("{3} past the arguments", 1)
+printf("no argument")
+
+## __fmt is the target of the desugaring, but a direct call still validates its arguments.
+var fmtDirect = false
+try
+    __fmt(1)
+catch e
+    fmtDirect = true
+    assert(e == "__fmt: expected (value, spec)")
+end
+assert(fmtDirect)
