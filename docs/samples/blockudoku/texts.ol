@@ -1,7 +1,7 @@
 ## The TEXTS of Blockudoku, in the languages the game speaks: French (the default) and English. The French
 ## strings are the translation the game asks for, not a slip in the language of the repository.
 ##
-## Every language has the same keys, which tests/blockudoku_texts_test.ol checks. A text is a string, except
+## Every language has the same keys, which docs/samples/blockudoku/texts_test.ol checks. A text is a string, except
 ## the help, which is a function of the figures of the rules: they live in the game's config, not here. A title is
 ## the text of its menu entry in capitals: the game does that when it draws it.
 

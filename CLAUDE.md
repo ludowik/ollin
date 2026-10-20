@@ -40,7 +40,7 @@ tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de carac
 
 **Seule exception à l'anglais, voulue par l'utilisateur** : les textes localisés de Blockudoku et de
 Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et leurs tests
-`tests/blockudoku_texts_test.ol`, `tests/sudoku_texts_test.ol`) sont en français À DESSEIN, le français
+`docs/samples/blockudoku/texts_test.ol`, `docs/samples/sudoku/texts_test.ol`) sont en français À DESSEIN, le français
 étant la langue par défaut de ces jeux et l'anglais la seconde. Ne pas les traduire ni les signaler à la
 passe de dictionnaire. Les identifiants et les commentaires de ces fichiers restent en anglais.
 
@@ -138,7 +138,7 @@ ollin/
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
-├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
+├── tests/             suite du MOTEUR (`bash tests/run.sh`) : syntax.ol, regressions.ol, test_errors.sh, les gardes + fixtures (utils_test*.ol, config.ol). Les tests des EXEMPLES n'y sont pas : cf. « Tests des exemples »
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
@@ -406,6 +406,17 @@ par `core.hooksPath` au démarrage de session (`.claude/hooks/session-start.sh`)
 n'étant pas versionné, il disparaîtrait à chaque conteneur neuf. La recompilation est
 essentielle : sans elle, une modification C++ non compilée serait validée par l'ANCIEN binaire.
 `git commit --no-verify` le contourne, à réserver aux cas où la suite ne peut pas tourner.
+
+**Tests des exemples** : un exemple qui porte de la logique isolable (règles, générateur, tirage…) a son
+test À CÔTÉ de son script — `<nom>_test.ol` (`sudoku_test.ol`, `texts_test.ol`), les aides partagées en
+`<nom>_testlib.ol` — et non dans `tests/`. `bash tests/samples.sh [dossier|fichier…]` les TROUVE (aucune
+liste à tenir) ; `tests/run.sh` ne les lance pas, et le hook `pre-commit` lance ceux de l'exemple modifié, ou
+tous quand le moteur, l'outillage, `tests/` ou `docs/samples/lib/` changent. Ce ne sont pas des exemples :
+`check_samples.sh` les écarte du catalogue, exige que chacun importe un fichier de son propre dossier (sinon il
+n'est attaché à aucun script), et signale en simple NOTE les exemples sans test. L'application web ne les charge
+jamais — un exemple est son fichier d'entrée et ce qu'il importe, et rien n'importe un test — mais GitHub
+Pages les sert, comme tout `docs/`. Le moteur n'a donc plus de test d'exemple : un test de LANGAGE reste dans
+`syntax.ol`, `regressions.ol` ou `test_errors.sh`.
 
 ## Versionning
 

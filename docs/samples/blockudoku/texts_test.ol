@@ -1,7 +1,7 @@
 ## The texts of the Blockudoku sample: both languages must speak about everything, since a key missing from one
 ## of them would show up in the game as nothing at all, and the first language is the one the game starts in.
 
-import "../docs/samples/blockudoku/texts.ol"
+import "texts.ol"
 
 assert(LANGUAGES[1] == "fr", "French is the default language")
 assert(i18n.lang == "fr", "the game starts in French")

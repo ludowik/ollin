@@ -6,7 +6,7 @@
 ## What runs here is a copy of src/parser.cpp written in Ollin (tracer.ol) that records every line it
 ## runs and what the line did to the tree, so the animation shows the engine's real rules and not a
 ## drawing of them: the same precedence table, the same order of attempts, the same refusals.
-## tests/parser_trace_test.ol checks that it builds exactly the trees the C++ parser builds. The
+## parser_test.ol checks that it builds exactly the trees the C++ parser builds. The
 ## tokens are the ones the lexer of the other example cuts.
 ##
 ## The top left shows the tokens, and an arrow under the one the parser is looking at, peek(). The

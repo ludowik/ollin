@@ -5,6 +5,12 @@
 # sample leaves a dangling entry that NO test sees — the failure only shows when a reader opens
 # the menu in the browser and gets nothing. Adding a sample without listing it is the symmetric
 # mistake: the example exists in the repository and is reachable from nowhere.
+#
+# TESTS live next to the sample they check: `<name>_test.ol` (run by tests/samples.sh), with the helpers
+# they share in `<name>_testlib.ol`. Neither is a sample: the catalogue must not list them, and the web
+# app never loads them (a sample is its entry file and what that imports, and nothing imports a test).
+# Each test must import a file of its own directory, so that it stays attached to its script.
+# A listed sample with no test is reported as a note, not as a failure.
 set -u
 here=$(dirname "$0")
 root=$(cd "$here/.." && pwd)
@@ -53,8 +59,11 @@ errs = []
 # files) is a legitimate layout, and globbing the top level only would let it escape the catalogue
 # entirely — exactly the oversight this guard exists to catch. The path is the identity, so two
 # files of the same name in different directories no longer collide either.
-on_disk = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
-           for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
+every = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
+         for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
+is_test = lambda f: f.endswith("_test.ol") or f.endswith("_testlib.ol")
+on_disk = {f for f in every if not is_test(f)}
+tests = {f for f in every if f.endswith("_test.ol")}
 LIBS = imported_by(on_disk)
 try:
     entries = json.load(open("docs/samples/index.json", encoding="utf-8"))
@@ -112,6 +121,15 @@ for f in sorted(on_disk - set(listed) - LIBS):
 for f in sorted(LIBS - on_disk):
     errs.append(f"{f}: imported by a sample but the file does not exist")
 
+# A test imports what it checks, from its own directory, and only files that exist.
+directory = lambda f: f.rsplit("/", 1)[0] if "/" in f else ""
+for t in sorted(tests):
+    imports = imported_by({t})
+    for f in sorted(imports - every):
+        errs.append(f"{t}: imports {f}, which does not exist")
+    if not any(directory(f) == directory(t) and f in on_disk for f in imports):
+        errs.append(f"{t}: imports no file of its own directory, so it is attached to no script")
+
 
 # A group split in two by a stray entry in between would show TWICE in the menu, the order of the
 # groups being that of their first appearance.
@@ -130,5 +148,15 @@ if errs:
     print(f"FAIL  {len(errs)} problem(s) in the sample catalogue")
     sys.exit(1)
 groups = len(dict.fromkeys(e["group"] for e in entries))
-print(f"OK   sample catalogue ({len(entries)} samples in {groups} groups, {len(LIBS)} libraries, {len(named)} icons)")
+print(f"OK   sample catalogue ({len(entries)} samples in {groups} groups, {len(LIBS)} libraries, {len(named)} icons, {len(tests)} tests)")
+
+# A sample is covered by a test of its own directory (a sample in a folder), or by `<name>_test.ol` beside it.
+def covered(f):
+    d = directory(f)
+    if d:
+        return any(directory(t) == d for t in tests)
+    return f[:-3] + "_test.ol" in tests
+bare = [f for f in listed if not covered(f)]
+if bare:
+    print(f"NOTE {len(bare)} of {len(listed)} samples have no test: {', '.join(bare)}")
 PYEOF

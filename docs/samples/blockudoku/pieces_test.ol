@@ -2,9 +2,9 @@
 ## under the finger, so it must be the real one — a row written without its trailing "." made the
 ## box one column too narrow and the piece sat half a cell off. Also the rules of the board and the sound switch.
 
-import "../docs/samples/blockudoku/board.ol"
-import "../docs/samples/blockudoku/pieces.ol"
-import "../docs/samples/blockudoku/sounds.ol"
+import "board.ol"
+import "pieces.ol"
+import "sounds.ol"
 
 buildShapes()
 

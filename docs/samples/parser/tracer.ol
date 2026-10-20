@@ -2,7 +2,7 @@
 ## the lexer of the other example, then runs the engine's parsing rules on its tokens one C++ line at a
 ## time, and returns the steps the animation replays — each step is the line the parser is on, and what
 ## that line did to the tree — together with the tree itself.
-## tests/parser_trace_test.ol checks that the tree is exactly the one the C++ parser builds, and
+## parser_test.ol checks that the tree is exactly the one the C++ parser builds, and
 ## tests/check_trace_source.sh that every line named below is the line of parser.cpp it claims to be.
 ##
 ## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index`

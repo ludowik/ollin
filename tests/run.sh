@@ -2,7 +2,8 @@
 # Runs the WHOLE Ollin test suite in one command:
 #   - the "pass" suites (.ol files that must run without error, with asserts)
 #   - the error suite (the compiler's rejection messages)
-#   - the guards: the API's naming, and the grammar's coverage by syntax.ol
+#   - the guards: the API's naming, and the grammar's coverage by syntax.ol, the catalogue of samples, the generated programs
+# The tests of the SAMPLES sit next to their script and run apart, by tests/samples.sh.
 # Usage: bash tests/run.sh   (the ./build/ollin binary must be compiled)
 set -u
 OLLIN=${OLLIN:-./build/ollin}
@@ -34,13 +35,6 @@ run_pass() {
 echo "── pass suites (.ol) ─────────────────────────────"
 run_pass tests/syntax.ol
 run_pass tests/regressions.ol
-run_pass tests/blockudoku_pieces_test.ol
-run_pass tests/blockudoku_deal_test.ol
-run_pass tests/blockudoku_texts_test.ol
-run_pass tests/sudoku_test.ol
-run_pass tests/sudoku_texts_test.ol
-run_pass tests/lexer_trace_test.ol
-run_pass tests/parser_trace_test.ol
 
 # Modules the headless build only stubs (ui) are exercised by the raylib build when it exists. It is
 # rebuilt first — incremental, so cheap — since nothing else keeps build-gfx/ollin up to date, and a

@@ -5,8 +5,8 @@
 ##
 ## A tree is written as text: the kind, its plain fields as name:value, and the nodes it holds grouped
 ## by field. An apostrophe stands for a double quote, in the programs and in the trees alike.
-import "../docs/samples/parser/tracer.ol"
-import "trace_path.ol"
+import "tracer.ol"
+import "../lib/trace_path_testlib.ol"
 
 func check(text, want)
     var r = parseTrace(unquote(text))

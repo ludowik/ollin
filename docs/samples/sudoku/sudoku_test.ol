@@ -1,8 +1,8 @@
 ## The Sudoku sample (docs/samples/sudoku): the rules, the solver, the generator and the hints, with no drawing.
 
-import "../docs/samples/sudoku/board.ol"
-import "../docs/samples/sudoku/solver.ol"
-import "../docs/samples/sudoku/generator.ol"
+import "board.ol"
+import "solver.ol"
+import "generator.ol"
 
 func parse(text)
     return boardDecode(text.replace(".", "0"))

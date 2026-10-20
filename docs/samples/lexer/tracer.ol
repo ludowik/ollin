@@ -1,7 +1,7 @@
 ## A copy of src/lexer.cpp that RECORDS every line it runs. trace(source) executes the engine's
 ## lexer rules on a program, one C++ line at a time, and returns the list of steps the animation
 ## replays — each step is the line the lexer is on — together with the tokens it produced.
-## tests/lexer_trace_test.ol checks that the tokens are exactly the ones the C++ lexer gives, and
+## lexer_test.ol checks that the tokens are exactly the ones the C++ lexer gives, and
 ## tests/check_trace_source.sh that every line named below is the line of lexer.cpp it claims to be.
 ##
 ## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index`

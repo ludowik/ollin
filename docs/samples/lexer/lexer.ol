@@ -4,7 +4,7 @@
 ##
 ## What runs here is a copy of src/lexer.cpp written in Ollin (tracer.ol) that records every move it
 ## makes, so the animation shows the engine's real rules and not a drawing of them: the same keyword
-## table, the same two-character operators, the same refusals. tests/lexer_trace_test.ol checks that
+## table, the same two-character operators, the same refusals. lexer_test.ol checks that
 ## it cuts a program into exactly the tokens the C++ lexer gives.
 ##
 ## The caret is the read head: the character the lexer is about to read. The highlighted span is the

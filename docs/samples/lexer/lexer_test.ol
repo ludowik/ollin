@@ -1,8 +1,8 @@
 ## The lexer animation (docs/samples/lexer) runs a copy of src/lexer.cpp written in Ollin. This test
 ## holds that copy to the engine's lexer: every expected token below was checked against the C++
 ## lexer's own output, so a drift in either one shows here.
-import "../docs/samples/lexer/tracer.ol"
-import "trace_path.ol"
+import "tracer.ol"
+import "../lib/trace_path_testlib.ol"
 
 ## The tokens of a program, as "TYPE:lexeme" separated by spaces.
 func cut(source)

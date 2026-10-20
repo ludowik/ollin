@@ -1,9 +1,9 @@
 ## The texts of the Sudoku sample: both languages must speak about everything, since a key missing from one of them
 ## would show up in the game as nothing at all, and the first language is the one the game starts in.
 
-import "../docs/samples/sudoku/board.ol"
-import "../docs/samples/sudoku/solver.ol"
-import "../docs/samples/sudoku/texts.ol"
+import "board.ol"
+import "solver.ol"
+import "texts.ol"
 
 assert(LANGUAGES[1] == "fr", "French is the default language")
 assert(i18n.lang == "fr", "the game starts in French")

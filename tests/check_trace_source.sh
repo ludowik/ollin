@@ -6,8 +6,8 @@
 #      file by tools/gen_cpp_source.py; it must be up to date.
 #   2. every line a tracer.ol names — `self.run("number", 21, "advance();")`, a function, a line of
 #      it and how that line begins — must be that line of the C++ file. The calls whose index is
-#      computed (`li + 1`) are checked when they run, by tests/lexer_trace_test.ol and
-#      tests/parser_trace_test.ol.
+#      computed (`li + 1`) are checked when they run, by docs/samples/lexer/lexer_test.ol and
+#      docs/samples/parser/parser_test.ol.
 #   3. the keyword table of the lexer's tracer.ol is the one of lexer.cpp, entry for entry, and the
 #      tables the parser's tracer.ol copies (precedence levels, comparison and assignment operators,
 #      the tokens that end a block) are those of parser.cpp.

@@ -1,7 +1,7 @@
 ## The TEXTS of Sudoku, in the languages the game speaks: French (the default) and English. The French strings are
 ## the translation the game asks for, not a slip in the language of the repository.
 ##
-## Every language has the same keys, which tests/sudoku_texts_test.ol checks. A text is a string, except the ones
+## Every language has the same keys, which docs/samples/sudoku/texts_test.ol checks. A text is a string, except the ones
 ## that take figures (the hints, the names of a unit, the help), which are functions of them.
 
 const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default

@@ -1,9 +1,9 @@
 ## How Blockudoku draws a hand as the score rises (docs/samples/blockudoku/deal.ol): the level, the weights of the
 ## shapes, the aids of the early levels, and the guarantee that a hand can always be played.
 
-import "../docs/samples/blockudoku/board.ol"
-import "../docs/samples/blockudoku/pieces.ol"
-import "../docs/samples/blockudoku/deal.ol"
+import "board.ol"
+import "pieces.ol"
+import "deal.ol"
 
 buildShapes()
 
