@@ -380,6 +380,7 @@ prétexte de cette colonne.
 | `tests/syntax.ol` | Claude | **la FORME** : toute construction du langage y figure, avec l'assertion minimale qui montre qu'elle s'écrit et fonctionne |
 | `tests/regressions/` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…). **Un fichier par domaine** (`functions.ol`, `classes.ol`, `scopes.ol`, `string.ol`, `tween.ol`…), trouvés par `run.sh` sans liste : un test va dans le fichier de son domaine, et un domaine neuf est un fichier neuf |
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
+| `tests/check_api_coverage.sh` | Claude | **garde-fou de couverture de l'API** : chaque fonction qu'un module expose aux scripts doit être NOMMÉE par un test (`.nom` ou `nom(`). Compare des noms, n'exécute rien ; les modules qui exigent un écran ou un périphérique (graphics, image, camera, mouse, keyboard) en sont exclus, `graphics` y étant nil. Il vient d'une mesure de couverture de lignes (gcov) qui avait trouvé dix fonctions `math`, deux méthodes de `Color` et `tween.curves()` jamais appelées, et le visiteur des comparaisons chaînées jamais exécuté |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `tests/check_func_limit.sh` | Claude | **garde-fou du plafond de fonctions** : un programme de N fonctions est ENGENDRÉ par le script, car le plafond lui-même interdit d'en committer un — et chacune doit être appelable PAR SON NOM, la dernière comprise. Rien du plafond n'y est écrit : il est cherché (doublement puis bissection), donc la garde survit à son déplacement. ⚠ Une boucle de closures ne l'exerce PAS (un `func` du texte = un proto, et une closure s'appelle par `CALL_DYN`) |
@@ -418,6 +419,19 @@ dossier et que chaque aide soit importée par un test, et signale en simple NOTE
 L'application web ne les charge jamais — un exemple est son fichier d'entrée et ce qu'il importe, et rien
 n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de LANGAGE reste dans `syntax.ol`,
 `tests/regressions/` ou `test_errors.sh`.
+
+**Couverture (mesure ponctuelle, pas une garde)** : `bash tests/run.sh` ne dit pas ce que la suite exécute.
+Le relevé se fait avec un build à part, hors du dépôt : `cmake -S . -B <dir> -DCMAKE_BUILD_TYPE=Debug
+-DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage`, puis `cmake --build <dir> --target ollin`,
+`syntax.ol`, chaque fichier de `tests/regressions/`, `test_errors.sh` (qui écrit `./build/ollin` en dur : le
+copier en remplaçant ce chemin) et les tests d'exemples avec CE binaire, puis `gcov -n` sur chaque `.gcda`.
+Premier relevé : **86 %** des lignes du moteur, avec le lexer à 98 %, le parser à 96 %, le compilateur à 94 %,
+la VM à 89 %. Les modules graphiques ne sont pas dans la mesure (le build headless ne les compile pas), et les
+en-têtes comptent mal (leur code est compté par unité de compilation). La mesure a trouvé ce que la garde de
+grammaire ne pouvait pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
+n'était exécuté par aucun test. Reste faible : `color_module` (40 %), `data_module` (58 %), `tween_curves.h`
+(20 %). Une ligne exécutée n'est pas une ligne vérifiée : seule une mutation (casser la ligne, voir la suite
+échouer) le prouve.
 
 ## Versionning
 

@@ -292,3 +292,22 @@ tween.sequence(sqX, [{to: {x: 100}, delay: 1.0, curve: "linear"}])
 tween.to(sqX, {x: 50}, 1.0, "linear")
 tween.update(1.0)
 assert(sqX.x == 50 and tween.count() == 0)
+
+## ── tween.curves: the catalogue of the curves, each one usable ──
+var twNames = tween.curves()
+assert(typeof(twNames) == "array" and len(twNames) > 0)
+var twHasLinear = false
+for name in twNames do
+    assert(typeof(name) == "string", "a curve is named by a string")
+    if name == "linear" then
+        twHasLinear = true
+    end
+    ## each name of the catalogue is accepted by a tween, and a finished tween lands exactly on its target
+    tween.cancelAll()
+    var twCurveObj = {x: 0}
+    tween.to(twCurveObj, {x: 10}, 1.0, name)
+    tween.update(1.0)
+    assert(twCurveObj.x == 10, "the curve {name} ends on the target")
+end
+assert(twHasLinear)
+tween.cancelAll()

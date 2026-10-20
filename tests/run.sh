@@ -2,7 +2,7 @@
 # Runs the WHOLE Ollin test suite in one command:
 #   - the "pass" suites (.ol files that must run without error, with asserts)
 #   - the error suite (the compiler's rejection messages)
-#   - the guards: the API's naming, and the grammar's coverage by syntax.ol, the catalogue of samples, the generated programs
+#   - the guards: the API's naming and coverage, the grammar's coverage by syntax.ol, the catalogue of samples, the generated programs
 # The tests of the SAMPLES sit next to their script and run apart, by tests/samples.sh.
 # Usage: bash tests/run.sh   (the ./build/ollin binary must be compiled)
 set -u
@@ -56,6 +56,11 @@ fi
 
 echo "── guard: grammar coverage ───────────────────────"
 if ! bash tests/check_grammar_coverage.sh; then
+    fails=$((fails + 1))
+fi
+
+echo "── guard: API coverage ───────────────────────────"
+if ! bash tests/check_api_coverage.sh; then
     fails=$((fails + 1))
 fi
 

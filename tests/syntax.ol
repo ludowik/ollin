@@ -180,6 +180,12 @@ assert(not (3 <= 2))    ## the false case: left > right
 assert(1 == 1.0)
 assert(1.0 <> 2)
 
+## chained: 1 < x < 10 is (1 < x) and (x < 10)
+var chainX = 5
+assert(1 < chainX < 10)
+assert(not (1 < chainX < 3))
+assert(1 <= 1 < 2 <= 2)
+
 ## ── 6. Logic ─────────────────────────────────────────────────────────────────
 ## [grammar: logical, logicalAnd]
 

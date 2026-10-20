@@ -95,3 +95,38 @@ func constOperandCheck()
     print("constant operands ok")
 end
 constOperandCheck()
+
+## ── Chained comparisons: a < b < c is (a < b) and (b < c), each operand evaluated once ──
+## No test exercised the compiler's chained form: only the single comparison was covered.
+var chCalls = 0
+func chFive()
+    chCalls += 1
+    return 5
+end
+assert(1 < chFive() < 10)
+assert(chCalls == 1)                    ## the middle operand is evaluated ONCE, not once per comparison
+assert(not (1 < chFive() < 3))
+assert(not (10 < chFive() < 20))
+assert(chCalls == 3)
+## every operator takes part, and each pair is judged on its own
+assert(1 <= 1 <= 1 and not (1 < 1 <= 2))
+assert(3 > 2 > 1 and not (3 > 2 > 2))
+assert(3 >= 3 >= 2 and not (3 >= 3 >= 4))
+assert(1 == 1 == 1 and not (1 == 1 == 2))
+assert(1 <> 2 <> 1 and not (1 <> 1 <> 2))
+## different operators in one chain: each pair keeps ITS operator (using the first one for all would change these)
+assert(1 < 2 <= 2 and not (2 <= 2 < 2) and 2 > 1 >= 1 and not (2 > 1 > 1))
+assert(1 < 3 == 3 and not (1 < 3 == 4) and 3 == 3 > 2 and not (3 == 3 > 3) and 1 <> 2 < 3 and not (1 <> 1 < 3))
+assert(1 < 2 < 3 < 4 and not (1 < 2 < 4 < 3) and not (2 < 1 < 3 < 4))   ## longer chains: one failing pair is enough
+## strings compare the way they do alone
+assert("a" < "b" < "c" and not ("a" < "c" < "b"))
+## the result is a real boolean, usable as one
+assert(typeof(1 < 2 < 3) == "bool" and typeof(3 < 2 < 1) == "bool")
+assert((1 < 2 < 3) == true and (3 < 2 < 1) == false)
+## an instance with __lt serves as the middle operand, on the right of one comparison and the left of the next
+class ChN
+    func init(v) self.v = v end
+    func __lt(o) return self.v < o end
+    func __le(o) return self.v <= o end
+end
+assert(0 < ChN(3) < 5 and not (5 < ChN(3) < 9) and not (0 < ChN(3) < 2) and not (0 < ChN(7) < 5))
