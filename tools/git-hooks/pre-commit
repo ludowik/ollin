@@ -1,7 +1,8 @@
 #!/bin/bash
 # Refuses a commit whose test suite does not pass (project rule: `tests/run.sh` before
-# EVERY commit, with no exception, plus the tests of the samples it touches: `tests/samples.sh`). Versioned in the repository, so present after a fresh
-# clone; wired in through `core.hooksPath`, set at session start.
+# EVERY commit, with no exception), and whose sample tests do not pass either (`tests/samples.sh`,
+# see below). Versioned in the repository, so present after a fresh clone; wired in through
+# `core.hooksPath`, set at session start.
 #
 # The binary is rebuilt first: without that, an uncompiled C++ change would be validated by
 # the OLD `build/ollin` — a green test saying nothing about the code committed.
@@ -41,7 +42,9 @@ for f in $(git diff --cached --name-only --diff-filter=d); do
     case "$f" in
         docs/samples/lib/*|src/*|libs/*|tests/*|tools/*|CMakeLists.txt) all=1 ;;
         docs/samples/*/*) scope="$scope ${f%/*}" ;;
-        docs/samples/*.ol) scope="$scope ${f%.ol}_test.ol" ;;
+        docs/samples/*.ol)
+            stem=${f%.ol}
+            scope="$scope ${stem%_test}_test.ol" ;;
     esac
 done
 if [ "$all" = 1 ]; then
