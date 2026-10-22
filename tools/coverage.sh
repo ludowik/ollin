@@ -95,10 +95,10 @@ def section(title, rows, counted=None):
     print(f"{'covered':>8}  {'lines':>6}  {'unrun':>5}  area")
     for label, pct, n, miss in rows:
         print(f"{pct:7.1f}%  {n:6d}  {miss:5d}  {label}")
+    note = "subtotal" if counted is None else "subtotal (stubs left out)"
     counted = rows if counted is None else counted
     lines = sum(r[2] for r in counted)
     unrun = sum(r[3] for r in counted)
-    note = "subtotal" if counted is rows else "subtotal (stubs left out)"
     print(f"{100 * (lines - unrun) / lines if lines else 100.0:7.1f}%  {lines:6d}  {unrun:5d}  {note}")
 
 

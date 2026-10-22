@@ -862,11 +862,11 @@ tween.sequence({x: 0}, [st])' \
 
 check_error "tween.sequence with a target that is not an object" \
     'tween.sequence({x: 0}, [{delay: 1, to: {x: 1}, target: 5}])' \
-    "`target` must be an object"
+    "\`target\` must be an object"
 
 check_error "tween.sequence with a to that is not a map" \
     'tween.sequence({x: 0}, [{delay: 1, to: 5}])' \
-    "`to` must be a non-empty map"
+    "\`to\` must be a non-empty map"
 
 check_error "tween.sequence with a curve of the wrong type" \
     'tween.sequence({x: 0}, [{delay: 1, curve: 5}])' \

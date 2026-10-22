@@ -216,8 +216,8 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     // statement beginning with an operator, a field access, a call or an index: refused, since
     // no statement does.
     if (only_continues_expr(peek().type))
-        fail(std::string("a statement cannot begin with '") + peek().lexeme +
-             "' — such a line continues the expression above; give the value a name instead");
+        fail("a statement cannot begin with " + peek_quoted() +
+             " — such a line continues the expression above; give the value a name instead");
     switch (peek().type) {
     case TokenType::SEMICOLON:
         // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
@@ -514,7 +514,7 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     // expression as the value, newlines being whitespace (checked: Lua reads it the same way,
     // and refuses the two statements outright).
     if (!at_block_terminator())
-        fail("'" + peek().lexeme + "' after 'return': a return ends its block, so nothing can follow it");
+        fail(peek_quoted() + " after 'return': a return ends its block, so nothing can follow it");
     return s;
 }
 

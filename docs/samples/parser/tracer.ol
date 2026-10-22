@@ -651,7 +651,7 @@ class ParseTracer
         var continues = onlyContinuesExpr(ty)
         self.run("parse_one_stmt", 10, "if (only_continues_expr(peek().type))")
         if continues then
-            self.fail("parse_one_stmt", 11, "fail(std::string(",
+            self.fail("parse_one_stmt", 11, "fail(",
                       "a statement cannot begin with '{self.peek().lexeme}' — such a line continues the expression above; give the value a name instead",
                       {span: 1})
         end
