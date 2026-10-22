@@ -44,6 +44,8 @@ class Parser {
 
     // Every refusal goes through one of these, so a message always carries its location.
     [[noreturn]] void fail(const std::string& msg) const;
+    std::string peek_quoted() const;
+    std::string unexpected_msg() const;
     [[noreturn]] void fail_at(int line, const std::string& msg) const;
 
     TokenType peek_next_type() const;

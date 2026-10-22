@@ -1096,6 +1096,26 @@ end
 f() = 1' \
     "invalid assignment target"
 
+check_error "a block that is never closed" \
+    'if true then
+    var a = 1
+' \
+    "unexpected end of file"
+
+check_error "an enum that is never closed" \
+    'enum E
+    A
+' \
+    "unexpected end of file"
+
+check_error "an argument list that is never closed" \
+    'func f(' \
+    "unexpected end of file"
+
+check_error "ref at the end of the file" \
+    'var a = ref' \
+    "ref expects a variable name, not end of file"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

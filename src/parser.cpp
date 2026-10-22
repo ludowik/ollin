@@ -40,9 +40,23 @@ bool Parser::match(TokenType t) {
     return true;
 }
 
+// The current token as a message shows it: the end of the file has no text of its own, and an empty pair of
+// quotes (an unclosed block ends there) told the author nothing.
+std::string Parser::peek_quoted() const {
+    if (peek().type == TokenType::EOF_T)
+        return "end of file";
+    return "'" + peek().lexeme + "'";
+}
+
+std::string Parser::unexpected_msg() const {
+    if (peek().type == TokenType::EOF_T)
+        return "unexpected end of file";
+    return "unexpected token " + peek_quoted();
+}
+
 const Token& Parser::expect(TokenType t) {
     if (!check(t))
-        fail("unexpected token '" + peek().lexeme + "'");
+        fail(unexpected_msg());
     return advance();
 }
 
@@ -74,7 +88,7 @@ bool Parser::at_name() const {
 
 std::string Parser::expect_name(const char* what) {
     if (!at_name())
-        fail(std::string("expected ") + what + ", got '" + peek().lexeme + "'");
+        fail(std::string("expected ") + what + ", got " + peek_quoted());
     return advance().lexeme;
 }
 
@@ -145,7 +159,7 @@ void Parser::parse_call_args(std::vector<std::unique_ptr<Expr>>& out) {
 void Parser::expect_separator(TokenType closing, const char* what) {
     if (match(TokenType::COMMA) || check(closing) || check(TokenType::EOF_T))
         return;
-    fail(std::string("expected ',' between ") + what + ", got '" + peek().lexeme + "'");
+    fail(std::string("expected ',' between ") + what + ", got " + peek_quoted());
 }
 
 void Parser::parse_field_path(std::vector<std::string>& path) {
@@ -742,7 +756,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     // Target: IDENT { "." IDENT }. Bracket indexing is refused, because the path is
     // re-evaluated on every access and `ref t[i]` would follow later changes to i.
     if (!check(TokenType::IDENTIFIER))
-        fail_at(line, "ref expects a variable name, not '" + peek().lexeme + "'");
+        fail_at(line, "ref expects a variable name, not " + peek_quoted());
     std::vector<std::string> path;
     parse_field_path(path);
     if (check(TokenType::LBRACKET))
@@ -1086,7 +1100,7 @@ std::unique_ptr<Expr> Parser::primary() {
         // Postfix on a parenthesized expression: (expr)(args), (expr)[i], (expr).field
         return parse_postfix(std::move(e));
     }
-    fail("unexpected token '" + peek().lexeme + "'");
+    fail(unexpected_msg());
 }
 
 std::unique_ptr<Stmt> Parser::class_decl() {

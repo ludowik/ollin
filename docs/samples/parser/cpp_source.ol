@@ -3,7 +3,7 @@
 ## one starts. A ¤ stands for a double quote, and tracer.ol puts the quotes back.
 
 const PARSER_CPP_SOURCE = {
-    "parse_body_until": {first: 102, lines: [
+    "parse_body_until": {first: 116, lines: [
         "void Parser::parse_body_until(std::vector<std::unique_ptr<Stmt>>& out, std::initializer_list<TokenType> stops) \{",
         "    while (true) \{",
         "        if (check(TokenType::EOF_T))",
@@ -15,7 +15,7 @@ const PARSER_CPP_SOURCE = {
         "    }",
         "}"
     ]},
-    "parse_params": {first: 113, lines: [
+    "parse_params": {first: 127, lines: [
         "void Parser::parse_params(std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,",
         "                          bool& variadic) \{",
         "    expect(TokenType::LPAREN);",
@@ -32,21 +32,21 @@ const PARSER_CPP_SOURCE = {
         "    expect(TokenType::RPAREN);",
         "}"
     ]},
-    "parse_expr_list": {first: 129, lines: [
+    "parse_expr_list": {first: 143, lines: [
         "void Parser::parse_expr_list(std::vector<std::unique_ptr<Expr>>& out) \{",
         "    out.push_back(expr());",
         "    while (match(TokenType::COMMA))",
         "        out.push_back(expr());",
         "}"
     ]},
-    "parse_call_args": {first: 135, lines: [
+    "parse_call_args": {first: 149, lines: [
         "void Parser::parse_call_args(std::vector<std::unique_ptr<Expr>>& out) \{",
         "    if (!check(TokenType::RPAREN))",
         "        parse_expr_list(out);",
         "    expect(TokenType::RPAREN);",
         "}"
     ]},
-    "parse": {first: 174, lines: [
+    "parse": {first: 188, lines: [
         "Program Parser::parse() \{",
         "    Program prog;",
         "    while (true) \{",
@@ -58,7 +58,7 @@ const PARSER_CPP_SOURCE = {
         "    return prog;",
         "}"
     ]},
-    "parse_one_stmt": {first: 195, lines: [
+    "parse_one_stmt": {first: 209, lines: [
         "std::unique_ptr<Stmt> Parser::parse_one_stmt() \{",
         "    if (depth_ >= 256)",
         "        fail(¤nesting too deep¤);",
@@ -133,7 +133,7 @@ const PARSER_CPP_SOURCE = {
         "    return expr_stmt();",
         "}"
     ]},
-    "finish_assign_from_expr": {first: 272, lines: [
+    "finish_assign_from_expr": {first: 286, lines: [
         "std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> target, int line) \{",
         "    TokenType opt = advance().type; // assignment operator",
         "    auto value = expr();",
@@ -178,7 +178,7 @@ const PARSER_CPP_SOURCE = {
         "    fail_at(line, ¤invalid assignment target¤);",
         "}"
     ]},
-    "decl_stmt": {first: 316, lines: [
+    "decl_stmt": {first: 330, lines: [
         "std::unique_ptr<Stmt> Parser::decl_stmt(bool is_global, bool is_constant) \{",
         "    int line = peek().line;",
         "    advance(); // var / global / const",
@@ -199,7 +199,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "while_stmt": {first: 336, lines: [
+    "while_stmt": {first: 350, lines: [
         "std::unique_ptr<Stmt> Parser::while_stmt() \{",
         "    int line = peek().line;",
         "    advance();",
@@ -213,7 +213,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "do_stmt": {first: 349, lines: [
+    "do_stmt": {first: 363, lines: [
         "std::unique_ptr<Stmt> Parser::do_stmt() \{",
         "    int line = peek().line;",
         "    advance();",
@@ -225,7 +225,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "if_stmt": {first: 360, lines: [
+    "if_stmt": {first: 374, lines: [
         "std::unique_ptr<Stmt> Parser::if_stmt() \{",
         "    int line = peek().line;",
         "    advance(); // IF",
@@ -251,7 +251,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "break_stmt": {first: 385, lines: [
+    "break_stmt": {first: 399, lines: [
         "std::unique_ptr<Stmt> Parser::break_stmt() \{",
         "    int line = peek().line;",
         "    advance();",
@@ -261,7 +261,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "continue_stmt": {first: 394, lines: [
+    "continue_stmt": {first: 408, lines: [
         "std::unique_ptr<Stmt> Parser::continue_stmt() \{",
         "    int line = peek().line;",
         "    advance();",
@@ -271,7 +271,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "throw_stmt": {first: 403, lines: [
+    "throw_stmt": {first: 417, lines: [
         "std::unique_ptr<Stmt> Parser::throw_stmt() \{",
         "    int line = peek().line;",
         "    advance(); // throw",
@@ -281,7 +281,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "func_decl_stmt": {first: 429, lines: [
+    "func_decl_stmt": {first: 443, lines: [
         "std::unique_ptr<Stmt> Parser::func_decl_stmt() \{",
         "    int line = peek().line;",
         "    advance(); // FUNC",
@@ -306,7 +306,7 @@ const PARSER_CPP_SOURCE = {
         "    return finish_func_decl(line, std::move(name));",
         "}"
     ]},
-    "finish_func_decl": {first: 464, lines: [
+    "finish_func_decl": {first: 478, lines: [
         "std::unique_ptr<FuncDeclStmt> Parser::finish_func_decl(int line, std::string name) \{",
         "    auto s = std::make_unique<FuncDeclStmt>();",
         "    s->line = line;",
@@ -318,7 +318,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "return_stmt": {first: 475, lines: [
+    "return_stmt": {first: 489, lines: [
         "std::unique_ptr<Stmt> Parser::return_stmt() \{",
         "    int line = peek().line;",
         "    advance(); // RETURN",
@@ -351,7 +351,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "multi_assign_stmt": {first: 513, lines: [
+    "multi_assign_stmt": {first: 527, lines: [
         "std::unique_ptr<Stmt> Parser::multi_assign_stmt(std::unique_ptr<Expr> first, int line) \{",
         "    auto s = std::make_unique<MultiAssignStmt>();",
         "    s->line = line;",
@@ -369,7 +369,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "for_stmt": {first: 530, lines: [
+    "for_stmt": {first: 544, lines: [
         "std::unique_ptr<Stmt> Parser::for_stmt() \{",
         "    int line = peek().line;",
         "    advance(); // FOR",
@@ -409,7 +409,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "expr_stmt": {first: 569, lines: [
+    "expr_stmt": {first: 583, lines: [
         "std::unique_ptr<Stmt> Parser::expr_stmt() \{",
         "    int line = peek().line;",
         "    auto e = expr();",
@@ -419,7 +419,7 @@ const PARSER_CPP_SOURCE = {
         "    return s;",
         "}"
     ]},
-    "expr": {first: 578, lines: [
+    "expr": {first: 592, lines: [
         "std::unique_ptr<Expr> Parser::expr() \{",
         "    if (depth_ >= 256)",
         "        fail(¤nesting too deep¤);",
@@ -427,7 +427,7 @@ const PARSER_CPP_SOURCE = {
         "    return binary_level(0);",
         "}"
     ]},
-    "binary_level": {first: 617, lines: [
+    "binary_level": {first: 631, lines: [
         "std::unique_ptr<Expr> Parser::binary_level(int level) \{",
         "    if (level == CMP_LEVEL)",
         "        return comparison();",
@@ -447,7 +447,7 @@ const PARSER_CPP_SOURCE = {
         "    }",
         "}"
     ]},
-    "comparison": {first: 684, lines: [
+    "comparison": {first: 698, lines: [
         "std::unique_ptr<Expr> Parser::comparison() \{",
         "    auto first = binary_level(CMP_LEVEL + 1);",
         "    if (!is_cmp_token(peek().type))",
@@ -471,7 +471,7 @@ const PARSER_CPP_SOURCE = {
         "    return chain;",
         "}"
     ]},
-    "unary": {first: 817, lines: [
+    "unary": {first: 831, lines: [
         "std::unique_ptr<Expr> Parser::unary() \{",
         "    if (check(TokenType::MINUS)) \{",
         "        advance();",
@@ -496,7 +496,7 @@ const PARSER_CPP_SOURCE = {
         "    return power();",
         "}"
     ]},
-    "power": {first: 841, lines: [
+    "power": {first: 855, lines: [
         "std::unique_ptr<Expr> Parser::power() \{",
         "    auto left = primary();",
         "    if (!check(TokenType::CARET))",
@@ -506,7 +506,7 @@ const PARSER_CPP_SOURCE = {
         "    return std::make_unique<BinaryExpr>('p', std::move(left), unary());",
         "}"
     ]},
-    "parse_postfix": {first: 850, lines: [
+    "parse_postfix": {first: 864, lines: [
         "std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) \{",
         "    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) || at_optional_call()) \{",
         "        if (check(TokenType::LBRACKET)) \{",
@@ -555,7 +555,7 @@ const PARSER_CPP_SOURCE = {
         "    return base;",
         "}"
     ]},
-    "primary": {first: 955, lines: [
+    "primary": {first: 969, lines: [
         "std::unique_ptr<Expr> Parser::primary() \{",
         "    if (check(TokenType::NUMBER)) \{",
         "        Token tok = advance();",
@@ -690,7 +690,7 @@ const PARSER_CPP_SOURCE = {
         "        // Postfix on a parenthesized expression: (expr)(args), (expr)[i], (expr).field",
         "        return parse_postfix(std::move(e));",
         "    }",
-        "    fail(¤unexpected token '¤ + peek().lexeme + ¤'¤);",
+        "    fail(unexpected_msg());",
         "}"
     ]}
 }
