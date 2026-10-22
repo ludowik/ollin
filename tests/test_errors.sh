@@ -973,6 +973,129 @@ end
 f(1)' \
     "stack overflow"
 
+check_error "a string that is never closed" \
+    'print("abc' \
+    "unterminated string"
+
+check_error "a block comment that is never closed" \
+    '### never closed
+var a = 1' \
+    "unterminated block comment"
+
+check_error "an interpolation brace that is never closed" \
+    'var x = 1
+print("a {x")' \
+    "unclosed brace in interpolation"
+
+check_error "'..' written as an operator" \
+    'var a = 1 .. 2' \
+    "'..' is not valid syntax"
+
+check_error "a semicolon ending a statement" \
+    'var a = 1;' \
+    "';' is not valid syntax"
+
+check_error "an unexpected token inside an expression" \
+    'var a = )' \
+    "unexpected token ')'"
+
+check_error "a class method written as func obj.field" \
+    'class A
+    func obj.f()
+    end
+end' \
+    "a class method must be 'func name(...)'"
+
+check_error "something other than func in a class body" \
+    'class A
+    var x = 1
+end' \
+    "expected 'func' inside class body"
+
+check_error "a range that is not closed" \
+    'var r = [1;3' \
+    "expected ']' or '[' to close range"
+
+check_error "super used as a value" \
+    'class A
+    func f()
+    end
+end
+class B extends A
+    func g()
+        var x = super.f
+    end
+end' \
+    "super: only method calls are supported"
+
+check_error "super outside a method" \
+    'func f()
+    super.g()
+end' \
+    "'super' can only be used inside a method"
+
+check_error "super in a class without a parent" \
+    'class A
+    func f()
+        super.f()
+    end
+end' \
+    "the current class has no parent"
+
+check_error "return at the top level" \
+    'return 1' \
+    "return outside function"
+
+check_error "... outside a variadic function" \
+    'var x = ...' \
+    "... outside a variadic function"
+
+check_error "a default value that is computed" \
+    'func f(a = 1 + n)
+end' \
+    "default values must be literal constants"
+
+check_error "an import of a file that does not exist" \
+    'import "no_such_file.ol"' \
+    "import: cannot open"
+
+check_error "assignment to an undeclared variable inside a function" \
+    'func f()
+    undefinedVar = 1
+end
+f()' \
+    "undeclared variable 'undefinedVar'"
+
+check_error "a compound assignment on an undeclared variable" \
+    'undefinedZ += 1' \
+    "undeclared variable 'undefinedZ'"
+
+check_error "a field assignment on an undeclared object" \
+    'undefinedObj.x = 1' \
+    "undeclared variable 'undefinedObj'"
+
+check_error "a call to an undefined function" \
+    'undefinedFn()' \
+    "undefined: undefinedFn"
+
+check_error "an expression nested too deeply" \
+    "var a = $(printf '(%.0s' $(seq 300))1$(printf ')%.0s' $(seq 300))" \
+    "nesting too deep"
+
+check_error "a literal nested too deeply" \
+    "var a = $(printf '[%.0s' $(seq 300))$(printf ']%.0s' $(seq 300))" \
+    "nesting too deep"
+
+check_error "statements nested too deeply" \
+    "$(printf 'if true then\n%.0s' $(seq 300))$(printf 'end\n%.0s' $(seq 300))" \
+    "nesting too deep"
+
+check_error "assignment to the result of a call" \
+    'func f()
+end
+f() = 1' \
+    "invalid assignment target"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]
