@@ -1172,6 +1172,13 @@ check_error "a float numeric for with a zero step" \
 end' \
     "runtime: step cannot be 0"
 
+check_error "an error inside a callback is placed once, where it happened" \
+    'var a = [1]
+var r = a.map(func(v)
+    return v / 0
+end)' \
+    "/dev/stdin:3: runtime: division by zero"
+
 check_error "a thrown value nobody catches" \
     'throw "boom"' \
     "unhandled exception: boom"
