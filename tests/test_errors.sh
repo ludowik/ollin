@@ -981,6 +981,13 @@ check_error "a string that is never closed" \
     'print("abc' \
     "unterminated string"
 
+# check_error feeds the code through echo, which adds the newline that ends the string: here the file stops
+# in the middle of it.
+unterminated_eof=$(mktemp)
+printf 'print("abc' > "$unterminated_eof"
+check_error_file "a string that stops at the very end of the file" "$unterminated_eof" "unterminated string"
+rm -f "$unterminated_eof"
+
 check_error "a block comment that is never closed" \
     '### never closed
 var a = 1' \
