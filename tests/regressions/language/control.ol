@@ -156,3 +156,11 @@ for x = 3.5, 1.5 do
     cxNone += 1
 end
 assert(cxNone == 0)
+
+## a for with two variables over a range gives the value twice, as key and as value
+var cxPairs = 0
+for k, v in [1;3] do
+    assert(k == v)
+    cxPairs += v
+end
+assert(cxPairs == 6)

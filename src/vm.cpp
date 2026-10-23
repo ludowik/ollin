@@ -1107,7 +1107,6 @@ void VM::run_goto(size_t stop_depth) {
         &&op_NEGATE,
         &&op_NOT,
         &&op_AND,
-        &&op_OR,
         &&op_EQ,
         &&op_NEQ,
         &&op_GT,
@@ -1312,10 +1311,6 @@ dispatch_loop:
 
     op_AND:
         regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) && !is_falsy(regs[base + C]));
-        NEXT();
-
-    op_OR:
-        regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) || !is_falsy(regs[base + C]));
         NEXT();
 
     op_EQ:

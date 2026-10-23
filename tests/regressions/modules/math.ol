@@ -86,3 +86,6 @@ for i = 0, 50 do
 end
 assert(math.noise(0.3, 0.7) == math.noise(0.3, 0.7), "the same point gives the same value")
 assert(math.noise(0.3) <> math.noise(0.3, 0.7), "a second coordinate is not ignored")
+
+## the natural logarithm, and its inverse
+assert(math.log(1) == 0 and math.abs(math.log(math.exp(1)) - 1) < 1e-12)

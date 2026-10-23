@@ -219,3 +219,10 @@ end
 assert(SqChild().tag() == "base")
 
 print("regressions ok")
+
+## a map whose `__class__` is itself a map with a `__class__` is a chain of prototypes: a meta-method is
+## looked up all along it, as a method is along classes
+var cxProtoBase = {__str: func(self) return "viaBase" end}
+var cxProtoMid = {__class__: cxProtoBase}
+var cxProtoObj = {__class__: cxProtoMid}
+assert("{cxProtoObj}" == "viaBase")

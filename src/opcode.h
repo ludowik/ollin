@@ -66,8 +66,7 @@ enum class Op : OpByte {
     POW, // ABC: R[A] = R[B] op R[C]
     NEGATE,
     NOT, // AB:  R[A] = op R[B]
-    AND,
-    OR, // ABC: logical and/or → 0 or 1
+    AND, // ABC: logical and → true or false; only the chained comparisons emit it, `and`/`or` are jumps
     EQ,
     NEQ,
     GT,

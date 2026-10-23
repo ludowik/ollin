@@ -59,3 +59,6 @@ data.delete("never_existed")
 assert(len(data.keys()) == before - 1, "deleting an absent key is harmless")
 data.clear()
 assert(len(data.keys()) == 0 and not data.has("pk"))
+
+## the shared store lists its keys too (read only: it is a single file of the machine, never cleared here)
+assert(typeof(data.shared.keys()) == "array")

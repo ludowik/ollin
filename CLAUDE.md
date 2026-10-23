@@ -427,7 +427,7 @@ n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de
 `src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
 (un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
 monte durablement. Hors de `run.sh` : la compilation instrumentée prend une minute et demie au premier passage.
-Dernier relevé : **96,2 %** des lignes (lexer 100 %, parser 100 %, compilateur 99 %, VM 94 %). Une accolade fermante seule marquée `=====` par gcov (le nettoyage d'une fonction dont les locales se détruisent sur un `bad_alloc`) n'est PAS comptée — aucun script ne fait échouer une allocation ; un relevé d'avant ce choix n'est pas comparable. ⚠ **Ne marquer que l'accolade** : gcov met aussi `=====` du code ordinaire d'un gestionnaire computed-goto que rien n'exécute (modulo flottant, `throw` d'opérande non entier…), et les écarter de tout le fichier cachait 39 lignes de `vm.cpp` qui n'avaient aucun test. C'est le build
+Dernier relevé : **96,3 %** des lignes (lexer 100 %, parser 100 %, compilateur 99 %, VM 95 %). Une accolade fermante seule marquée `=====` par gcov (le nettoyage d'une fonction dont les locales se détruisent sur un `bad_alloc`) n'est PAS comptée — aucun script ne fait échouer une allocation ; un relevé d'avant ce choix n'est pas comparable. ⚠ **Ne marquer que l'accolade** : gcov met aussi `=====` du code ordinaire d'un gestionnaire computed-goto que rien n'exécute (modulo flottant, `throw` d'opérande non entier…), et les écarter de tout le fichier cachait 39 lignes de `vm.cpp` qui n'avaient aucun test. C'est le build
 HEADLESS : les modules graphiques n'y sont que des stubs, leur code réel n'est pas dans le chiffre. Les
 en-têtes sont exclus, leur code en ligne étant compté par unité de compilation. La mesure trouve ce que la
 garde de grammaire ne peut pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
@@ -845,7 +845,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | IDIV          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = floor(R[B] / R[C])  (INT//INT → INT)      |
 | POW           | ABC    | A=dst, B=base, C=exp       | R[A] = R[B] ^ R[C]  (INT^INT(≥0) → INT ; sinon FLOAT ; '^' = puissance, modèle Lua) |
 | NEGATE / NOT  | AB     | A=dst, B=src               | R[A] = -R[B] / !R[B]                            |
-| AND / OR      | ABC    | A=dst, B=lhs, C=rhs        | R[A] = 1.0 si vrai sinon 0.0 — **réservé aux comparaisons chaînées** ; les opérateurs `and`/`or` du langage compilent en court-circuit (JUMP_IF_FALSE + MOVE, sémantique valeur Lua) |
+| AND           | ABC    | A=dst, B=lhs, C=rhs        | R[A] = vrai si les deux sont vrais — **réservé aux comparaisons chaînées** ; les opérateurs `and`/`or` du langage compilent en court-circuit (JUMP_IF_FALSE + MOVE, sémantique valeur Lua). Il n'y a pas d'opcode `OR` : aucun émetteur, retiré |
 | EQ/NEQ/GT/LT/GE/LE | ABC | A=dst, B=lhs, C=rhs  | R[A] = 1.0 si vrai sinon 0.0 ; GT/LT/GE/LE : nombres OU deux strings (ordre lexicographique) |
 | JUMP          | Bx     | Bx=addr                    | ip = Bx                                          |
 | JUMP_IF_FALSE | ABx    | A=cond_reg, Bx=addr        | si falsy(R[A]) → ip = Bx (aussi : appel optionnel f?()) |
@@ -2184,9 +2184,9 @@ Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin i
 
 **Itérateur** (`for [k,] v in expr`) : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
 - 2 vars : `FOR_ITER_NEXT` → `[block+1]`=key, `[block+2]`=val. 3 registres + 1 temp source.  
-- 1 var  : `FOR_ITER_NEXT1` → `[block+1]`=primary (val si `primary_is_val()`, sinon key). 2 registres + 1 temp source.  
+- 1 var  : `FOR_ITER_NEXT1` → `[block+1]`=primary (la valeur pour un tableau ou un intervalle, la clé pour une map ; c'est `next_primary` de chaque itérateur qui le décide). 2 registres + 1 temp source.  
 `var1`/`var2` sont aliasées directement sur `[block+1]`/`[block+2]` (pas de copie : `FOR_ITER_NEXT` les réécrit à chaque tour → modifier la variable dans le corps est sans effet).  
-`Iterator::primary_is_val()` : `ArrayIterator`=true, `RangeIterator`=true, `MapIterator`=false.
+⚠ `Iterator::primary_is_val()` n'est appelée par personne (le choix valeur/clé est dans `next_primary`) et reste déclarée : la retirer des quatre itérateurs a été essayé et **coûte +0,86 %** d'instructions sur le script `map` d'`icount.sh`, sans changer aucun chemin que ce script exécute (`fib` et `loop` neutres). Placement du code de `run_goto`, mesuré — ne pas la retirer sans une idée qui ne le déplace pas.
 
 ## Type range (implémentation)
 

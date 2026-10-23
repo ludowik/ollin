@@ -39,3 +39,7 @@ for name in ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "GRAY", "ORANGE
     assert(colors[name].__class__.__name__ == "Color", "colors.{name} is a Color")
 end
 assert(len(map.keys(colors)) == 15, "the palette has fifteen colours")
+
+## a Color may be built from any map that has r, g, b and a, the absent ones defaulting to 0 and 1
+var cxFromMap = Color({r: 1, g: 0.5, b: 0})
+assert(cxFromMap.r == 1 and cxFromMap.g == 0.5 and cxFromMap.b == 0 and cxFromMap.a == 1)

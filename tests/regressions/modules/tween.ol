@@ -311,3 +311,23 @@ for name in twNames do
 end
 assert(twHasLinear)
 tween.cancelAll()
+
+## every curve starts at the origin, ends exactly on the target, and passes between at the middle; the
+## polynomial ones have a known middle
+for name in tween.curves() do
+    var twC = {x: 0}
+    tween.to(twC, {x: 1}, 1.0, name)
+    tween.update(0.5)
+    assert(twC.x > -1 and twC.x < 2)
+    tween.update(0.5)
+    assert(twC.x == 1)
+end
+func twMid(name)
+    var o = {x: 0}
+    tween.to(o, {x: 1}, 1.0, name)
+    tween.update(0.5)
+    tween.update(0)
+    return o.x
+end
+assert(twMid("easeInQuad") == 0.25 and twMid("easeOutQuad") == 0.75 and twMid("easeInOutQuad") == 0.5)
+assert(twMid("easeInCubic") == 0.125 and twMid("easeOutCubic") == 0.875 and twMid("easeInOutCubic") == 0.5)
