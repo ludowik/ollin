@@ -46,31 +46,47 @@ files = {}
 # brace of a function whose locals are destroyed on a std::bad_alloc (gcov marks it =====): no script makes an
 # allocation fail, so such a line is not counted at all. ONLY a lone brace is dropped: gcov also marks ===== the
 # ordinary code of a computed-goto handler that nothing runs, and that is exactly what this report is for.
+lines_of = {}
 with tempfile.TemporaryDirectory() as scratch:
-    for gcda in gcdas:
+    for n, gcda in enumerate(gcdas):
+        # One directory per .gcda: two binaries built from the same source write the same report name. A source
+        # can be compiled into several binaries (the engine, the unit tests), and a line counts as run when ANY
+        # of them ran it.
+        where = os.path.join(scratch, str(n))
+        os.mkdir(where)
         subprocess.run(["gcov", "-o", os.path.dirname(os.path.abspath(gcda)), os.path.abspath(gcda)],
-                       cwd=scratch, capture_output=True, text=True)
-    for report in os.listdir(scratch):
-        if not report.endswith(".gcov"):
-            continue
-        source = None
-        hit = lines = 0
-        with open(os.path.join(scratch, report), errors="replace") as text:
-            for line in text:
-                count, _, rest = line.partition(":")
-                count = count.strip()
-                if rest.lstrip().startswith("0:Source:"):
-                    source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
-                elif count == "=====":
-                    if rest.partition(":")[2].strip() not in ("}", "};"):
-                        lines += 1
-                elif count == "#####":
-                    lines += 1
-                elif count[:1].isdigit():
-                    lines += 1
-                    hit += 1
-        if source and source.startswith(root + "/src/") and source.endswith(".cpp") and lines:
-            files[os.path.relpath(source, root)] = (100.0 * hit / lines, lines)
+                       cwd=where, capture_output=True, text=True)
+        for report in os.listdir(where):
+            if not report.endswith(".gcov"):
+                continue
+            source = None
+            counted = {}
+            seen = {}
+            with open(os.path.join(where, report), errors="replace") as text:
+                for line in text:
+                    count, _, rest = line.partition(":")
+                    count = count.strip()
+                    # A line expanded from a macro or a template shows up once per instance, each with its own
+                    # count: the Nth occurrence of a line number is the key, the same in every binary.
+                    number = rest.partition(":")[0].strip()
+                    seen[number] = seen.get(number, 0) + 1
+                    number = (number, seen[number])
+                    if rest.lstrip().startswith("0:Source:"):
+                        source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
+                    elif count == "=====":
+                        if rest.partition(":")[2].strip() not in ("}", "};"):
+                            counted[number] = False
+                    elif count == "#####":
+                        counted[number] = False
+                    elif count[:1].isdigit():
+                        counted[number] = True
+            if source and source.startswith(root + "/src/") and source.endswith(".cpp"):
+                merged = lines_of.setdefault(os.path.relpath(source, root), {})
+                for number, ran in counted.items():
+                    merged[number] = merged.get(number, False) or ran
+    for name, merged in lines_of.items():
+        if merged:
+            files[name] = (100.0 * sum(merged.values()) / len(merged), len(merged))
 
 total = sum(n for _, n in files.values())
 hit = sum(p * n / 100 for p, n in files.values())

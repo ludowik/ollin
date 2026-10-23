@@ -165,6 +165,11 @@ else()
         target_link_libraries(ollin PRIVATE psapi)   # GetProcessMemoryInfo (mem())
     endif()
     target_compile_options(ollin PRIVATE -Wall -Wextra)
+
+    # Unit tests of the units no script can reach on its own (tests/check_unit.sh builds and runs it).
+    add_executable(unit_tests EXCLUDE_FROM_ALL tests/unit/paths_test.cpp src/paths.cpp src/source_registry.cpp)
+    target_include_directories(unit_tests PRIVATE src)
+    target_compile_options(unit_tests PRIVATE -Wall -Wextra)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-Og")
     endif()

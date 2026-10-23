@@ -57,6 +57,7 @@ checks=(
     "guard: trace animations|tests/check_trace_source.sh"
     "guard: constant operands|tests/check_const_operands.sh"
     "guard: upvalue ceiling|tests/check_upval_limit.sh"
+    "guard: unit tests|tests/check_unit.sh"
     "guard: data persistence|tests/check_data_persistence.sh"
 )
 reports=$(mktemp -d)
