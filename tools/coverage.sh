@@ -36,7 +36,7 @@ OLLIN="$bin" bash tests/run.sh >/dev/null 2>&1 || echo "note: tests/run.sh faile
 OLLIN="$bin" bash tests/samples.sh >/dev/null 2>&1 || echo "note: tests/samples.sh failed with the instrumented binary"
 
 python3 - "$dir" "$mode" "$floor_file" <<'PYEOF'
-import os, re, subprocess, sys, tempfile
+import os, subprocess, sys, tempfile
 
 build, mode, floor_file = sys.argv[1:4]
 root = os.getcwd()
@@ -54,18 +54,17 @@ with tempfile.TemporaryDirectory() as scratch:
             continue
         source = None
         hit = lines = 0
-        for line in open(os.path.join(scratch, report), errors="replace"):
-            count, _, rest = line.partition(":")
-            count = count.strip()
-            if rest.lstrip().startswith("0:Source:"):
-                source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
-            elif count == "=====" or count == "-":
-                continue
-            elif count == "#####":
-                lines += 1
-            elif count[:1].isdigit():
-                lines += 1
-                hit += 1
+        with open(os.path.join(scratch, report), errors="replace") as text:
+            for line in text:
+                count, _, rest = line.partition(":")
+                count = count.strip()
+                if rest.lstrip().startswith("0:Source:"):
+                    source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
+                elif count == "#####":
+                    lines += 1
+                elif count[:1].isdigit():
+                    lines += 1
+                    hit += 1
         if source and source.startswith(root + "/src/") and source.endswith(".cpp") and lines:
             files[os.path.relpath(source, root)] = (100.0 * hit / lines, lines)
 

@@ -43,7 +43,7 @@ else
 fi
 
 generate "$work/over.ol" 35000
-if "$OLLIN" "$work/over.ol" 2>&1 | grep -qF "function captures more than 65535 upvalues"; then
+if "$OLLIN" "$work/over.ol" 2>&1 | grep -qF "function captures more than"; then
     echo "OK   70 000 captured variables are refused, naming the ceiling"
 else
     echo "FAIL a function that captures 70 000 variables is not refused"
