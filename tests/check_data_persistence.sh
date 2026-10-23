@@ -61,7 +61,15 @@ run_cmd "data: a truncated file keeps the entries before the damage" "$OLLIN" "$
 cat > "$work/empty.ol" <<'OL'
 assert(len(data.keys()) == 0)
 OL
-for blob in 'not json' '{' '{}' '{"k" "v"}' '{"k":5}' '{"k":"v\u12'; do
+# An entry whose value is empty is read as a nil that is still there: the key exists.
+cat > "$work/nilvalue.ol" <<'OL'
+assert(data.has("k"))
+assert(data.get("k") == nil)
+OL
+printf '{"k":""}' > "$work/nilvalue.ol.data.json"
+run_cmd "data: an empty value loads as a nil entry" "$OLLIN" "$work/nilvalue.ol" || fails=$((fails + 1))
+
+for blob in 'not json' '{' '{}' '{"k" "v"}' '{"k":5}' '{k:1}' '{"k":"v' '{"k":"v\' '{"k":"v\u12'; do
     printf '%s' "$blob" > "$work/empty.ol.data.json"
     run_cmd "data: the file '$blob' loads as an empty store" "$OLLIN" "$work/empty.ol" || fails=$((fails + 1))
 done

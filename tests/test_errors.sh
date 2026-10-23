@@ -617,6 +617,10 @@ check_error "sound.trigger with a zero duration" \
     'sound.sine(440).trigger(0)' \
     "duration must be > 0"
 
+check_error "sound.tone without a frequency" \
+    'sound.tone()' \
+    "expected a frequency as first argument"
+
 check_error "sound.tone without a duration" \
     'sound.tone(440)' \
     "duration must be a number of seconds"
