@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "modules/modules.h"
 #include <algorithm>
+#include <cassert>
 #include <stdexcept>
 
 int Compiler::resolve_upvalue(const std::string& name) {
@@ -564,9 +565,9 @@ void Compiler::visit(const VarDeclStmt& s) {
     // declared.
     ScopeTables& sc = scopes(); // a deque frame: the reference survives compiling a nested body
     auto activate_local = [&](const std::string& name) -> int {
-        int reg;
-        if (!sc.pending.pop(name, reg))
-            return *sc.regs.find(name); // already active
+        int reg = 0;
+        [[maybe_unused]] bool reserved = sc.pending.pop(name, reg);
+        assert(reserved && "collect_locals reserves a register for every local of the scope");
         sc.regs.set(name, reg);
         return reg;
     };
@@ -586,7 +587,8 @@ void Compiler::visit(const VarDeclStmt& s) {
     // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
         const int* pend = sc.pending.find(name);
-        return pend != nullptr ? *pend : *sc.regs.find(name);
+        assert(pend != nullptr && "collect_locals reserves a register for every local of the scope");
+        return *pend;
     };
 
     // Multi-return: several targets and a single value that is a CALL, in any form — named
