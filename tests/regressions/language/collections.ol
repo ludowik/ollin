@@ -128,3 +128,17 @@ ckMap[ckA] = "a2"
 assert(ckMap[ckA] == "a2" and len(ckMap) == 2, "writing through the same closure reuses its entry")
 ckMap[ckA] = nil
 assert(ckMap[ckA] == nil and len(ckMap) == 1, "a nil value removes it")
+
+## INTEGER(2) and FLOAT(2.0) are one key, whichever form wrote it and whichever reads it: the hash and the
+## equality of a map agree on it (a division always gives a float)
+var cxKeys = {}
+cxKeys[2] = "int"
+assert(cxKeys[4 / 2] == "int")
+cxKeys[6 / 2] = "float"
+assert(cxKeys[3] == "float" and cxKeys[6 / 2] == "float" and len(cxKeys) == 2)
+cxKeys[1 / 2] = "half"
+assert(cxKeys[0.5] == "half" and len(cxKeys) == 3)
+## two keys of different kinds that hash alike are still two keys: nil and 0 both hash to 0
+var cxNilKey = {}
+cxNilKey[0] = "zero"
+assert(cxNilKey[nil] == nil and cxNilKey[0] == "zero")
