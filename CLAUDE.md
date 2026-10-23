@@ -426,7 +426,7 @@ n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de
 `src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
 (un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
 monte durablement. Hors de `run.sh` : la compilation instrumentée prend une minute et demie au premier passage.
-Dernier relevé : **94,2 %** des lignes (lexer 100 %, parser 98 %, compilateur 96 %, VM 89 %). C'est le build
+Dernier relevé : **94,5 %** des lignes (lexer 100 %, parser 99,8 %, compilateur 96 %, VM 89 %). C'est le build
 HEADLESS : les modules graphiques n'y sont que des stubs, leur code réel n'est pas dans le chiffre. Les
 en-têtes sont exclus, leur code en ligne étant compté par unité de compilation. La mesure trouve ce que la
 garde de grammaire ne peut pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées

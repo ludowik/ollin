@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "paths.h"
 #include "source_registry.h"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -69,9 +70,7 @@ void Parser::fail_at(int line, const std::string& msg) const {
 }
 
 TokenType Parser::peek_next_type() const {
-    if (pos + 1 < static_cast<int>(tokens.size()))
-        return tokens[pos + 1].type;
-    return TokenType::EOF_T;
+    return tokens[std::min(pos + 1, static_cast<int>(tokens.size()) - 1)].type;
 }
 
 // grammar.ebnf wants a plain NAME for a map-literal key and for a field after '.' — a word
@@ -925,8 +924,6 @@ bool Parser::looks_like_range() const {
             if (t == TokenType::SEMICOLON)
                 return true;
             if (t == TokenType::COMMA)
-                return false;
-            if (t == TokenType::EOF_T)
                 return false;
         }
     }

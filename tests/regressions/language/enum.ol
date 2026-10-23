@@ -107,3 +107,14 @@ end
 assert(foReached == -1)
 foDeferred()
 assert(FoLate.A == 1)          ## and once it HAS run, the ordinary lookup finds it
+
+## an enum may have no member at all; a negated expression is accepted as a value but, not being a
+## literal, leaves the counter where it is
+enum EnEmpty
+end
+assert(len(EnEmpty) == 0)
+enum EnNeg
+    A = -(1 + 2),
+    B
+end
+assert(EnNeg.A == -3 and EnNeg.B == 1)

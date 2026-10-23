@@ -130,3 +130,25 @@ func cmBare()
     return           ## a bare return, its line ending with a comment
 end
 assert(cmBare() == nil)
+
+## ── Parser: a statement that opens with an operator that is also unary ───────
+## At the start of a block nothing precedes it to continue, so '-', 'not', '~' and '#' begin an
+## expression statement whose value is thrown away — the call is what matters.
+var usHits = 0
+func usBump()
+    usHits += 1
+    return 1
+end
+if true then
+    -usBump()
+end
+if true then
+    not usBump()
+end
+if true then
+    ~usBump()
+end
+if true then
+    #usBump()
+end
+assert(usHits == 4)

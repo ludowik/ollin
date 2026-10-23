@@ -193,4 +193,13 @@ func ctorChecks()
 end
 ctorChecks()
 
+## an optional call through super: the parent method is called when it is there
+class SqBase
+    func tag() return "base" end
+end
+class SqChild extends SqBase
+    func tag() return super.tag?() end
+end
+assert(SqChild().tag() == "base")
+
 print("regressions ok")

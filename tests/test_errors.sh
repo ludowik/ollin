@@ -1093,6 +1093,14 @@ check_error "an expression nested too deeply" \
     "var a = $(printf '(%.0s' $(seq 300))1$(printf ')%.0s' $(seq 300))" \
     "nesting too deep"
 
+check_error "blocks nested too deeply" \
+    "$(printf 'do\n%.0s' $(seq 300))$(printf 'end\n%.0s' $(seq 300))" \
+    "nesting too deep"
+
+check_error "an array literal that is never closed" \
+    'var a = [1' \
+    "unexpected end of file"
+
 check_error "a literal nested too deeply" \
     "var a = $(printf '[%.0s' $(seq 300))$(printf ']%.0s' $(seq 300))" \
     "nesting too deep"
