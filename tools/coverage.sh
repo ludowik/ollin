@@ -10,7 +10,7 @@
 # That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs
 # (their real code is not compiled, so it is not in the figures). Headers are left out: the code of an
 # inline function is counted once per translation unit that includes it, which makes their percentage mean
-# nothing. A line that runs is not a line that is checked: only breaking it and watching the suite fail
+# nothing, and so are the lines only an exception can run (gcov's =====). A line that runs is not a line that is checked: only breaking it and watching the suite fail
 # proves that. What the number is for is the lines nothing runs at all — the chained comparisons were one.
 #
 # Not part of tests/run.sh: building with --coverage takes a couple of minutes the first time.
@@ -35,26 +35,38 @@ OLLIN="$bin" bash tests/run.sh >/dev/null 2>&1 || echo "note: tests/run.sh faile
 OLLIN="$bin" bash tests/samples.sh >/dev/null 2>&1 || echo "note: tests/samples.sh failed with the instrumented binary"
 
 python3 - "$dir" "$mode" "$floor_file" <<'PYEOF'
-import os, re, subprocess, sys
+import os, re, subprocess, sys, tempfile
 
 build, mode, floor_file = sys.argv[1:4]
 root = os.getcwd()
 gcdas = subprocess.run(["find", build, "-name", "*.gcda"], capture_output=True, text=True).stdout.split()
 files = {}
-for gcda in gcdas:
-    where = os.path.dirname(gcda)
-    out = subprocess.run(["gcov", "-n", os.path.basename(gcda)], cwd=where, capture_output=True, text=True).stdout
-    current = None
-    for line in out.splitlines():
-        m = re.match(r"File '(.*)'", line)
-        if m:
-            current = m.group(1)
+# One .gcov report per source, read line by line: the summary gcov prints (-n) counts the lines that only an
+# exception can run (marked =====, the brace of a function whose locals are destroyed on a std::bad_alloc) as
+# lines left unexecuted, and no script can make an allocation fail. They are not counted at all.
+with tempfile.TemporaryDirectory() as scratch:
+    for gcda in gcdas:
+        subprocess.run(["gcov", "-o", os.path.dirname(os.path.abspath(gcda)), os.path.abspath(gcda)],
+                       cwd=scratch, capture_output=True, text=True)
+    for report in os.listdir(scratch):
+        if not report.endswith(".gcov"):
             continue
-        m = re.match(r"Lines executed:([\d.]+)% of (\d+)", line)
-        if m and current:
-            if current.startswith(root + "/src/") and current.endswith(".cpp"):
-                files[os.path.relpath(current, root)] = (float(m.group(1)), int(m.group(2)))
-            current = None
+        source = None
+        hit = lines = 0
+        for line in open(os.path.join(scratch, report), errors="replace"):
+            count, _, rest = line.partition(":")
+            count = count.strip()
+            if rest.lstrip().startswith("0:Source:"):
+                source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
+            elif count == "=====" or count == "-":
+                continue
+            elif count == "#####":
+                lines += 1
+            elif count[:1].isdigit():
+                lines += 1
+                hit += 1
+        if source and source.startswith(root + "/src/") and source.endswith(".cpp") and lines:
+            files[os.path.relpath(source, root)] = (100.0 * hit / lines, lines)
 
 total = sum(n for _, n in files.values())
 hit = sum(p * n / 100 for p, n in files.values())
