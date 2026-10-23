@@ -10,8 +10,9 @@
 # That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs
 # (their real code is not compiled, so it is not in the figures). Headers are left out: the code of an
 # inline function is counted once per translation unit that includes it, which makes their percentage mean
-# nothing, and so are the lines only an exception can run (gcov's =====). A line that runs is not a line that is checked: only breaking it and watching the suite fail
-# proves that. What the number is for is the lines nothing runs at all — the chained comparisons were one.
+# nothing. The lines only an exception can run (gcov's =====) are left out as well: no script makes an
+# allocation fail. A line that runs is not a line that is checked: only breaking it and watching the suite
+# fail proves that. What the number is for is the lines nothing runs at all — the chained comparisons were one.
 #
 # Not part of tests/run.sh: building with --coverage takes a couple of minutes the first time.
 set -eu

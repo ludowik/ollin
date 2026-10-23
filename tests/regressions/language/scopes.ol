@@ -437,8 +437,8 @@ end
 checkLambdaInInterpolation()
 
 ## ── Compiler: names read and written through upvalues and globals ──
-## an enum is a constant only where its name is not shadowed: a local or an upvalue of the same
-## name is a real lookup
+## a local of the same name as an enum, anywhere in the program, keeps that enum from being folded into
+## constants: reading its field stays a real lookup, here on the local and on the enum alike
 enum CxCol
     Red = 1,
     Green
@@ -455,7 +455,7 @@ func cxShadowUp()
     return inner()
 end
 assert(cxShadowLocal() == 100 and cxShadowUp() == 200 and CxCol.Red == 1)
-## the same, in code compiled AFTER the enum: a block-level local, then a lambda reading it as an upvalue
+## the same in code compiled AFTER the enum: a block-level local, then a lambda reading it as an upvalue
 do
     var CxCol = {Red: 300}
     var cxRead = func() return CxCol.Red end
