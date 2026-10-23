@@ -1,7 +1,6 @@
 #include "compiler.h"
 #include "modules/modules.h"
 #include <algorithm>
-#include <cassert>
 #include <stdexcept>
 
 int Compiler::resolve_upvalue(const std::string& name) {
@@ -566,8 +565,8 @@ void Compiler::visit(const VarDeclStmt& s) {
     ScopeTables& sc = scopes(); // a deque frame: the reference survives compiling a nested body
     auto activate_local = [&](const std::string& name) -> int {
         int reg = 0;
-        [[maybe_unused]] bool reserved = sc.pending.pop(name, reg);
-        assert(reserved && "collect_locals reserves a register for every local of the scope");
+        if (!sc.pending.pop(name, reg))
+            throw std::runtime_error("internal: local '" + name + "' was not reserved by collect_locals");
         sc.regs.set(name, reg);
         return reg;
     };
@@ -584,12 +583,6 @@ void Compiler::visit(const VarDeclStmt& s) {
     if (s.is_constant)
         for (auto& n : s.names)
             sc.consts.set(n, {});
-    // Register reserved for a still-deferred local, without activating it.
-    auto reserved_reg = [&](const std::string& name) -> int {
-        const int* pend = sc.pending.find(name);
-        assert(pend != nullptr && "collect_locals reserves a register for every local of the scope");
-        return *pend;
-    };
 
     // Multi-return: several targets and a single value that is a CALL, in any form — named
     // function, closure, dynamic call, method. The call is compiled at a known base where the VM
@@ -646,7 +639,11 @@ void Compiler::visit(const VarDeclStmt& s) {
     // so that `var a = a` reads the outer `a`. Every target's initializer therefore sees the
     // scope as it was before the declaration.
     for (int i = 0; i < (int)s.names.size(); ++i) {
-        int dest = reserved_reg(s.names[i]);
+        // The register reserved for a still-deferred local, which is not activated yet.
+        const int* reserved = sc.pending.find(s.names[i]);
+        if (reserved == nullptr)
+            throw std::runtime_error("internal: local '" + s.names[i] + "' was not reserved by collect_locals");
+        int dest = *reserved;
         if (i < (int)s.values.size()) {
             compile_into(*s.values[i], dest);
         } else {

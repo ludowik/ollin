@@ -150,9 +150,10 @@ func cxCollect(r)
     end
     return out
 end
-assert(#cxCollect([1;10;3]) == 4 and cxCollect([1;10;3])[2] == 4)
-assert(cxCollect([1;10;3])[4] == 10)
-assert(cxCollect(]1;10;3])[1] == 4 and #cxCollect(]1;10;3]) == 3)
+var cxClosed = cxCollect([1;10;3])
+assert(#cxClosed == 4 and cxClosed[2] == 4 and cxClosed[4] == 10)
+var cxOpen = cxCollect(]1;10;3])
+assert(#cxOpen == 3 and cxOpen[1] == 4)
 
 ## a chained comparison whose middle operand is computed: it needs a temporary register of its own
 func cxId(x) return x end
@@ -163,3 +164,7 @@ func cxOne()
     return 1
 end
 assert(0 < cxOne() < 3 and not (1 < cxOne() < 3))
+
+## float remainder and float floor division keep the sign rules of their integer forms
+assert(5.5 % 2 == 1.5 and -5.5 % 2 == -1.5)
+assert(5.5 // 2 == 2 and -5.5 // 2 == -3)

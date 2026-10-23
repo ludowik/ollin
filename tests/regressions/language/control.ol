@@ -139,3 +139,20 @@ else
     cxHit = "only else"
 end
 assert(cxHit == "only else")
+
+## A numeric for with a float bound or step runs on doubles: forward, backward, and not at all
+var cxFwd = 0
+for x = 0.5, 2.5 do
+    cxFwd += x
+end
+assert(cxFwd == 4.5)
+var cxBack = []
+for x = 2, 0.5, -0.5 do
+    cxBack.push(x)
+end
+assert(#cxBack == 4 and cxBack[1] == 2 and cxBack[4] == 0.5)
+var cxNone = 0
+for x = 3.5, 1.5 do
+    cxNone += 1
+end
+assert(cxNone == 0)

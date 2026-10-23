@@ -1,12 +1,12 @@
 #!/bin/bash
-# UPVALUE-CEILING guard: a function can capture as many variables as the field that names them can count
-# (16 bits). Past it the compiler refuses, and the message says so.
+# UPVALUE-CEILING guard: a function can capture as many variables as the field that names them can count.
+# Past it the compiler refuses, and the message says so.
 #
 # The program is GENERATED: a function cannot hold the variables itself, since registers are bounded by
 # the same width, so they are spread over two enclosing functions and read from the innermost one. Nothing
-# about the ceiling is written down but the width: 2 x 30 000 variables must compile, 2 x 35 000 must be
-# refused. The functions are never CALLED — running one would hit the VM's own 4096-register stack, a
-# different ceiling.
+# about the ceiling is written down: a program far beyond any 16-bit ceiling is refused first, the ceiling is
+# READ from the message, and a program just under it must then compile. The functions are never CALLED —
+# running one would hit the VM's own 4096-register stack, a different ceiling.
 set -u
 OLLIN=${OLLIN:-./build/ollin}
 here=$(dirname "$0")
@@ -34,19 +34,20 @@ open(sys.argv[1], "w").write("\n".join(out) + "\n")
 PYEOF
 }
 
-generate "$work/under.ol" 30000
-if [ "$("$OLLIN" "$work/under.ol" 2>&1)" = "compiled" ]; then
-    echo "OK   60 000 captured variables compile"
+generate "$work/over.ol" 60000
+ceiling=$("$OLLIN" "$work/over.ol" 2>&1 | sed -n 's/.*captures more than \([0-9][0-9]*\) upvalues.*/\1/p')
+if [ -n "$ceiling" ]; then
+    echo "OK   $((2 * 60000)) captured variables are refused, naming the ceiling ($ceiling)"
 else
-    echo "FAIL a function that captures 60 000 variables is refused"
-    fails=1
+    echo "FAIL a function that captures $((2 * 60000)) variables is not refused"
+    exit 1
 fi
 
-generate "$work/over.ol" 35000
-if "$OLLIN" "$work/over.ol" 2>&1 | grep -qF "function captures more than"; then
-    echo "OK   70 000 captured variables are refused, naming the ceiling"
+generate "$work/under.ol" $((ceiling / 2 - 1))
+if [ "$("$OLLIN" "$work/under.ol" 2>&1)" = "compiled" ]; then
+    echo "OK   $((ceiling - 2)) captured variables compile"
 else
-    echo "FAIL a function that captures 70 000 variables is not refused"
+    echo "FAIL a function that captures $((ceiling - 2)) variables, under the ceiling, is refused"
     fails=1
 fi
 exit $fails

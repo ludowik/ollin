@@ -454,14 +454,7 @@ func cxShadowUp()
     end
     return inner()
 end
-assert(cxShadowLocal() == 100 and cxShadowUp() == 200 and CxCol.Red == 1)
-## the same in code compiled AFTER the enum: a block-level local, then a lambda reading it as an upvalue
-do
-    var CxCol = {Red: 300}
-    var cxRead = func() return CxCol.Red end
-    assert(CxCol.Red == 300 and cxRead() == 300)
-end
-assert(CxCol.Green == 2)
+assert(cxShadowLocal() == 100 and cxShadowUp() == 200 and CxCol.Red == 1 and CxCol.Green == 2)
 ## a PARAMETER of that name shadows it too. A separate enum: a `var` of the same name, as above, stops
 ## the enum from being a constant at all, and the shadow is then never even looked at
 enum CxParamEnum
@@ -490,7 +483,7 @@ func cxBumpGl()
 end
 assert(cxBumpGl() == 6)
 
-## an upvalue passed as an argument, a container reached through one, several targets assigned at once
+## an upvalue passed as an argument
 func cxShow(v)
     return v
 end

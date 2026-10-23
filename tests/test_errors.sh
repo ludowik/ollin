@@ -1098,6 +1098,79 @@ check_error "a function declared on an undeclared variable" \
 end' \
     "undeclared variable 'undefinedHolder'"
 
+check_error "an integer division by zero" \
+    'var z = 0
+print(1 / z)' \
+    "runtime: division by zero"
+
+check_error "an integer modulo by zero" \
+    'var z = 0
+print(5 % z)' \
+    "runtime: modulo by zero"
+
+check_error "a float modulo by zero" \
+    'var z = 0.0
+print(5.5 % z)' \
+    "runtime: modulo by zero"
+
+check_error "an integer floor division by zero" \
+    'var z = 0
+print(5 // z)' \
+    "runtime: division by zero"
+
+check_error "a float floor division by zero" \
+    'var z = 0.0
+print(5.5 // z)' \
+    "runtime: division by zero"
+
+check_error "a bitwise AND on a float" \
+    'print(1.5 & 1)' \
+    "runtime: & requires integer operands"
+
+check_error "a bitwise OR on a float" \
+    'print(1 | 1.5)' \
+    "runtime: | requires integer operands"
+
+check_error "a bitwise XOR on a float" \
+    'print(1 ~ 1.5)' \
+    "runtime: ^ requires integer operands"
+
+check_error "a bitwise NOT on a float" \
+    'print(~1.5)' \
+    "runtime: ~ requires integer operand"
+
+check_error "a left shift by a float" \
+    'print(1 << 1.5)' \
+    "runtime: << requires integer operands"
+
+check_error "a right shift by a float" \
+    'print(1 >> 1.5)' \
+    "runtime: >> requires integer operands"
+
+check_error "an array read with a float index" \
+    'var a = [1]
+print(a[1.5])' \
+    "runtime: array index must be integer"
+
+check_error "an array write with a float index" \
+    'var a = [1]
+a[1.5] = 2' \
+    "runtime: array index must be integer"
+
+check_error "an indexed write on a number" \
+    'var n = 5
+n[1] = 2' \
+    "cannot assign index on int"
+
+check_error "a numeric for over a string bound" \
+    'for x = "a", 3 do
+end' \
+    "runtime: for: expected numeric bounds"
+
+check_error "a thrown value nobody catches" \
+    'throw "boom"' \
+    "unhandled exception: boom"
+
 check_error "a call to an undefined function" \
     'undefinedFn()' \
     "undefined: undefinedFn"

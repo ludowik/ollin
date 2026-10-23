@@ -128,6 +128,26 @@ end
 assert(shadow_test() == 7)
 assert(gshadow == 100)
 
+## a statement may open with a unary operator when nothing above it could be continued: the value is dropped
+var us_hits = 0
+func us_bump()
+    us_hits += 1
+    return 1
+end
+do
+    -us_bump()
+end
+do
+    not us_bump()
+end
+do
+    ~us_bump()
+end
+do
+    #us_bump()
+end
+assert(us_hits == 4)
+
 ## ── 4. Arithmetic ────────────────────────────────────────────────────────────
 ## [grammar: additive, multiplicative, power, unary, primary, postfix, expr]
 
@@ -381,6 +401,13 @@ for i in ]1;5] do
 end
 assert(s12 == 14)
 
+## left-exclusive with a step: ]1;10;3] gives 4,7,10
+var s12b = 0
+for i in ]1;10;3] do
+    s12b += i
+end
+assert(s12b == 21)
+
 ## continue inside a for k,v over a map
 var cm = {a: 1, b: 2, c: 3, d: 4}
 var cs1 = 0
@@ -492,6 +519,26 @@ func passthrough(a, ...)
 end
 var r1, r2, r3 = passthrough(1, 2, 3)
 assert(r1 == 1 and r2 == 2 and r3 == 3)
+
+## `...` as ONE value is the first vararg; as the tail of a call it expands, whether the callee is an
+## expression or the call feeds a destructuring assignment
+func first_of(...)
+    var f = ...
+    return f
+end
+assert(first_of(9, 8) == 9)
+var va_fns = [func(...) return ... end]
+func call_idx(...)
+    return va_fns[1](...)
+end
+var ci1, ci2 = call_idx(3, 4)
+assert(ci1 == 3 and ci2 == 4)
+func split_va(...)
+    var sa, sb = 0, 0
+    sa, sb = wrap(...)
+    return sa + sb
+end
+assert(split_va(5, 6) == 11)
 
 ## a one-line function
 func double(x)  return x * 2  end
@@ -955,6 +1002,15 @@ func relay(...)
 end
 assert(relay(4, 5) == "p045")
 
+## the optional form `super.m?()` calls the parent's version
+class OptBase
+    func tag() return "base" end
+end
+class OptChild extends OptBase
+    func tag() return super.tag?() end
+end
+assert(OptChild().tag() == "base")
+
 ## inheritance with no init of its own: the parent's is inherited
 class Cat extends Animal
     func purr()
@@ -1203,6 +1259,22 @@ assert(sw_func(1) == "one or two")
 assert(sw_func(2) == "one or two")
 assert(sw_func(5) == "other")
 
+## a case value may be a variable, and a switch may hold nothing but its else
+var sw_key = 2
+var sw_hit = "none"
+switch 2
+case sw_key
+    sw_hit = "variable"
+else
+    sw_hit = "else"
+end
+assert(sw_hit == "variable")
+switch 3
+else
+    sw_hit = "only else"
+end
+assert(sw_hit == "only else")
+
 ## ── 23. The graphics module (raylib) ─────────────────────────────────────────
 ##
 ## Available in the native build as in WASM, which the playground uses. The DEFAULT native build
@@ -1296,6 +1368,12 @@ assert(State.IDLE == 0 and State.WALK == 1 and State.JUMP == 10 and State.FALL =
 ## Any expression is accepted as a value, but does not move the counter.
 enum Mixed A, B = "text", C end
 assert(Mixed.A == 1 and Mixed.B == "text" and Mixed.C == 2)
+
+## The list of items may be empty, and a value may be a negated expression.
+enum Nothing end
+assert(#Nothing == 0)
+enum Negated N = -(1 + 2) end
+assert(Negated.N == -3)
 
 ## For reading, an enum is a map: len and iteration.
 assert(#Tint == 3)

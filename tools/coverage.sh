@@ -42,9 +42,10 @@ build, mode, floor_file = sys.argv[1:4]
 root = os.getcwd()
 gcdas = subprocess.run(["find", build, "-name", "*.gcda"], capture_output=True, text=True).stdout.split()
 files = {}
-# One .gcov report per source, read line by line: the summary gcov prints (-n) counts the lines that only an
-# exception can run (marked =====, the brace of a function whose locals are destroyed on a std::bad_alloc) as
-# lines left unexecuted, and no script can make an allocation fail. They are not counted at all.
+# One .gcov report per source, read line by line. The summary gcov prints (-n) counts as unexecuted the closing
+# brace of a function whose locals are destroyed on a std::bad_alloc (gcov marks it =====): no script makes an
+# allocation fail, so such a line is not counted at all. ONLY a lone brace is dropped: gcov also marks ===== the
+# ordinary code of a computed-goto handler that nothing runs, and that is exactly what this report is for.
 with tempfile.TemporaryDirectory() as scratch:
     for gcda in gcdas:
         subprocess.run(["gcov", "-o", os.path.dirname(os.path.abspath(gcda)), os.path.abspath(gcda)],
@@ -60,6 +61,9 @@ with tempfile.TemporaryDirectory() as scratch:
                 count = count.strip()
                 if rest.lstrip().startswith("0:Source:"):
                     source = os.path.normpath(os.path.join(root, rest.split("Source:", 1)[1].strip()))
+                elif count == "=====":
+                    if rest.partition(":")[2].strip() not in ("}", "};"):
+                        lines += 1
                 elif count == "#####":
                     lines += 1
                 elif count[:1].isdigit():
