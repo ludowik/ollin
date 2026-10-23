@@ -122,3 +122,20 @@ end
 assert(swWide(-9223372036854775807) == "min")
 assert(swWide(9223372036854775807) == "max")
 assert(swWide(1) == "autre")
+
+## A case value may be a variable: the branch is then found by the chain of comparisons, not the table
+var cxKey = 2
+var cxHit = "none"
+switch 2
+case cxKey
+    cxHit = "variable"
+else
+    cxHit = "else"
+end
+assert(cxHit == "variable")
+## a switch with no case at all runs its else
+switch 3
+else
+    cxHit = "only else"
+end
+assert(cxHit == "only else")

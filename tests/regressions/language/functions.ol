@@ -432,3 +432,48 @@ func vaCheck()
     print("method-call expansion ok")
 end
 vaCheck()
+
+## ── Compiler: calls and destructuring that expand a tail ──
+func cxTwo(...)
+    return ...
+end
+global cxP
+global cxQ
+func cxVa(...)
+    var p, q = cxTwo(...)
+    var r, s = cxTwo(cxTwo(5, 6))
+    cxP, cxQ = cxTwo(...)
+    return p, q, r, s
+end
+var cxV1, cxV2, cxV3, cxV4 = cxVa(7, 8)
+assert(cxV1 == 7 and cxV2 == 8 and cxV3 == 5 and cxV4 == 6)
+assert(cxP == 7 and cxQ == 8)
+
+## an expression as the callee takes the spread too
+var cxFns = [func(...) return ... end]
+func cxCallIdx(...)
+    return cxFns[1](...)
+end
+var cxC1, cxC2, cxC3 = cxCallIdx(1, 2, 3)
+assert(cxC1 == 1 and cxC2 == 2 and cxC3 == 3)
+
+## `...` as a single value is the first vararg
+func cxFirst(...)
+    var f = ...
+    return f
+end
+assert(cxFirst(9, 8) == 9)
+
+## a constructor's return value is evaluated for its effect, and the object is returned anyway
+var cxCalls = 0
+func cxCount(n)
+    cxCalls += 1
+    return n
+end
+class CxK
+    func init(n)
+        self.n = n
+        return cxCount(n)
+    end
+end
+assert(CxK(3).n == 3 and cxCalls == 1)

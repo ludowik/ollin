@@ -435,3 +435,144 @@ func checkLambdaInInterpolation()
     assert(fns[3]() == "n=3")
 end
 checkLambdaInInterpolation()
+
+## ── Compiler: names read and written through upvalues and globals ──
+## an enum is a constant only where its name is not shadowed: a local or an upvalue of the same
+## name is a real lookup
+enum CxCol
+    Red = 1,
+    Green
+end
+func cxShadowLocal()
+    var CxCol = {Red: 100}
+    return CxCol.Red
+end
+func cxShadowUp()
+    var CxCol = {Red: 200}
+    func inner()
+        return CxCol.Red
+    end
+    return inner()
+end
+assert(cxShadowLocal() == 100 and cxShadowUp() == 200 and CxCol.Red == 1)
+## the same, in code compiled AFTER the enum: a block-level local, then a lambda reading it as an upvalue
+do
+    var CxCol = {Red: 300}
+    var cxRead = func() return CxCol.Red end
+    assert(CxCol.Red == 300 and cxRead() == 300)
+end
+assert(CxCol.Green == 2)
+## a PARAMETER of that name shadows it too. A separate enum: a `var` of the same name, as above, stops
+## the enum from being a constant at all, and the shadow is then never even looked at
+enum CxParamEnum
+    Red = 1
+end
+func cxShadowParam(CxParamEnum)
+    func inner()
+        return CxParamEnum.Red
+    end
+    return CxParamEnum.Red + inner()
+end
+assert(cxShadowParam({Red: 40}) == 80 and CxParamEnum.Red == 1)
+
+## a compound assignment whose right side is a variable, on an upvalue and on a global
+var cxUp = 1
+var cxAdd = 5
+func cxBumpUp()
+    cxUp += cxAdd
+end
+cxBumpUp()
+assert(cxUp == 6)
+global cxGl = 1
+func cxBumpGl()
+    cxGl += cxAdd
+    return cxGl
+end
+assert(cxBumpGl() == 6)
+
+## an upvalue passed as an argument, a container reached through one, several targets assigned at once
+func cxShow(v)
+    return v
+end
+func cxPassUp()
+    return cxShow(cxUp)
+end
+assert(cxPassUp() == 6)
+## a top-level function that captures a local is a closure: its NAME read as a value still finds it
+var cxRef = cxBumpUp
+cxRef()
+assert(cxUp == 11)
+## a callee that is an upvalue, called with a spread tail and with the optional form
+var cxCb = func(...) return ... end
+func cxViaUp(...)
+    return cxCb(...)
+end
+func cxViaUpOpt()
+    return cxCb?(4)
+end
+assert(cxViaUp(3) == 3 and cxViaUpOpt() == 4)
+## `func holder.name()` on a variable reached as an upvalue
+var cxHolder = {}
+func cxDefine()
+    func cxHolder.say()
+        return "hi"
+    end
+end
+cxDefine()
+assert(cxHolder.say() == "hi")
+## several indexed targets at once, through an upvalue and through a global
+var cxMt = [0, 0]
+func cxMultiIdx()
+    cxMt[1], cxMt[2] = 5, 6
+end
+cxMultiIdx()
+assert(cxMt[1] == 5 and cxMt[2] == 6)
+global cxGt = [0, 0]
+cxGt[1], cxGt[2] = 7, 8
+assert(cxGt[1] == 7 and cxGt[2] == 8)
+var cxTt = [0, 0]
+func cxSetIdx()
+    cxTt[1] = 5
+    cxTt[2] += 1
+end
+cxSetIdx()
+assert(cxTt[1] == 5 and cxTt[2] == 1)
+var cxM1 = 0
+var cxM2 = 0
+func cxMulti()
+    cxM1, cxM2 = 1, 2
+end
+cxMulti()
+assert(cxM1 == 1 and cxM2 == 2)
+
+## the loop variable stays a copy when the body shadows it or assigns it in a multiple assignment;
+## a class or an enum declared in the body keeps the loop registers
+var cxSeen = []
+for i = 1, 2 do
+    var i = 5
+    cxSeen.push(i)
+end
+assert(cxSeen[1] == 5 and cxSeen[2] == 5)
+var cxCount = 0
+for i = 1, 2 do
+    var j
+    i, j = 7, 8
+    cxCount += 1
+end
+assert(cxCount == 2)
+var cxCls = []
+for i = 1, 2 do
+    class CxInner
+        func f() return i end
+    end
+    cxCls.push(CxInner().f())
+end
+assert(cxCls[1] == 1 and cxCls[2] == 2)
+var cxEn = 0
+for i = 1, 2 do
+    enum CxLoopEnum
+        A
+    end
+    cxEn += CxLoopEnum.A
+end
+assert(cxEn == 2)

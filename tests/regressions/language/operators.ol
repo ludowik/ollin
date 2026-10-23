@@ -130,3 +130,36 @@ class ChN
     func __le(o) return self.v <= o end
 end
 assert(0 < ChN(3) < 5 and not (5 < ChN(3) < 9) and not (0 < ChN(3) < 2) and not (0 < ChN(7) < 5))
+
+## ── Compiler: compound assignment on an index or a field, ranges with a step ──
+## `/=` and `%=` on a container slot take the same path as `+=`, one opcode each
+var cxT = {x: 12, y: 13}
+cxT.x /= 4
+cxT.y %= 5
+assert(cxT.x == 3 and cxT.y == 3)
+var cxA = [10, 11]
+cxA[1] /= 4
+cxA[2] %= 4
+assert(cxA[1] == 2.5 and cxA[2] == 3)
+
+## a range VALUE with a step, closed and open on the left (the left bound moves by one step)
+func cxCollect(r)
+    var out = []
+    for v in r do
+        out.push(v)
+    end
+    return out
+end
+assert(#cxCollect([1;10;3]) == 4 and cxCollect([1;10;3])[2] == 4)
+assert(cxCollect([1;10;3])[4] == 10)
+assert(cxCollect(]1;10;3])[1] == 4 and #cxCollect(]1;10;3]) == 3)
+
+## a chained comparison whose middle operand is computed: it needs a temporary register of its own
+func cxId(x) return x end
+var cxU = 1
+assert(cxU < cxId(2) < 3 and cxId(1) < cxId(2) <= cxId(3) and 1 < cxU + 1 < 5)
+## ... and a call with no argument leaves its result at the very top of the registers in use
+func cxOne()
+    return 1
+end
+assert(0 < cxOne() < 3 and not (1 < cxOne() < 3))

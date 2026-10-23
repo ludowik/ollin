@@ -934,9 +934,7 @@ void Compiler::visit(const SwitchStmt& s) {
     CodeAddr end_addr = chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
-    for (size_t p : fn().break_patches.back().patches)
-        chunk.patch_jump(p, end_addr);
-    fn().break_patches.pop_back();
+    fn().break_patches.pop_back(); // no jump to patch: a break inside a switch is refused
     reg_top_ = saved;
 
     if (!use_table)
@@ -1877,15 +1875,13 @@ void Compiler::visit(const ForIterStmt& s) {
 // the previous cascade of dynamic_cast answered "yes, conservatively" for anything it did not
 // list, and an interpolated string was in that case — one in a loop body was enough to forbid
 // recycling the loop registers, though it carries no function at all.
-static bool expr_has_lambda(const Expr* e) {
-    if (!e)
-        return false;
-    if (dynamic_cast<const FuncExpr*>(e))
+static bool expr_has_lambda(const Expr& e) {
+    if (dynamic_cast<const FuncExpr*>(&e))
         return true;
     bool found = false;
-    e->for_each_child([&found](const Expr& c) {
+    e.for_each_child([&found](const Expr& c) {
         if (!found)
-            found = expr_has_lambda(&c);
+            found = expr_has_lambda(c);
     });
     return found;
 }
@@ -1921,7 +1917,7 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
         bool lambda = false;
         s->for_each_expr([&lambda](const Expr& e) {
             if (!lambda)
-                lambda = expr_has_lambda(&e);
+                lambda = expr_has_lambda(e);
         });
         if (lambda)
             return false;
@@ -1975,7 +1971,7 @@ static bool stmt_has_func(const Stmt* s) {
     // register still held by an open upvalue.
     s->for_each_expr([&found](const Expr& e) {
         if (!found)
-            found = expr_has_lambda(&e);
+            found = expr_has_lambda(e);
     });
     if (found)
         return true;

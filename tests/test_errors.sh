@@ -1085,6 +1085,19 @@ check_error "a field assignment on an undeclared object" \
     'undefinedObj.x = 1' \
     "undeclared variable 'undefinedObj'"
 
+check_error "a multiple assignment to an undeclared variable" \
+    'undefinedQ, b = 1, 2' \
+    "undeclared variable 'undefinedQ' (use 'var' or 'global')"
+
+check_error "a multiple assignment to a slot of an undeclared container" \
+    'undefinedQ[1], undefinedQ[2] = 1, 2' \
+    "undeclared variable 'undefinedQ'"
+
+check_error "a function declared on an undeclared variable" \
+    'func undefinedHolder.m()
+end' \
+    "undeclared variable 'undefinedHolder'"
+
 check_error "a call to an undefined function" \
     'undefinedFn()' \
     "undefined: undefinedFn"
