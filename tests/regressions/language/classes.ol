@@ -112,6 +112,22 @@ assert("[" + StrBool() + "]" == "[true]")
 assert("[" + StrArr() + "]" == "[\{array}]")
 assert("[" + StrNum() + "]" == "[42]")
 
+## the other values a `__str` may hand back are named by their kind
+class StrMap
+    func __str() return {a: 1} end
+end
+class StrRange
+    func __str() return [1;3] end
+end
+class StrFunc
+    func __str() return func() end end
+end
+class StrClassValue
+    func __str() return StrNum end
+end
+assert("[" + StrMap() + "]" == "[\{map}]" and "[" + StrRange() + "]" == "[\{range}]")
+assert("[" + StrFunc() + "]" == "[\{function}]" and "[" + StrClassValue() + "]" == "[\{class}]")
+
 ## A `__str` that RETURNS NOTHING reads "nil", the value its result slot holds — the same answer
 ## whether it is written in Ollin or native, since both now go down one road.
 class StrVoid

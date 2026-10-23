@@ -105,3 +105,12 @@ var rq_sorted = [3, 1, 2]
 rq_sorted.sort(func(a, b) rq_deep(300) return a < b end)
 assert(rq_sorted[1] == 1)
 assert(rq_sorted[3] == 3)
+
+## join names every kind of value the way print does, a class, a map, a range and a function included
+class JoinCls
+end
+assert(["x", JoinCls, {a: 1}, [1;3], print, func() end, 4 / 2].join(",") == "x,\{class},\{map},\{range},\{function},\{function},2")
+
+## a native function works as the callback of the higher-order methods
+assert([1.5, 2.5].map(math.floor)[2] == 2)
+assert([3, 9, 4].reduce(math.max, 0) == 9)

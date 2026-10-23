@@ -1167,6 +1167,11 @@ check_error "a numeric for over a string bound" \
 end' \
     "runtime: for: expected numeric bounds"
 
+check_error "a float numeric for with a zero step" \
+    'for x = 0.5, 3, 0 do
+end' \
+    "runtime: step cannot be 0"
+
 check_error "a thrown value nobody catches" \
     'throw "boom"' \
     "unhandled exception: boom"

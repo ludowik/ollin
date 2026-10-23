@@ -20,6 +20,7 @@ assert("{ {"k": 7}.k }" == "7")
 ## {N} and {} are positional placeholders, hence LITERALS outside printf
 assert("{1}-{2}" == "{1}-{2}")
 assert("{}" == "{}")                             ## no more "empty interpolation" error
+assert("{4 / 2}" == "2" and "{2.5 * 2}" == "5")     ## a float with a whole value prints without a decimal part
 assert("{0 }" == "{0 }")                         ## blanks after the digits do not make it an expression
 assert("{1 :.3f}" == "{1 :.3f}")
 ## an invalid spec gives a clear runtime error
