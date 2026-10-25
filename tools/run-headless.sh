@@ -8,9 +8,9 @@
 set -e
 cd "$(dirname "$0")/.."
 
-BIN=build-gfx/ollin
+BIN=${OLLIN_GFX:-build-gfx/ollin}   # tools/coverage.sh points it at the instrumented build
 if [ ! -x "$BIN" ]; then
-    echo "build-gfx/ollin is missing - run bash tools/native-gfx.sh first"
+    echo "$BIN is missing - run bash tools/native-gfx.sh first"
     exit 1
 fi
 if [ $# -lt 1 ]; then

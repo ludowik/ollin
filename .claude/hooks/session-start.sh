@@ -44,7 +44,7 @@ if [ "$(uname)" = "Linux" ]; then
   sudo apt-get install -y -qq --no-install-recommends \
     build-essential cmake git \
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
-    libxcursor-dev libxinerama-dev 2>/dev/null || true
+    libxcursor-dev libxinerama-dev libgl1-mesa-dev 2>/dev/null || true
 
   # ── Lua, référence du tableau de benchmarks (bench/bench_all.sh) ───────────
   # Python est déjà dans l'image ; Lua non, et sans lui le benchmark perd son point de

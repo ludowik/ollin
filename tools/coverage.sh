@@ -7,8 +7,12 @@
 #        bash tools/coverage.sh --floor    records the current total, less half a point, as the floor
 #
 # What is measured: src/**/*.cpp, by tests/run.sh and tests/samples.sh run with the instrumented binary.
-# That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs
-# (their real code is not compiled, so it is not in the figures). Headers are left out: the code of an
+# That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs.
+# A second instrumented build WITH raylib (build-cov-gfx/, tools/native-gfx.sh) runs tests/run_gfx.sh under
+# Xvfb, and its counters are MERGED with the first: a line counts as run when either binary ran it, which
+# is how the lines of vm.cpp that only a graphics session reaches get measured. The sources only that build
+# compiles (graphics, image, ui, touch...) are listed apart as "display" and kept OUT of the total and of
+# the floor, whose perimeter stays the one it always had: a handful of Xvfb tests would otherwise sink it. Headers are left out: the code of an
 # inline function is counted once per translation unit that includes it, which makes their percentage mean
 # nothing. The lines only an exception can run (gcov's =====) are left out as well: no script makes an
 # allocation fail. A line that runs is not a line that is checked: only breaking it and watching the suite
@@ -35,18 +39,32 @@ bin="$root/$dir/ollin"
 OLLIN="$bin" bash tests/run.sh >/dev/null 2>&1 || echo "note: tests/run.sh failed with the instrumented binary"
 OLLIN="$bin" bash tests/samples.sh >/dev/null 2>&1 || echo "note: tests/samples.sh failed with the instrumented binary"
 
-python3 - "$dir" "$mode" "$floor_file" <<'PYEOF'
+# The build with raylib, when Xvfb and a raylib source are there to run it. Without them the figures are the
+# headless ones alone, which the note says.
+gfx_dir=build-cov-gfx
+if command -v xvfb-run >/dev/null 2>&1 && COVERAGE=1 bash tools/native-gfx.sh >>"$log" 2>&1; then
+    find "$gfx_dir" -name '*.gcda' -delete
+    OLLIN_GFX="$root/$gfx_dir/ollin" bash tests/run_gfx.sh >/dev/null 2>&1 || echo "note: tests/run_gfx.sh failed with the instrumented binary"
+else
+    gfx_dir=""
+    echo "note: no build with raylib (Xvfb or the raylib source missing): the figures are the headless ones alone"
+fi
+
+python3 - "$dir" "$mode" "$floor_file" "$gfx_dir" <<'PYEOF'
 import os, subprocess, sys, tempfile
 
-build, mode, floor_file = sys.argv[1:4]
+build, mode, floor_file, gfx_build = sys.argv[1:5]
 root = os.getcwd()
 gcdas = subprocess.run(["find", build, "-name", "*.gcda"], capture_output=True, text=True).stdout.split()
+if gfx_build:
+    gcdas += subprocess.run(["find", gfx_build, "-name", "*.gcda"], capture_output=True, text=True).stdout.split()
 files = {}
 # One .gcov report per source, read line by line. The summary gcov prints (-n) counts as unexecuted the closing
 # brace of a function whose locals are destroyed on a std::bad_alloc (gcov marks it =====): no script makes an
 # allocation fail, so such a line is not counted at all. ONLY a lone brace is dropped: gcov also marks ===== the
 # ordinary code of a computed-goto handler that nothing runs, and that is exactly what this report is for.
 lines_of = {}
+in_headless = set()   # the sources the headless build compiles; the others only the build with raylib has
 with tempfile.TemporaryDirectory() as scratch:
     for n, gcda in enumerate(gcdas):
         # One directory per .gcda: two binaries built from the same source write the same report name. A source
@@ -81,20 +99,25 @@ with tempfile.TemporaryDirectory() as scratch:
                     elif count[:1].isdigit():
                         counted[number] = True
             if source and source.startswith(root + "/src/") and source.endswith(".cpp"):
-                merged = lines_of.setdefault(os.path.relpath(source, root), {})
+                name = os.path.relpath(source, root)
+                if not (gfx_build and gcda.startswith(gfx_build + os.sep)):
+                    in_headless.add(name)
+                merged = lines_of.setdefault(name, {})
                 for number, ran in counted.items():
                     merged[number] = merged.get(number, False) or ran
     for name, merged in lines_of.items():
         if merged:
             files[name] = (100.0 * sum(merged.values()) / len(merged), len(merged))
 
-total = sum(n for _, n in files.values())
-hit = sum(p * n / 100 for p, n in files.values())
+display = sorted(f for f in files if f not in in_headless)
+counted_files = {f: v for f, v in files.items() if f in in_headless}
+total = sum(n for _, n in counted_files.values())
+hit = sum(p * n / 100 for p, n in counted_files.values())
 percent = 100 * hit / total
 print(f"{'covered':>8}  {'lines':>6}  file")
 for name, (p, n) in sorted(files.items(), key=lambda kv: kv[1][0]):
-    print(f"{p:7.1f}%  {n:6d}  {name}")
-print(f"{percent:7.1f}%  {total:6d}  TOTAL ({int(round(hit))} of {total} lines, {len(files)} files)")
+    print(f"{p:7.1f}%  {n:6d}  {name}" + ("  (display build only, not in the total)" if name in display else ""))
+print(f"{percent:7.1f}%  {total:6d}  TOTAL ({int(round(hit))} of {total} lines, {len(counted_files)} files)")
 
 # The synthesis: the language (everything outside src/modules/), then one row per module, the stubs
 # together on the last row (a display module is a stub in this headless build, so its 0 % means nothing).
@@ -112,7 +135,7 @@ other_language = sorted(f for f in files if not f.startswith("src/modules/") and
 if other_language:
     LANGUAGE_ROWS.append(("other", other_language))
 stubs = sorted(f for f in files if f.startswith("src/modules/") and f.endswith("_stub.cpp"))
-module_files = sorted(f for f in files if f.startswith("src/modules/") and f not in stubs)
+module_files = sorted(f for f in files if f.startswith("src/modules/") and f not in stubs and f not in display)
 
 
 def row(label, names):
@@ -138,6 +161,9 @@ print("\nSYNTHESIS")
 section("Language", [row(label, group) for label, group in LANGUAGE_ROWS])
 module_rows = [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in module_files]
 section("Modules", module_rows + [row(f"stubs ({len(stubs)}, expected low)", stubs)], counted=module_rows)
+if display:
+    display_rows = [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in display]
+    section("Display (build with raylib, under Xvfb; not in the total)", display_rows)
 
 if mode == "--floor":
     floor = round(percent - 0.5, 1)

@@ -428,8 +428,14 @@ n'importe un test — mais GitHub Pages les sert, comme tout `docs/`. Un test de
 `src/**/*.cpp`, le moins couvert en premier. `--check` échoue si le total passe sous `tools/coverage-floor`
 (un demi-point sous le dernier relevé), `--floor` enregistre le relevé courant : à refaire quand la couverture
 monte durablement. Hors de `run.sh` : la compilation instrumentée prend une minute et demie au premier passage.
-Dernier relevé : **97,3 %** des lignes (lexer 100 %, parser 100 %, compilateur 99 %, VM 95 %). Une accolade fermante seule marquée `=====` par gcov (le nettoyage d'une fonction dont les locales se détruisent sur un `bad_alloc`) n'est PAS comptée — aucun script ne fait échouer une allocation ; un relevé d'avant ce choix n'est pas comparable. ⚠ **Ne marquer que l'accolade** : gcov met aussi `=====` du code ordinaire d'un gestionnaire computed-goto que rien n'exécute (modulo flottant, `throw` d'opérande non entier…), et les écarter de tout le fichier cachait 39 lignes de `vm.cpp` qui n'avaient aucun test. C'est le build
-HEADLESS : les modules graphiques n'y sont que des stubs, leur code réel n'est pas dans le chiffre. Les
+Dernier relevé : **97,6 %** des lignes (lexer 100 %, parser 100 %, compilateur 99 %, VM 96 %). Une accolade fermante seule marquée `=====` par gcov (le nettoyage d'une fonction dont les locales se détruisent sur un `bad_alloc`) n'est PAS comptée — aucun script ne fait échouer une allocation ; un relevé d'avant ce choix n'est pas comparable. ⚠ **Ne marquer que l'accolade** : gcov met aussi `=====` du code ordinaire d'un gestionnaire computed-goto que rien n'exécute (modulo flottant, `throw` d'opérande non entier…), et les écarter de tout le fichier cachait 39 lignes de `vm.cpp` qui n'avaient aucun test. Deux binaires instrumentés alimentent le relevé et leurs compteurs sont FUSIONNÉS (une ligne compte dès qu'UN des
+deux l'a exécutée) : le build HEADLESS, où les modules graphiques ne sont que des stubs, et `build-cov-gfx/` (raylib,
+`COVERAGE=1 bash tools/native-gfx.sh`) qui lance `tests/run_gfx.sh` sous Xvfb — c'est lui qui atteint les lignes de
+`vm.cpp` propres à une session graphique (le lancement de `graphics.run`, `set_global` à chaque image) ; le canvas implicite et les rappels de `mouse`/`keyboard` n'y ont encore aucun test. Les sources
+que SEUL ce second build compile (`graphics`, `image`, `ui`, `touch`, `audio`…) sont listées à part sous « Display » et
+restent **HORS du total et du plancher** : quelques tests Xvfb les couvrent à 20 %, et les y mettre ferait tomber le
+chiffre sous le plancher. Sans Xvfb ou sans source raylib le script le dit et ne mesure que le headless. Un relevé
+d'avant ce second binaire n'est pas comparable (la VM gagnait 1,4 point à elle seule). Les
 en-têtes sont exclus, leur code en ligne étant compté par unité de compilation. La mesure trouve ce que la
 garde de grammaire ne peut pas voir — elle compare des NOMS de règles : le visiteur des comparaisons chaînées
 n'était exécuté par aucun test. Le rechargement du fichier de `data` ne se teste qu'avec deux processus : c'est `tests/check_data_persistence.sh`.
