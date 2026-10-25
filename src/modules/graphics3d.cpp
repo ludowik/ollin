@@ -843,6 +843,11 @@ static int gfx_ambient(CallCtx& ctx) {
 // configuration (type, direction or position, colour, enabled) and, on every mutation,
 // pushes it into the global lighting state (last written wins).
 
+static void refuse_null_direction(double x, double y, double z) {
+    if (x == 0.0 && y == 0.0 && z == 0.0)
+        throw std::runtime_error("graphics.light: a directional light needs a direction, and (0, 0, 0) is none");
+}
+
 static void apply_light_from_instance(const Value& self) {
     int type = (int)map_number_or(self, "type", 0);
     float x = (float)map_number_or(self, "dx", 0.0);
@@ -852,8 +857,8 @@ static void apply_light_from_instance(const Value& self) {
     // normalize(vec3(0)), which is undefined — measured as "the light contributes nothing" on one
     // driver, but nothing guarantees that elsewhere. A meaningless argument is refused, never
     // silently ignored. A point light has no such case: its position is a place, not a direction.
-    if (type == 0 && x == 0.0f && y == 0.0f && z == 0.0f)
-        throw std::runtime_error("graphics.light: a directional light needs a direction, and (0, 0, 0) is none");
+    if (type == 0)
+        refuse_null_direction(x, y, z);
     s_light_type = type;
     if (type == 1) {
         s_light_pos = Vector3{x, y, z};
@@ -874,15 +879,18 @@ static void apply_light_from_instance(const Value& self) {
 static int light_set_dir(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
+    double dx = num_arg(args, argc, 1, "Light.setDir");
+    double dy = num_arg(args, argc, 2, "Light.setDir");
+    double dz = num_arg(args, argc, 3, "Light.setDir");
+    refuse_null_direction(dx, dy, dz);   // before any write: a refused call leaves the light as it was
     self.map_set(Value(std::string("type")), Value((int64_t)0));
-    self.map_set(Value(std::string("dx")), Value(num_arg(args, argc, 1, "Light.setDir")));
-    self.map_set(Value(std::string("dy")), Value(num_arg(args, argc, 2, "Light.setDir")));
-    self.map_set(Value(std::string("dz")), Value(num_arg(args, argc, 3, "Light.setDir")));
+    self.map_set(Value(std::string("dx")), Value(dx));
+    self.map_set(Value(std::string("dy")), Value(dy));
+    self.map_set(Value(std::string("dz")), Value(dz));
     apply_light_from_instance(self);
     return ctx.ret(self);
 }
 
-// light.setPos(x,y,z): places a point light.
 static int light_set_pos(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];

@@ -13,9 +13,10 @@ export OLLIN_GFX=$OLLIN
 fails=0
 
 run_pass tests/gfx_ui_test.ol || fails=$((fails + 1))
+run_pass tests/gfx_quat_test.ol || fails=$((fails + 1))
 ## The tests that need a frame loop, hence a window: they run under Xvfb and end with graphics.quit().
 if command -v xvfb-run >/dev/null 2>&1; then
-    for f in tests/gfx_ui_draw_test.ol tests/gfx_image_test.ol tests/gfx_graphics_test.ol; do
+    for f in tests/gfx_ui_draw_test.ol tests/gfx_image_test.ol tests/gfx_graphics_test.ol tests/gfx_3d_test.ol; do
         out=$(timeout 60 bash tools/run-headless.sh "$f" 2>&1)
         rc=$?
         if [ $rc -eq 0 ]; then
