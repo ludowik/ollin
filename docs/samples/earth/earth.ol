@@ -1,7 +1,10 @@
 ## The Earth seen from space: a globe turning on its tilted axis, lit by the Sun, with its clouds, the
-## glow of its atmosphere and a sky of stars. Everything is computed — the planet's map is not a
-## picture but a noise (earth_map.ol), and where the Sun stands comes from the astronomy of the real
-## Earth (astro.ol), so the day, the night and the seasons are the right ones for the date shown.
+## glow of its atmosphere and a sky of stars. The continents are the real ones (earth_day.jpg, NASA's
+## Blue Marble) and so are the clouds, a snapshot of a real cloud cover — see
+## tools/convert_earth_textures.py for where both come from. Where the Sun stands is computed from the
+## astronomy of the real Earth (astro.ol), so the day, the night and the seasons are the right ones for
+## the date shown. The pictures are what is fixed: the snow is the snow of a northern winter, and the
+## clouds do not move with the weather.
 ##
 ## Drag with the mouse or a finger to move around the Earth; the wheel or a pinch zooms; a double
 ## click puts the view back. The arrows move the view too, and space stops the time. The menu sets how
@@ -12,7 +15,6 @@
 ## only way for the light to stay where the Sun is while the view turns.
 
 import "astro.ol"
-import "earth_map.ol"
 import "../lib/trackball.ol"
 
 const GLOBE = 1.0          ## the radius of the globe: the unit of the scene
@@ -20,13 +22,11 @@ const CLOUD_SHELL = 1.012  ## the cloud layer floats a little above the ground
 const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
 
-## The texture of the ground runs from pole to pole in x and round the globe in y: the mesh of a
-## sphere takes its first coordinate along the meridians. The clouds get a rougher one, being soft.
-const GROUND_U = 512
-const GROUND_V = 1024
-const CLOUD_U = 256
-const CLOUD_V = 512
-const ROWS_PER_FRAME = 24   ## texture rows computed in each frame while the planet forms
+## Both pictures are laid out the way the sphere's mesh reads them: the latitude along x (0 at the
+## north pole), the longitude along y, west to east — the opposite of the usual equirectangular map,
+## which the converter turns once so that nothing has to be turned here.
+const GROUND_FILE = "earth_day.jpg"
+const CLOUDS_FILE = "earth_clouds.png"
 
 ## How fast time runs: a label for the menu and a rate in simulated DAYS per real second.
 global speeds = [
@@ -47,61 +47,8 @@ global sun = nil             ## the light
 global zoom = {factor: 1.0, min: 0.45, max: 4.0, wheelStep: 0.1}
 global ground = nil          ## the textures
 global cloudTex = nil
-global build = {texture: "ground", row: 0}   ## where the computation of the textures has got to
 global stars = []            ## unit vectors then brightnesses: x, y, z, b, x, y, z, b…
 global view = {px: 0, py: 0, pz: 4, ux: 0, uy: 1, uz: 0, dist: 4}   ## the camera as the last frame placed it
-
-## ── the planet is computed a few rows at a time ───────────────────────────────────────────────
-
-func paintGround(tex, x, y, lat, lon)
-    var r, g, b = earthColor(lat, lon)
-    image.setPixel(tex, x, y, r, g, b, 1)
-end
-
-func paintClouds(tex, x, y, lat, lon)
-    image.setPixel(tex, x, y, 1, 1, 1, cloudDensity(lat, lon) * 0.9)
-end
-
-## Fills `count` rows of a texture from `row` on, and says which row is next. x is the latitude
-## axis (0 at the north pole), y the longitude (west to east): the layout the sphere's mesh reads.
-func fillRows(tex, width, height, row, count, paint)
-    var last = math.min(row + count, height) - 1
-    image.beginPixels(tex)
-    for y = row, last do
-        var lon = (y + 0.5) / height * 360 - 180
-        for x = 0, width - 1 do
-            paint(tex, x, y, 90 - (x + 0.5) / width * 180, lon)
-        end
-    end
-    image.endPixels(tex)
-    return last + 1
-end
-
-func buildStep()
-    if build.texture == "ground" then
-        build.row = fillRows(ground, GROUND_U, GROUND_V, build.row, ROWS_PER_FRAME, paintGround)
-        if build.row >= GROUND_V then
-            build.texture = "clouds"
-            build.row = 0
-        end
-    elseif build.texture == "clouds" then
-        build.row = fillRows(cloudTex, CLOUD_U, CLOUD_V, build.row, ROWS_PER_FRAME, paintClouds)
-        if build.row >= CLOUD_V then
-            build.texture = "done"
-        end
-    end
-end
-
-## How far the computation has got, from 0 to 1, over the two textures.
-func buildProgress()
-    var total = GROUND_V + CLOUD_V
-    if build.texture == "ground" then
-        return build.row / total
-    elseif build.texture == "clouds" then
-        return (GROUND_V + build.row) / total
-    end
-    return 1
-end
 
 ## ── the view ──────────────────────────────────────────────────────────────────────────────────
 
@@ -255,9 +202,8 @@ func setup()
     end
     config.speed = speedLabels[2]
     days = unixToDays(time())
-    ground = image.create(GROUND_U, GROUND_V)
-    cloudTex = image.create(CLOUD_U, CLOUD_V)
-    math.noiseSeed(MAP_SEED)
+    ground = image.load(GROUND_FILE)
+    cloudTex = image.load(CLOUDS_FILE)
     seedStars()
 
     var lx, ly, lz = sunLightDirection(days)
@@ -286,9 +232,6 @@ func speedRate()
 end
 
 func update(dt)
-    if build.texture <> "done" then
-        buildStep()
-    end
     if not config.paused then
         days += dt * speedRate()
     end
@@ -371,9 +314,6 @@ func drawText()
     graphics.stroke(0.75, 0.85, 1)
     var line = graphics.fontSize() * 1.5
     graphics.text("The Sun is overhead at {degrees(lat, "N", "S")}, {degrees(lon, "E", "W")}", 12, 12 + line * 1.4)
-    if build.texture <> "done" then
-        graphics.text("Forming the planet... {math.floor(buildProgress() * 100)} %", 12, 12 + line * 2.4)
-    end
     graphics.stroke(0.6, 0.65, 0.75)
     graphics.text("drag: move around   wheel or pinch: zoom   space: stop time   return: reset", 12, H - 22)
 end

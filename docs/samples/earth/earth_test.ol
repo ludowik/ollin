@@ -1,10 +1,9 @@
-## The astronomy and the map of the Earth example, with no window: the Sun's position against the
-## known dates of the equinoxes and solstices, the turn of the globe, and the properties of the
-## procedural planet (it is the same every time, a third of it is land, its poles are ice).
+## The astronomy of the Earth example, with no window: the Sun's position against the known dates of
+## the equinoxes and solstices, and the turn of the globe. The pictures of the planet need a display:
+## tests/gfx_earth_test.ol reads them.
 ## Run: ./build/ollin docs/samples/earth/earth_test.ol — it must finish without error.
 
 import "astro.ol"
-import "earth_map.ol"
 
 func near(a, b, tolerance)
     return math.abs(a - b) <= tolerance
@@ -83,71 +82,4 @@ assert(near(lx, -1, 0.01) and ly == 0 and near(lz, 0, 0.01))
 var jx, jy, jz = sunLightDirection(unixToDays(JUNE_SOLSTICE))
 assert(near(jz, 1, 0.01) and near(jx, 0, 0.01))
 
-## ── the map ────────────────────────────────────────────────────────────────
-math.noiseSeed(MAP_SEED)
-
-var ux, uy, uz = unitVector(35, -120)
-assert(near(ux * ux + uy * uy + uz * uz, 1, 0.000001))
-var px, py, pz = unitVector(90, 0)
-assert(near(px, 0, 0.000001) and near(py, 1, 0.000001) and near(pz, 0, 0.000001))
-
-## The same point gives the same colour, whatever the order the points are visited in.
-var r1, g1, b1 = earthColor(12.5, 77.5)
-var r2, g2, b2 = earthColor(-40, -20)
-var r3, g3, b3 = earthColor(12.5, 77.5)
-assert(r1 == r3 and g1 == g3 and b1 == b3)
-assert(r1 <> r2 or g1 <> g2 or b1 <> b2)
-
-## A regular grid of the sphere: every colour is a valid colour, a third of the points are land at
-## most and a fifth at least, and the clouds cover some of the sky, not all of it.
-var land = 0
-var total = 0
-var cloudy = 0
-var clear = 0
-for i = 0, 35 do
-    var lat = 87.5 - i * 5
-    for j = 0, 71 do
-        var lon = -177.5 + j * 5
-        var r, g, b = earthColor(lat, lon)
-        assert(r >= 0 and r <= 1 and g >= 0 and g <= 1 and b >= 0 and b <= 1)
-        var cloud = cloudDensity(lat, lon)
-        assert(cloud >= 0 and cloud <= 1)
-        if cloud > 0.5 then cloudy += 1 end
-        if cloud < 0.05 then clear += 1 end
-        if elevation(lat, lon) >= 0 then
-            land += math.cos(math.rad(lat))      ## the grid is denser near the poles: weigh by the area
-        end
-        total += math.cos(math.rad(lat))
-    end
-end
-assert(land / total > 0.2 and land / total < 0.4)
-assert(cloudy > 0 and clear > cloudy)
-
-## The poles are ice, the middle of a deep ocean is dark blue.
-var ir, ig, ib = earthColor(89, 40)
-assert(ir > 0.85 and ig > 0.85 and ib > 0.9)
-var sr, sg, sb = earthColor(-89, -150)
-assert(sr > 0.85 and sg > 0.85 and sb > 0.9)
-var deep = 0
-for lon = -180, 175, 5 do
-    if elevation(0, lon) < -0.3 then
-        var dr, dg, db = earthColor(0, lon)
-        assert(db > dr and db > dg and db < 0.5)
-        deep += 1
-    end
-end
-assert(deep > 0)
-
-## Another seed makes another planet.
-math.noiseSeed(MAP_SEED + 1)
-var other = 0
-for lon = -180, 175, 5 do
-    if elevation(10, lon) < 0 then other += 1 end
-end
-math.noiseSeed(MAP_SEED)
-var same = 0
-for lon = -180, 175, 5 do
-    if elevation(10, lon) < 0 then same += 1 end
-end
-assert(other <> same)
 print("earth ok")

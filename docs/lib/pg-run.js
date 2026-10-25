@@ -125,13 +125,13 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
-// The 3D models referenced are preloaded from samples/ (of no effect for a project whose models are already
-// among its resources), and so are the files the entry imports, and THEIR models. Best-effort: a file that
+// The 3D models and the pictures referenced are preloaded from samples/ (of no effect for a project whose models are already
+// among its resources), and so are the files the entry imports, and THEIR assets. Best-effort: a file that
 // does not come is reported by the engine when the program asks for it, so a caller never has to guard.
 export async function preloadProgramAssets(m, code, v, entryName) {
   try {
     const imported = await preloadSampleImports(m, code, v, entryName)
-    await preloadSampleModels(m, code + '\n' + imported, v, entryName)
+    await preloadSampleAssets(m, code + '\n' + imported, v, entryName)
   } catch (_) {}
 }
 
@@ -207,18 +207,22 @@ async function fetchAsset(name, v, entry) {
   return null
 }
 
-// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") (user projects go
-// through their own resources instead). The key is the name AS WRITTEN in the code, which is what
-// the engine looks up — never the URL it was found at.
-export async function preloadSampleModels(m, code, v, entry = '') {
-  if (!m || !m.preloadModel || typeof code !== 'string') return
-  // Fetched CONCURRENTLY: the models are independent of one another, and six in single file cost
+// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") and the pictures referenced
+// by image.load("x.png") (user projects go through their own resources instead). The key is the name AS
+// WRITTEN in the code, which is what the engine looks up — never the URL it was found at.
+export async function preloadSampleAssets(m, code, v, entry = '') {
+  if (!m || typeof code !== 'string') return
+  // Fetched CONCURRENTLY: the assets are independent of one another, and six in single file cost
   // six round trips before the first frame.
-  const names = [...new Set(findModels(code))]
+  const models = m.preloadModel ? [...new Set(findModels(code))] : []
+  const images = m.preloadImage ? [...new Set(findImages(code))] : []
+  const names = [...models, ...images]
   const fetched = await Promise.all(names.map((file) => fetchAsset(file, v, entry)))
   names.forEach((file, i) => {
-    if (fetched[i])
-      m.preloadModel(file, bytesToB64(fetched[i]), file.split('.').pop().toLowerCase())
+    if (!fetched[i]) return
+    const ext = file.split('.').pop().toLowerCase()
+    if (i < models.length) m.preloadModel(file, bytesToB64(fetched[i]), ext)
+    else m.preloadImage(file, bytesToB64(fetched[i]), ext)
   })
 }
 
