@@ -8,9 +8,7 @@
 #
 # What is measured: src/**/*.cpp, by tests/run.sh and tests/samples.sh run with the instrumented binary.
 # That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs
-# (their real code is not compiled, so it is not in the figures). The stubs themselves are listed but
-# LEFT OUT of the total and the floor: their hooks are called only by the render loop and wasm_main.cpp,
-# neither of which this build compiles, so no script can run them and their percentage says nothing. Headers are left out: the code of an
+# (their real code is not compiled, so it is not in the figures). Headers are left out: the code of an
 # inline function is counted once per translation unit that includes it, which makes their percentage mean
 # nothing. The lines only an exception can run (gcov's =====) are left out as well: no script makes an
 # allocation fail. A line that runs is not a line that is checked: only breaking it and watching the suite
@@ -90,15 +88,13 @@ with tempfile.TemporaryDirectory() as scratch:
         if merged:
             files[name] = (100.0 * sum(merged.values()) / len(merged), len(merged))
 
-stubs = sorted(f for f in files if f.startswith("src/modules/") and f.endswith("_stub.cpp"))
-counted_files = {f: v for f, v in files.items() if f not in stubs}
-total = sum(n for _, n in counted_files.values())
-hit = sum(p * n / 100 for p, n in counted_files.values())
+total = sum(n for _, n in files.values())
+hit = sum(p * n / 100 for p, n in files.values())
 percent = 100 * hit / total
 print(f"{'covered':>8}  {'lines':>6}  file")
 for name, (p, n) in sorted(files.items(), key=lambda kv: kv[1][0]):
-    print(f"{p:7.1f}%  {n:6d}  {name}" + ("  (stub, not in the total)" if name in stubs else ""))
-print(f"{percent:7.1f}%  {total:6d}  TOTAL ({int(round(hit))} of {total} lines, {len(counted_files)} files, stubs left out)")
+    print(f"{p:7.1f}%  {n:6d}  {name}")
+print(f"{percent:7.1f}%  {total:6d}  TOTAL ({int(round(hit))} of {total} lines, {len(files)} files)")
 
 # The synthesis: the language (everything outside src/modules/), then one row per module, the stubs
 # together on the last row (a display module is a stub in this headless build, so its 0 % means nothing).
@@ -115,6 +111,7 @@ named = {f for _, group in LANGUAGE_ROWS for f in group}
 other_language = sorted(f for f in files if not f.startswith("src/modules/") and f not in named)
 if other_language:
     LANGUAGE_ROWS.append(("other", other_language))
+stubs = sorted(f for f in files if f.startswith("src/modules/") and f.endswith("_stub.cpp"))
 module_files = sorted(f for f in files if f.startswith("src/modules/") and f not in stubs)
 
 
