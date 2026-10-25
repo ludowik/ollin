@@ -477,3 +477,65 @@ class CxK
     end
 end
 assert(CxK(3).n == 3 and cxCalls == 1)
+
+## A function whose LAST statement is an `if` (or a `switch`) that returns in its branch still ends with
+## its own epilogue: the jump that skips the branch lands right after the branch's RETURN, and with no
+## epilogue there the function fell off its end into the code that follows it — the next function, or
+## its own body again (an endless loop, then "stack overflow").
+func endGuard(x)
+    if x == 0 then
+        return "zero"
+    end
+end
+func endNeighbour()
+    return "neighbour"
+end
+assert(endGuard(0) == "zero")
+assert(endGuard(1) == nil)
+assert(endNeighbour() == "neighbour")
+
+func endGuardPair(x)
+    if x == 0 then
+        return 1, 2
+    end
+end
+var egA, egB = endGuardPair(5)
+assert(egA == nil and egB == nil)
+
+func endSwitch(x)
+    switch x
+        case 1
+            return "one"
+        case 2
+            return "two"
+    end
+end
+func endSwitchNeighbour()
+    return "after"
+end
+assert(endSwitch(2) == "two")
+assert(endSwitch(9) == nil)
+assert(endSwitchNeighbour() == "after")
+
+class EndGuardCls
+    func pick(x)
+        if x == 0 then
+            return "zero"
+        end
+    end
+    func other()
+        return "other"
+    end
+end
+var egObj = EndGuardCls()
+assert(egObj.pick(0) == "zero")
+assert(egObj.pick(1) == nil)
+assert(egObj.other() == "other")
+
+var endLambda = func(x)
+    if x == 0 then
+        return "zero"
+    end
+end
+assert(endLambda(0) == "zero")
+assert(endLambda(1) == nil)

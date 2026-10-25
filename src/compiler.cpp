@@ -190,11 +190,14 @@ static bool is_ctor_name(const std::string& name) {
     return name == "init";
 }
 
-// Implicit void epilogue of a function or method. Omitted when the body already ends with a
-// RETURN or RETURN_V: that last instruction returns unconditionally, so one more would be
-// unreachable. This does NOT cover an explicit valueless `return`, which is always emitted.
-static void emit_implicit_return(Chunk& chunk, bool is_ctor) {
-    if (!chunk.code.empty()) {
+// Implicit void epilogue of a function or method. Omitted when the body's LAST STATEMENT is a `return`
+// that compiled to a RETURN or RETURN_V: it returns unconditionally, so one more would be unreachable.
+// The last INSTRUCTION being a RETURN is not enough: in `if c then return 1 end` it belongs to the
+// branch, and the jump that skips the branch lands right after it — on the epilogue, which then must
+// exist, or the function falls off its end into whatever the chunk holds next. This does NOT cover an
+// explicit valueless `return`, which is always emitted.
+static void emit_implicit_return(Chunk& chunk, bool is_ctor, bool ends_with_return) {
+    if (ends_with_return && !chunk.code.empty()) {
         Op last = (Op)i_op(chunk.code.back());
         if (last == Op::RETURN || last == Op::RETURN_V)
             return;
@@ -1201,7 +1204,7 @@ FuncIdx Compiler::compile_func_body(const std::string& name, const std::vector<s
         on_registered(func_idx);
 
     compile_stmt_seq(body);
-    emit_implicit_return(chunk, fn().in_ctor); // omitted when the body already ends with a RETURN
+    emit_implicit_return(chunk, fn().in_ctor, !body.empty() && dynamic_cast<const ReturnStmt*>(body.back().get()));
 
     check_reg_count("function");
     chunk.funcs[func_idx].reg_count = (Field)reg_count_;
