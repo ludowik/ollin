@@ -24,6 +24,7 @@
   { "group": "Simulations", "name": "Game of Life",   "file": "game_of_life.ol", "icon": "icons/game_of_life.png" },
   { "group": "Simulations", "name": "Lunar eclipse",  "file": "lunar_eclipse.ol", "icon": "icons/lunar_eclipse.png" },
   { "group": "Simulations", "name": "Solar eclipse",  "file": "solar_eclipse.ol", "icon": "icons/solar_eclipse.png" },
+  { "group": "Simulations", "name": "Earth from space", "file": "earth/earth.ol", "icon": "icons/earth.png" },
 
   { "group": "Games", "name": "Ollin Invaders", "file": "invaders/invaders.ol", "icon": "icons/invaders.png" },
   { "group": "Games", "name": "Ollin Asteroids", "file": "asteroids/asteroids.ol", "icon": "icons/asteroids.png" },

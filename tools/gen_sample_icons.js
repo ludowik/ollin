@@ -27,6 +27,7 @@ const SETTLE_LONG = {                  // the heavier ones bake a world or load 
   'voxel_world/voxel_world.ol': 12000,
   'model_3d/model_3d.ol': 12000,
   'rally/rally.ol': 9000,
+  'earth/earth.ol': 10000,
   'transforms_3d/transforms_3d.ol': 7000,
   'primitives_3d/primitives_3d.ol': 7000,
   'parser/parser.ol': 27000,         // the tree is only worth a picture once a few nodes are in it
