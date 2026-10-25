@@ -1351,8 +1351,8 @@ static void draw_ellipse_stroke(float cx, float cy, float rx, float ry, float th
         Vector2 i0 = {cx + rxi * c0, cy + ryi * s0};
         Vector2 i1 = {cx + rxi * c1, cy + ryi * s1};
         // The quad (o0,o1,i1,i0) becomes two triangles, wound like draw_ellipse_fill.
-        DrawTriangle(o0, o1, i1, color);
-        DrawTriangle(o0, i1, i0, color);
+        DrawTriangle(o0, i1, o1, color);
+        DrawTriangle(o0, i0, i1, color);
     }
 }
 
