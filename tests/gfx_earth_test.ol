@@ -5,6 +5,7 @@
 
 const GROUND = "../docs/samples/earth/earth_day.jpg"
 const CLOUDS = "../docs/samples/earth/earth_clouds.png"
+const NIGHT = "../docs/samples/earth/earth_night.jpg"
 
 func setup()
     graphics.canvas(32, 32, "earth test")
@@ -16,6 +17,20 @@ func place(img, lat, lon)
     var y = math.floor((lon + 180) / 360 * img.height)
     var r, g, b, a = image.getPixel(img, x, y)
     return r, g, b, a
+end
+
+## The mean brightness of a box of latitudes and longitudes, sampled every two degrees.
+func glow(img, lat0, lat1, lon0, lon1)
+    var total = 0
+    var count = 0
+    for lat = lat0, lat1, 2 do
+        for lon = lon0, lon1, 2 do
+            var r, g, b = place(img, lat, lon)
+            total += (r + g + b) / 3
+            count += 1
+        end
+    end
+    return total / count
 end
 
 func draw()
@@ -47,6 +62,16 @@ func draw()
         end
     end
     assert(covered > 0 and clear > covered)      ## a cloud cover has gaps, and is not empty
+    ## The lights of the cities, on black: Europe and Japan shine, the ocean, the Sahara and the ice do not.
+    var night = image.load(NIGHT)
+    assert(night.width == 1024 and night.height == 2048)
+    var europe = glow(night, 44, 54, -5, 15)
+    assert(europe > 0.05 and glow(night, 33, 40, 132, 142) > 0.05)
+    assert(glow(night, -10, 10, -160, -120) < 0.005 and glow(night, 18, 28, 0, 20) < 0.005)
+    assert(glow(night, -85, -75, -60, 60) < 0.005)
+    r, g, b = place(night, 48.9, 2.4)
+    assert(r >= b)                                ## warm, not blue
+    image.unload(night)
     image.unload(ground)
     image.unload(clouds)
     graphics.quit()

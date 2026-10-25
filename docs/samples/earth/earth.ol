@@ -1,7 +1,7 @@
 ## The Earth seen from space: a globe turning on its tilted axis, lit by the Sun, with its clouds, the
 ## glow of its atmosphere and a sky of stars. The continents are the real ones (earth_day.jpg, NASA's
-## Blue Marble) and so are the clouds, a snapshot of a real cloud cover — see
-## tools/convert_earth_textures.py for where both come from. Where the Sun stands is computed from the
+## Blue Marble) and so are the clouds, a snapshot of a real cloud cover, and the lights of the cities
+## that come on over the night side — see tools/convert_earth_textures.py for where they come from. Where the Sun stands is computed from the
 ## astronomy of the real Earth (astro.ol), so the day, the night and the seasons are the right ones for
 ## the date shown. The pictures are what is fixed: the snow is the snow of a northern winter, and the
 ## clouds do not move with the weather.
@@ -19,6 +19,9 @@ import "../lib/trackball.ol"
 
 const GLOBE = 1.0          ## the radius of the globe: the unit of the scene
 const CLOUD_SHELL = 1.012  ## the cloud layer floats a little above the ground
+const LIGHTS_SHELL = 1.003 ## the lights of the cities lie between the two, so the clouds hide them
+const LIGHTS_GAIN = 3.0   ## the cities' light is faint on the map: the layer's light is brighter than the Sun's
+const AMBIENT = 0.09       ## what the night side keeps of the light: a little earthshine
 const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
 
@@ -27,6 +30,7 @@ const STARS = 2500
 ## which the converter turns once so that nothing has to be turned here.
 const GROUND_FILE = "earth_day.jpg"
 const CLOUDS_FILE = "earth_clouds.png"
+const NIGHT_FILE = "earth_night.jpg"      ## the lights of the cities, on black
 
 ## How fast time runs: a label for the menu and a rate in simulated DAYS per real second.
 global speeds = [
@@ -38,7 +42,7 @@ global speeds = [
     {label: "60 days / s",  rate: 60}
 ]
 global speedLabels = []
-global config = {speed: nil, clouds: true, atmosphere: true, stars: true, axis: false, paused: false}
+global config = {speed: nil, clouds: true, lights: true, atmosphere: true, stars: true, axis: false, paused: false}
 
 global days = 0.0            ## the simulated time, in days since J2000 (see astro.ol)
 global ball = Trackball()
@@ -47,6 +51,7 @@ global sun = nil             ## the light
 global zoom = {factor: 1.0, min: 0.45, max: 4.0, wheelStep: 0.1}
 global ground = nil          ## the textures
 global cloudTex = nil
+global nightTex = nil
 global stars = []            ## unit vectors then brightnesses: x, y, z, b, x, y, z, b…
 global view = {px: 0, py: 0, pz: 4, ux: 0, uy: 1, uz: 0, dist: 4}   ## the camera as the last frame placed it
 
@@ -263,7 +268,8 @@ func drawGlint()
     hy /= length
     hz /= length
     var lat, lon = sceneToLatLon(hx, hy, hz, days)
-    var shine = waterAround(lat, lon)
+    var facing = hx * vx + hy * vy + hz * vz                ## 1 at the middle of the disc, 0 on its rim
+    var shine = waterAround(lat, lon) * smooth(0.35, 0.7, facing)
     if config.clouds then
         var cr, cg, cb, cloud = pixelAt(cloudTex, lat, lon)
         shine *= 1 - math.min(1, cloud * 1.6)
@@ -278,7 +284,7 @@ func drawGlint()
     var focal = (H / 2) / math.tan(math.rad(FOV / 2))
     var sx = CX + (rel_x * rx + rel_y * ry + rel_z * rz) / ahead * focal
     var sy = CY - (rel_x * ux + rel_y * uy + rel_z * uz) / ahead * focal
-    var spot = focal * GLOBE / view.dist * 0.16
+    var spot = focal * GLOBE / view.dist * 0.16 * facing   ## foreshortened towards the rim, so it stays on the globe
     graphics.blendMode("add")
     graphics.noStroke()
     for k = 0, 15 do
@@ -300,11 +306,12 @@ func setup()
     days = unixToDays(time())
     ground = image.load(GROUND_FILE)
     cloudTex = image.load(CLOUDS_FILE)
+    nightTex = image.load(NIGHT_FILE)
     seedStars()
 
     var lx, ly, lz = sunLightDirection(days)
     sun = graphics.light("dir", lx, ly, lz)
-    graphics.ambient(0.09)
+    graphics.ambient(AMBIENT)
     graphics.specular(0)    ## the highlight is drawn by drawGlint, on the sea only
     pixelAt(ground, 0, 0)    ## reads the ground back once, now: a read in the middle of a frame is not safe
     pixelAt(cloudTex, 0, 0)
@@ -313,6 +320,7 @@ func setup()
     menu.list("Time", speedLabels, ref config.speed)
     menu.button("Now", func() days = unixToDays(time()) end)
     menu.checkbox("Clouds", ref config.clouds)
+    menu.checkbox("City lights", ref config.lights)
     menu.checkbox("Atmosphere", ref config.atmosphere)
     menu.checkbox("Stars", ref config.stars)
     menu.checkbox("Axis and equator", ref config.axis)
@@ -359,6 +367,17 @@ func drawAxis()
     end
 end
 
+## The globe takes its place in space: tilted, turned, and stood up on its poles.
+func orientGlobe()
+    graphics.rotateX(-OBLIQUITY)                          ## the tilt of the axis, fixed in space
+    graphics.rotateY(greenwichAngle(days) + 180)          ## the turn of the globe: the prime meridian is local −X
+    graphics.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
+end
+
+## Three layers, one block each, because the light is ONE setting for a whole block. The ground and the
+## clouds are lit by the Sun. The lights of the cities are lit by a sun on the other side of the Earth,
+## and added: where the Sun shines the night side's light is nil, so nothing is added there, and it
+## grows towards midnight. The clouds come last, so they cover the lights they float above.
 func drawGlobe()
     var lx, ly, lz = sunLightDirection(days)
     sun.setDir(lx, ly, lz)
@@ -366,18 +385,46 @@ func drawGlobe()
     graphics.begin3d(cam)
     graphics.noStroke()
     graphics.push()
-    graphics.rotateX(-OBLIQUITY)                          ## the tilt of the axis, fixed in space
-    graphics.rotateY(greenwichAngle(days) + 180)          ## the turn of the globe: the prime meridian is local −X
-    graphics.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
+    orientGlobe()
     graphics.fill(1, 1, 1)
     graphics.texture(ground)
     graphics.sphere(0, 0, 0, GLOBE)
-    if config.clouds then
-        graphics.texture(cloudTex)
-        graphics.sphere(0, 0, 0, GLOBE * CLOUD_SHELL)
-    end
     graphics.noTexture()
     graphics.pop()
+    graphics.end3d()
+
+    if config.lights then
+        sun.setDir(-lx, -ly, -lz)
+        sun.setColor(Color(LIGHTS_GAIN, LIGHTS_GAIN, LIGHTS_GAIN))
+        graphics.ambient(0)
+        graphics.blendMode("add")
+        graphics.begin3d(cam)
+        graphics.noStroke()
+        graphics.push()
+        orientGlobe()
+        graphics.fill(1, 1, 1)
+        graphics.texture(nightTex)
+        graphics.sphere(0, 0, 0, GLOBE * LIGHTS_SHELL)
+        graphics.noTexture()
+        graphics.pop()
+        graphics.end3d()
+        graphics.blendMode("alpha")
+        graphics.ambient(AMBIENT)
+        sun.setColor(Color(1, 1, 1))
+        sun.setDir(lx, ly, lz)
+    end
+
+    graphics.begin3d(cam)
+    graphics.noStroke()
+    if config.clouds then
+        graphics.push()
+        orientGlobe()
+        graphics.fill(1, 1, 1)
+        graphics.texture(cloudTex)
+        graphics.sphere(0, 0, 0, GLOBE * CLOUD_SHELL)
+        graphics.noTexture()
+        graphics.pop()
+    end
     if config.axis then
         graphics.push()
         graphics.rotateX(-OBLIQUITY)
