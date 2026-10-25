@@ -26,3 +26,14 @@ assert(liR == "alpha")           ## a map sorted by label, hence the first in al
 var liKept = "blue"
 ui.list("Colour", liTints, ref liKept)
 assert(liKept == "blue")
+
+## ── menu.list, ui.current ──────────────────────────────────────────────────
+## The declaration as a METHOD of a menu goes through its own function in the stub, with the same
+## validation and the same initialisation as ui.list; ui.current() answers a handle, never nil.
+var liM = nil
+ui.menu("Palette").list("Colour", liTints, ref liM)
+assert(liM == "red")
+var liMKept = "green"
+ui.menu("Palette").list("Colour", liTints, ref liMKept)
+assert(liMKept == "green")
+assert(ui.current() <> nil)

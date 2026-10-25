@@ -387,6 +387,15 @@ check_error "ui.menu label not a string" \
     'var m = ui.menu(42)' \
     "label must be a string"
 
+check_error "menu.list without a reference" \
+    'global v = nil
+ui.menu("Palette").list("Colour", ["red"], v)' \
+    "reference"
+
+check_error "camera.open without a browser" \
+    'camera.open()' \
+    "camera: only available in the playground (WASM)"
+
 check_error "ui.slider without a reference" \
     'global v = 1
 ui.slider("Size", v, 1, 10)' \
