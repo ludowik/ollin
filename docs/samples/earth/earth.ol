@@ -307,7 +307,7 @@ end
 func drawAxis()
     graphics.noFill()
     graphics.stroke(1, 0.85, 0.3)
-    graphics.strokeSize(2)
+    graphics.strokeSize(0.4)                   ## a 3D line is a tube of strokeSize * 0.02 units: this one is thin
     graphics.line3d(0, -1.5, 0, 0, 1.5, 0)
     var steps = 72
     for i = 0, steps - 1 do
