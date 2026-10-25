@@ -331,3 +331,74 @@ func twMid(name)
 end
 assert(twMid("easeInQuad") == 0.25 and twMid("easeOutQuad") == 0.75 and twMid("easeInOutQuad") == 0.5)
 assert(twMid("easeInCubic") == 0.125 and twMid("easeOutCubic") == 0.875 and twMid("easeInOutCubic") == 0.5)
+
+## ── Objects, channels and cancellation ─────────────────────────────────────
+tween.cancelAll()
+## A class is an object like any other: its own fields can be animated.
+class TwHolder
+end
+TwHolder.count = 0
+tween.to(TwHolder, {count: 4}, 1.0, "linear")
+tween.update(0.5)
+assert(TwHolder.count == 2)
+tween.cancelAll()
+
+## Between two instances of one class, only the numeric fields the two share are animated.
+class TwPair
+    func init(n, s)
+        self.n = n
+        self.s = s
+    end
+end
+var twPA = {p: TwPair(0, "a")}
+tween.to(twPA, {p: TwPair(10, "b")}, 1.0, "linear")
+tween.update(0.5)
+assert(twPA.p.n == 5 and twPA.p.s == "a")
+tween.cancelAll()
+
+## A tween declared on an object leaves alone the channels of a `ref` that is still running: a `ref` has
+## no object for the new tween to be compared with.
+var twCell = 0
+tween.value(ref twCell, 10, 1.0, "linear")
+var twRefObj = {x: 0}
+tween.to(twRefObj, {x: 5}, 1.0, "linear")
+tween.update(0.5)
+assert(twCell == 5 and twRefObj.x == 2.5)
+tween.cancelAll()
+
+## `nil` after the list of a sequence stands for "no completion callback".
+var twNilCb = {x: 0}
+tween.sequence(twNilCb, [{to: {x: 1}, delay: 1.0, curve: "linear"}], nil)
+tween.update(1.0)
+assert(twNilCb.x == 1 and tween.count() == 0)
+
+## The progress of a sequence counts the time of the steps already crossed.
+var twPrg = {v: 0}
+var twPrgT = tween.sequence(twPrg, [{to: {v: 1}, delay: 3.0, curve: "linear"}, {to: {v: 2}, delay: 1.0, curve: "linear"}])
+tween.update(3.5)
+assert(math.abs(twPrgT.progress() - 0.875) < 0.001)
+tween.cancelAll()
+
+## The code a tween calls — the getter and the setter of a `ref` — may cancel that very tween. The
+## pass must stop writing for it, whether the call comes at the first start, in a step crossed along
+## the way, or at the end of a step.
+var twH1 = nil
+var twV1 = 0
+var twR1 = {__ref: true, get: func() if twH1 <> nil then twH1.cancel() end return twV1 end, set: func(v) twV1 = v end}
+twH1 = tween.value(twR1, 10, 1.0, "linear")
+tween.update(0.25)
+assert(tween.count() == 0 and twV1 == 0)
+
+var twH2 = nil
+var twV2 = 0
+var twR2 = {__ref: true, get: func() if twH2 <> nil then twH2.cancel() end return twV2 end, set: func(v) twV2 = v end}
+twH2 = tween.value(twR2, 10, 0.5, "linear").repeat(2)
+tween.update(1.0)
+assert(tween.count() == 0)
+
+var twH3 = nil
+var twV3 = 0
+var twR3 = {__ref: true, get: func() return twV3 end, set: func(v) twV3 = v if v == 10 then twH3.cancel() end end}
+twH3 = tween.value(twR3, 10, 0.5, "linear").repeat(2)
+tween.update(1.0)
+assert(tween.count() == 0 and twV3 == 10)

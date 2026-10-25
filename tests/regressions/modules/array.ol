@@ -114,3 +114,28 @@ assert(["x", JoinCls, {a: 1}, [1;3], print, func() end, 4 / 2].join(",") == "x,\
 ## a native function works as the callback of the higher-order methods
 assert([1.5, 2.5].map(math.floor)[2] == 2)
 assert([3, 9, 4].reduce(math.max, 0) == 9)
+
+## A method called without its argument names itself in the refusal.
+var arrNoArg = nil
+try
+    var r = [1, 2].contains()
+catch e
+    arrNoArg = e
+end
+assert(arrNoArg == "array.contains: expected (array, value)")
+
+## delete takes an integer index: anything else removes nothing and answers nil.
+var arrKeep = [1, 2]
+assert(arrKeep.delete("a") == nil)
+assert(#arrKeep == 2)
+
+## Without a comparator the order is nil, numbers, strings, then every other value, which keeps the
+## order it had among itself (the sort is stable). Strings compare as text.
+var arrWords = ["b", "a", "c"]
+arrWords.sort()
+assert(arrWords[1] == "a" and arrWords[2] == "b" and arrWords[3] == "c")
+var arrKinds = [{k: 1}, "z", 3, nil, 1.5, "a", {k: 2}]
+arrKinds.sort()
+assert(arrKinds[1] == nil and arrKinds[2] == 1.5 and arrKinds[3] == 3)
+assert(arrKinds[4] == "a" and arrKinds[5] == "z")
+assert(arrKinds[6].k == 1 and arrKinds[7].k == 2)

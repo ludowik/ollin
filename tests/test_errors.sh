@@ -555,6 +555,22 @@ check_error "tween.sequence with an unknown curve" \
 tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "no_such_curve"}])' \
     "unknown curve"
 
+check_error "tween.sequence with a curve of the wrong type" \
+    'var o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: 1, curve: 5}])' \
+    "expected a curve: a name or a function"
+
+check_error "tween.to between instances sharing no numeric field" \
+    'class TwP
+    func init(n, s)
+        self.n = n
+        self.s = s
+    end
+end
+var o = {p: TwP("x", "a")}
+tween.to(o, {p: TwP(10, "b")}, 1)' \
+    "no numeric field to animate"
+
 check_error "tween.sequence with a tween as target" \
     'global o = {x: 0}
 var inner = tween.sequence(o, [{to: {x: 1}, delay: 1}])
