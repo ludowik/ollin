@@ -82,4 +82,18 @@ assert(near(lx, -1, 0.01) and ly == 0 and near(lz, 0, 0.01))
 var jx, jy, jz = sunLightDirection(unixToDays(JUNE_SOLSTICE))
 assert(near(jz, 1, 0.01) and near(jx, 0, 0.01))
 
+## ── from a direction to a place ────────────────────────────────────────────
+## The Sun's own direction lands on the subsolar point, whatever the day, and the axis on the pole.
+for day = 0, 360, 30 do
+    var t = 9497 + day + 0.37
+    var lx, ly, lz = sunLightDirection(t)
+    var lat, lon = sceneToLatLon(-lx, -ly, -lz, t)
+    var sunLat, sunLon = subsolarPoint(t)
+    assert(near(lat, sunLat, 0.0001) and near(wrap180(lon - sunLon), 0, 0.0001))
+end
+var poleLat, poleLon = sceneToLatLon(0, math.cos(math.rad(TILT)), -math.sin(math.rad(TILT)), 9497)
+assert(near(poleLat, 90, 0.01))
+## The equinox direction lies on the equator, at the longitude the sidereal angle puts it.
+var eqLat, eqLon = sceneToLatLon(1, 0, 0, 0)
+assert(near(eqLat, 0, 0.0001) and near(eqLon, wrap180(-greenwichAngle(0)), 0.0001))
 print("earth ok")

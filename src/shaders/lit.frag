@@ -16,6 +16,7 @@ uniform vec4 animParams;
 // uFlipV is 0, 1 - v when it is 1.
 uniform float uFlipV;
 uniform vec4 ambient;
+uniform vec2 specular;   // the highlight: strength, then the exponent that narrows it (graphics.specular)
 uniform vec3 viewPos;
 struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };
 uniform Light light0;
@@ -63,8 +64,8 @@ void main() {
         result += base * light0.color.rgb * ndl;
         if (ndl > 0.0) {
             vec3 viewD = normalize(viewPos - fragPosition);
-            float spec = pow(max(dot(viewD, reflect(-l, normal)), 0.0), 16.0);
-            result += light0.color.rgb * spec * 0.3;
+            float spec = pow(max(dot(viewD, reflect(-l, normal)), 0.0), specular.y);
+            result += light0.color.rgb * spec * specular.x;
         }
     }
     finalColor = vec4(result, texel.a * tint.a);

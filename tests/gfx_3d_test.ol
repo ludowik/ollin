@@ -215,6 +215,39 @@ func check_b_side()
     image.unload(s)
 end
 
+## The highlight is its own setting: a half-bright sphere facing the light, whose centre is where the
+## highlight lands. The light is already on (scene B), and the setting is put back to its default after.
+func scene_specular(name, strength, shininess)
+    graphics.clear(0, 0, 0)
+    graphics.ambient(0.1)
+    lamp.setDir(0, 0, -1)
+    graphics.specular(strength, shininess)
+    graphics.begin3d(cam)
+    graphics.noStroke()
+    graphics.fill(0.5, 0.5, 0.5)
+    graphics.sphere(0, 0, 0, 4)
+    graphics.end3d()
+    graphics.screenshot(SHOT + name)
+    graphics.specular()
+end
+
+func check_specular()
+    var none = image.load(SHOT + "b3.png")
+    var soft = image.load(SHOT + "b4.png")
+    var tight = image.load(SHOT + "b5.png")
+    assert(near(grey(none, 60, 45), 0.55))                      ## the diffuse light alone: 0.5 x (0.1 + 1)
+    assert(near(grey(soft, 60, 45), 0.85))                      ## plus the highlight, 0.3 at its peak
+    assert(near(grey(tight, 60, 45), 0.85))                     ## as strong at the peak...
+    assert(grey(soft, 60 + 8, 45) > grey(tight, 60 + 8, 45) + 0.05)   ## ...but narrower: less of it off the peak
+    assert(grey(tight, 60 + 8, 45) >= grey(none, 60 + 8, 45) - 0.01)
+    image.unload(none)
+    image.unload(soft)
+    image.unload(tight)
+    expect(refusal(func() graphics.specular(-1) end), "graphics.specular: the strength cannot be negative")
+    expect(refusal(func() graphics.specular(1, 0) end), "graphics.specular: the shininess must be at least 1")
+    expect(refusal(func() graphics.specular("a") end), "graphics.specular: argument 1 expected number, got string")
+end
+
 ## ── scene C: textures, flat ────────────────────────────────────────────────
 func scene_c()
     lamp.enable(false)
@@ -414,21 +447,28 @@ func draw()
         scene_b("b2.png", 1, 0, 0)
     elseif frames == 4 then
         check_b_side()
-        scene_c()
+        scene_specular("b3.png", 0, 16)
     elseif frames == 5 then
+        scene_specular("b4.png", 0.3, 16)
+    elseif frames == 6 then
+        scene_specular("b5.png", 0.3, 64)
+    elseif frames == 7 then
+        check_specular()
+        scene_c()
+    elseif frames == 8 then
         check_c()
         scene_d_setup()
         scene_d()
-    elseif frames == 6 then
+    elseif frames == 9 then
         check_d()
         scene_e()
-    elseif frames == 7 then
+    elseif frames == 10 then
         check_e()
         scene_f()
-    elseif frames == 8 then
+    elseif frames == 11 then
         check_f()
         scene_g()
-    elseif frames == 9 then
+    elseif frames == 12 then
         check_g()
         check_state()                                  ## last: creating a light turns the lighting on for good
         graphics.quit()

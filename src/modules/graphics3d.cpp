@@ -439,7 +439,11 @@ static bool s_lit_ready = false;
 static int s_loc_vertcolor = -1;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
-static int s_loc_animparams = -1, s_loc_flipv = -1;
+static int s_loc_animparams = -1, s_loc_flipv = -1, s_loc_specular = -1;
+// The highlight of the light on a surface: how strong, and how narrow (the exponent of the cosine).
+static constexpr float k_default_specular_strength = 0.3f;
+static constexpr float k_default_specular_shininess = 16.0f;
+static float s_specular[2] = {k_default_specular_strength, k_default_specular_shininess};
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // PERSISTENT instance VBOs (transform + colour): reused from one frame to the next
@@ -486,6 +490,7 @@ static void load_lit_shader() {
     s_loc_flipv = GetShaderLocation(s_lit, "uFlipV");
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
+    s_loc_specular = GetShaderLocation(s_lit, "specular");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
     s_loc_l_type = GetShaderLocation(s_lit, "light0.type");
     s_loc_l_pos = GetShaderLocation(s_lit, "light0.position");
@@ -576,6 +581,7 @@ static bool lit_begin_draw() {
         en = s_light_on ? 1 : 0;
     }
     rlSetUniform(s_loc_ambient, amb, RL_SHADER_UNIFORM_VEC4, 1);
+    rlSetUniform(s_loc_specular, s_specular, RL_SHADER_UNIFORM_VEC2, 1);
     rlSetUniform(s_loc_l_en, &en, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(s_loc_l_type, &s_light_type, RL_SHADER_UNIFORM_INT, 1);
     float lp[3] = {s_light_pos.x, s_light_pos.y, s_light_pos.z};
@@ -685,6 +691,8 @@ static void flush_bucket(const Bucket3D& b) {
 }
 
 void reset3d_lighting_state() {
+    s_specular[0] = k_default_specular_strength;
+    s_specular[1] = k_default_specular_shininess;
     s_lighting_used = false;
     s_light_on = false;
     s_cur_tex3d = 0;
@@ -835,6 +843,24 @@ static int gfx_ambient(CallCtx& ctx) {
         s_amb3d[3] = 1.0f;
     }
     s_lighting_used = true;
+    return ctx.ret(Value{});
+}
+
+// graphics.specular([strength [, shininess]]): the highlight a light leaves on every lit surface. The
+// default is a soft, wide one; a strength of 0 leaves the diffuse light alone, and a larger shininess
+// narrows the spot. With no argument the defaults come back.
+static int gfx_specular(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    double strength = argc > 0 ? num_arg(args, argc, 0, "graphics.specular") : k_default_specular_strength;
+    double shininess = argc > 1 ? num_arg(args, argc, 1, "graphics.specular") : k_default_specular_shininess;
+    if (strength < 0.0) {
+        throw std::runtime_error("graphics.specular: the strength cannot be negative");
+    }
+    if (shininess < 1.0) {
+        throw std::runtime_error("graphics.specular: the shininess must be at least 1");
+    }
+    s_specular[0] = (float)strength;
+    s_specular[1] = (float)shininess;
     return ctx.ret(Value{});
 }
 
@@ -1848,6 +1874,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("begin3d")), Value::make_builtin(with_area<gfx_begin3d>));
     m.map_set(Value(std::string("end3d")), Value::make_builtin(with_area<gfx_end3d>));
     m.map_set(Value(std::string("ambient")), Value::make_builtin(gfx_ambient));
+    m.map_set(Value(std::string("specular")), Value::make_builtin(gfx_specular));
     m.map_set(Value(std::string("light")), Value::make_builtin(gfx_light));
     m.map_set(Value(std::string("texture")), Value::make_builtin(gfx_texture));
     m.map_set(Value(std::string("noTexture")), Value::make_builtin(gfx_no_texture));

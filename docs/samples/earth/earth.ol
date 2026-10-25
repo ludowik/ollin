@@ -169,8 +169,15 @@ func drawStars()
     end
 end
 
-## The glow of the atmosphere: rings round the globe, brighter on the side the Sun lights, drawn BEFORE
-## the globe so that the globe covers their inner half and only the halo outside remains.
+func smooth(lo, hi, x)
+    var t = math.clamp((x - lo) / (hi - lo), 0, 1)
+    return t * t * (3 - 2 * t)
+end
+
+## The glow of the atmosphere: a few thin rings round the globe, drawn BEFORE the globe so that it covers
+## their inner half. The air only glows where the Sun lights it: bright on the day side, warm towards
+## the terminator, nothing on the night side — except when the Sun is behind the globe, which lights the
+## whole rim from behind.
 func drawHalo()
     var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
     var focal = (H / 2) / math.tan(math.rad(FOV / 2))
@@ -179,18 +186,107 @@ func drawHalo()
     var sx = -lx
     var sy = -ly
     var sz = -lz
-    var towardSun = math.deg(math.atan2(sx * ux + sy * uy + sz * uz, sx * rx + sy * ry + sz * rz))   ## on the screen
-    var behind = math.max(0, sx * fx + sy * fy + sz * fz)     ## the Sun behind the globe: the whole rim glows
+    var behind = math.max(0, sx * fx + sy * fy + sz * fz)     ## 1: the Sun is straight behind the globe
+    var steps = 120
+    var thickness = radius * 0.006 + 1
     graphics.noFill()
-    for k = 1, 5 do
-        var ring = radius * (1 + 0.012 * k)
-        var fade = 0.5 / k
-        graphics.stroke(0.25, 0.5, 1.0, fade * (0.25 + 0.75 * behind))
-        graphics.strokeSize(radius * 0.012 + 1)
-        graphics.circle(CX, CY, ring)
-        graphics.stroke(0.4, 0.65, 1.0, fade * 0.8)
-        graphics.arc(CX, CY, ring * 2, ring * 2, -towardSun - 75, -towardSun + 75)
+    graphics.strokeSize(thickness)
+    for k = 0, 5 do
+        var ring = radius * (1 + 0.004 * k) + thickness / 2
+        var fade = (1 - k / 6) * (1 - k / 6)
+        var lastX = 0
+        var lastY = 0
+        for i = 0, steps do
+            var a = i / steps * math.TAU
+            var c = math.cos(a)
+            var s = math.sin(a)
+            var px = CX + c * ring
+            var py = CY - s * ring
+            if i > 0 then
+                var lit = (c * (sx * rx + sy * ry + sz * rz) + s * (sx * ux + sy * uy + sz * uz))   ## the Sun, along this part of the rim
+                var glow = math.max(smooth(-0.25, 0.55, lit), behind * behind * 0.9)
+                var warm = math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind)
+                if glow > 0.01 then
+                    graphics.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
+                    graphics.line(lastX, lastY, px, py)
+                end
+            end
+            lastX = px
+            lastY = py
+        end
     end
+end
+
+## ── the sunglint ──────────────────────────────────────────────────────────────────────────────
+
+## The place on a picture of the Earth (laid out as the sphere reads it, see GROUND_FILE) where a
+## latitude and a longitude are.
+func pixelAt(img, lat, lon)
+    var x = math.clamp(math.floor((90 - lat) / 180 * img.width), 0, img.width - 1)
+    var y = math.floor((lon + 180) / 360 * img.height) % img.height
+    return image.getPixel(img, x, y)
+end
+
+## How much of the ground round a place is open water, from 0 to 1. Water is the blue of the map; ice,
+## sand and forest are not, and none of them shines.
+func waterAround(lat, lon)
+    var water = 0
+    for dlat = -2, 2, 2 do
+        for dlon = -2, 2, 2 do
+            var r, g, b = pixelAt(ground, math.clamp(lat + dlat, -90, 90), wrap180(lon + dlon))
+            if b > g and b > r * 1.3 then
+                water += 1
+            end
+        end
+    end
+    return water / 9
+end
+
+## The Sun's reflection on the sea: a soft bright spot at the one point of the globe whose surface
+## faces halfway between the camera and the Sun, there only if that point is open water and the sky
+## above it is clear. The engine's own highlight (graphics.specular) is off, since it cannot tell the sea
+## from the land and the clouds.
+func drawGlint()
+    var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
+    var lx, ly, lz = sunLightDirection(days)
+    var vx = view.px / view.dist
+    var vy = view.py / view.dist
+    var vz = view.pz / view.dist
+    var hx = vx - lx
+    var hy = vy - ly
+    var hz = vz - lz
+    var length = math.sqrt(hx * hx + hy * hy + hz * hz)
+    if length < 0.2 then
+        return nil          ## the Sun is behind the globe: nothing to reflect towards the camera
+    end
+    hx /= length
+    hy /= length
+    hz /= length
+    var lat, lon = sceneToLatLon(hx, hy, hz, days)
+    var shine = waterAround(lat, lon)
+    if config.clouds then
+        var cr, cg, cb, cloud = pixelAt(cloudTex, lat, lon)
+        shine *= 1 - math.min(1, cloud * 1.6)
+    end
+    if shine < 0.02 then
+        return nil
+    end
+    var rel_x = hx * GLOBE - view.px
+    var rel_y = hy * GLOBE - view.py
+    var rel_z = hz * GLOBE - view.pz
+    var ahead = rel_x * fx + rel_y * fy + rel_z * fz
+    var focal = (H / 2) / math.tan(math.rad(FOV / 2))
+    var sx = CX + (rel_x * rx + rel_y * ry + rel_z * rz) / ahead * focal
+    var sy = CY - (rel_x * ux + rel_y * uy + rel_z * uz) / ahead * focal
+    var spot = focal * GLOBE / view.dist * 0.16
+    graphics.blendMode("add")
+    graphics.noStroke()
+    for k = 0, 15 do
+        var f = 1 - k / 16
+        graphics.fill(1, 0.96, 0.88, 0.03 * shine)
+        graphics.circle(sx, sy, spot * f * f)
+    end
+    graphics.blendMode("alpha")
 end
 
 ## ── the program ───────────────────────────────────────────────────────────────────────────────
@@ -200,7 +296,7 @@ func setup()
     for i, s in speeds do
         speedLabels.push(s.label)
     end
-    config.speed = speedLabels[2]
+    config.speed = speedLabels[1]
     days = unixToDays(time())
     ground = image.load(GROUND_FILE)
     cloudTex = image.load(CLOUDS_FILE)
@@ -209,6 +305,9 @@ func setup()
     var lx, ly, lz = sunLightDirection(days)
     sun = graphics.light("dir", lx, ly, lz)
     graphics.ambient(0.09)
+    graphics.specular(0)    ## the highlight is drawn by drawGlint, on the sea only
+    pixelAt(ground, 0, 0)    ## reads the ground back once, now: a read in the middle of a frame is not safe
+    pixelAt(cloudTex, 0, 0)
 
     var menu = ui.menu("Earth")
     menu.list("Time", speedLabels, ref config.speed)
@@ -328,5 +427,6 @@ func draw()
         drawHalo()
     end
     drawGlobe()
+    drawGlint()
     drawText()
 end

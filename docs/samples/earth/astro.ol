@@ -69,3 +69,18 @@ func sunLightDirection(days)
     var lam = math.rad(sunLongitude(days))
     return -math.cos(lam), 0, math.sin(lam)
 end
+
+## The reverse of the Sun's placement: the latitude and longitude (positive to the east, in degrees) of
+## the point of the Earth that lies in the direction (x, y, z) from its centre, in the scene's frame.
+## The equatorial frame is the scene's, turned so that the Earth's axis is its Z: X stays the March
+## equinox, and Y completes the frame.
+func sceneToLatLon(x, y, z, days)
+    var c = math.cos(math.rad(OBLIQUITY))
+    var s = math.sin(math.rad(OBLIQUITY))
+    var length = math.sqrt(x * x + y * y + z * z)
+    var ex = x / length
+    var ey = (-s * y - c * z) / length
+    var ez = (c * y - s * z) / length
+    var rightAscension = math.deg(math.atan2(ey, ex))
+    return math.deg(math.asin(ez)), wrap180(rightAscension - greenwichAngle(days))
+end
