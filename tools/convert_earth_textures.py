@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Builds the three real maps of docs/samples/earth/ — the ground, a snapshot of the clouds and the lights
-of the cities by night.
+"""Builds the four real maps of docs/samples/earth/ — the ground, a snapshot of the clouds, the lights of the
+cities by night and the mask of the open water, which the sunglint needs.
 
     python3 tools/convert_earth_textures.py
 
@@ -22,13 +22,20 @@ by the proxy of the session). Check both before reusing these files anywhere els
 Why not simply ship the originals: the engine's sphere reads its texture with the LATITUDE along x
 (0 at the north pole) and the LONGITUDE along y (west to east), the opposite of the usual
 equirectangular layout, so the pictures are transposed here, once, instead of being turned pixel
-by pixel by the script every time. The ground is reduced to 2048 x 1024 (1024 x 2048 once
-transposed), the clouds to 1024 x 512, the lights to 2048 x 1024 (1024 x 2048 transposed).
+by pixel by the script every time. The ground keeps the full 4096 x 2048 of its source (2048 x 4096
+once transposed): the sphere is meant to be looked at close. The clouds, the lights and the
+mask of the water (computed on the full ground) are reduced to 2048 x 1024.
 
 The night picture is not used as it comes. Its cities are warm and its background is blue, so a
 city is what has more red and green than blue: the light of a pixel is min(r, g) - b / 2, clamped
 at 0 (the background gives nothing, a city gives its glow), boosted, painted in a warm
 white and given a halo. Everything else goes to black, which is what an additive layer needs.
+
+The mask of the water is a picture of the ground's own colours: water is blue (more blue than green,
+and more than one and a half times the red), which sand, forest and ice are not. It is computed on the
+full picture and then averaged down, so that a coast is a soft edge rather than a staircase. It is
+stored as the ALPHA of a black picture: drawn with the engine's highlight on and added, the result
+is the highlight where the alpha is, and nothing on the land.
 
 The script also reads a few places of the SOURCE and refuses to write anything if the picture
 does not show what the Earth shows there: a wrong file, a flipped map or a shifted meridian
@@ -40,15 +47,17 @@ import sys
 import tarfile
 import tempfile
 
+import numpy
 from PIL import Image, ImageChops, ImageFilter
 
 PACKAGE = "three-globe@2.45.6"
 GROUND = "example/img/earth-blue-marble.jpg"
 CLOUDS = "example/clouds/clouds.png"
 NIGHT = "example/img/earth-night.jpg"
-GROUND_SIZE = (2048, 1024)
-CLOUDS_SIZE = (1024, 512)
+CLOUDS_SIZE = (2048, 1024)
+CLOUDS_ALPHA_STEP = 8     # the opacity is rounded to this step: smooth enough once filtered, and the PNG a third smaller
 NIGHT_SIZE = (2048, 1024)
+WATER_SIZE = (2048, 1024)
 LIGHT_GAIN = 4.0
 LIGHT_COLOUR = (1.0, 0.84, 0.58)    # the warm white of sodium and tungsten
 
@@ -80,6 +89,22 @@ def check_geography(ground):
     assert min(greenland) > 170, f"Greenland is not white: {greenland}"
     assert min(antarctica) > 170, f"Antarctica is not white: {antarctica}"
     assert amazon[1] > amazon[0] and amazon[1] > amazon[2], f"the Amazon is not green: {amazon}"
+
+
+def water_mask(ground):
+    """The open water of the ground picture, as a grey picture: 255 where it is water, 0 elsewhere."""
+    pixels = numpy.asarray(ground, dtype=numpy.float32)
+    red, green, blue = pixels[..., 0], pixels[..., 1], pixels[..., 2]
+    water = (blue > green) & (blue > red * 1.5)
+    mask = Image.fromarray((water * 255).astype(numpy.uint8), "L")
+    return mask.resize(WATER_SIZE, Image.BOX)
+
+
+def check_water(mask):
+    sea = [pixel_at(mask, *where) for where in ((0, -140), (30, -45), (-35, 80), (35, 18))]   # Pacific, Atlantic, Indian, Mediterranean
+    land = [pixel_at(mask, *where) for where in ((23, 12), (-5, -62), (60, 90), (-80, 0), (75, -40))]   # Sahara, Amazon, Siberia, ice
+    assert min(sea) > 200, f"the sea is not water: {sea}"
+    assert max(land) < 40, f"the land is water: {land}"
 
 
 def city_lights(night):
@@ -135,9 +160,16 @@ def main():
         package = fetch(workdir)
         ground = Image.open(os.path.join(package, GROUND)).convert("RGB")
         check_geography(ground)
-        ground = ground.resize(GROUND_SIZE, Image.LANCZOS).transpose(Image.TRANSPOSE)
+        water = water_mask(ground)
+        check_water(water)
+        ground = ground.transpose(Image.TRANSPOSE)
+        water = Image.merge("RGBA", (Image.new("L", water.size, 0),) * 3 + (water,)).transpose(Image.TRANSPOSE)
+        water_path = os.path.join(out, "earth_water.png")
+        water.save(water_path, optimize=True)
         clouds = Image.open(os.path.join(package, CLOUDS)).convert("RGBA")
         clouds = clouds.resize(CLOUDS_SIZE, Image.LANCZOS).transpose(Image.TRANSPOSE)
+        alpha = clouds.getchannel("A").point(lambda v: v // CLOUDS_ALPHA_STEP * CLOUDS_ALPHA_STEP)
+        clouds.putalpha(alpha)
         night = Image.open(os.path.join(package, NIGHT)).convert("RGB")
         lights = city_lights(night)
         check_lights(lights)
@@ -148,7 +180,7 @@ def main():
         clouds_path = os.path.join(out, "earth_clouds.png")
         ground.save(ground_path, quality=88, optimize=True)
         clouds.save(clouds_path, optimize=True)
-    for path in (ground_path, clouds_path, lights_path):
+    for path in (ground_path, clouds_path, lights_path, water_path):
         print(f"{os.path.normpath(path)}: {os.path.getsize(path)} bytes")
 
 

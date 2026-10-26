@@ -65,6 +65,7 @@ struct TexHandle {
     // image.create + setPixel, image.fromPattern — is already top-down, and flipping it on draw
     // turned every pattern upside down.
     bool gpu_flipped = false;
+    bool mipmapped = false;   // image.filter(img, "mipmap"): the mipmaps are redone whenever the pixels are uploaded
     Texture2D tex = {};
     RenderTexture2D rtt = {};
     Image cpu = {};
@@ -256,7 +257,10 @@ static void pixels_open(TexHandle& h) {
 // The ONLY place the CPU shadow reaches the texture, which is why the orientation flag is cleared
 // here: any future write path that goes through this one is correct without having to think about it.
 static void upload_cpu(TexHandle& h) {
-    UpdateTexture(h.gpu_tex(), h.cpu.data);
+    Texture2D tex = h.gpu_tex();
+    UpdateTexture(tex, h.cpu.data);
+    if (h.mipmapped)
+        GenTextureMipmaps(&tex);   // the smaller levels would keep showing the old pixels
     h.gpu_flipped = false;   // uploaded from the top-down CPU shadow
 }
 
@@ -532,6 +536,38 @@ static int img_draw(CallCtx& ctx) {
 }
 
 
+// image.filter(img, mode): how the texture is sampled when it is drawn bigger or smaller than it is.
+// Textures start "nearest", the pixel-art default; "linear" blends the neighbouring pixels, which is what
+// a picture stretched over a surface needs; "mipmap" adds smaller copies of the picture, so that one
+// looked at from afar is averaged instead of sparkling. A render target drawn into is not redone.
+static int img_filter(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    static constexpr const char* FN = "image.filter";
+    if (argc < 2)
+        throw std::runtime_error(std::string(FN) + ": expected img, mode");
+    TexHandle& h = handle_ptr(args[0], FN);
+    if (!args[1].is_string())
+        throw std::runtime_error(std::string(FN) + ": the mode must be a string (\"nearest\", \"linear\" or \"mipmap\")");
+    std::string mode = args[1].as_string();
+    Texture2D tex = h.gpu_tex();
+    if (mode == "nearest") {
+        h.mipmapped = false;
+        SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+    } else if (mode == "linear") {
+        h.mipmapped = false;
+        SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+    } else if (mode == "mipmap") {
+        GenTextureMipmaps(&tex);
+        SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR);
+        h.mipmapped = true;
+    } else {
+        throw std::runtime_error(std::string(FN) + ": unknown mode '" + mode +
+                                 "' (expected \"nearest\", \"linear\" or \"mipmap\")");
+    }
+    return ctx.ret(Value{});
+}
+
+
 static int img_unload(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
@@ -763,6 +799,7 @@ Value make_image_module() {
         .fn("beginDraw", with_area<img_begin>)
         .fn("endDraw", with_area<img_end>)
         .fn("draw", with_area<img_draw>)
+        .fn("filter", with_area<img_filter>)
         .fn("unload", with_area<img_unload>)
         .fn("beginPixels", with_area<img_begin_pixels>)
         .fn("endPixels", with_area<img_end_pixels>)

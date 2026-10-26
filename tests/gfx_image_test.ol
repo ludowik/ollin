@@ -3,6 +3,7 @@
 ## `image` (nil).
 
 const PNG_2X2 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE0lEQVR4nGP4z8DwHwyBNAgwAABIyQj4ccUx4AAAAABJRU5ErkJggg=="
+const Q = string.fromCode(34)   ## a double quote: a string has no escape for it
 const SHOT = "/tmp/ollin_gfx_image_test.png"
 
 global frames = 0
@@ -46,6 +47,10 @@ func check_loading()
     assert(refusal(func() image.loadData("png", "AAAA") end) == "image: failed to decode image (ext: .png)")
     assert(refusal(func() image.loadData(5, "AAAA") end) == "image.loadData: expected format string and base64 string")
     assert(refusal(func() image.load(5) end) == "image.load: expected path string")
+    assert(refusal(func() image.filter(img) end) == "image.filter: expected img, mode")
+    var modes = Q + "nearest" + Q + ", " + Q + "linear" + Q + " or " + Q + "mipmap" + Q
+    assert(refusal(func() image.filter(img, 3) end) == "image.filter: the mode must be a string (" + modes + ")")
+    assert(refusal(func() image.filter(img, "cubic") end) == "image.filter: unknown mode 'cubic' (expected " + modes + ")")
     assert(refusal(func() image.load("no_such_image.png") end) == "image.load: cannot open 'no_such_image.png'")
     image.unload(img)
     image.unload(dotted)
@@ -164,10 +169,20 @@ end
 
 ## ── drawing images on the screen ──────────────────────────────────────────
 global stamp = nil
+global ramp = nil
+global blended = nil
+global mipped = nil
 global target = nil
 
 func prepare_images()
     stamp = image.fromPattern(["##", "##"], {"#": Color(1, 0, 0)})
+    ramp = image.fromPattern(["ab"], {"a": Color(1, 0, 0), "b": Color(0, 0, 1)})
+    blended = image.fromPattern(["ab"], {"a": Color(1, 0, 0), "b": Color(0, 0, 1)})
+    mipped = image.fromPattern(["ab"], {"a": Color(1, 0, 0), "b": Color(0, 0, 1)})
+    image.filter(blended, "linear")
+    image.filter(mipped, "mipmap")
+    image.filter(ramp, "linear")
+    image.filter(ramp, "nearest")                        ## and back
     target = image.create(4, 4)
     image.beginDraw(target)
     graphics.clear(0, 1, 0)
@@ -187,6 +202,9 @@ func draw_images()
     graphics.spriteMode("corner")
     image.draw(target, 2, 20, 8, 8)                      ## a render target, rows flipped back
     graphics.sprite(stamp, 14, 20, 4, 4)
+    image.draw(ramp, 0, 34, 40, 4)                       ## nearest: two flat halves
+    image.draw(blended, 0, 39, 40, 4)                    ## linear: a ramp from red to blue between the pixel centres
+    image.draw(mipped, 0, 44, 40, 3)                     ## mipmap: the same, seen bigger than it is
     graphics.screenshot(SHOT)
 end
 
@@ -211,6 +229,13 @@ func draw()
         assert(pixel_is(shot, 5, 23, 0, 1, 0, 1))
         assert(pixel_is(shot, 15, 21, 1, 0, 0, 1))
         assert(pixel_is(shot, 60, 44, 0, 0, 0, 1))
+        assert(pixel_is(shot, 18, 35, 1, 0, 0, 1) and pixel_is(shot, 22, 35, 0, 0, 1, 1))
+        var mr, mg, mb, ma = image.getPixel(shot, 20, 40)
+        assert(mr > 0.3 and mr < 0.7 and mb > 0.3 and mb < 0.7)
+        var lr, lg, lb, la = image.getPixel(shot, 10, 40)
+        assert(lr > 0.9, "left {lr} {lg} {lb} {la}")
+        mr, mg, mb, ma = image.getPixel(shot, 20, 45)
+        assert(mr > 0.3 and mr < 0.7 and mb > 0.3 and mb < 0.7)
         image.unload(shot)
         graphics.quit()
     end

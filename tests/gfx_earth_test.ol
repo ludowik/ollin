@@ -6,6 +6,7 @@
 const GROUND = "../docs/samples/earth/earth_day.jpg"
 const CLOUDS = "../docs/samples/earth/earth_clouds.png"
 const NIGHT = "../docs/samples/earth/earth_night.jpg"
+const WATER = "../docs/samples/earth/earth_water.png"
 
 func setup()
     graphics.canvas(32, 32, "earth test")
@@ -35,7 +36,7 @@ end
 
 func draw()
     var ground = image.load(GROUND)
-    assert(ground.width == 1024 and ground.height == 2048)
+    assert(ground.width == 2048 and ground.height == 4096)
 
     var r, g, b = place(ground, 23, 12)          ## the Sahara: sand
     assert(r > b + 0.15 and r > 0.45)
@@ -51,7 +52,7 @@ func draw()
     assert(r + g + b > 0.35 and r >= b)
 
     var clouds = image.load(CLOUDS)
-    assert(clouds.width == 512 and clouds.height == 1024)
+    assert(clouds.width == 1024 and clouds.height == 2048)
     var covered = 0
     var clear = 0
     for x = 0, clouds.width - 1, 8 do
@@ -72,6 +73,19 @@ func draw()
     r, g, b = place(night, 48.9, 2.4)
     assert(r >= b)                                ## warm, not blue
     image.unload(night)
+
+    ## The mask of the open water is the alpha of a black picture: the sea is opaque, the land and the ice not.
+    var water = image.load(WATER)
+    assert(water.width == 1024 and water.height == 2048)
+    var wr, wg, wb, wa = place(water, 0, -140)
+    assert(wa > 0.9 and wr == 0 and wb == 0)                     ## the Pacific
+    wr, wg, wb, wa = place(water, 35, 18)
+    assert(wa > 0.9)                                             ## the Mediterranean
+    wr, wg, wb, wa = place(water, 23, 12)
+    assert(wa < 0.1)                                             ## the Sahara
+    wr, wg, wb, wa = place(water, -80, 0)
+    assert(wa < 0.1)                                             ## the ice
+    image.unload(water)
     image.unload(ground)
     image.unload(clouds)
     graphics.quit()
