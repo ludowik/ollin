@@ -1,10 +1,10 @@
 ## The Earth seen from space: a globe turning on its tilted axis, lit by the Sun, with its clouds, the
 ## glow of its atmosphere and a sky of stars. The continents are the real ones (earth_day.jpg, NASA's
 ## Blue Marble) and so are the clouds, a snapshot of a real cloud cover, and the lights of the cities
-## that come on over the night side — see tools/convert_earth_textures.py for where they come from. Where the Sun stands is computed from the
-## astronomy of the real Earth (astro.ol), so the day, the night and the seasons are the right ones for
-## the date shown. The pictures are what is fixed: the snow is the snow of a northern winter, and the
-## clouds do not move with the weather.
+## that come on over the night side — see tools/convert_earth_textures.py for where they come from.
+## Where the Sun stands is computed from the astronomy of the real Earth (astro.ol), so the day, the
+## night and the seasons are the right ones for the date shown. The pictures are what is fixed: the snow
+## is the snow of a northern winter, and the clouds do not move with the weather.
 ##
 ## Drag with the mouse or a finger to move around the Earth; the wheel or a pinch zooms; a double
 ## click puts the view back. The arrows move the view too, and space stops the time. The menu sets how
@@ -28,7 +28,7 @@ const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
 const KEY_PIXELS_PER_SECOND = 400   ## the arrows move the view like a drag of this speed
 
-## Both pictures are laid out the way the sphere's mesh reads them: the latitude along x (0 at the
+## The pictures are laid out the way the sphere's mesh reads them: the latitude along x (0 at the
 ## north pole), the longitude along y, west to east — the opposite of the usual equirectangular map,
 ## which the converter turns once so that nothing has to be turned here.
 const GROUND_FILE = "earth_day.jpg"

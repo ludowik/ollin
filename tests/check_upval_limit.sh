@@ -43,11 +43,12 @@ else
     exit 1
 fi
 
-generate "$work/under.ol" $((ceiling / 2 - 1))
+under=$((ceiling / 2 - 1))
+generate "$work/under.ol" "$under"
 if [ "$("$OLLIN" "$work/under.ol" 2>&1)" = "compiled" ]; then
-    echo "OK   $((ceiling - 2)) captured variables compile"
+    echo "OK   $((2 * under)) captured variables compile"
 else
-    echo "FAIL a function that captures $((ceiling - 2)) variables, under the ceiling, is refused"
+    echo "FAIL a function that captures $((2 * under)) variables, under the ceiling, is refused"
     fails=1
 fi
 exit $fails

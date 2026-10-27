@@ -2336,7 +2336,7 @@ risque, aucun bytecode n'étant sérialisé sur disque.
 - **Fabrique explicite** `Value::make_bool(bool)`, et surtout PAS de constructeur
   `Value(bool)` : avec `Value(int64_t)` et `Value(double)` déjà présents, il ferait de
   `Value(0)` un booléen par conversion implicite silencieuse.
-- **Producteurs** : `NOT`, `AND`, `OR`, les six comparaisons, les trois sites de
+- **Producteurs** : `NOT`, `AND`, les six comparaisons, les trois sites de
   `negate_result` (RETURN), les littéraux (`BoolExpr`), et les prédicats natifs
   (`math.isNan`/`isInf`, `keyboard.isDown`, `data.has`, `graphics.isOpen`/`isVisible`,
   `camera.isOpen`, `tween.isDone`, champ `enabled` d'une `Light`).

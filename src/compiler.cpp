@@ -1426,7 +1426,7 @@ void Compiler::visit(const VarExpr& e) {
 void Compiler::visit(const BinaryExpr& e) {
     // and (&) / or (|) short-circuit: the right side is evaluated only when needed, and the
     // result is a VALUE as in Lua — `a and b` is a when a is falsy, b otherwise; `a or b` is a
-    // when a is truthy, b otherwise. The AND/OR opcodes remain in use for chained comparisons,
+    // when a is truthy, b otherwise. The AND opcode remains in use for chained comparisons,
     // where both sides are already computed.
     if (e.op == '&' || e.op == '|') {
         // The left operand is compiled INTO dst: the value of the whole expression is the left

@@ -853,10 +853,11 @@ static int gfx_specular(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     double strength = argc > 0 ? num_arg(args, argc, 0, "graphics.specular") : k_default_specular_strength;
     double shininess = argc > 1 ? num_arg(args, argc, 1, "graphics.specular") : k_default_specular_shininess;
-    if (strength < 0.0) {
-        throw std::runtime_error("graphics.specular: the strength cannot be negative");
+    // Written as the negation of the valid range, so that NaN (which compares false to everything) is refused too.
+    if (!(strength >= 0.0)) {
+        throw std::runtime_error("graphics.specular: the strength must be 0 or more");
     }
-    if (shininess < 1.0) {
+    if (!(shininess >= 1.0)) {
         throw std::runtime_error("graphics.specular: the shininess must be at least 1");
     }
     s_specular[0] = (float)strength;
