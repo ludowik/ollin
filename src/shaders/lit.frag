@@ -17,10 +17,36 @@ uniform vec4 animParams;
 uniform float uFlipV;
 uniform vec4 ambient;
 uniform vec2 specular;   // the highlight: strength, then the exponent that narrows it (graphics.specular)
+uniform vec2 bump;       // relief read from the texture: the height of a white texel, then of the grain (graphics.bump)
 uniform vec3 viewPos;
 struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };
 uniform Light light0;
 out vec4 finalColor;
+
+// A value noise, smooth enough for its slope to be taken.
+float hash12(vec2 p) {
+    vec3 q = fract(vec3(p.xyx) * 0.1031);
+    q += dot(q, q.yzx + 33.33);
+    return fract((q.x + q.y) * q.z);
+}
+float value_noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1, 0)), f.x), mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), f.x), f.y);
+}
+
+// The normal bent by a height that varies over the surface. The height's slope comes from the screen
+// derivatives of the height and of the position, so that no tangent is needed.
+vec3 bent_normal(vec3 n, float h) {
+    vec3 dpx = dFdx(fragPosition);
+    vec3 dpy = dFdy(fragPosition);
+    vec3 r1 = cross(dpy, n);
+    vec3 r2 = cross(n, dpx);
+    float det = dot(dpx, r1);
+    vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+    return normalize(abs(det) * n - grad);
+}
 
 void main() {
     vec4 texel;
@@ -55,6 +81,15 @@ void main() {
     vec4 tint = fragColor;
     vec3 base = (texel * tint).rgb;
     vec3 normal = normalize(fragNormal);
+    if (fragTile.x < 0.0 && (bump.x > 0.0 || bump.y > 0.0)) {
+        vec2 texels = vec2(fragTexCoord.x, abs(uFlipV - fragTexCoord.y)) * vec2(textureSize(texture0, 0));
+        float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+        // The grain only appears where a texel covers more than a pixel, and grows as it covers more.
+        float per_pixel = max(length(dFdx(texels)), length(dFdy(texels)));
+        float magnified = smoothstep(1.0, 0.25, per_pixel);
+        float grain = (value_noise(texels * 1.5) + 0.5 * value_noise(texels * 3.5) - 0.75) * (0.3 + lum);
+        normal = bent_normal(normal, lum * bump.x + grain * magnified * bump.y);
+    }
     vec3 result = base * ambient.rgb;
     if (light0.enabled == 1) {
         vec3 l;

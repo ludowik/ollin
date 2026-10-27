@@ -439,11 +439,13 @@ static bool s_lit_ready = false;
 static int s_loc_vertcolor = -1;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
-static int s_loc_animparams = -1, s_loc_flipv = -1, s_loc_specular = -1;
+static int s_loc_animparams = -1, s_loc_flipv = -1, s_loc_specular = -1, s_loc_bump = -1;
 // The highlight of the light on a surface: how strong, and how narrow (the exponent of the cosine).
 static constexpr float k_default_specular_strength = 0.3f;
 static constexpr float k_default_specular_shininess = 16.0f;
 static float s_specular[2] = {k_default_specular_strength, k_default_specular_shininess};
+// Relief drawn from the texture itself (graphics.bump): the height of a white texel, then the height of the grain.
+static float s_bump[2] = {0.0f, 0.0f};
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // PERSISTENT instance VBOs (transform + colour): reused from one frame to the next
@@ -491,6 +493,7 @@ static void load_lit_shader() {
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
     s_loc_specular = GetShaderLocation(s_lit, "specular");
+    s_loc_bump = GetShaderLocation(s_lit, "bump");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
     s_loc_l_type = GetShaderLocation(s_lit, "light0.type");
     s_loc_l_pos = GetShaderLocation(s_lit, "light0.position");
@@ -582,6 +585,7 @@ static bool lit_begin_draw() {
     }
     rlSetUniform(s_loc_ambient, amb, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(s_loc_specular, s_specular, RL_SHADER_UNIFORM_VEC2, 1);
+    rlSetUniform(s_loc_bump, s_bump, RL_SHADER_UNIFORM_VEC2, 1);
     rlSetUniform(s_loc_l_en, &en, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(s_loc_l_type, &s_light_type, RL_SHADER_UNIFORM_INT, 1);
     float lp[3] = {s_light_pos.x, s_light_pos.y, s_light_pos.z};
@@ -693,6 +697,8 @@ static void flush_bucket(const Bucket3D& b) {
 void reset3d_lighting_state() {
     s_specular[0] = k_default_specular_strength;
     s_specular[1] = k_default_specular_shininess;
+    s_bump[0] = 0.0f;
+    s_bump[1] = 0.0f;
     s_lighting_used = false;
     s_light_on = false;
     s_cur_tex3d = 0;
@@ -862,6 +868,26 @@ static int gfx_specular(CallCtx& ctx) {
     }
     s_specular[0] = (float)strength;
     s_specular[1] = (float)shininess;
+    return ctx.ret(Value{});
+}
+
+// graphics.bump([height [, grain]]): relief for the textured surfaces that are drawn next, read from the
+// texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
+// numbers are heights in scene units: how high a white texel stands above a black one, and how high the
+// grain is. The grain is fine noise that only shows where a texel is bigger than a screen pixel, to give
+// a surface seen close more to look at than the texture holds. Without argument, or with 0, the surface is flat.
+static int gfx_bump(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    double height = argc > 0 ? num_arg(args, argc, 0, "graphics.bump") : 0.0;
+    double grain = argc > 1 ? num_arg(args, argc, 1, "graphics.bump") : 0.0;
+    if (!(height >= 0.0)) {
+        throw std::runtime_error("graphics.bump: the height must be 0 or more");
+    }
+    if (!(grain >= 0.0)) {
+        throw std::runtime_error("graphics.bump: the grain must be 0 or more");
+    }
+    s_bump[0] = (float)height;
+    s_bump[1] = (float)grain;
     return ctx.ret(Value{});
 }
 
@@ -1877,6 +1903,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("end3d")), Value::make_builtin(with_area<gfx_end3d>));
     m.map_set(Value(std::string("ambient")), Value::make_builtin(gfx_ambient));
     m.map_set(Value(std::string("specular")), Value::make_builtin(gfx_specular));
+    m.map_set(Value(std::string("bump")), Value::make_builtin(gfx_bump));
     m.map_set(Value(std::string("light")), Value::make_builtin(gfx_light));
     m.map_set(Value(std::string("texture")), Value::make_builtin(gfx_texture));
     m.map_set(Value(std::string("noTexture")), Value::make_builtin(gfx_no_texture));

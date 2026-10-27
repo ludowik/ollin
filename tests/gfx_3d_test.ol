@@ -253,6 +253,45 @@ func check_specular()
     expect(refusal(func() graphics.specular("a") end), "graphics.specular: argument 1 expected number, got string")
 end
 
+## Relief drawn from the texture: a lit sphere wrapped in the two-by-two pattern, whose colours differ in
+## brightness, so that the edges between them become steps that the light catches.
+func scene_bump(name, height)
+    graphics.clear(0, 0, 0)
+    graphics.ambient(0.1)
+    lamp.setDir(0.5, 0.5, -1)
+    graphics.bump(height, 0)
+    graphics.begin3d(cam)
+    graphics.noStroke()
+    graphics.fill(1, 1, 1)
+    graphics.texture(pattern)
+    graphics.sphere(0, 0, 0, 4)
+    graphics.noTexture()
+    graphics.end3d()
+    graphics.screenshot(SHOT + name)
+    graphics.bump()
+end
+
+func check_bump()
+    var flat = image.load(SHOT + "b6.png")
+    var bumpy = image.load(SHOT + "b7.png")
+    var differ = 0
+    for y = 20, 70 do
+        for x = 25, 95 do
+            if math.abs(grey(flat, x, y) - grey(bumpy, x, y)) > 0.03 then
+                differ += 1
+            end
+        end
+    end
+    assert(differ > 50, "the relief changed {differ} pixels")
+    assert(grey(flat, 5, 5) == 0 and grey(bumpy, 5, 5) == 0)      ## nothing is drawn off the sphere
+    image.unload(flat)
+    image.unload(bumpy)
+    expect(refusal(func() graphics.bump(-1) end), "graphics.bump: the height must be 0 or more")
+    expect(refusal(func() graphics.bump(math.sqrt(-1)) end), "graphics.bump: the height must be 0 or more")
+    expect(refusal(func() graphics.bump(1, -1) end), "graphics.bump: the grain must be 0 or more")
+    expect(refusal(func() graphics.bump("a") end), "graphics.bump: argument 1 expected number, got string")
+end
+
 ## ── scene C: textures, flat ────────────────────────────────────────────────
 func scene_c()
     lamp.enable(false)
@@ -459,21 +498,26 @@ func draw()
         scene_specular("b5.png", 0.3, 64)
     elseif frames == 7 then
         check_specular()
-        scene_c()
+        scene_bump("b6.png", 0)
     elseif frames == 8 then
+        scene_bump("b7.png", 3)
+    elseif frames == 9 then
+        check_bump()
+        scene_c()
+    elseif frames == 10 then
         check_c()
         scene_d_setup()
         scene_d()
-    elseif frames == 9 then
+    elseif frames == 11 then
         check_d()
         scene_e()
-    elseif frames == 10 then
+    elseif frames == 12 then
         check_e()
         scene_f()
-    elseif frames == 11 then
+    elseif frames == 13 then
         check_f()
         scene_g()
-    elseif frames == 12 then
+    elseif frames == 14 then
         check_g()
         check_state()                                  ## last: creating a light turns the lighting on for good
         graphics.quit()

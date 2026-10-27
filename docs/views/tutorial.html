@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-27 19:30</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-27 19:38</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-27 19:30</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-27 19:38</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2105,6 +2105,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>The ambient light, a uniform base. <code>v</code> ∈ [0,1]</td></tr>
+    <tr><td><code>graphics.bump([height [, grain]])</code></td><td>Relief for the textured surfaces drawn next, read from the texture itself: the brighter a texel, the higher it stands, and the light shades the slopes. <code>height</code> is how high a white texel stands above a black one, <code>grain</code> the height of a fine noise that only shows where a texel is bigger than a screen pixel (a surface seen close), both in scene units. Like the highlight it is one setting per <code>begin3d</code> block; with no argument, or 0, the surface is flat. Atlas tiles are not affected</td></tr>
     <tr><td><code>graphics.specular([strength [, shininess]])</code></td><td>The highlight the light leaves on every lit surface: <code>strength</code> (default 0.3, 0 for none) and <code>shininess</code> (default 16, at least 1; the larger, the narrower the spot). It is one setting for the whole frame, and it lights the sea as much as the land — set it to 0 when a shiny spot would look wrong. With no argument the defaults come back</td></tr>
     <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object. The kind is an identifier: anything but <code>"dir"</code> or <code>"point"</code> is refused, and named in the error</td></tr>
     <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>A point light at the position <code>(x,y,z)</code> → a <code>Light</code> object</td></tr>

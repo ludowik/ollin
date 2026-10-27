@@ -1706,8 +1706,8 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 - Les identifiants GLSL (`fragTexCoord`, `instanceTransform`…) sont en camelCase et échappent aux
   conventions C++ : `check_naming.sh` ne parcourt que `src/**/*.cpp` et `src/**/*.h`, donc ni les
   `.glsl` ni le `.h.in`. Le header généré vit dans `build*/`, ignoré par git.
-- **Un seul couple de shaders** pour toute la 3D. Il porte quatre sujets — éclairage Blinn-Phong,
-  atlas de tuiles, eau animée, test alpha du feuillage. Le retournement vertical
+- **Un seul couple de shaders** pour toute la 3D. Il porte cinq sujets — éclairage Blinn-Phong,
+  atlas de tuiles, eau animée, test alpha du feuillage, relief tiré de la texture (`graphics.bump`). Le retournement vertical
   (`uFlipV`, cf. « Orientation verticale d'une image ») n'en est pas un cinquième : c'est un uniforme
   et non un attribut d'instance, il ne coûte qu'une soustraction par pixel, et le sens étant une
   propriété de la TEXTURE il n'ajoute rien à la clé de regroupement. Chaque instance
@@ -1716,6 +1716,12 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),
   donc un tri et des changements d'état en cours de frame. Seuil de bascule : une **sixième**
   fonctionnalité, ou un attribut d'instance supplémentaire.
+  Le relief (`graphics.bump(hauteur, grain)`) prend la LUMINANCE du texel comme hauteur et plie la normale par les
+  dérivées d'écran de la hauteur et de la position (`bent_normal`) : aucune tangente, aucun attribut, aucune seconde
+  texture. Un uniforme `bump` à 0 ne coûte qu'un test, et le chemin d'atlas n'y passe jamais. Le grain (bruit de valeur)
+  n'apparaît que là où un texel couvre plus d'un pixel (`fwidth` des texels), si bien qu'une vue lointaine ne change pas.
+  Les dérivées sont prises par blocs de 2×2 pixels : un grain plus fin que cela se froisse, d'où des fréquences
+  basses (1,5 et 3,5 texels⁻¹) et une amplitude de l'ordre du dix-millième du rayon pour un globe.
   ⚠ **Un terrain déformé ne se fait PAS par des attributs d'instance** : `corners`, `cornerSlopes`,
   `mixCorners` et `blendColor` (hauteurs, normales et couleur par coin d'un cube) ont été ajoutés puis
   RETIRÉS. Ils faisaient porter 16 floats de coin à CHAQUE instance — une voiture comme un cube

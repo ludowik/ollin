@@ -23,6 +23,8 @@ const GLINT_SHELL = 1.002  ## the reflection of the Sun lies on the sea, under t
 const LIGHTS_SHELL = 1.003 ## the lights of the cities lie between the two, so the clouds hide them
 const GLINT_STRENGTH = 0.45  ## how bright the Sun's reflection is on the sea, and how wide: a rough sea
 const GLINT_SHININESS = 60
+const RELIEF = 0.004       ## how high the brightest ground stands, in globe radii: the map's own brightness is the height
+const GRAIN = 0.0003       ## the fine grain that fills a close view with more than the map holds
 const AMBIENT = 0.09       ## what the night side keeps of the light: a little earthshine
 const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
@@ -336,10 +338,12 @@ func drawGlobe()
     orientGlobe()
     graphics.fill(1, 1, 1)
     graphics.texture(ground)
+    graphics.bump(RELIEF, GRAIN)
     graphics.sphere(0, 0, 0, GLOBE)
     graphics.noTexture()
     graphics.pop()
     graphics.end3d()
+    graphics.bump()
 
     graphics.specular(GLINT_STRENGTH, GLINT_SHININESS)
     graphics.ambient(0)
