@@ -870,8 +870,9 @@ static int gfx_specular(CallCtx& ctx) {
 // configuration (type, direction or position, colour, enabled) and, on every mutation,
 // pushes it into the global lighting state (last written wins).
 
+// Tested on the FLOAT values the shader will get: 1e-46 is not zero as a double and is as a float.
 static void refuse_null_direction(double x, double y, double z) {
-    if (x == 0.0 && y == 0.0 && z == 0.0)
+    if ((float)x == 0.0f && (float)y == 0.0f && (float)z == 0.0f)
         throw std::runtime_error("graphics.light: a directional light needs a direction, and (0, 0, 0) is none");
 }
 

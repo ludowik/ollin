@@ -93,6 +93,9 @@ func check_state()
     ## A refused direction leaves the light as it was.
     expect(refusal(func() l.setDir(0, 0, 0) end), "graphics.light: a directional light needs a direction, and (0, 0, 0) is none")
     assert(l.dz == 1)
+    ## A direction too small for a float is no direction either, and the light still keeps its old one.
+    expect(refusal(func() l.setDir(1e-46, 0, 0) end), "graphics.light: a directional light needs a direction, and (0, 0, 0) is none")
+    assert(l.dz == 1 and l.dx == 0)
     l.enable(true)
     graphics.light("point", 1, 2, 3, Color(0, 1, 0))
     graphics.ambient(Color(0.2, 0.2, 0.2))
