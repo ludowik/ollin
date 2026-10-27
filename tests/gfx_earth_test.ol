@@ -6,7 +6,6 @@
 const GROUND = "../docs/samples/earth/earth_day.jpg"
 const CLOUDS = "../docs/samples/earth/earth_clouds.png"
 const NIGHT = "../docs/samples/earth/earth_night.jpg"
-const WATER = "../docs/samples/earth/earth_water.png"
 
 func setup()
     graphics.canvas(32, 32, "earth test")
@@ -74,18 +73,6 @@ func draw()
     assert(r >= b)                                ## warm, not blue
     image.unload(night)
 
-    ## The mask of the open water is the alpha of a black picture: the sea is opaque, the land and the ice not.
-    var water = image.load(WATER)
-    assert(water.width == 1024 and water.height == 2048)
-    var wr, wg, wb, wa = place(water, 0, -140)
-    assert(wa > 0.9 and wr == 0 and wb == 0)                     ## the Pacific
-    wr, wg, wb, wa = place(water, 35, 18)
-    assert(wa > 0.9)                                             ## the Mediterranean
-    wr, wg, wb, wa = place(water, 23, 12)
-    assert(wa < 0.1)                                             ## the Sahara
-    wr, wg, wb, wa = place(water, -80, 0)
-    assert(wa < 0.1)                                             ## the ice
-    image.unload(water)
     image.unload(ground)
     image.unload(clouds)
     graphics.quit()

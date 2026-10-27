@@ -19,10 +19,7 @@ import "../lib/trackball.ol"
 
 const GLOBE = 1.0          ## the radius of the globe: the unit of the scene
 const CLOUD_SHELL = 1.012  ## the cloud layer floats a little above the ground
-const GLINT_SHELL = 1.002  ## the reflection of the Sun lies on the sea, under the lights and the clouds
-const LIGHTS_SHELL = 1.003 ## the lights of the cities lie between the two, so the clouds hide them
-const GLINT_STRENGTH = 0.45  ## how bright the Sun's reflection is on the sea, and how wide: a rough sea
-const GLINT_SHININESS = 60
+const LIGHTS_SHELL = 1.003 ## the lights of the cities lie just above the ground, so the clouds hide them
 const RELIEF = 0.004       ## how high the brightest ground stands, in globe radii: the map's own brightness is the height
 const GRAIN = 0.0003       ## the fine grain that fills a close view with more than the map holds
 const AMBIENT = 0.09       ## what the night side keeps of the light: a little earthshine
@@ -36,7 +33,6 @@ const KEY_PIXELS_PER_SECOND = 400   ## the arrows move the view like a drag of t
 const GROUND_FILE = "earth_day.jpg"
 const CLOUDS_FILE = "earth_clouds.png"
 const NIGHT_FILE = "earth_night.jpg"      ## the lights of the cities, on black
-const WATER_FILE = "earth_water.png"      ## the open water, as the alpha of a black picture
 
 ## How fast time runs: a label for the menu and a rate in simulated DAYS per real second.
 global speeds = [
@@ -58,7 +54,6 @@ global zoom = {factor: 1.0, min: 0.45, max: 2.7, wheelStep: 0.1}
 global ground = nil          ## the textures
 global cloudTex = nil
 global nightTex = nil
-global waterTex = nil
 global stars = []            ## unit vectors then brightnesses: x, y, z, b, x, y, z, b…
 global view = {px: 0, py: 0, pz: 4, ux: 0, uy: 1, uz: 0, dist: 4}   ## the camera as the last frame placed it
 
@@ -251,8 +246,7 @@ func setup()
     ground = image.load(GROUND_FILE)
     cloudTex = image.load(CLOUDS_FILE)
     nightTex = image.load(NIGHT_FILE)
-    waterTex = image.load(WATER_FILE)
-    for tex in [ground, cloudTex, nightTex, waterTex] do
+    for tex in [ground, cloudTex, nightTex] do
         image.filter(tex, "mipmap")    ## the default would show the pixels squared when close and sparkling from afar
     end
     seedStars()
@@ -260,7 +254,7 @@ func setup()
     var lx, ly, lz = sunLightDirection(days)
     sun = graphics.light("dir", lx, ly, lz)
     graphics.ambient(AMBIENT)
-    graphics.specular(0)    ## the land does not shine: only the layer of the sea turns the highlight on
+    graphics.specular(0)    ## the Earth seen from space shows no highlight of its own
 
     var menu = ui.menu("Earth")
     menu.list("Time", speedLabels, ref config.speed)
@@ -321,13 +315,10 @@ func orientGlobe()
     graphics.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
 end
 
-## Four layers, one block each, because the light and the highlight are ONE setting for a whole block.
-## The ground and the clouds are lit by the Sun, and the ground does not shine. The reflection of the Sun
-## is its own layer: a black picture whose alpha is the open water, drawn with the engine's highlight on
-## and added, so that what is added is the highlight where there is water and nothing on the land. The
-## lights of the cities are lit by a sun on the other side of the Earth, and added: where the Sun shines
-## the night side's light is nil, so nothing is added there, and it grows towards midnight. The clouds
-## come last, so they cover the reflection and the lights they float above.
+## Three layers, one block each, because the light is ONE setting for a whole block. The ground and the
+## clouds are lit by the Sun. The lights of the cities are lit by a sun on the other side of the Earth, and
+## added: where the Sun shines the night side's light is nil, so nothing is added there, and it grows
+## towards midnight. The clouds come last, so they cover the lights they float above.
 func drawGlobe()
     var lx, ly, lz = sunLightDirection(days)
     sun.setDir(lx, ly, lz)
@@ -344,23 +335,6 @@ func drawGlobe()
     graphics.pop()
     graphics.end3d()
     graphics.bump()
-
-    graphics.specular(GLINT_STRENGTH, GLINT_SHININESS)
-    graphics.ambient(0)
-    graphics.blendMode("add")
-    graphics.begin3d(cam)
-    graphics.noStroke()
-    graphics.push()
-    orientGlobe()
-    graphics.fill(1, 1, 1)
-    graphics.texture(waterTex)
-    graphics.sphere(0, 0, 0, GLOBE * GLINT_SHELL)
-    graphics.noTexture()
-    graphics.pop()
-    graphics.end3d()
-    graphics.blendMode("alpha")
-    graphics.specular(0)
-    graphics.ambient(AMBIENT)
 
     if config.lights then
         sun.setDir(-lx, -ly, -lz)

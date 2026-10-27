@@ -155,8 +155,8 @@ ollin/
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
 │                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
-│                      convert_earth_textures.py (idem pour les quatre cartes de docs/samples/earth/ : le sol, les nuages, les villes
-│                      de nuit et le masque de l'eau — le Blue Marble de la NASA et des images voisines, pris dans le paquet
+│                      convert_earth_textures.py (idem pour les trois cartes de docs/samples/earth/ : le sol, les nuages et les villes
+│                      de nuit — le Blue Marble de la NASA et des images voisines, pris dans le paquet
 │                      npm three-globe ; la licence des
 │                      images n'est pas LISIBLE d'ici, cf. l'en-tête du script ; le script refuse d'écrire si la carte ne
 │                      montre pas le Sahara, le Pacifique, le Groenland… aux bons endroits),
