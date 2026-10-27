@@ -539,7 +539,9 @@ static int img_draw(CallCtx& ctx) {
 // image.filter(img, mode): how the texture is sampled when it is drawn bigger or smaller than it is.
 // Textures start "nearest", the pixel-art default; "linear" blends the neighbouring pixels, which is what
 // a picture stretched over a surface needs; "mipmap" adds smaller copies of the picture, so that one
-// looked at from afar is averaged instead of sparkling. A render target drawn into is not redone.
+// looked at from afar is averaged instead of sparkling, and from a slant (a globe's edge, a floor
+// running away) it also samples along the stretched direction, which keeps the picture sharp there.
+// A render target drawn into is not redone.
 static int img_filter(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.filter";
@@ -559,6 +561,7 @@ static int img_filter(CallCtx& ctx) {
     } else if (mode == "mipmap") {
         GenTextureMipmaps(&tex);
         SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR);
+        SetTextureFilter(tex, TEXTURE_FILTER_ANISOTROPIC_8X);   // a surface seen at a slant would blur to the smallest copy otherwise
         h.mipmapped = true;
     } else {
         throw std::runtime_error(std::string(FN) + ": unknown mode '" + mode +

@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-26 19:50</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-27 19:05</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-26 19:50</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-27 19:05</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2837,7 +2837,7 @@ image.endDraw()
     <tr><td><code>image.beginDraw(handle)</code></td><td>Redirects the rendering into the render texture, the counterpart of <code>BeginTextureMode</code></td></tr>
     <tr><td><code>image.endDraw()</code></td><td>Ends the off-screen rendering and restores the default target</td></tr>
     <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Draws the texture; an explicit <code>tint</code> (a Color object) wins, otherwise the global <code>graphics.tint</code> applies. The anchoring follows <code>graphics.spriteMode</code>, as <code>graphics.sprite</code> does</td></tr>
-    <tr><td><code>image.filter(handle, mode)</code></td><td>How the texture is sampled when it is drawn bigger or smaller than it is: <code>"nearest"</code> (the default, each pixel stays a square: what pixel art wants), <code>"linear"</code> (neighbouring pixels are blended: what a picture stretched over a surface wants) or <code>"mipmap"</code> (linear, plus smaller copies of the picture, so that one seen from afar is averaged instead of sparkling). The copies are redone when the pixels are written with <code>endPixels</code>, but not after <code>beginDraw</code>: call it again then. Any other mode is an error</td></tr>
+    <tr><td><code>image.filter(handle, mode)</code></td><td>How the texture is sampled when it is drawn bigger or smaller than it is: <code>"nearest"</code> (the default, each pixel stays a square: what pixel art wants), <code>"linear"</code> (neighbouring pixels are blended: what a picture stretched over a surface wants) or <code>"mipmap"</code> (linear, plus smaller copies of the picture, so that one seen from afar is averaged instead of sparkling, and sampling along the stretched direction, so that one seen at a slant stays sharp). The copies are redone when the pixels are written with <code>endPixels</code>, but not after <code>beginDraw</code>: call it again then. Any other mode is an error</td></tr>
     <tr><td><code>image.unload(handle)</code></td><td>Frees the texture's GPU resources</td></tr>
     <tr><td><code>image.beginPixels(handle)</code></td><td>Opens pixel-by-pixel access to the texture, to be recomputed every frame</td></tr>
     <tr><td><code>image.setPixel(handle, x, y, color)</code></td><td>Writes a pixel — a <code>Color</code> object, or the components <code>r, g, b [, a]</code> in [0,1]. Between <code>beginPixels</code> and <code>endPixels</code>.</td></tr>

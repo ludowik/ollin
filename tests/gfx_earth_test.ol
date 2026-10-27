@@ -52,7 +52,7 @@ func draw()
     assert(r + g + b > 0.35 and r >= b)
 
     var clouds = image.load(CLOUDS)
-    assert(clouds.width == 1024 and clouds.height == 2048)
+    assert(clouds.width == 1536 and clouds.height == 3072)
     var covered = 0
     var clear = 0
     for x = 0, clouds.width - 1, 8 do

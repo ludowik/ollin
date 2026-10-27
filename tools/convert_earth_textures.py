@@ -23,8 +23,8 @@ Why not simply ship the originals: the engine's sphere reads its texture with th
 (0 at the north pole) and the LONGITUDE along y (west to east), the opposite of the usual
 equirectangular layout, so the pictures are transposed here, once, instead of being turned pixel
 by pixel by the script every time. The ground keeps the full 4096 x 2048 of its source (2048 x 4096
-once transposed): the sphere is meant to be looked at close. The clouds, the lights and the
-mask of the water (computed on the full ground) are reduced to 2048 x 1024.
+once transposed): the sphere is meant to be looked at close. The clouds are kept at 3072 x 1536 (the source has detail beyond 2048, and a cloud edge is what first looks soft when the
+globe is close); the lights and the mask of the water (computed on the full ground) are reduced to 2048 x 1024.
 
 The night picture is not used as it comes. Its cities are warm and its background is blue, so a
 city is what has more red and green than blue: the light of a pixel is min(r, g) - b / 2, clamped
@@ -54,7 +54,7 @@ PACKAGE = "three-globe@2.45.6"
 GROUND = "example/img/earth-blue-marble.jpg"
 CLOUDS = "example/clouds/clouds.png"
 NIGHT = "example/img/earth-night.jpg"
-CLOUDS_SIZE = (2048, 1024)
+CLOUDS_SIZE = (3072, 1536)
 CLOUDS_ALPHA_STEP = 8     # the opacity is rounded to this step: smooth enough once filtered, and the PNG a third smaller
 NIGHT_SIZE = (2048, 1024)
 WATER_SIZE = (2048, 1024)
@@ -69,6 +69,16 @@ def fetch(workdir):
         members = [m for m in tar.getmembers() if m.name in ("package/" + GROUND, "package/" + CLOUDS, "package/" + NIGHT)]
         tar.extractall(workdir, members=members, filter="data")
     return os.path.join(workdir, "package")
+
+
+def cloud_layer(source):
+    """The clouds as white with an alpha, transposed for the sphere. Only the alpha is resampled: the colour
+    of the source is black where there is no cloud, and averaging it in would grey the edge of every cloud."""
+    alpha = source.convert("RGBA").getchannel("A").resize(CLOUDS_SIZE, Image.LANCZOS).transpose(Image.TRANSPOSE)
+    alpha = alpha.point(lambda v: v // CLOUDS_ALPHA_STEP * CLOUDS_ALPHA_STEP)
+    clouds = Image.new("RGBA", alpha.size, (255, 255, 255, 0))
+    clouds.putalpha(alpha)
+    return clouds
 
 
 def pixel_at(img, lat, lon):
@@ -166,10 +176,7 @@ def main():
         water = Image.merge("RGBA", (Image.new("L", water.size, 0),) * 3 + (water,)).transpose(Image.TRANSPOSE)
         water_path = os.path.join(out, "earth_water.png")
         water.save(water_path, optimize=True)
-        clouds = Image.open(os.path.join(package, CLOUDS)).convert("RGBA")
-        clouds = clouds.resize(CLOUDS_SIZE, Image.LANCZOS).transpose(Image.TRANSPOSE)
-        alpha = clouds.getchannel("A").point(lambda v: v // CLOUDS_ALPHA_STEP * CLOUDS_ALPHA_STEP)
-        clouds.putalpha(alpha)
+        clouds = cloud_layer(Image.open(os.path.join(package, CLOUDS)))
         night = Image.open(os.path.join(package, NIGHT)).convert("RGB")
         lights = city_lights(night)
         check_lights(lights)
