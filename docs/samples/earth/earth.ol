@@ -26,6 +26,7 @@ const GLINT_SHININESS = 60
 const AMBIENT = 0.09       ## what the night side keeps of the light: a little earthshine
 const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
+const KEY_PIXELS_PER_SECOND = 400   ## the arrows move the view like a drag of this speed
 
 ## Both pictures are laid out the way the sphere's mesh reads them: the latitude along x (0 at the
 ## north pole), the longitude along y, west to east — the opposite of the usual equirectangular map,
@@ -89,6 +90,15 @@ func zoomBy(factor)
     zoom.factor = math.max(zoom.min, math.min(zoom.max, zoom.factor * factor))
 end
 
+## How far the globe turns for a pixel of drag, in degrees: the point of the surface under the finger
+## follows it. The same pixel is a far smaller angle when the camera is close, the globe being so much
+## bigger on the screen, so a fixed sensitivity made a close view race away from the finger.
+func degreesPerPixel()
+    var dist = graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
+    var focal = (H / 2) / math.tan(math.rad(FOV / 2))
+    return math.deg((dist - GLOBE) / (GLOBE * focal))
+end
+
 func mouse.pressed(x, y)
     ball.press(x, y)
 end
@@ -96,6 +106,7 @@ end
 ## A pinch is not a drag: with two fingers down the system still emulates the mouse with one of them.
 func mouse.moved(x, y)
     if touch.count() > 1 then return end
+    ball.sensitivity = degreesPerPixel()
     ball.move(x, y)
 end
 
@@ -282,7 +293,8 @@ func update(dt)
     if keyboard.isDown("up") then dy -= 1 end
     if keyboard.isDown("down") then dy += 1 end
     if dx <> 0 or dy <> 0 then
-        ball.spin(dx * 60 * dt, dy * 60 * dt)
+        var speed = KEY_PIXELS_PER_SECOND * degreesPerPixel() * dt
+        ball.spin(dx * speed, dy * speed)
     end
 end
 
