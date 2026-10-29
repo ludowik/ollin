@@ -1426,7 +1426,7 @@ static int gfx_fit_distance(CallCtx& ctx) {
 
 // graphics.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
 // `camera`: the pixel (x, y) in the drawing area, and the depth, its distance in front of the camera. A
-// point behind the camera has no place on the screen: x and y are then nil, and 0 being false, the test
+// point behind the camera, or asked before the drawing area exists, has no place on the screen: x and y are then nil, and 0 being false, the test
 // to write is on the depth (`depth > 0`). The pixel is raylib's own (GetWorldToScreenEx, the projection
 // begin3d gives the solids), taken from the camera given and not from the last begin3d, so it answers at
 // any time of the frame and for any camera — which is what lets a script draw in 2D what belongs to the
@@ -1455,9 +1455,12 @@ static int gfx_project(CallCtx& ctx) {
     double depth = Vector3DotProduct(Vector3Subtract(p, s_camera.position), s_forward);
     Value sx;
     Value sy;
-    if (depth > 0.0 || s_camera.projection == CAMERA_ORTHOGRAPHIC) {
-        // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
-        Vector2 pixel = GetWorldToScreenEx(p, s_camera, gfx_logical_width(), gfx_logical_height());
+    // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
+    // Before graphics.canvas there is none (0 by 0, hence a NaN aspect): no place on the screen either.
+    int width = gfx_logical_width();
+    int height = gfx_logical_height();
+    if ((depth > 0.0 || s_camera.projection == CAMERA_ORTHOGRAPHIC) && width > 0 && height > 0) {
+        Vector2 pixel = GetWorldToScreenEx(p, s_camera, width, height);
         sx = Value((double)pixel.x);
         sy = Value((double)pixel.y);
     }
