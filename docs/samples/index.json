@@ -20,6 +20,7 @@
   { "group": "Interface, animation, sound", "name": "Animations (tween)", "file": "tween_demo.ol", "icon": "icons/tween_demo.png" },
   { "group": "Interface, animation, sound", "name": "Animated sequence (tween)", "file": "tween_sequence.ol", "icon": "icons/tween_sequence.png" },
   { "group": "Interface, animation, sound", "name": "Synthesised sound (audio + sound)", "file": "sound_demo.ol", "icon": "icons/sound_demo.png" },
+  { "group": "Interface, animation, sound", "name": "Calculator", "file": "calculator/calculator.ol", "icon": "icons/calculator.png" },
 
   { "group": "Simulations", "name": "Game of Life",   "file": "game_of_life.ol", "icon": "icons/game_of_life.png" },
   { "group": "Simulations", "name": "Lunar eclipse",  "file": "lunar_eclipse.ol", "icon": "icons/lunar_eclipse.png" },
@@ -31,7 +32,6 @@
   { "group": "Games", "name": "Rally", "file": "rally/rally.ol", "icon": "icons/rally.png" },
   { "group": "Games", "name": "Blockudoku", "file": "blockudoku/blockudoku.ol", "icon": "icons/blockudoku.png" },
   { "group": "Games", "name": "Sudoku", "file": "sudoku/sudoku.ol", "icon": "icons/sudoku.png" },
-  { "group": "Games", "name": "Calculator", "file": "calculator/calculator.ol", "icon": "icons/calculator.png" },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }

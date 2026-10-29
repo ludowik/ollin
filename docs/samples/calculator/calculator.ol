@@ -47,6 +47,7 @@ end
 
 ## The key under (x, y) or nil.
 func keyAt(x, y)
+    layoutCompute()                  ## a tap can come before the first draw, or after the area changed
     var c = math.floor((x - layout.x) / layout.cell) + 1
     var r = math.floor((y - layout.keysY) / layout.cell) + 1
     if c < 1 or c > COLS or r < 1 or r > ROWS then
@@ -120,12 +121,10 @@ func drawKey(key, r, c)
     if lit.key == key and elapsedTime - lit.since < FLASH then
         glow = 1 - (elapsedTime - lit.since) / FLASH
     end
-    graphics.rectMode("corner")
     fillC(fill)
-    graphics.noStroke()
     graphics.rect(x, y, size, size, L.radius)
     if glow > 0 then
-        graphics.fill(1, 1, 1, 0.45 * glow)
+        fillC(LIGHT_INK, 0.45 * glow)
         graphics.rect(x, y, size, size, L.radius)
     end
     if calc.op == key and calc.fresh and not calc.error then
@@ -135,7 +134,8 @@ func drawKey(key, r, c)
         graphics.rect(x, y, size, size, L.radius)
         graphics.noStroke()
     end
-    drawText(keyLabel(key), x + size / 2, y + size / 2, fitSize(keyLabel(key), L.cell * 0.4, size * 0.8), "center", "center", ink)
+    var label = keyLabel(key)
+    drawText(label, x + size / 2, y + size / 2, fitSize(label, L.cell * 0.4, size * 0.8), "center", "center", ink)
 end
 
 func drawDisplay()

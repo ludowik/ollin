@@ -1426,12 +1426,13 @@ static int gfx_fit_distance(CallCtx& ctx) {
 
 // graphics.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
 // `camera`: the pixel (x, y) in the drawing area, and the depth, its distance in front of the camera. A
-// point behind the camera, or asked before the drawing area exists, has no place on the screen: x and y are then nil, and 0 being false, the test
-// to write is on the depth (`depth > 0`). The pixel is raylib's own (GetWorldToScreenEx, the projection
-// begin3d gives the solids), taken from the camera given and not from the last begin3d, so it answers at
-// any time of the frame and for any camera — which is what lets a script draw in 2D what belongs to the
-// 3D scene. A script projects a few thousand points a frame through ONE camera, and reading the camera
-// out of its map is most of a call: the last one read is kept, as long as the map has not changed.
+// point behind the camera, or asked before the drawing area exists, has no place on the screen: x and y
+// are then nil, and 0 being false, the test to write is on the depth (`depth > 0`). The pixel is raylib's
+// own (GetWorldToScreenEx, the projection begin3d gives the solids), taken from the camera given and not
+// from the last begin3d, so it answers at any time of the frame and for any camera — which is what lets a
+// script draw in 2D what belongs to the 3D scene. A script projects a few thousand points a frame through
+// ONE camera, and reading the camera out of its map is most of a call: the last one read is kept, as long
+// as the map has not changed.
 static int gfx_project(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static const Map* s_camera_map = nullptr;
