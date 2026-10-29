@@ -44,7 +44,7 @@ import tempfile
 from PIL import Image, ImageChops, ImageFilter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gltf_util as gl
+import sample_paths
 
 PACKAGE = "three-globe@2.45.6"
 GROUND = "example/img/earth-blue-marble.jpg"
@@ -153,10 +153,10 @@ def main():
         lights = city_lights(night)
         check_lights(lights)
         lights = lights.transpose(Image.TRANSPOSE)
-        lights_path = gl.sample_path("earth_night.jpg", "earth")
+        lights_path = sample_paths.sample_path("earth_night.jpg", "earth")
         lights.save(lights_path, quality=90, optimize=True)
-        ground_path = gl.sample_path("earth_day.jpg", "earth")
-        clouds_path = gl.sample_path("earth_clouds.png", "earth")
+        ground_path = sample_paths.sample_path("earth_day.jpg", "earth")
+        clouds_path = sample_paths.sample_path("earth_clouds.png", "earth")
         ground.save(ground_path, quality=88, optimize=True)
         clouds.save(clouds_path, optimize=True)
     for path in (ground_path, clouds_path, lights_path):

@@ -6,8 +6,11 @@ accessor, rotating a vector, writing a .glb back. That is what lives here — no
 particular model.
 """
 import json
-import os
 import struct
+
+# Where an example keeps its data lives in sample_paths.py, which the texture converters use as well; it is
+# re-exported here so that the generators keep writing gl.sample_path(...).
+from sample_paths import sample_path  # noqa: F401
 
 COMPONENT = {5120: ("b", 1), 5121: ("B", 1), 5122: ("h", 2), 5123: ("H", 2),
              5125: ("I", 4), 5126: ("f", 4)}
@@ -15,14 +18,6 @@ COUNT = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
 
 JSON_CHUNK = 0x4E4F534A
 BIN_CHUNK = 0x004E4942
-
-
-# Where an example keeps its data — by default the "3D models" one. The six generators wrote these two
-# lines each, and moving the models into model_3d/ therefore took six identical edits — the next move
-# would take six more, with one generator liable to stay behind and write beside the catalogue.
-def sample_path(name, folder="model_3d"):
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(root, "docs", "samples", folder, name)
 
 
 def rotate(v, quat):

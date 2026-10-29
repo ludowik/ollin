@@ -87,14 +87,14 @@ void main() {
         if (max(texture_size.x, texture_size.y) > 1.0) {
             vec2 texels = vec2(fragTexCoord.x, abs(uFlipV - fragTexCoord.y)) * texture_size;
             float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
-            float height = lum * bump.x;
             // The grain only appears where a texel covers more than a pixel, and grows as it covers more.
             float per_pixel = max(length(dFdx(texels)), length(dFdy(texels)));
             float magnified = 1.0 - smoothstep(0.25, 1.0, per_pixel);
+            float grain = 0.0;
             if (bump.y > 0.0 && magnified > 0.0) {
-                float grain = (value_noise(texels * 1.5) + 0.5 * value_noise(texels * 3.5) - 0.75) * (0.3 + lum);
-                height += grain * magnified * bump.y;
+                grain = (value_noise(texels * 1.5) + 0.5 * value_noise(texels * 3.5) - 0.75) * (0.3 + lum);
             }
+            float height = lum * bump.x + grain * magnified * bump.y;
             normal = bent_normal(normal, height);
         }
     }

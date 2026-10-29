@@ -871,8 +871,8 @@ static int gfx_specular(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.bump([height [, grain]]): relief for the textured surfaces of the 3D block, read when it ends like
-// the light, from the texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
+// graphics.bump([height [, grain]]): relief for the textured surfaces of the 3D block (one setting for the
+// whole block, like the light), read from the texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
 // numbers are heights in scene units: how high a white texel stands above a black one, and how high the
 // grain is. The grain is fine noise that only shows where a texel is bigger than a screen pixel, to give
 // a surface seen close more to look at than the texture holds. Without argument, or with 0, the surface is flat.
@@ -1405,37 +1405,43 @@ static int gfx_fit_distance(CallCtx& ctx) {
 // graphics.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
 // `camera`: the pixel (x, y) in the drawing area, and the depth, its distance in front of the camera. A
 // point behind the camera has no place on the screen: x and y are then nil, and 0 being false, the test
-// to write is on the depth (`depth > 0`). It is the camera's own geometry (the one begin3d gives the
-// solids), taken from the camera given and not from the last begin3d, so it answers at any time of the
-// frame and for any camera — which is what lets a script draw in 2D what belongs to the 3D scene.
+// to write is on the depth (`depth > 0`). The pixel is raylib's own (GetWorldToScreenEx, the projection
+// begin3d gives the solids), taken from the camera given and not from the last begin3d, so it answers at
+// any time of the frame and for any camera — which is what lets a script draw in 2D what belongs to the
+// 3D scene. A script projects a few thousand points a frame through ONE camera, and reading the camera
+// out of its map is most of a call: the last one read is kept, as long as the map has not changed.
 static int gfx_project(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Camera3D camera = camera_from_map(argc > 0 ? args[0] : Value{}, "graphics.project");
-    Vector3 p = Vector3{(float)num_arg(args, argc, 1, "graphics.project"),
-                        (float)num_arg(args, argc, 2, "graphics.project"),
-                        (float)num_arg(args, argc, 3, "graphics.project")};
-    Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-    Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
-    Vector3 up = Vector3CrossProduct(right, forward);
-    Vector3 v = Vector3Subtract(p, camera.position);
-    double depth = Vector3DotProduct(v, forward);
-    // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
-    double width = gfx_logical_width();
-    double height = gfx_logical_height();
-    double aspect = height > 0 ? width / height : 1.0;
-    // The half-extent of the view at that depth, vertically: a perspective camera's grows with the depth.
-    double half_height = camera.projection == CAMERA_ORTHOGRAPHIC ? camera.fovy * 0.5
-                                                                  : depth * std::tan(camera.fovy * DEG2RAD * 0.5);
-    ctx.set_result(2, Value(depth));
-    if (depth <= 0.0 && camera.projection != CAMERA_ORTHOGRAPHIC) {
-        ctx.set_result(0, Value{});
-        ctx.set_result(1, Value{});
-        return 3;
+    static const Map* s_camera_map = nullptr;
+    static uint64_t s_camera_version = 0;
+    static Camera3D s_camera{};
+    static Vector3 s_forward{};
+    if (argc < 1 || !args[0].is_map()) {
+        throw std::runtime_error("graphics.project: expected a camera (graphics.camera)");
     }
-    double ndc_x = Vector3DotProduct(v, right) / (half_height * aspect);
-    double ndc_y = Vector3DotProduct(v, up) / half_height;
-    ctx.set_result(0, Value((ndc_x * 0.5 + 0.5) * width));
-    ctx.set_result(1, Value((0.5 - ndc_y * 0.5) * height));
+    Map* map = args[0].mptr;
+    float x = (float)num_arg(args, argc, 1, "graphics.project");
+    float y = (float)num_arg(args, argc, 2, "graphics.project");
+    float z = (float)num_arg(args, argc, 3, "graphics.project");
+    if (map != s_camera_map || map->version != s_camera_version || map->version == 0) {
+        s_camera = camera_from_map(args[0], "graphics.project");
+        s_forward = Vector3Normalize(Vector3Subtract(s_camera.target, s_camera.position));
+        s_camera_map = map;
+        s_camera_version = map->version;
+    }
+    Vector3 p = Vector3{x, y, z};
+    double depth = Vector3DotProduct(Vector3Subtract(p, s_camera.position), s_forward);
+    Value sx;
+    Value sy;
+    if (depth > 0.0 || s_camera.projection == CAMERA_ORTHOGRAPHIC) {
+        // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
+        Vector2 pixel = GetWorldToScreenEx(p, s_camera, gfx_logical_width(), gfx_logical_height());
+        sx = Value((double)pixel.x);
+        sy = Value((double)pixel.y);
+    }
+    ctx.set_result(0, sx);
+    ctx.set_result(1, sy);
+    ctx.set_result(2, Value(depth));
     return 3;
 }
 

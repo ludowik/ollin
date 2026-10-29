@@ -2003,7 +2003,7 @@ alloue quand même un matériau par défaut à défaire, et écrit un avertissem
   `graphics.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
   même nom.
 - Les six générateurs et convertisseurs de `tools/` écrivent dans `docs/samples/model_3d/`, par
-  `gl.sample_path(nom)` (gltf_util.py) : le chemin de sortie était recopié six fois, et le
+  `sample_path(nom)` (tools/sample_paths.py, que `gltf_util` réexporte en `gl.sample_path`) : le chemin de sortie était recopié six fois, et le
   déplacement des modèles a coûté six retouches identiques.
 
 ## Noms exportés par un module (`Stmt::exported_names`)

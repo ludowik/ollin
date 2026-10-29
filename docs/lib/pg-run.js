@@ -31,6 +31,7 @@ export function loadDataInto(m) {
 // Hands the engine one resource under the name a script will ask for: 3D models (OBJ, GLTF, GLB) go to
 // preloadModel, anything else is an image. Shared by every way a resource reaches the engine.
 export function preloadResource(m, name, b64, ext) {
+  ext = (ext || '').toLowerCase()
   if (['obj', 'gltf', 'glb'].includes(ext)) {
     if (m.preloadModel) m.preloadModel(name, b64, ext)
   } else if (m.preloadImage) {
@@ -54,7 +55,7 @@ export function loadProjectIntoRuntime(m, project) {
     }
     const res = project.resources || {}
     for (const name in res) {
-      preloadResource(m, name, res[name].b64, (res[name].ext || '').toLowerCase())
+      preloadResource(m, name, res[name].b64, res[name].ext)
     }
   } catch (_) { /* best-effort preloading */ }
 }
@@ -223,13 +224,13 @@ function fetchAsset(name, v, entry) {
 // load a file twice.
 export async function preloadSampleAssets(m, code, v, entry = '', done = new Set()) {
   if (!m || typeof code !== 'string') return
-  const names = [...new Set([...findModels(code), ...findImages(code)])].filter((name) => !done.has(name))
+  const names = assetNames(code).filter((name) => !done.has(name))
   names.forEach((name) => done.add(name))
   // Fetched CONCURRENTLY, and handed over as each one arrives: the assets are independent of one another,
   // and six in single file cost six round trips before the first frame.
   await Promise.all(names.map(async (name) => {
     const bytes = await fetchAsset(name, v, entry)
-    if (bytes) preloadResource(m, name, bytesToB64(bytes), name.split('.').pop().toLowerCase())
+    if (bytes) preloadResource(m, name, bytesToB64(bytes), assetExt(name))
   }))
 }
 
@@ -342,6 +343,9 @@ function findAssets(code, exts) {
 const findModels = (code) => findAssets(code, 'obj|glb|gltf')
 // image.loadData (embedded base64) has no asset to collect, and so is not concerned.
 const findImages = (code) => findAssets(code, 'png|jpg|jpeg|gif|webp|bmp')
+// Every binary asset a code names, once each, and the extension of one of them.
+const assetNames = (code) => [...new Set([...findModels(code), ...findImages(code)])]
+const assetExt = (name) => name.split('.').pop().toLowerCase()
 
 // Builds a complete PROJECT from a sample of the repository: the entry file, all its transitive
 // .ol imports (as files) and the 3D models it references (as base64 binary resources). It serves
@@ -360,11 +364,11 @@ export async function collectSampleProject(entryFile, v) {
   // The binary assets referenced — 3D models (model("x.obj")) AND external images
   // (image.load("x.png")) — become base64 resources of the project.
   const allCode = Object.values(files).join('\n')
-  const names = [...new Set([...findModels(allCode), ...findImages(allCode)])]
+  const names = assetNames(allCode)
   const fetched = await Promise.all(names.map((name) => fetchAsset(name, v, entryFile)))
   names.forEach((name, i) => {
     if (fetched[i])
-      resources[name] = { b64: bytesToB64(fetched[i]), ext: name.split('.').pop().toLowerCase() }
+      resources[name] = { b64: bytesToB64(fetched[i]), ext: assetExt(name) }
   })
   return { files, resources, entry: entryFile }
 }

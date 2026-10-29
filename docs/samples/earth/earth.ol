@@ -25,6 +25,7 @@ const GRAIN = 0.0003       ## the fine grain that fills a close view with more t
 const AMBIENT = 0.09       ## what the night side keeps of the light: a little earthshine
 const FOV = 45             ## the camera's vertical field of view, in degrees
 const STARS = 2500
+const HALO_STEPS = 120     ## the segments of each ring of the halo
 const KEY_PIXELS_PER_SECOND = 400   ## the arrows move the view like a drag of this speed
 
 ## The pictures are laid out the way the sphere's mesh reads them: the latitude along x (0 at the
@@ -55,6 +56,8 @@ global ground = nil          ## the textures
 global cloudTex = nil
 global nightTex = nil
 global stars = []            ## unit vectors then brightnesses: x, y, z, b, x, y, z, b…
+global HALO_COS = []         ## the points of a ring of the halo, on the unit circle: they never change
+global HALO_SIN = []
 
 ## ── the view ──────────────────────────────────────────────────────────────────────────────────
 
@@ -89,17 +92,19 @@ func zoomBy(factor)
     zoom.factor = math.max(zoom.min, math.min(zoom.max, zoom.factor * factor))
 end
 
+func screenDistance(x0, y0, x1, y1)
+    return math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
+end
+
 ## How far the globe turns for a pixel of drag, in degrees: the point of the surface under the finger
 ## follows it. The same pixel is a far smaller angle when the camera is close, the globe being so much
 ## bigger on the screen, so a fixed sensitivity made a close view race away from the finger.
 func degreesPerPixel()
     var fx, fy, fz, rx, ry, rz = cameraAxes()
     var x0, y0 = graphics.project(cam, -fx * GLOBE, -fy * GLOBE, -fz * GLOBE)     ## the surface nearest to the camera
-    var step = math.rad(1)                                                          ## and the point one degree away from it
-    var c = math.cos(step) * GLOBE
-    var s = math.sin(step) * GLOBE
-    var x1, y1 = graphics.project(cam, -fx * c + rx * s, -fy * c + ry * s, -fz * c + rz * s)
-    return 1 / math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
+    var step = GLOBE * math.rad(1)                                                  ## and the point one degree off it, along the tangent
+    var x1, y1 = graphics.project(cam, -fx * GLOBE + rx * step, -fy * GLOBE + ry * step, -fz * GLOBE + rz * step)
+    return 1 / screenDistance(x0, y0, x1, y1)
 end
 
 func mouse.pressed(x, y)
@@ -155,14 +160,8 @@ end
 
 ## The camera's own axes: where it looks (f), what is up on the screen (u) and what is to the right (r).
 func cameraAxes()
-    var d = cameraDistance()
-    var fx = -cam.px / d
-    var fy = -cam.py / d
-    var fz = -cam.pz / d
-    var ux = cam.ux
-    var uy = cam.uy
-    var uz = cam.uz
-    return fx, fy, fz, fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux, ux, uy, uz
+    var f = cam.getViewDir()
+    return f.x, f.y, f.z, f.y * cam.uz - f.z * cam.uy, f.z * cam.ux - f.x * cam.uz, f.x * cam.uy - f.y * cam.ux, cam.ux, cam.uy, cam.uz
 end
 
 ## The stars are fixed in space, at infinity: one unit from the camera along their direction, a star
@@ -171,7 +170,7 @@ func drawStars()
     graphics.noStroke()
     for i = 1, #stars, 4 do
         var sx, sy, ahead = graphics.project(cam, cam.px + stars[i], cam.py + stars[i + 1], cam.pz + stars[i + 2])
-        if ahead > 0.05 and sx >= 0 and sx < W and sy >= 0 and sy < H then
+        if ahead > 0 and sx >= 0 and sx < W and sy >= 0 and sy < H then
             var b = stars[i + 3]
             graphics.fill(0.85 * b, 0.9 * b, b)
             if b > 0.6 then
@@ -190,14 +189,13 @@ end
 
 ## The radius of the globe's disc on the screen: the limb is where the view just grazes the surface, at the
 ## point on the side of the globe that stands back from the centre by GLOBE²/distance towards the camera.
+## The centre of the globe is the camera's target, so it is the centre of the screen.
 func limbRadius()
     var fx, fy, fz, rx, ry, rz = cameraAxes()
-    var d = cameraDistance()
-    var back = GLOBE * GLOBE / d
-    var side = GLOBE * math.sqrt(1 - back * back / (GLOBE * GLOBE))
-    var cx, cy = graphics.project(cam, 0, 0, 0)
+    var back = GLOBE * GLOBE / cameraDistance()
+    var side = math.sqrt(GLOBE * GLOBE - back * back)
     var x, y = graphics.project(cam, -fx * back + rx * side, -fy * back + ry * side, -fz * back + rz * side)
-    return math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy))
+    return screenDistance(CX, CY, x, y)
 end
 
 ## The glow of the atmosphere: a few thin rings round the globe, drawn BEFORE the globe so that it covers
@@ -211,19 +209,12 @@ func drawHalo()
     var behind = math.max(0, -(lx * fx + ly * fy + lz * fz))     ## 1: the Sun is straight behind the globe
     var sunRight = -(lx * rx + ly * ry + lz * rz)
     var sunUp = -(lx * ux + ly * uy + lz * uz)
-    var steps = 120
-    ## What the rim is, point by point, does not depend on the ring: worked out once, drawn six times.
-    var cosines = []
-    var sines = []
+    ## What the rim is, segment by segment, does not depend on the ring: worked out once, drawn six times.
+    ## Segment i runs from the point i - 1 to the point i, and is lit like the point i.
     var glows = []
     var warms = []
-    for i = 0, steps do
-        var a = i / steps * math.TAU
-        var c = math.cos(a)
-        var s = math.sin(a)
-        var lit = c * sunRight + s * sunUp                  ## the Sun, along this part of the rim
-        cosines.push(c)
-        sines.push(s)
+    for i = 1, HALO_STEPS do
+        var lit = HALO_COS[i + 1] * sunRight + HALO_SIN[i + 1] * sunUp     ## the Sun, along this part of the rim
         glows.push(math.max(smooth(-0.25, 0.55, lit), behind * behind * 0.9))
         warms.push(math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind))
     end
@@ -233,17 +224,16 @@ func drawHalo()
     for k = 0, 5 do
         var ring = radius * (1 + 0.004 * k) + thickness / 2
         var fade = (1 - k / 6) * (1 - k / 6)
-        for i = 2, steps + 1 do
+        for i = 1, HALO_STEPS do
             var glow = glows[i]
             if glow > 0.01 then
                 var warm = warms[i]
                 graphics.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
-                graphics.line(CX + cosines[i - 1] * ring, CY - sines[i - 1] * ring, CX + cosines[i] * ring, CY - sines[i] * ring)
+                graphics.line(CX + HALO_COS[i] * ring, CY - HALO_SIN[i] * ring, CX + HALO_COS[i + 1] * ring, CY - HALO_SIN[i + 1] * ring)
             end
         end
     end
 end
-
 
 ## ── the program ───────────────────────────────────────────────────────────────────────────────
 
@@ -258,6 +248,10 @@ func setup()
         image.filter(tex, "mipmap")    ## the default would show the pixels squared when close and sparkling from afar
     end
     seedStars()
+    for i = 0, HALO_STEPS do
+        HALO_COS.push(math.cos(i / HALO_STEPS * math.TAU))
+        HALO_SIN.push(math.sin(i / HALO_STEPS * math.TAU))
+    end
 
     var lx, ly, lz = sunLightDirection(days)
     sun = graphics.light("dir", lx, ly, lz)
