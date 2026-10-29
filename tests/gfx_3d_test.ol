@@ -175,7 +175,25 @@ func check_a()
     assert(count(s, 48, 48, 72, 72, 1, 0, 1) > 100)       ## the torus
     assert(count(s, 82, 50, 102, 70, 0, 1, 1) > 100)      ## the plane, turned to face the camera
     assert(count(s, 0, 0, 119, 89, 1, 1, 1) == 0)
+    check_project(s)
     image.unload(s)
+end
+
+## graphics.project must agree with what begin3d drew: the centre of each solid projects onto its own colour.
+func check_project(s)
+    var sx, sy, depth = graphics.project(cam, 0, 0, 0)
+    assert(near(sx, 60) and near(sy, 45) and near(depth, 10))         ## the target is at the middle of the screen, 10 away
+    for p in [[-3, 2, 0, 1, 0, 0], [0, 2, 0, 0, 1, 0], [3, 2, 0, 0, 0, 1], [-3, -1.5, 0, 1, 1, 0]] do
+        var px, py, pd = graphics.project(cam, p[1], p[2], p[3])
+        assert(count(s, math.floor(px) - 1, math.floor(py) - 1, math.floor(px) + 1, math.floor(py) + 1, p[4], p[5], p[6]) >= 4,
+            "the solid at {p[1]}, {p[2]} is not where graphics.project says: {px}, {py}")
+    end
+    var bx, by, behind = graphics.project(cam, 0, 0, 20)             ## behind the camera: no place, and a depth that says so
+    assert(bx == nil and by == nil and near(behind, -10))
+    var ox, oy, od = graphics.project(cam, 0, 0, 10)                 ## at the camera itself: not in front either
+    assert(ox == nil and near(od, 0))
+    expect(refusal(func() graphics.project(5, 0, 0, 0) end), "graphics.project: expected a camera (graphics.camera)")
+    expect(refusal(func() graphics.project(cam, 0, 0) end), "graphics.project: missing argument")
 end
 
 ## ── scene B: lighting ──────────────────────────────────────────────────────

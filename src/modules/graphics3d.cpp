@@ -1402,6 +1402,42 @@ static int gfx_fit_distance(CallCtx& ctx) {
     return ctx.ret(Value((s > 1e-4) ? radius / s : radius * 10.0));
 }
 
+// graphics.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
+// `camera`: the pixel (x, y) in the drawing area, and the depth, its distance in front of the camera. A
+// point behind the camera has no place on the screen: x and y are then nil, and 0 being false, the test
+// to write is on the depth (`depth > 0`). It is the camera's own geometry (the one begin3d gives the
+// solids), taken from the camera given and not from the last begin3d, so it answers at any time of the
+// frame and for any camera — which is what lets a script draw in 2D what belongs to the 3D scene.
+static int gfx_project(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    Camera3D camera = camera_from_map(argc > 0 ? args[0] : Value{}, "graphics.project");
+    Vector3 p = Vector3{(float)num_arg(args, argc, 1, "graphics.project"),
+                        (float)num_arg(args, argc, 2, "graphics.project"),
+                        (float)num_arg(args, argc, 3, "graphics.project")};
+    Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
+    Vector3 up = Vector3CrossProduct(right, forward);
+    Vector3 v = Vector3Subtract(p, camera.position);
+    double depth = Vector3DotProduct(v, forward);
+    double width = GetScreenWidth();
+    double height = GetScreenHeight();
+    double aspect = height > 0 ? width / height : 1.0;
+    // The half-extent of the view at that depth, vertically: a perspective camera's grows with the depth.
+    double half_height = camera.projection == CAMERA_ORTHOGRAPHIC ? camera.fovy * 0.5
+                                                                  : depth * std::tan(camera.fovy * DEG2RAD * 0.5);
+    ctx.set_result(2, Value(depth));
+    if (depth <= 0.0 && camera.projection != CAMERA_ORTHOGRAPHIC) {
+        ctx.set_result(0, Value{});
+        ctx.set_result(1, Value{});
+        return 3;
+    }
+    double ndc_x = Vector3DotProduct(v, right) / (half_height * aspect);
+    double ndc_y = Vector3DotProduct(v, up) / half_height;
+    ctx.set_result(0, Value((ndc_x * 0.5 + 0.5) * width));
+    ctx.set_result(1, Value((0.5 - ndc_y * 0.5) * height));
+    return 3;
+}
+
 // graphics.inFrustum(x, y, z [, radius]): is the sphere (centre, radius) at least partly
 // INSIDE the current camera's field of view? It answers true (visible) or false (off
 // screen), which serves per-chunk culling: only the visible part is drawn. To be called
@@ -1924,6 +1960,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("drawModel")), Value::make_builtin(with_area<gfx_draw_model>));
     m.map_set(Value(std::string("modelSize")), Value::make_builtin(with_area<gfx_model_size>));
     m.map_set(Value(std::string("fitDistance")), Value::make_builtin(gfx_fit_distance));
+    m.map_set(Value(std::string("project")), Value::make_builtin(gfx_project));
     m.map_set(Value(std::string("inFrustum")), Value::make_builtin(with_area<gfx_in_frustum>));
     m.map_set(Value(std::string("beginChunk")), Value::make_builtin(gfx_begin_chunk));
     m.map_set(Value(std::string("endChunk")), Value::make_builtin(with_area<gfx_end_chunk>));

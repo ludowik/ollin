@@ -69,13 +69,9 @@ func resetView()
     ball.q = camera.inverse()
 end
 
-## How far the camera stands from the centre of the globe, and the focal length of its lens in pixels.
+## How far the camera stands from the centre of the globe.
 func cameraDistance()
     return graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
-end
-
-func focalLength()
-    return (H / 2) / math.tan(math.rad(FOV / 2))
 end
 
 func placeCamera()
@@ -97,7 +93,13 @@ end
 ## follows it. The same pixel is a far smaller angle when the camera is close, the globe being so much
 ## bigger on the screen, so a fixed sensitivity made a close view race away from the finger.
 func degreesPerPixel()
-    return math.deg((cameraDistance() - GLOBE) / (GLOBE * focalLength()))
+    var fx, fy, fz, rx, ry, rz = cameraAxes()
+    var x0, y0 = graphics.project(cam, -fx * GLOBE, -fy * GLOBE, -fz * GLOBE)     ## the surface nearest to the camera
+    var step = math.rad(1)                                                          ## and the point one degree away from it
+    var c = math.cos(step) * GLOBE
+    var s = math.sin(step) * GLOBE
+    var x1, y1 = graphics.project(cam, -fx * c + rx * s, -fy * c + ry * s, -fz * c + rz * s)
+    return 1 / math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
 end
 
 func mouse.pressed(x, y)
@@ -163,28 +165,19 @@ func cameraAxes()
     return fx, fy, fz, fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux, ux, uy, uz
 end
 
-## The stars are fixed in space, so they are projected by hand, with the same perspective as the
-## camera's: a point of the sky straight ahead lands at the centre, and the rest goes out from there.
+## The stars are fixed in space, at infinity: one unit from the camera along their direction, a star
+## lands where it would on the sky. A star behind the camera has no place on the screen.
 func drawStars()
-    var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
-    var focal = focalLength()
     graphics.noStroke()
     for i = 1, #stars, 4 do
-        var x = stars[i]
-        var y = stars[i + 1]
-        var z = stars[i + 2]
-        var ahead = x * fx + y * fy + z * fz
-        if ahead > 0.05 then
-            var sx = CX + (x * rx + y * ry + z * rz) / ahead * focal
-            var sy = CY - (x * ux + y * uy + z * uz) / ahead * focal
-            if sx >= 0 and sx < W and sy >= 0 and sy < H then
-                var b = stars[i + 3]
-                graphics.fill(0.85 * b, 0.9 * b, b)
-                if b > 0.6 then
-                    graphics.rect(sx, sy, 2, 2)
-                else
-                    graphics.rect(sx, sy, 1, 1)
-                end
+        var sx, sy, ahead = graphics.project(cam, cam.px + stars[i], cam.py + stars[i + 1], cam.pz + stars[i + 2])
+        if ahead > 0.05 and sx >= 0 and sx < W and sy >= 0 and sy < H then
+            var b = stars[i + 3]
+            graphics.fill(0.85 * b, 0.9 * b, b)
+            if b > 0.6 then
+                graphics.rect(sx, sy, 2, 2)
+            else
+                graphics.rect(sx, sy, 1, 1)
             end
         end
     end
@@ -195,14 +188,25 @@ func smooth(lo, hi, x)
     return t * t * (3 - 2 * t)
 end
 
+## The radius of the globe's disc on the screen: the limb is where the view just grazes the surface, at the
+## point on the side of the globe that stands back from the centre by GLOBE²/distance towards the camera.
+func limbRadius()
+    var fx, fy, fz, rx, ry, rz = cameraAxes()
+    var d = cameraDistance()
+    var back = GLOBE * GLOBE / d
+    var side = GLOBE * math.sqrt(1 - back * back / (GLOBE * GLOBE))
+    var cx, cy = graphics.project(cam, 0, 0, 0)
+    var x, y = graphics.project(cam, -fx * back + rx * side, -fy * back + ry * side, -fz * back + rz * side)
+    return math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy))
+end
+
 ## The glow of the atmosphere: a few thin rings round the globe, drawn BEFORE the globe so that it covers
 ## their inner half. The air only glows where the Sun lights it: bright on the day side, warm towards
 ## the terminator, nothing on the night side — except when the Sun is behind the globe, which lights the
 ## whole rim from behind.
 func drawHalo()
     var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
-    var dist = cameraDistance()
-    var radius = focalLength() * GLOBE / math.sqrt(dist * dist - GLOBE * GLOBE)
+    var radius = limbRadius()
     var lx, ly, lz = sunLightDirection(days)
     var behind = math.max(0, -(lx * fx + ly * fy + lz * fz))     ## 1: the Sun is straight behind the globe
     var sunRight = -(lx * rx + ly * ry + lz * rz)

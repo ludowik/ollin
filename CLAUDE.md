@@ -65,6 +65,12 @@ tour, sans demander confirmation. La question « veux-tu que je corrige ? » est
 réponse est toujours oui. Seule exception, à énoncer en une ligne : un constat dont la
 correction changerait un comportement voulu ou déborderait largement du périmètre revu.
 
+**Ne pas se répéter — DRY (règle permanente, décidée par l'utilisateur)** : ne jamais recopier une règle, une
+formule ou un morceau de code qui existe déjà ou qui vient d'être écrit ailleurs. Avant d'écrire, chercher l'existant
+et l'appeler ; si trois lignes se retrouvent à deux endroits, les sortir en UNE fonction ; si un exemple refait à la
+main ce que le moteur sait (comme la perspective de la caméra, d'où `graphics.project`), c'est au MOTEUR de le donner.
+Un constat de revue qui nomme une duplication ne s'écarte pas au motif que sa correction demande une fonction neuve.
+
 **`todo.md` n'est PAS à Claude (règle permanente)** : ne jamais le lire pour se donner
 du travail, ne jamais l'éditer, ne jamais proposer ce qu'il contient. Traiter uniquement
 ce que l'utilisateur demande.

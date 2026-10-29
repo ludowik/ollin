@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-29 18:49</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-29 18:57</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-29 18:49</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-29 18:57</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2197,6 +2197,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redraws a baked chunk's <strong>opaque</strong> part in a single call, inside <code>begin3d</code></td></tr>
     <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Draws the <strong>transparent</strong> part (instances whose <code>fill</code> alpha is &lt; 1, water for instance). To be called AFTER all the opaque geometry</td></tr>
     <tr><td><code>graphics.freeChunk(handle)</code></td><td>Frees a (distant) chunk's GPU buffers, giving the memory back</td></tr>
+    <tr><td><code>graphics.project(camera, x, y, z)</code></td><td>Where the point <code>(x, y, z)</code> of the scene lands on the screen, seen by <code>camera</code> → <code>sx, sy, depth</code>: the pixel in the drawing area, and the distance in front of the camera. It answers at any time and for any camera, so a script can draw in 2D (a label, a marker, a halo) what belongs to the 3D scene. A point behind the camera has no place on the screen: <code>sx</code> and <code>sy</code> are <code>nil</code>, and since 0 is false the test to write is <code>depth &gt; 0</code>. It follows the drawing area, not a <code>graphics.viewport</code></td></tr>
     <tr><td><code>graphics.inFrustum(x,y,z [, radius])</code></td><td>Is the sphere (centre, radius) visible to the camera, at least in part? → <code>1</code>/<code>0</code>. Used for culling by chunk; to be called inside <code>begin3d</code></td></tr>
   </tbody>
 </table>
