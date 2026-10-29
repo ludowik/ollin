@@ -2383,12 +2383,7 @@ imgFileInput.addEventListener('change', () => {
       currentProject.resources[name] = { b64, ext }
       await persist(currentProject)
       if (ollin) {
-        // 3D models go to preloadModel, images to preloadImage.
-        if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && ollin.preloadModel) {
-          ollin.preloadModel(name, b64, ext)
-        } else if (ollin.preloadImage) {
-          ollin.preloadImage(name, b64, ext)
-        }
+        Run.preloadResource(ollin, name, b64, ext)
       }
       renderResources()
     }

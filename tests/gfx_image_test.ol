@@ -49,7 +49,7 @@ func check_loading()
     assert(refusal(func() image.load(5) end) == "image.load: expected path string")
     assert(refusal(func() image.filter(img) end) == "image.filter: expected img, mode")
     var modes = Q + "nearest" + Q + ", " + Q + "linear" + Q + " or " + Q + "mipmap" + Q
-    assert(refusal(func() image.filter(img, 3) end) == "image.filter: the mode must be a string (" + modes + ")")
+    assert(refusal(func() image.filter(img, 3) end) == "image.filter: expected " + modes)
     assert(refusal(func() image.filter(img, "cubic") end) == "image.filter: unknown mode 'cubic' (expected " + modes + ")")
     assert(refusal(func() image.load("no_such_image.png") end) == "image.load: cannot open 'no_such_image.png'")
     image.unload(img)

@@ -159,11 +159,14 @@ def section(title, rows, counted=None):
 
 print("\nSYNTHESIS")
 section("Language", [row(label, group) for label, group in LANGUAGE_ROWS])
-module_rows = [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in module_files]
+def rows_of(files):
+    return [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in files]
+
+
+module_rows = rows_of(module_files)
 section("Modules", module_rows + [row(f"stubs ({len(stubs)}, expected low)", stubs)], counted=module_rows)
 if display:
-    display_rows = [row(os.path.basename(f)[:-4].replace("_module", ""), [f]) for f in display]
-    section("Display (build with raylib, under Xvfb; not in the total)", display_rows)
+    section("Display (build with raylib, under Xvfb; not in the total)", rows_of(display))
 
 if mode == "--floor":
     floor = round(percent - 0.5, 1)

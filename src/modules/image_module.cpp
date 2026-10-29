@@ -548,24 +548,19 @@ static int img_filter(CallCtx& ctx) {
     if (argc < 2)
         throw std::runtime_error(std::string(FN) + ": expected img, mode");
     TexHandle& h = handle_ptr(args[0], FN);
-    if (!args[1].is_string())
-        throw std::runtime_error(std::string(FN) + ": the mode must be a string (\"nearest\", \"linear\" or \"mipmap\")");
-    std::string mode = args[1].as_string();
+    static const char* const MODES[] = {"nearest", "linear", "mipmap"};
+    enum { FILTER_NEAREST, FILTER_LINEAR, FILTER_MIPMAP };
+    int mode = mode_arg(ctx, 1, FN, MODES, FILTER_NEAREST);
     Texture2D tex = h.gpu_tex();
-    if (mode == "nearest") {
-        h.mipmapped = false;
+    h.mipmapped = mode == FILTER_MIPMAP;
+    if (mode == FILTER_NEAREST) {
         SetTextureFilter(tex, TEXTURE_FILTER_POINT);
-    } else if (mode == "linear") {
-        h.mipmapped = false;
+    } else if (mode == FILTER_LINEAR) {
         SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
-    } else if (mode == "mipmap") {
+    } else {
         GenTextureMipmaps(&tex);
         SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR);
         SetTextureFilter(tex, TEXTURE_FILTER_ANISOTROPIC_8X);   // a surface seen at a slant would blur to the smallest copy otherwise
-        h.mipmapped = true;
-    } else {
-        throw std::runtime_error(std::string(FN) + ": unknown mode '" + mode +
-                                 "' (expected \"nearest\", \"linear\" or \"mipmap\")");
     }
     return ctx.ret(Value{});
 }

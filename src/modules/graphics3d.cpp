@@ -871,8 +871,8 @@ static int gfx_specular(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.bump([height [, grain]]): relief for the textured surfaces that are drawn next, read from the
-// texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
+// graphics.bump([height [, grain]]): relief for the textured surfaces of the 3D block, read when it ends like
+// the light, from the texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
 // numbers are heights in scene units: how high a white texel stands above a black one, and how high the
 // grain is. The grain is fine noise that only shows where a texel is bigger than a screen pixel, to give
 // a surface seen close more to look at than the texture holds. Without argument, or with 0, the surface is flat.

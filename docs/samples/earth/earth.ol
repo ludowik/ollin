@@ -43,7 +43,7 @@ global speeds = [
     {label: "10 days / s",  rate: 10},
     {label: "60 days / s",  rate: 60}
 ]
-global speedLabels = []
+global speedLabels = speeds.map(func(s) return s.label end)
 global config = {speed: nil, clouds: true, lights: true, atmosphere: true, stars: true, axis: false, paused: false}
 
 global days = 0.0            ## the simulated time, in days since J2000 (see astro.ol)
@@ -55,7 +55,6 @@ global ground = nil          ## the textures
 global cloudTex = nil
 global nightTex = nil
 global stars = []            ## unit vectors then brightnesses: x, y, z, b, x, y, z, b…
-global view = {px: 0, py: 0, pz: 4, ux: 0, uy: 1, uz: 0, dist: 4}   ## the camera as the last frame placed it
 
 ## ── the view ──────────────────────────────────────────────────────────────────────────────────
 
@@ -70,17 +69,24 @@ func resetView()
     ball.q = camera.inverse()
 end
 
+## How far the camera stands from the centre of the globe, and the focal length of its lens in pixels.
+func cameraDistance()
+    return graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
+end
+
+func focalLength()
+    return (H / 2) / math.tan(math.rad(FOV / 2))
+end
+
 func placeCamera()
     var look = ball.orient().inverse()
-    var dist = graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
-    var eye = look.rotateVec(0, 0, dist)      ## rotateVec answers an array [x, y, z]
+    var eye = look.rotateVec(0, 0, cameraDistance())      ## rotateVec answers an array [x, y, z]
     var up = look.rotateVec(0, 1, 0)
     cam.setPos(eye[1], eye[2], eye[3])
     cam.lookAt(0, 0, 0)
     cam.ux = up[1]
     cam.uy = up[2]
     cam.uz = up[3]
-    view = {px: eye[1], py: eye[2], pz: eye[3], ux: up[1], uy: up[2], uz: up[3], dist: dist}
 end
 
 func zoomBy(factor)
@@ -91,9 +97,7 @@ end
 ## follows it. The same pixel is a far smaller angle when the camera is close, the globe being so much
 ## bigger on the screen, so a fixed sensitivity made a close view race away from the finger.
 func degreesPerPixel()
-    var dist = graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
-    var focal = (H / 2) / math.tan(math.rad(FOV / 2))
-    return math.deg((dist - GLOBE) / (GLOBE * focal))
+    return math.deg((cameraDistance() - GLOBE) / (GLOBE * focalLength()))
 end
 
 func mouse.pressed(x, y)
@@ -149,13 +153,13 @@ end
 
 ## The camera's own axes: where it looks (f), what is up on the screen (u) and what is to the right (r).
 func cameraAxes()
-    var d = view.dist
-    var fx = -view.px / d
-    var fy = -view.py / d
-    var fz = -view.pz / d
-    var ux = view.ux
-    var uy = view.uy
-    var uz = view.uz
+    var d = cameraDistance()
+    var fx = -cam.px / d
+    var fy = -cam.py / d
+    var fz = -cam.pz / d
+    var ux = cam.ux
+    var uy = cam.uy
+    var uz = cam.uz
     return fx, fy, fz, fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux, ux, uy, uz
 end
 
@@ -163,7 +167,7 @@ end
 ## camera's: a point of the sky straight ahead lands at the centre, and the rest goes out from there.
 func drawStars()
     var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
-    var focal = (H / 2) / math.tan(math.rad(FOV / 2))
+    var focal = focalLength()
     graphics.noStroke()
     for i = 1, #stars, 4 do
         var x = stars[i]
@@ -197,50 +201,50 @@ end
 ## whole rim from behind.
 func drawHalo()
     var fx, fy, fz, rx, ry, rz, ux, uy, uz = cameraAxes()
-    var focal = (H / 2) / math.tan(math.rad(FOV / 2))
-    var radius = focal * GLOBE / math.sqrt(view.dist * view.dist - GLOBE * GLOBE)
+    var dist = cameraDistance()
+    var radius = focalLength() * GLOBE / math.sqrt(dist * dist - GLOBE * GLOBE)
     var lx, ly, lz = sunLightDirection(days)
-    var sx = -lx
-    var sy = -ly
-    var sz = -lz
-    var behind = math.max(0, sx * fx + sy * fy + sz * fz)     ## 1: the Sun is straight behind the globe
+    var behind = math.max(0, -(lx * fx + ly * fy + lz * fz))     ## 1: the Sun is straight behind the globe
+    var sunRight = -(lx * rx + ly * ry + lz * rz)
+    var sunUp = -(lx * ux + ly * uy + lz * uz)
     var steps = 120
+    ## What the rim is, point by point, does not depend on the ring: worked out once, drawn six times.
+    var cosines = []
+    var sines = []
+    var glows = []
+    var warms = []
+    for i = 0, steps do
+        var a = i / steps * math.TAU
+        var c = math.cos(a)
+        var s = math.sin(a)
+        var lit = c * sunRight + s * sunUp                  ## the Sun, along this part of the rim
+        cosines.push(c)
+        sines.push(s)
+        glows.push(math.max(smooth(-0.25, 0.55, lit), behind * behind * 0.9))
+        warms.push(math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind))
+    end
     var thickness = radius * 0.006 + 1
     graphics.noFill()
     graphics.strokeSize(thickness)
     for k = 0, 5 do
         var ring = radius * (1 + 0.004 * k) + thickness / 2
         var fade = (1 - k / 6) * (1 - k / 6)
-        var lastX = 0
-        var lastY = 0
-        for i = 0, steps do
-            var a = i / steps * math.TAU
-            var c = math.cos(a)
-            var s = math.sin(a)
-            var px = CX + c * ring
-            var py = CY - s * ring
-            if i > 0 then
-                var lit = (c * (sx * rx + sy * ry + sz * rz) + s * (sx * ux + sy * uy + sz * uz))   ## the Sun, along this part of the rim
-                var glow = math.max(smooth(-0.25, 0.55, lit), behind * behind * 0.9)
-                var warm = math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind)
-                if glow > 0.01 then
-                    graphics.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
-                    graphics.line(lastX, lastY, px, py)
-                end
+        for i = 2, steps + 1 do
+            var glow = glows[i]
+            if glow > 0.01 then
+                var warm = warms[i]
+                graphics.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
+                graphics.line(CX + cosines[i - 1] * ring, CY - sines[i - 1] * ring, CX + cosines[i] * ring, CY - sines[i] * ring)
             end
-            lastX = px
-            lastY = py
         end
     end
 end
+
 
 ## ── the program ───────────────────────────────────────────────────────────────────────────────
 
 func setup()
     graphics.canvas(W, H, "Earth from space")
-    for i, s in speeds do
-        speedLabels.push(s.label)
-    end
     config.speed = speedLabels[1]
     days = unixToDays(time())
     ground = image.load(GROUND_FILE)
@@ -315,6 +319,17 @@ func orientGlobe()
     graphics.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
 end
 
+## One sphere of the globe, in the tilt and the turn of the Earth, wrapped in a picture.
+func drawLayer(tex, radius)
+    graphics.push()
+    orientGlobe()
+    graphics.fill(1, 1, 1)
+    graphics.texture(tex)
+    graphics.sphere(0, 0, 0, radius)
+    graphics.noTexture()
+    graphics.pop()
+end
+
 ## Three layers, one block each, because the light is ONE setting for a whole block. The ground and the
 ## clouds are lit by the Sun. The lights of the cities are lit by a sun on the other side of the Earth, and
 ## added: where the Sun shines the night side's light is nil, so nothing is added there, and it grows
@@ -325,14 +340,8 @@ func drawGlobe()
     graphics.segments(96)
     graphics.begin3d(cam)
     graphics.noStroke()
-    graphics.push()
-    orientGlobe()
-    graphics.fill(1, 1, 1)
-    graphics.texture(ground)
     graphics.bump(RELIEF, GRAIN)
-    graphics.sphere(0, 0, 0, GLOBE)
-    graphics.noTexture()
-    graphics.pop()
+    drawLayer(ground, GLOBE)
     graphics.end3d()
     graphics.bump()
 
@@ -342,13 +351,7 @@ func drawGlobe()
         graphics.blendMode("add")
         graphics.begin3d(cam)
         graphics.noStroke()
-        graphics.push()
-        orientGlobe()
-        graphics.fill(1, 1, 1)
-        graphics.texture(nightTex)
-        graphics.sphere(0, 0, 0, GLOBE * LIGHTS_SHELL)
-        graphics.noTexture()
-        graphics.pop()
+        drawLayer(nightTex, GLOBE * LIGHTS_SHELL)
         graphics.end3d()
         graphics.blendMode("alpha")
         graphics.ambient(AMBIENT)
@@ -358,13 +361,7 @@ func drawGlobe()
     graphics.begin3d(cam)
     graphics.noStroke()
     if config.clouds then
-        graphics.push()
-        orientGlobe()
-        graphics.fill(1, 1, 1)
-        graphics.texture(cloudTex)
-        graphics.sphere(0, 0, 0, GLOBE * CLOUD_SHELL)
-        graphics.noTexture()
-        graphics.pop()
+        drawLayer(cloudTex, GLOBE * CLOUD_SHELL)
     end
     if config.axis then
         graphics.push()
@@ -373,13 +370,6 @@ func drawGlobe()
         graphics.pop()
     end
     graphics.end3d()
-end
-
-func pad(n)
-    if n < 10 then
-        return "0{n}"
-    end
-    return "{n}"
 end
 
 func degrees(value, positive, negative)
@@ -396,7 +386,7 @@ func drawText()
     graphics.fill(1, 1, 1)
     graphics.stroke(1, 1, 1)
     graphics.fontSize(16)
-    graphics.text("{t.year}-{pad(t.month)}-{pad(t.day)}  {pad(t.hour)}:{pad(t.minute)} UTC", 12, 12)
+    graphics.text("{t.year}-{t.month:02d}-{t.day:02d}  {t.hour:02d}:{t.minute:02d} UTC", 12, 12)
     graphics.fontSize(13)
     graphics.stroke(0.75, 0.85, 1)
     var line = graphics.fontSize() * 1.5

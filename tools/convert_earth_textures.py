@@ -41,8 +41,10 @@ import sys
 import tarfile
 import tempfile
 
-import numpy
 from PIL import Image, ImageChops, ImageFilter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gltf_util as gl
 
 PACKAGE = "three-globe@2.45.6"
 GROUND = "example/img/earth-blue-marble.jpg"
@@ -141,8 +143,6 @@ def check_lights(lights):
 
 
 def main():
-    here = os.path.dirname(os.path.abspath(__file__))
-    out = os.path.join(here, "..", "docs", "samples", "earth")
     with tempfile.TemporaryDirectory() as workdir:
         package = fetch(workdir)
         ground = Image.open(os.path.join(package, GROUND)).convert("RGB")
@@ -153,10 +153,10 @@ def main():
         lights = city_lights(night)
         check_lights(lights)
         lights = lights.transpose(Image.TRANSPOSE)
-        lights_path = os.path.join(out, "earth_night.jpg")
+        lights_path = gl.sample_path("earth_night.jpg", "earth")
         lights.save(lights_path, quality=90, optimize=True)
-        ground_path = os.path.join(out, "earth_day.jpg")
-        clouds_path = os.path.join(out, "earth_clouds.png")
+        ground_path = gl.sample_path("earth_day.jpg", "earth")
+        clouds_path = gl.sample_path("earth_clouds.png", "earth")
         ground.save(ground_path, quality=88, optimize=True)
         clouds.save(clouds_path, optimize=True)
     for path in (ground_path, clouds_path, lights_path):

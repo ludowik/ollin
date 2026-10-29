@@ -28,6 +28,16 @@ export function loadDataInto(m) {
   m.dataLoad(p, g)
 }
 
+// Hands the engine one resource under the name a script will ask for: 3D models (OBJ, GLTF, GLB) go to
+// preloadModel, anything else is an image. Shared by every way a resource reaches the engine.
+export function preloadResource(m, name, b64, ext) {
+  if (['obj', 'gltf', 'glb'].includes(ext)) {
+    if (m.preloadModel) m.preloadModel(name, b64, ext)
+  } else if (m.preloadImage) {
+    m.preloadImage(name, b64, ext)
+  }
+}
+
 // Pushes a project's files (.ol) and resources (images) into the runtime, before execution.
 // `m` is the Ollin WASM module, `project` is { files, resources }.
 export function loadProjectIntoRuntime(m, project) {
@@ -44,13 +54,7 @@ export function loadProjectIntoRuntime(m, project) {
     }
     const res = project.resources || {}
     for (const name in res) {
-      const ext = (res[name].ext || '').toLowerCase()
-      // 3D models (OBJ, GLTF, GLB) go to preloadModel; anything else is an image.
-      if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && m.preloadModel) {
-        m.preloadModel(name, res[name].b64, ext)
-      } else if (m.preloadImage) {
-        m.preloadImage(name, res[name].b64, ext)
-      }
+      preloadResource(m, name, res[name].b64, (res[name].ext || '').toLowerCase())
     }
   } catch (_) { /* best-effort preloading */ }
 }
@@ -130,8 +134,11 @@ export function runProgram(m, code, canvasEl, hooks) {
 // does not come is reported by the engine when the program asks for it, so a caller never has to guard.
 export async function preloadProgramAssets(m, code, v, entryName) {
   try {
+    // The entry's own assets do not depend on its imports: they download while the imports are walked.
+    const done = new Set()
+    const own = preloadSampleAssets(m, code, v, entryName, done)
     const imported = await preloadSampleImports(m, code, v, entryName)
-    await preloadSampleAssets(m, code + '\n' + imported, v, entryName)
+    await Promise.all([own, preloadSampleAssets(m, imported, v, entryName, done)])
   } catch (_) {}
 }
 
@@ -182,7 +189,7 @@ function bytesToB64(bytes) {
   return btoa(bin)
 }
 
-// Session cache of the binary assets already fetched, keyed by the name AS WRITTEN in the code —
+// Session cache of the binary assets already fetched (or being fetched), keyed by the name AS WRITTEN in the code —
 // the same key the engine looks up. A relaunch would otherwise re-download them: the six models of
 // the 3D example weigh 5.7 MB, and `cache: no-cache` forbids even the HTTP cache from serving them.
 const _assetCache = new Map()
@@ -191,39 +198,39 @@ const _assetCache = new Map()
 // the same rule the engine follows for a native run (asset_candidates, paths.h), so an example kept
 // in its own directory carries its data beside it while a shared asset stays reachable. Returns the
 // bytes, or null: the preloading is best-effort, and the engine reports a genuinely missing one.
-async function fetchAsset(name, v, entry) {
+function fetchAsset(name, v, entry) {
   if (_assetCache.has(name)) return _assetCache.get(name)
-  const dir = dirOf(entry || '')
-  for (const url of dir ? [dir + name, name] : [name]) {
-    try {
-      const r = await fetch(sampleUrl(url, v), { cache: 'no-cache' })
-      if (r.ok) {
-        const bytes = new Uint8Array(await r.arrayBuffer())
-        _assetCache.set(name, bytes)
-        return bytes
-      }
-    } catch (_) { /* try the next place */ }
-  }
-  return null
+  const found = (async () => {
+    const dir = dirOf(entry || '')
+    for (const url of dir ? [dir + name, name] : [name]) {
+      try {
+        const r = await fetch(sampleUrl(url, v), { cache: 'no-cache' })
+        if (r.ok) return new Uint8Array(await r.arrayBuffer())
+      } catch (_) { /* try the next place */ }
+    }
+    return null
+  })()
+  // The promise is what is kept, so that two requests for one file share a download; a miss is forgotten.
+  _assetCache.set(name, found)
+  found.then((bytes) => { if (!bytes) _assetCache.delete(name) })
+  return found
 }
 
 // SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") and the pictures referenced
 // by image.load("x.png") (user projects go through their own resources instead). The key is the name AS
-// WRITTEN in the code, which is what the engine looks up — never the URL it was found at.
-export async function preloadSampleAssets(m, code, v, entry = '') {
+// WRITTEN in the code, which is what the engine looks up — never the URL it was found at. `done` holds the
+// names already handed to the engine by an earlier call, so that two passes over overlapping code do not
+// load a file twice.
+export async function preloadSampleAssets(m, code, v, entry = '', done = new Set()) {
   if (!m || typeof code !== 'string') return
-  // Fetched CONCURRENTLY: the assets are independent of one another, and six in single file cost
-  // six round trips before the first frame.
-  const models = m.preloadModel ? [...new Set(findModels(code))] : []
-  const images = m.preloadImage ? [...new Set(findImages(code))] : []
-  const names = [...models, ...images]
-  const fetched = await Promise.all(names.map((file) => fetchAsset(file, v, entry)))
-  names.forEach((file, i) => {
-    if (!fetched[i]) return
-    const ext = file.split('.').pop().toLowerCase()
-    if (i < models.length) m.preloadModel(file, bytesToB64(fetched[i]), ext)
-    else m.preloadImage(file, bytesToB64(fetched[i]), ext)
-  })
+  const names = [...new Set([...findModels(code), ...findImages(code)])].filter((name) => !done.has(name))
+  names.forEach((name) => done.add(name))
+  // Fetched CONCURRENTLY, and handed over as each one arrives: the assets are independent of one another,
+  // and six in single file cost six round trips before the first frame.
+  await Promise.all(names.map(async (name) => {
+    const bytes = await fetchAsset(name, v, entry)
+    if (bytes) preloadResource(m, name, bytesToB64(bytes), name.split('.').pop().toLowerCase())
+  }))
 }
 
 // Session cache of imported .ol sources (resolved path to text), which avoids downloading them
