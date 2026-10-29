@@ -19,7 +19,9 @@ const MAX_DIGITS = 10                  ## digits a number can be typed with; a r
 const SYMBOLS = {"+": "+", "-": "-", "*": "x", "/": "/"}   ## what the screen says for each operation (the font has no multiplication sign)
 
 func calcNew()
-    return {display: "0", fresh: true, entered: false, error: false, history: ""}
+    var s = {}
+    calcReset(s)
+    return s
 end
 
 func calcReset(s)
@@ -105,13 +107,14 @@ func calcDigit(s, key)
             s.history = ""
         end
     end
+    var room = digits.replace(".", "").len() < MAX_DIGITS
     if key == "." then
-        if digits.find(".") == nil and digits.replace(".", "").len() < MAX_DIGITS then
+        if digits.find(".") == nil and room then
             digits = digits + "."
         end
     elseif digits == "0" then
         digits = key
-    elseif digits.replace(".", "").len() < MAX_DIGITS then
+    elseif room then
         digits = digits + key
     end
     s.display = sign + digits

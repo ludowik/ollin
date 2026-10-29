@@ -24,15 +24,16 @@ const DIGIT_FILL = [0.20, 0.22, 0.28, 1]
 const FUNCTION_FILL = [0.62, 0.65, 0.72, 1]
 const OPERATOR_FILL = [0.96, 0.62, 0.12, 1]
 const LIGHT_INK = [1, 1, 1, 1]
-const DARK_INK = [0.07, 0.08, 0.11, 1]
-const MUTED = [0.62, 0.65, 0.72, 1]
+const DARK_INK = BACKGROUND
+const MUTED = FUNCTION_FILL
 const ERROR_INK = [1, 0.55, 0.55, 1]
 
 global calc = calcNew()
 global lit = {key: nil, since: 0}    ## the key just tapped, for its flash
-global layout = {}
 
-func layoutCompute()
+## Where everything goes, from the size of the area: computed again whenever it is needed, so it is never stale.
+func layoutOf()
+    var layout = {}
     var margin = SIZE * 0.04
     var availW = W - 2 * margin
     var availH = H - 2 * margin
@@ -43,11 +44,12 @@ func layoutCompute()
     layout.x = (W - cell * COLS) / 2
     layout.y = (H - cell * (ROWS + DISPLAY_ROWS)) / 2
     layout.keysY = layout.y + cell * DISPLAY_ROWS
+    return layout
 end
 
 ## The key under (x, y) or nil.
 func keyAt(x, y)
-    layoutCompute()                  ## a tap can come before the first draw, or after the area changed
+    var layout = layoutOf()
     var c = math.floor((x - layout.x) / layout.cell) + 1
     var r = math.floor((y - layout.keysY) / layout.cell) + 1
     if c < 1 or c > COLS or r < 1 or r > ROWS then
@@ -85,12 +87,14 @@ func keyboard.keypressed(key)
     end
 end
 
-func isFunctionKey(key)
-    return key == "AC" or key == "+/-" or key == "%"
-end
-
-func isOperatorKey(key)
-    return SYMBOLS[key] <> nil or key == "="
+## The colour of a key and of what is written on it.
+func keyColors(key)
+    if key == "AC" or key == "+/-" or key == "%" then
+        return FUNCTION_FILL, DARK_INK
+    elseif SYMBOLS[key] <> nil or key == "=" then
+        return OPERATOR_FILL, DARK_INK
+    end
+    return DIGIT_FILL, LIGHT_INK
 end
 
 func keyLabel(key)
@@ -103,20 +107,11 @@ func keyLabel(key)
     return key
 end
 
-func drawKey(key, r, c)
-    var L = layout
+func drawKey(L, key, r, c)
     var x = L.x + (c - 1) * L.cell + L.pad
     var y = L.keysY + (r - 1) * L.cell + L.pad
     var size = L.cell - 2 * L.pad
-    var fill = DIGIT_FILL
-    var ink = LIGHT_INK
-    if isFunctionKey(key) then
-        fill = FUNCTION_FILL
-        ink = DARK_INK
-    elseif isOperatorKey(key) then
-        fill = OPERATOR_FILL
-        ink = DARK_INK
-    end
+    var fill, ink = keyColors(key)
     var glow = 0
     if lit.key == key and elapsedTime - lit.since < FLASH then
         glow = 1 - (elapsedTime - lit.since) / FLASH
@@ -138,8 +133,7 @@ func drawKey(key, r, c)
     drawText(label, x + size / 2, y + size / 2, fitSize(label, L.cell * 0.4, size * 0.8), "center", "center", ink)
 end
 
-func drawDisplay()
-    var L = layout
+func drawDisplay(L)
     var right = L.x + L.cell * COLS - L.pad * 2
     var width = L.cell * COLS - L.pad * 4
     var ink = LIGHT_INK
@@ -157,13 +151,13 @@ func setup()
 end
 
 func draw()
-    layoutCompute()
+    var L = layoutOf()
     graphics.clear(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3])
     graphics.noStroke()
-    drawDisplay()
+    drawDisplay(L)
     for r = 1, ROWS do
         for c = 1, COLS do
-            drawKey(KEYS[r][c], r, c)
+            drawKey(L, KEYS[r][c], r, c)
         end
     end
 end

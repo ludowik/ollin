@@ -341,7 +341,7 @@ const findModels = (code) => findAssets(code, 'obj|glb|gltf')
 const findImages = (code) => findAssets(code, 'png|jpg|jpeg|gif|webp|bmp')
 // Every binary asset a code names, once each, and the extension of one of them.
 const assetNames = (code) => [...new Set([...findModels(code), ...findImages(code)])]
-const assetExt = (name) => name.split('.').pop().toLowerCase()
+export const assetExt = (name) => name.split('.').pop().toLowerCase()
 
 // Builds a complete PROJECT from a sample of the repository: the entry file, all its transitive
 // .ol imports (as files) and the 3D models it references (as base64 binary resources). It serves

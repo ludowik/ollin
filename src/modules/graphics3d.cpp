@@ -98,11 +98,7 @@ static bool map_flag(const Value& map, const char* key) {
     return map_number_or(map, key, 0.0) != 0.0;
 }
 
-// Rebuilds a raylib Camera3D from the map handle (graphics.camera). Default up = +Y,
-// perspective projection, raylib's default near/far.
-static Camera3D camera_from_map(const Value& v, const char* fn) {
-    if (!v.is_map())
-        throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
+static Camera3D read_camera(const Value& v) {
     auto get = [&](const char* k, double def) -> float { return (float)map_number_or(v, k, def); };
     bool ortho = map_flag(v, "ortho");
     Camera3D cam{};
@@ -112,6 +108,26 @@ static Camera3D camera_from_map(const Value& v, const char* fn) {
     cam.fovy = get("fovy", ortho ? 10.0f : 45.0f);
     cam.projection = ortho ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
     return cam;
+}
+
+// Rebuilds a raylib Camera3D from the map handle (graphics.camera). Default up = +Y,
+// perspective projection, raylib's default near/far. Reading the camera out of its map is most of the cost
+// of a call that projects a point, and a script projects a few thousand a frame through ONE camera: the
+// last one read is kept, as long as the map has not changed (a version of 0 is a map never written to,
+// which says nothing about what it held before).
+static Camera3D camera_from_map(const Value& v, const char* fn) {
+    static const Map* s_map = nullptr;
+    static uint64_t s_version = 0;
+    static Camera3D s_camera{};
+    if (!v.is_map())
+        throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
+    const Map* map = v.mptr;
+    if (map != s_map || map->version != s_version || map->version == 0) {
+        s_camera = read_camera(v);
+        s_map = map;
+        s_version = map->version;
+    }
+    return s_camera;
 }
 
 // Camera class (native, like Color).
@@ -205,6 +221,10 @@ static int cam_orbit(CallCtx& ctx) {
 // is up on it. The up the camera was given is only a hint (it need not be square to the view): `up` here is
 // the axis it implies, square to both. A target equal to the position, or an up along the view, leaves the
 // axes that cannot be worked out as null vectors.
+static Vector3 camera_forward(const Camera3D& camera) {
+    return Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+}
+
 struct CameraAxes {
     Vector3 forward;
     Vector3 right;
@@ -214,7 +234,7 @@ struct CameraAxes {
 static CameraAxes camera_axes(const Value& self) {
     Camera3D camera = camera_from_map(self, "Camera");
     CameraAxes axes;
-    axes.forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    axes.forward = camera_forward(camera);
     axes.right = Vector3Normalize(Vector3CrossProduct(axes.forward, camera.up));
     axes.up = Vector3CrossProduct(axes.right, axes.forward);
     return axes;
@@ -1430,38 +1450,23 @@ static int gfx_fit_distance(CallCtx& ctx) {
 // are then nil, and 0 being false, the test to write is on the depth (`depth > 0`). The pixel is raylib's
 // own (GetWorldToScreenEx, the projection begin3d gives the solids), taken from the camera given and not
 // from the last begin3d, so it answers at any time of the frame and for any camera — which is what lets a
-// script draw in 2D what belongs to the 3D scene. A script projects a few thousand points a frame through
-// ONE camera, and reading the camera out of its map is most of a call: the last one read is kept, as long
-// as the map has not changed.
+// script draw in 2D what belongs to the 3D scene.
 static int gfx_project(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    static const Map* s_camera_map = nullptr;
-    static uint64_t s_camera_version = 0;
-    static Camera3D s_camera{};
-    static Vector3 s_forward{};
-    if (argc < 1 || !args[0].is_map()) {
-        throw std::runtime_error("graphics.project: expected a camera (graphics.camera)");
-    }
-    Map* map = args[0].mptr;
+    Camera3D camera = camera_from_map(argc > 0 ? args[0] : Value(), "graphics.project");
     float x = (float)num_arg(args, argc, 1, "graphics.project");
     float y = (float)num_arg(args, argc, 2, "graphics.project");
     float z = (float)num_arg(args, argc, 3, "graphics.project");
-    if (map != s_camera_map || map->version != s_camera_version || map->version == 0) {
-        s_camera = camera_from_map(args[0], "graphics.project");
-        s_forward = Vector3Normalize(Vector3Subtract(s_camera.target, s_camera.position));
-        s_camera_map = map;
-        s_camera_version = map->version;
-    }
     Vector3 p = Vector3{x, y, z};
-    double depth = Vector3DotProduct(Vector3Subtract(p, s_camera.position), s_forward);
+    double depth = Vector3DotProduct(Vector3Subtract(p, camera.position), camera_forward(camera));
     Value sx;
     Value sy;
     // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
     // Before graphics.canvas there is none (0 by 0, hence a NaN aspect): no place on the screen either.
     int width = gfx_logical_width();
     int height = gfx_logical_height();
-    if ((depth > 0.0 || s_camera.projection == CAMERA_ORTHOGRAPHIC) && width > 0 && height > 0) {
-        Vector2 pixel = GetWorldToScreenEx(p, s_camera, width, height);
+    if ((depth > 0.0 || camera.projection == CAMERA_ORTHOGRAPHIC) && width > 0 && height > 0) {
+        Vector2 pixel = GetWorldToScreenEx(p, camera, width, height);
         sx = Value((double)pixel.x);
         sy = Value((double)pixel.y);
     }

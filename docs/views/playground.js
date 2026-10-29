@@ -1074,7 +1074,7 @@ function showResource(name) {
     return
   }
   const r = (currentProject.resources || {})[name] || {}
-  const ext = (r.ext || name.split('.').pop() || '').toLowerCase()
+  const ext = (r.ext || Run.assetExt(name)).toLowerCase()
   const bytes = Math.round((r.b64 || '').length * 3 / 4)
 
   const head = document.createElement('div'); head.className = 'res-head'
@@ -2375,7 +2375,7 @@ imgFileInput.addEventListener('change', () => {
   const files = Array.from(imgFileInput.files)
   if (!files.length || !currentProject || isExample()) return
   files.forEach(file => {
-    const ext  = file.name.split('.').pop().toLowerCase()
+    const ext  = Run.assetExt(file.name)
     const name = file.name
     const reader = new FileReader()
     reader.onload = async e => {
