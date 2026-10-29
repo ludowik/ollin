@@ -158,10 +158,12 @@ func seedStars()
     end
 end
 
-## The camera's own axes: where it looks (f), what is up on the screen (u) and what is to the right (r).
+## The camera's own axes: where it looks (f), what is to the right of the screen (r) and what is up on it (u).
 func cameraAxes()
     var f = cam.getViewDir()
-    return f.x, f.y, f.z, f.y * cam.uz - f.z * cam.uy, f.z * cam.ux - f.x * cam.uz, f.x * cam.uy - f.y * cam.ux, cam.ux, cam.uy, cam.uz
+    var r = cam.getRight()
+    var u = cam.getUp()
+    return f.x, f.y, f.z, r.x, r.y, r.z, u.x, u.y, u.z
 end
 
 ## The stars are fixed in space, at infinity: one unit from the camera along their direction, a star
@@ -269,7 +271,7 @@ func setup()
     menu.button("Reset view", resetView)
     ui.show(menu)
     resetView()
-    placeCamera()    ## the camera carries no "up" until it is placed, and a drag can come before the first frame
+    placeCamera()    ## a drag can come before the first frame: it is measured on the camera that will be drawn
 end
 
 func speedRate()

@@ -201,24 +201,44 @@ static int cam_orbit(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.getViewDir(): NORMALISED viewing direction (target - position), as a map {x,y,z}.
-// A target equal to the position (a null vector) returns {x:0, y:0, z:0}.
+// The camera's own axes, unit vectors: where it looks (forward), what is to the right of the screen and what
+// is up on it. The up the camera was given is only a hint (it need not be square to the view): `up` here is
+// the axis it implies, square to both. A target equal to the position, or an up along the view, leaves the
+// axes that cannot be worked out as null vectors.
+struct CameraAxes {
+    Vector3 forward;
+    Vector3 right;
+    Vector3 up;
+};
+
+static CameraAxes camera_axes(const Value& self) {
+    Camera3D camera = camera_from_map(self, "Camera");
+    CameraAxes axes;
+    axes.forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    axes.right = Vector3Normalize(Vector3CrossProduct(axes.forward, camera.up));
+    axes.up = Vector3CrossProduct(axes.right, axes.forward);
+    return axes;
+}
+
+static Value vector_map(Vector3 v) {
+    Value out = Value::make_map();
+    out.map_set(Value(std::string("x")), Value((double)v.x));
+    out.map_set(Value(std::string("y")), Value((double)v.y));
+    out.map_set(Value(std::string("z")), Value((double)v.z));
+    return out;
+}
+
+// cam.getViewDir() / cam.getRight() / cam.getUp(): one axis of the camera, as a map {x,y,z}.
 static int cam_get_view_dir(CallCtx& ctx) {
-    Value self = ctx.args[0];
-    double dx = cam_field(self, "tx") - cam_field(self, "px");
-    double dy = cam_field(self, "ty") - cam_field(self, "py");
-    double dz = cam_field(self, "tz") - cam_field(self, "pz");
-    double len = std::sqrt(dx * dx + dy * dy + dz * dz);
-    if (len > 0.0) {
-        dx /= len;
-        dy /= len;
-        dz /= len;
-    }
-    Value dir = Value::make_map();
-    dir.map_set(Value(std::string("x")), Value(dx));
-    dir.map_set(Value(std::string("y")), Value(dy));
-    dir.map_set(Value(std::string("z")), Value(dz));
-    return ctx.ret(dir);
+    return ctx.ret(vector_map(camera_axes(ctx.args[0]).forward));
+}
+
+static int cam_get_right(CallCtx& ctx) {
+    return ctx.ret(vector_map(camera_axes(ctx.args[0]).right));
+}
+
+static int cam_get_up(CallCtx& ctx) {
+    return ctx.ret(vector_map(camera_axes(ctx.args[0]).up));
 }
 
 static Value make_camera_class() {
@@ -230,6 +250,8 @@ static Value make_camera_class() {
         .fn("orbit", cam_orbit)
         .fn("zoom", cam_zoom)
         .fn("getViewDir", cam_get_view_dir)
+        .fn("getRight", cam_get_right)
+        .fn("getUp", cam_get_up)
         .done();
 }
 
@@ -241,7 +263,7 @@ static Value camera_class() {
 
 // graphics.camera(px,py,pz, tx,ty,tz [, fovy]): a Camera class INSTANCE. Looks at
 // (tx,ty,tz) from (px,py,pz), up = +Y, fovy = vertical field of view (45° by default).
-// Mutable through its methods (setPos/lookAt/move/orbit/zoom); getViewDir returns the viewing direction {x,y,z}.
+// Mutable through its methods (setPos/lookAt/move/orbit/zoom); getViewDir, getRight and getUp return its axes {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();

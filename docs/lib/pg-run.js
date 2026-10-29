@@ -135,11 +135,11 @@ export function runProgram(m, code, canvasEl, hooks) {
 // does not come is reported by the engine when the program asks for it, so a caller never has to guard.
 export async function preloadProgramAssets(m, code, v, entryName) {
   try {
-    // The entry's own assets do not depend on its imports: they download while the imports are walked.
-    const done = new Set()
-    const own = preloadSampleAssets(m, code, v, entryName, done).catch(() => {})   // best-effort, and not awaited yet
+    // The entry's own assets do not depend on its imports: their downloads start now, while the imports are
+    // walked, and the pass below finds them in the cache of downloads instead of starting them.
+    assetNames(code).forEach((name) => fetchAsset(name, v, entryName))
     const imported = await preloadSampleImports(m, code, v, entryName)
-    await Promise.all([own, preloadSampleAssets(m, imported, v, entryName, done)])
+    await preloadSampleAssets(m, code + '\n' + imported, v, entryName)
   } catch (_) {}
 }
 
@@ -219,16 +219,12 @@ function fetchAsset(name, v, entry) {
 
 // SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") and the pictures referenced
 // by image.load("x.png") (user projects go through their own resources instead). The key is the name AS
-// WRITTEN in the code, which is what the engine looks up — never the URL it was found at. `done` holds the
-// names already handed to the engine by an earlier call, so that two passes over overlapping code do not
-// load a file twice.
-export async function preloadSampleAssets(m, code, v, entry = '', done = new Set()) {
+// WRITTEN in the code, which is what the engine looks up — never the URL it was found at.
+export async function preloadSampleAssets(m, code, v, entry = '') {
   if (!m || typeof code !== 'string') return
-  const names = assetNames(code).filter((name) => !done.has(name))
-  names.forEach((name) => done.add(name))
   // Fetched CONCURRENTLY, and handed over as each one arrives: the assets are independent of one another,
   // and six in single file cost six round trips before the first frame.
-  await Promise.all(names.map(async (name) => {
+  await Promise.all(assetNames(code).map(async (name) => {
     const bytes = await fetchAsset(name, v, entry)
     if (bytes) preloadResource(m, name, bytesToB64(bytes), assetExt(name))
   }))

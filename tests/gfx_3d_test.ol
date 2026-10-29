@@ -74,6 +74,25 @@ func check_state()
     assert(near(c.py, 8))
     var d = c.getViewDir()
     assert(near(d.x * d.x + d.y * d.y + d.z * d.z, 1) and d.x < 0 and d.z == 0)
+    ## The three axes are unit vectors, square to one another, whatever the up the camera was given.
+    var axes = graphics.camera(0, 0, 10, 0, 0, 0)
+    var f = axes.getViewDir()
+    var r = axes.getRight()
+    var u = axes.getUp()
+    assert(near(f.x, 0) and near(f.y, 0) and near(f.z, -1))        ## looking down -Z, up being +Y: right is +X
+    assert(near(r.x, 1) and near(r.y, 0) and near(r.z, 0))
+    assert(near(u.x, 0) and near(u.y, 1) and near(u.z, 0))
+    axes.setPos(3, 4, 5).lookAt(1, 1, 1)
+    axes.uy = 0.2                                                   ## an up that is not square to the view
+    axes.uz = 1
+    f = axes.getViewDir()
+    r = axes.getRight()
+    u = axes.getUp()
+    assert(near(r.x * r.x + r.y * r.y + r.z * r.z, 1) and near(u.x * u.x + u.y * u.y + u.z * u.z, 1))
+    assert(near(f.x * r.x + f.y * r.y + f.z * r.z, 0) and near(f.x * u.x + f.y * u.y + f.z * u.z, 0) and near(r.x * u.x + r.y * u.y + r.z * u.z, 0))
+    var straight = graphics.camera(0, 5, 0, 0, 0, 0)               ## looking straight down with the default up: no right to find
+    var none = straight.getRight()
+    assert(none.x == 0 and none.y == 0 and none.z == 0)
     var o = graphics.cameraOrtho(0, 0, 10, 0, 0, 0)
     assert(o.ortho == 1 and o.fovy == 10)
     o.zoom(0.5)                                        ## for an orthographic camera it narrows the view

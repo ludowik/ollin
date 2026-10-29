@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-29 19:11</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-10-29 19:27</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-29 19:11</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-10-29 19:27</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2081,6 +2081,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>An orthographic camera — a projection with no perspective; <code>size</code> is the number of units visible vertically, 10 by default. The same methods as <code>camera()</code></td></tr>
     <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Sets the camera's position / target</td></tr>
     <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, radius [, height])</code></td><td>Moves the camera, keeping its aim / puts it in orbit around its target (<code>angle</code> in radians)</td></tr>
+    <tr><td><code>cam.getViewDir()</code> · <code>cam.getRight()</code> · <code>cam.getUp()</code></td><td>The camera's three axes, unit vectors <code>{x, y, z}</code>: where it looks, what is to the right of the screen and what is up on it. The up is the one the camera implies, square to the other two even if the <code>ux, uy, uz</code> it was given are not. An axis that cannot be worked out (looking straight along the up) is the null vector</td></tr>
     <tr><td><code>cam.zoom(factor)</code></td><td>Multiplies the visible size (orthographic: it adjusts <code>size</code>; perspective: it moves nearer or further along the viewing axis)</td></tr>
     <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>They frame the 3D drawing inside <code>draw()</code></td></tr>
     <tr><td><code>graphics.grid(slices, spacing)</code></td><td>A grid on the ground (the XZ plane), centred on the origin, in a fixed grey</td></tr>
