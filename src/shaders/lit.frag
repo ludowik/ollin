@@ -81,12 +81,14 @@ void main() {
     vec4 tint = fragColor;
     vec3 base = (texel * tint).rgb;
     vec3 normal = normalize(fragNormal);
-    if (fragTile.x < 0.0 && (bump.x > 0.0 || bump.y > 0.0)) {
-        vec2 texels = vec2(fragTexCoord.x, abs(uFlipV - fragTexCoord.y)) * vec2(textureSize(texture0, 0));
+    vec2 texture_size = vec2(textureSize(texture0, 0));
+    // The blank 1x1 texture of an untextured surface has no relief to read: the grain would be laid on it all the same.
+    if (fragTile.x < 0.0 && (bump.x > 0.0 || bump.y > 0.0) && max(texture_size.x, texture_size.y) > 1.0) {
+        vec2 texels = vec2(fragTexCoord.x, abs(uFlipV - fragTexCoord.y)) * texture_size;
         float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
         // The grain only appears where a texel covers more than a pixel, and grows as it covers more.
         float per_pixel = max(length(dFdx(texels)), length(dFdy(texels)));
-        float magnified = smoothstep(1.0, 0.25, per_pixel);
+        float magnified = 1.0 - smoothstep(0.25, 1.0, per_pixel);
         float grain = (value_noise(texels * 1.5) + 0.5 * value_noise(texels * 3.5) - 0.75) * (0.3 + lum);
         normal = bent_normal(normal, lum * bump.x + grain * magnified * bump.y);
     }

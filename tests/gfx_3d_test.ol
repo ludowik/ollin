@@ -255,15 +255,17 @@ end
 
 ## Relief drawn from the texture: a lit sphere wrapped in the two-by-two pattern, whose colours differ in
 ## brightness, so that the edges between them become steps that the light catches.
-func scene_bump(name, height)
+func scene_bump(name, height, textured)
     graphics.clear(0, 0, 0)
     graphics.ambient(0.1)
     lamp.setDir(0.5, 0.5, -1)
-    graphics.bump(height, 0)
+    graphics.bump(height, height)
     graphics.begin3d(cam)
     graphics.noStroke()
     graphics.fill(1, 1, 1)
-    graphics.texture(pattern)
+    if textured then
+        graphics.texture(pattern)
+    end
     graphics.sphere(0, 0, 0, 4)
     graphics.noTexture()
     graphics.end3d()
@@ -271,18 +273,28 @@ func scene_bump(name, height)
     graphics.bump()
 end
 
-func check_bump()
-    var flat = image.load(SHOT + "b6.png")
-    var bumpy = image.load(SHOT + "b7.png")
-    var differ = 0
+func differing(a, b)
+    var n = 0
     for y = 20, 70 do
         for x = 25, 95 do
-            if math.abs(grey(flat, x, y) - grey(bumpy, x, y)) > 0.03 then
-                differ += 1
+            if math.abs(grey(a, x, y) - grey(b, x, y)) > 0.03 then
+                n += 1
             end
         end
     end
+    return n
+end
+
+func check_bump()
+    var flat = image.load(SHOT + "b6.png")
+    var bumpy = image.load(SHOT + "b7.png")
+    var plain = image.load(SHOT + "b8.png")
+    var blank = image.load(SHOT + "b9.png")
+    var differ = differing(flat, bumpy)
     assert(differ > 50, "the relief changed {differ} pixels")
+    assert(differing(plain, blank) == 0, "the relief marked a surface that has no texture")
+    image.unload(plain)
+    image.unload(blank)
     assert(grey(flat, 5, 5) == 0 and grey(bumpy, 5, 5) == 0)      ## nothing is drawn off the sphere
     image.unload(flat)
     image.unload(bumpy)
@@ -498,26 +510,30 @@ func draw()
         scene_specular("b5.png", 0.3, 64)
     elseif frames == 7 then
         check_specular()
-        scene_bump("b6.png", 0)
+        scene_bump("b6.png", 0, true)
     elseif frames == 8 then
-        scene_bump("b7.png", 3)
+        scene_bump("b7.png", 3, true)
     elseif frames == 9 then
+        scene_bump("b8.png", 0, false)
+    elseif frames == 10 then
+        scene_bump("b9.png", 3, false)
+    elseif frames == 11 then
         check_bump()
         scene_c()
-    elseif frames == 10 then
+    elseif frames == 12 then
         check_c()
         scene_d_setup()
         scene_d()
-    elseif frames == 11 then
+    elseif frames == 13 then
         check_d()
         scene_e()
-    elseif frames == 12 then
+    elseif frames == 14 then
         check_e()
         scene_f()
-    elseif frames == 13 then
+    elseif frames == 15 then
         check_f()
         scene_g()
-    elseif frames == 14 then
+    elseif frames == 16 then
         check_g()
         check_state()                                  ## last: creating a light turns the lighting on for good
         graphics.quit()
