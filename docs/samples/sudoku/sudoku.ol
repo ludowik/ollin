@@ -13,6 +13,7 @@ import "solver.ol"
 import "generator.ol"
 import "sounds.ol"
 import "texts.ol"
+import "../lib/draw.ol"
 
 const HINTS = 3                      ## hints per puzzle
 
@@ -507,28 +508,6 @@ func toggleInput()
 end
 
 ## ── Drawing ─────────────────────────────────────────────────────────────────────────────────────
-
-func fillC(col, alpha = 1)
-    graphics.fill(col[1], col[2], col[3], col[4] * alpha)
-end
-
-func drawText(str, x, y, size, h, v, col, alpha = 1)
-    graphics.fontSize(size)
-    graphics.textMode(h, v)
-    graphics.stroke(col[1], col[2], col[3], col[4] * alpha)
-    graphics.text(str, x, y)
-    graphics.noStroke()
-end
-
-## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
-func fitSize(str, size, maxW)
-    graphics.fontSize(size)
-    var tw = graphics.textSize(str)
-    if tw > maxW then
-        return size * maxW / tw
-    end
-    return size
-end
 
 func drawButton(label, r, fill, textSize, ink = nil)
     var L = game.layout
