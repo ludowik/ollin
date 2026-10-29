@@ -211,6 +211,19 @@ func check_project(s)
     assert(bx == nil and by == nil and near(behind, -10))
     var ox, oy, od = graphics.project(cam, 0, 0, 10)                 ## at the camera itself: not in front either
     assert(ox == nil and near(od, 0))
+    ## The last camera read is kept, and every change to it must show: a field written directly, a method, another camera in between.
+    var left = graphics.camera(0, 0, 10, 0, 0, 0)
+    var right = graphics.camera(0, 0, 10, 4, 0, 0)
+    var lx = graphics.project(left, 0, 0, 0)
+    assert(near(lx, 60) and graphics.project(right, 0, 0, 0) < 59 and near(graphics.project(left, 0, 0, 0), 60))
+    left.tx = 3
+    assert(graphics.project(left, 0, 0, 0) < 59)
+    left.lookAt(0, 0, 0)
+    assert(near(graphics.project(left, 0, 0, 0), 60))
+    for i = 1, 20 do                                                 ## cameras made and dropped: a recycled map must not hit the cache
+        var made = graphics.camera(i, 0, 10, i, 0, 0)
+        assert(near(graphics.project(made, i, 0, 0), 60))
+    end
     expect(refusal(func() graphics.project(5, 0, 0, 0) end), "graphics.project: expected a camera (graphics.camera)")
     expect(refusal(func() graphics.project(cam, 0, 0) end), "graphics.project: missing argument")
 end
