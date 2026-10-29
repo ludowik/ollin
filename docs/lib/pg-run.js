@@ -136,7 +136,7 @@ export async function preloadProgramAssets(m, code, v, entryName) {
   try {
     // The entry's own assets do not depend on its imports: they download while the imports are walked.
     const done = new Set()
-    const own = preloadSampleAssets(m, code, v, entryName, done)
+    const own = preloadSampleAssets(m, code, v, entryName, done).catch(() => {})   // best-effort, and not awaited yet
     const imported = await preloadSampleImports(m, code, v, entryName)
     await Promise.all([own, preloadSampleAssets(m, imported, v, entryName, done)])
   } catch (_) {}

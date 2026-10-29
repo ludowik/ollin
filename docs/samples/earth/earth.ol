@@ -275,6 +275,7 @@ func setup()
     menu.button("Reset view", resetView)
     ui.show(menu)
     resetView()
+    placeCamera()    ## the camera carries no "up" until it is placed, and a drag can come before the first frame
 end
 
 func speedRate()

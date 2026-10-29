@@ -1146,9 +1146,9 @@ async function renameResource(name) {
   delete currentProject.resources[name]
   const shown = currentRes === name
   await persist(currentProject)
-  if (ollin && ollin.preloadImage) {
+  if (ollin) {
     const r = currentProject.resources[n]
-    ollin.preloadImage(n, r.b64, r.ext)
+    Run.preloadResource(ollin, n, r.b64, (r.ext || '').toLowerCase())
   }
   if (shown) {
     showResource(n)   // the preview carries the name in its header, so rebuild it

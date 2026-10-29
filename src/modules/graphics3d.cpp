@@ -1419,8 +1419,9 @@ static int gfx_project(CallCtx& ctx) {
     Vector3 up = Vector3CrossProduct(right, forward);
     Vector3 v = Vector3Subtract(p, camera.position);
     double depth = Vector3DotProduct(v, forward);
-    double width = GetScreenWidth();
-    double height = GetScreenHeight();
+    // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
+    double width = gfx_logical_width();
+    double height = gfx_logical_height();
     double aspect = height > 0 ? width / height : 1.0;
     // The half-extent of the view at that depth, vertically: a perspective camera's grows with the depth.
     double half_height = camera.projection == CAMERA_ORTHOGRAPHIC ? camera.fovy * 0.5
