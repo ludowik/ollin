@@ -1518,12 +1518,21 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
 Registre de polices **embarquées**, désignées par un nom : `"sans"` (Liberation Sans,
 défaut), `"mono"` (Liberation Mono) et `"pixel"` (la police intégrée de raylib, sans
 atlas). Aucun fichier à trouver à l'exécution, aucune option de build → même rendu sur
-toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
+toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plus dans le `.wasm` que les anciens atlas de couverture).
 
 - Les atlas `src/modules/font_sans.h` / `font_mono.h` sont **générés** par
   `ExportFontAsCode` (raylib) via `tools/gen_ui_font.cpp` — lancé à la main, PAS par le
   build : `xvfb-run -a gen_ui_font <police.ttf> <taille> <nom>` (mode d'emploi complet en
-  tête de l'outil). 32 px, ASCII + accents français, SIL OFL 1.1.
+  tête de l'outil). 48 px, ASCII + accents français, SIL OFL 1.1.
+- **`"sans"` et `"mono"` sont des CHAMPS DE DISTANCE signés (SDF), pas des atlas de couverture** :
+  chaque texel dit sa distance au contour, et `src/shaders/sdf.frag` redessine un bord net à toute
+  taille. Un atlas de couverture à 32 px étiré dix fois (un grand chiffre sur un téléphone de densité 3,
+  la texture de rendu étant à la résolution de l'appareil) donnait un texte FLOU — signalé par
+  l'utilisateur sur une calculatrice. ⚠ **Tout texte passe par `engine_draw_text`**, jamais par
+  `DrawTextEx` : sans le shader, un SDF s'affiche en silhouettes épaisses et floues. Les rectangles de
+  glyphes SDF portent une marge de 4 px de l'atlas (`SDF_MARGIN`) que `engine_font_ascent` retire, sinon
+  la ligne de base descend. Mesuré (`tests/gfx_graphics_test.ol`, scène E) : un « H » de 70 px a un
+  bord d'un pixel et ses montants restent à 255. `"pixel"` reste un bitmap, sans shader.
 - `engine_font(idx)` charge l'atlas au PREMIER usage : le construire crée une texture,
   donc exige un contexte graphique, absent quand les widgets sont déclarés. Repli sur
   `GetFontDefault()` en cas d'échec. Filtre BILINEAR, l'atlas étant le plus souvent réduit.

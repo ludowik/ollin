@@ -1210,7 +1210,7 @@ static int gfx_text(CallCtx& ctx) {
     }
     if (s_text_valign == TEXT_BASELINE)
         pos.y -= engine_font_ascent(font, s_font_size);
-    DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
+    engine_draw_text(s_font_idx, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
 }
 

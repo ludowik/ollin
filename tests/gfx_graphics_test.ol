@@ -7,6 +7,7 @@ const SHOT_A = "/tmp/ollin_gfx_graphics_a.png"
 const SHOT_B = "/tmp/ollin_gfx_graphics_b.png"
 const SHOT_C = "/tmp/ollin_gfx_graphics_c.png"
 const SHOT_D = "/tmp/ollin_gfx_graphics_d.png"
+const SHOT_E = "/tmp/ollin_gfx_graphics_e.png"
 
 global frames = 0
 global updates = 0
@@ -356,6 +357,32 @@ func check_d()
     image.unload(s)
 end
 
+## ── scene E: the engine fonts are distance fields, drawn sharp at a large size ──
+func scene_e()
+    graphics.clear(0, 0, 0)
+    graphics.stroke(1, 1, 1)
+    graphics.fontSize(70)
+    graphics.textMode("left", "baseline")
+    graphics.text("H", 5, 70)                          ## the capital H has neither descender nor overshoot
+    graphics.screenshot(SHOT_E)
+end
+
+func check_e()
+    var s = image.load(SHOT_E)
+    assert(lit(s, 5, 66, 40, 69) > 10)                 ## the stems reach the baseline...
+    assert(lit(s, 0, 72, 99, 79) == 0)                 ## ...and nothing hangs below it, margin of the glyph's rectangle included
+    assert(lit(s, 0, 0, 99, 23) == 0 and lit(s, 5, 26, 40, 28) > 10)    ## the capital is about 44 px high
+    var solid = 0                                      ## the stem is fully white inside: an edge, not a blur
+    for x = 5, 50 do
+        var r, g, b, a = image.getPixel(s, x, 45)
+        if r > 0.97 then
+            solid += 1
+        end
+    end
+    assert(solid >= 8)
+    image.unload(s)
+end
+
 ## ── the viewport variables ────────────────────────────────────────────────
 func check_viewport()
     graphics.viewport(50, 40)
@@ -383,7 +410,11 @@ func draw()
         scene_d()
     elseif frames == 6 then
         check_d()
-        graphics.viewport()
+        graphics.viewport()                            ## takes effect with the next frame
+    elseif frames == 7 then
+        scene_e()
+    elseif frames == 8 then
+        check_e()
         assert(updates >= 5 and lastDt >= 0)
         var gone = image.fromPattern(["#"])
         image.unload(gone)

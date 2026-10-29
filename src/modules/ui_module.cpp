@@ -727,7 +727,7 @@ void draw_text_at(const std::string& text, float x, const Rectangle& rect, const
     if (f.texture.id == 0 || f.baseSize == 0)
         return;
     Vector2 pos = {x, rect.y + (rect.height - m.font) * 0.5f};
-    DrawTextEx(f, text.c_str(), pos, m.font, m.font / (float)f.baseSize, color);
+    engine_draw_text(engine_font_default(), text.c_str(), pos, m.font, m.font / (float)f.baseSize, color);
 }
 
 } // namespace
