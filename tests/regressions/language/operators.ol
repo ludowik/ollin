@@ -168,3 +168,46 @@ assert(0 < cxOne() < 3 and not (1 < cxOne() < 3))
 ## float remainder and float floor division keep the sign rules of their integer forms
 assert(5.5 % 2 == 1.5 and -5.5 % 2 == -1.5)
 assert(5.5 // 2 == 2 and -5.5 // 2 == -3)
+
+## ── CONCAT: an interpolation, or a chain of `+` that starts with a string literal, joins its pieces at once ──
+## The chain is flattened only when the leftmost operand is a string literal: with a number first, the
+## additions come before the concatenation.
+var ca, cb = 1, 2
+assert("{ca}{cb}" == "12")                 ## two numbers: text, never a sum
+assert("{ca}" == "1")
+assert("x" + ca + cb == "x12")
+assert(ca + cb + "x" == "3x")
+assert("a" + 1.5 + true + nil + "b" == "a1.5truenilb")
+assert("[{ca + cb}|{"in{cb}"}]" == "[3|in2]")
+class CatStr
+    func init(n)
+        self.n = n
+    end
+    func __str()
+        return "<" + self.n + ">"
+    end
+end
+assert("v" + CatStr(7) + CatStr(8) == "v<7><8>")
+assert("{CatStr(1)}-{CatStr(2)}" == "<1>-<2>")
+## evaluation order is left to right, and each piece is evaluated once
+var catLog = ""
+func catNote(t)
+    catLog = catLog + t
+    return t
+end
+assert("-" + catNote("a") + catNote("b") + catNote("c") == "-abc")
+assert(catLog == "abc")
+## more pieces than one window holds (the accumulator carries over from window to window)
+var catParts = []
+var catWant = ""
+for catI = 1, 200 do
+    catParts.push("{catI},")
+    catWant = catWant + "{catI},"
+end
+var catText = "" + catParts[1]
+for catI = 2, 200 do
+    catText = catText + catParts[catI]
+end
+assert(catText == catWant)
+var cN = 5
+assert("{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}" == "5555555555555555555555555555555555555555555555555555555555555555555555")

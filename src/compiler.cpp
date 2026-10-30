@@ -485,6 +485,14 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
         // dest, so aliasing is harmless even when dest is also an operand (a = a - b gives
         // SUB Ra,Ra,Rb). Every caller has dest < reg_top_, so operand temporaries — allocated
         // from reg_top_ up — never overlap dest.
+        if (bin->op == '+') {
+            std::vector<ConcatPiece> pieces;
+            if (concat_chain(*bin, pieces)) {
+                emit_concat(pieces, dest);
+                last_reg_ = dest;
+                return;
+            }
+        }
         int saved = reg_top_;
         bin->left->accept(*this);
         int r_l = last_reg_;
@@ -1381,27 +1389,66 @@ void Compiler::visit(const StringExpr& e) {
 
 void Compiler::visit(const InterpExpr& e) {
     note_line(e.line, e.file_idx);
-    // Result is literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]; an ADD with a
-    // string on the left converts the right-hand side through value_to_string.
-    // Accumulated IN PLACE: `ADD acc, acc, x` reads before it writes, as a compound assignment
-    // does. Allocating a fresh register per piece burned three of them per placeholder, and a
-    // string of some 85 pieces failed to compile on the register limit, 255 at the time.
-    int acc = alloc_reg();
-    chunk.emit(make_abx(Op::LOAD_K, acc, chunk.add_constant(Value(e.literals[0]))));
-    int scratch = reg_top_; // the piece being appended, reused at every step
-    for (int i = 0; i < (int)e.exprs.size(); ++i) {
-        reg_top_ = scratch;
-        e.exprs[i]->accept(*this);
-        chunk.emit(make_abc(Op::ADD, acc, acc, last_reg_));
-        if (!e.literals[i + 1].empty()) {
-            reg_top_ = scratch;
-            int lit = alloc_reg();
-            chunk.emit(make_abx(Op::LOAD_K, lit, chunk.add_constant(Value(e.literals[i + 1]))));
-            chunk.emit(make_abc(Op::ADD, acc, acc, lit));
-        }
+    // Result is literals[0] + str(exprs[0]) + literals[1] + ... + literals[n], joined by CONCAT.
+    std::vector<ConcatPiece> pieces;
+    for (size_t i = 0; i < e.exprs.size(); ++i) {
+        if (!e.literals[i].empty())
+            pieces.push_back({nullptr, &e.literals[i]});
+        pieces.push_back({e.exprs[i].get(), nullptr});
     }
-    reg_top_ = scratch;
-    last_reg_ = acc;
+    if (!e.literals.back().empty() || pieces.empty())
+        pieces.push_back({nullptr, &e.literals.back()});
+    int w = reg_top_;
+    emit_concat(pieces, w);
+    reg_top_ = w + 1;
+    last_reg_ = w;
+}
+
+// The operands of a chain `s + a + b ...` whose LEFTMOST operand is a string literal, in order, or false.
+// With a string on the left every step of the chain is a concatenation (ADD tests for a string first), so
+// the chain is exactly CONCAT of its operands; any other leftmost operand may be a number, and then
+// `1 + 2 + "x"` adds before it concatenates.
+bool Compiler::concat_chain(const BinaryExpr& e, std::vector<ConcatPiece>& pieces) {
+    std::vector<const Expr*> rights;
+    const Expr* node = &e;
+    while (auto* b = dynamic_cast<const BinaryExpr*>(node)) {
+        if (b->op != '+')
+            break;
+        rights.push_back(b->right.get());
+        node = b->left.get();
+    }
+    if (rights.empty() || !dynamic_cast<const StringExpr*>(node))
+        return false;
+    pieces.push_back({node, nullptr});
+    for (size_t i = rights.size(); i-- > 0;)
+        pieces.push_back({rights[i], nullptr});
+    return true;
+}
+
+// R[dest] = the pieces joined. They are compiled into consecutive registers from reg_top_, and a long
+// list goes through the accumulator by windows, so that no more than k_concat_window registers are held at once.
+void Compiler::emit_concat(const std::vector<ConcatPiece>& pieces, int dest) {
+    constexpr int k_concat_window = 64;
+    int saved = reg_top_;
+    int w = reg_top_;
+    size_t i = 0;
+    int filled = 0;
+    do {
+        while (i < pieces.size() && filled < k_concat_window) {
+            int r = alloc_reg();
+            if (pieces[i].literal)
+                chunk.emit(make_abx(Op::LOAD_K, r, chunk.add_constant(Value(*pieces[i].literal))));
+            else
+                compile_into(*pieces[i].expr, r);
+            ++i;
+            ++filled;
+        }
+        bump_reg_count();
+        chunk.emit(make_abc(Op::CONCAT, i == pieces.size() ? dest : w, w, filled));
+        filled = 1; // the accumulator opens the next window
+        reg_top_ = w + 1;
+    } while (i < pieces.size());
+    reg_top_ = saved;
 }
 
 void Compiler::visit(const BoolExpr& e) {
@@ -1477,6 +1524,16 @@ void Compiler::visit(const BinaryExpr& e) {
         reg_top_ = dst + 1;
         last_reg_ = dst;
         return;
+    }
+    if (e.op == '+') {
+        std::vector<ConcatPiece> pieces;
+        if (concat_chain(e, pieces)) {
+            int w = reg_top_;
+            emit_concat(pieces, w);
+            reg_top_ = w + 1;
+            last_reg_ = w;
+            return;
+        }
     }
     e.left->accept(*this);
     int r_l = last_reg_;

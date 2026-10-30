@@ -138,6 +138,7 @@ enum class Op : OpByte {
     // GET_INDEXK: R[A] = R[B][constants[C]]. SET_INDEXK: R[A][constants[B]] = R[C].
     GET_INDEXK,
     SET_INDEXK,
+    CONCAT, // ABC: R[A] = the text of R[B] .. R[B+C-1] joined — an interpolation or a chain of `+` that starts with a string
     HALT,
 };
 

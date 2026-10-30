@@ -209,6 +209,13 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // that allocates its own register land on dest itself instead of being copied there.
     void compile_into(const Expr& e, int dest, bool dest_at_top = false);
     int operand_reg(const Expr& e);
+    // One piece of a CONCAT: an expression to compile, or a literal text.
+    struct ConcatPiece {
+        const Expr* expr;
+        const std::string* literal;
+    };
+    bool concat_chain(const BinaryExpr& e, std::vector<ConcatPiece>& pieces);
+    void emit_concat(const std::vector<ConcatPiece>& pieces, int dest);
     bool const_key(const Expr& key, PoolIdx& index);
     void emit_get_member(int dest, int obj_r, const std::string& name);
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the

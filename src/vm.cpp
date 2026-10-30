@@ -1166,6 +1166,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_LEK,
         &&op_GET_INDEXK,
         &&op_SET_INDEXK,
+        &&op_CONCAT,
         &&op_HALT,
     };
 
@@ -1600,6 +1601,23 @@ dispatch_loop:
         } else {
             throw std::runtime_error("cannot assign index on " + std::string(obj.type_name()) +
                                      (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
+        }
+        NEXT();
+    }
+
+    // The pieces are joined into ONE string: `a + b + c` through ADD interned (hashed, allocated, then
+    // dropped) a string for every partial result.
+    op_CONCAT: {
+        {
+            std::string out;
+            for (int i = 0; i < C; ++i) {
+                const Value& piece = R[B + i];
+                if (piece.is_string())
+                    out += piece.as_string();
+                else
+                    out += value_to_string(piece);
+            }
+            R[A] = Value(std::move(out));
         }
         NEXT();
     }

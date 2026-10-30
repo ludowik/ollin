@@ -905,6 +905,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | ADDK/SUBK/MULK/EQK/NEQK/GTK/LTK/GEK/LEK | ABC | A=dst, B=lhs, C=index de constante | comme `ADD`… mais l'opérande DROIT est `constants[C]` : un littéral n'a plus de `LOAD_K` (cf. « Opérande constant à droite ») |
 | GET_INDEXK / SET_INDEXK | ABC | `R[A] = R[B][constants[C]]` / `R[A][constants[B]] = R[C]` | la CLÉ est une constante du pool (nom de champ, indice littéral) : plus de `LOAD_K` avant l'accès ; repli sur `LOAD_K` + `GET_INDEX`/`SET_INDEX` au-delà de 65 535 constantes. Même corps que la forme à registre (`goto get_index` / `set_index` : seule la source de la clé change) |
+| CONCAT        | ABC    | A=dst, B=première pièce, C=nombre | `R[A]` = le texte de `R[B..B+C-1]` mis bout à bout, en UNE chaîne : une interpolation, ou une chaîne de `+` dont l'opérande le plus à GAUCHE est un littéral chaîne (alors chaque `+` est une concaténation : `ADD` teste la chaîne avant tout). Une chaîne de `+` qui commence par un nombre ne s'aplatit pas (`1 + 2 + "x"` additionne d'abord). Au-delà de 64 pièces, l'accumulateur passe d'une fenêtre à l'autre. Mesuré : `strings` −46 % d'instructions (un internement par chaîne au lieu d'un par résultat partiel) |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Commentaires : un BLANC, jeté au découpage
