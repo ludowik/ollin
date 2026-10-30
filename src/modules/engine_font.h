@@ -19,8 +19,13 @@ int engine_font_index(const char* name);
 // The font is loaded on FIRST use: building its atlas creates a texture, which requires a
 // graphics context. Falls back to GetFontDefault() on failure.
 Font engine_font(int idx);
-// Draws `text` with the font `idx`, as DrawTextEx would: the signed distance fields go through their shader.
-void engine_draw_text(int idx, const char* text, Vector2 pos, float size, float spacing, Color color);
+// False while there is no drawing area: no font is loaded then, and nothing can be measured or drawn.
+bool engine_font_usable(int idx);
+// Measure and draw take the font by INDEX and a size in pixels: the spacing (size / the atlas's own size)
+// and the shader a signed distance field needs are the registry's business, so a measure and the drawing
+// it is meant to match cannot disagree. The caller checks engine_font_usable first.
+Vector2 engine_text_size(int idx, const char* text, float size);
+void engine_draw_text(int idx, const char* text, Vector2 pos, float size, Color color);
 // Forgets the fonts WITHOUT unloading them: their textures belong to the previous program's
 // context, which is already destroyed. Called when a program starts.
 void engine_font_reset();
@@ -31,5 +36,5 @@ int engine_font_default();
 // Distance from the top of a line down to its BASELINE, at the size asked for. raylib's Font does
 // not carry it, so it is a metric of the REGISTRY rather than of any one caller: `graphics` aligns
 // text on it, and `ui` will the day a widget label has to.
-// Precondition: a loaded font (baseSize != 0), which engine_font guarantees once a context exists.
-float engine_font_ascent(const Font& font, float size);
+// Precondition: engine_font_usable(idx).
+float engine_font_ascent(int idx, float size);

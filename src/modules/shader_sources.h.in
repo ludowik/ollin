@@ -5,8 +5,14 @@
 // target, WASM included, and no build option can change it.
 //
 // The "#version" line is deliberately absent from the .glsl files: it depends on the target
-// (300 es under emscripten, 330 elsewhere) and load_lit_shader/load_fxaa_shader/load_sdf_shader prepend it.
+// (300 es under emscripten, 330 elsewhere), so every shader loader prepends k_shader_header.
 #pragma once
+
+#ifdef __EMSCRIPTEN__
+inline const char* const k_shader_header = "#version 300 es\nprecision highp float;\n";
+#else
+inline const char* const k_shader_header = "#version 330\n";
+#endif
 
 inline const char* const k_lit_vertex_src = R"GLSL(
 @OLLIN_LIT_VERT@

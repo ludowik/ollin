@@ -34,18 +34,17 @@ endif()
 # when a program runs, exactly as for the engine fonts, so every target renders the same.
 # CMAKE_CONFIGURE_DEPENDS re-runs the configuration when a .glsl changes, so editing a shader and
 # rebuilding is enough — no explicit cmake call.
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.vert" OLLIN_LIT_VERT)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.frag" OLLIN_LIT_FRAG)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/fxaa.frag" OLLIN_FXAA_FRAG)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/sdf.frag" OLLIN_SDF_FRAG)
+# One variable per shader, named after its file (lit.vert -> OLLIN_LIT_VERT), read by shader_sources.h.in.
+foreach(shader lit.vert lit.frag fxaa.frag sdf.frag)
+    string(TOUPPER "${shader}" shader_var)
+    string(REPLACE "." "_" shader_var "${shader_var}")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}" OLLIN_${shader_var})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}")
+endforeach()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/modules/shader_sources.h.in"
                "${CMAKE_BINARY_DIR}/generated/shader_sources.h" @ONLY)
 include_directories("${CMAKE_BINARY_DIR}/generated")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.vert"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.frag"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/fxaa.frag"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/sdf.frag")
 
 set(OLLIN_SOURCES
     src/chunk.cpp

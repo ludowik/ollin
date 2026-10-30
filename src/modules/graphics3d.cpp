@@ -514,12 +514,11 @@ static void load_lit_shader() {
     if (s_lit_ready) {
         return;
     }
-    const char* HDR = gfx_shader_header();
     // The GLSL lives in src/shaders/lit.vert and lit.frag, pasted into a generated header at
     // configure time (see CMakeLists). Only the version line, which depends on the target, is
     // added here.
-    std::string vs = std::string(HDR) + k_lit_vertex_src;
-    std::string fs = std::string(HDR) + k_lit_fragment_src;
+    std::string vs = std::string(k_shader_header) + k_lit_vertex_src;
+    std::string fs = std::string(k_shader_header) + k_lit_fragment_src;
     s_lit = LoadShaderFromMemory(vs.c_str(), fs.c_str());
     if (s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] <= 0) {
         s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] = GetShaderLocationAttrib(s_lit, "instanceTransform");

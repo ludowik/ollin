@@ -97,8 +97,7 @@ static void load_fxaa_shader() {
         upload_fxaa_texel();   // already loaded: only the render target's size may have changed
         return;
     }
-    const char* HDR = gfx_shader_header();
-    std::string fs = std::string(HDR) + k_fxaa_fragment_src;
+    std::string fs = std::string(k_shader_header) + k_fxaa_fragment_src;
     s_fxaa = LoadShaderFromMemory(nullptr, fs.c_str());   // nullptr = raylib's default 2D vertex shader
     s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
     s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
@@ -601,11 +600,6 @@ static void apply_font_size(float sz) {
     s_font_size = sz;
 }
 
-// Font used for text drawing, as chosen by the script.
-static Font current_font() {
-    return engine_font(s_font_idx);
-}
-
 // Sub-pixel strokes: the RenderTexture has no MSAA, so a thickness below 1 renders as dots — partial
 // coverage without smoothing. We approximate anti-aliasing by keeping a CONTINUOUS 1 px stroke and
 // modulating the alpha by the coverage, that is by the thickness, giving a thin continuous line that
@@ -851,8 +845,7 @@ static int gfx_text_size(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.textSize: expected a text");
-    Font font = current_font();
-    if (font.texture.id == 0 || font.baseSize == 0) {
+    if (!engine_font_usable(s_font_idx)) {
         // With no drawing area no font is loaded, so we return 0 rather than divide by the native
         // height — the same choice as graphics.text, which draws nothing.
         ctx.set_result(0, Value(0.0));
@@ -862,7 +855,7 @@ static int gfx_text_size(CallCtx& ctx) {
     // Same conversion as graphics.text, and for the same reason: measuring must agree with
     // drawing, or a number could be written but never centred.
     std::string text = drawn_text(args, argc, 0);
-    Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, s_font_size / (float)font.baseSize);
+    Vector2 size = engine_text_size(s_font_idx, text.c_str(), s_font_size);
     ctx.set_result(0, Value((double)size.x));
     ctx.set_result(1, Value((double)size.y));
     return 2;
@@ -1183,22 +1176,20 @@ static int gfx_text(CallCtx& ctx) {
     // DrawText's spacing is fontSize/baseSize in INTEGER division, so it advances in steps — 1 from 10
     // to 19, 2 from 20 to 29 — and we keep the same intent continuously, which is the scale factor
     // itself.
-    Font font = current_font();
     // A guard DrawText applied and that calling DrawTextEx directly lost: with no canvas the default
     // font is not loaded (null glyphs, baseSize at 0), which means a division by zero and then a null
     // dereference. Draw nothing, as before.
-    if (font.texture.id == 0 || font.baseSize == 0)
+    if (!engine_font_usable(s_font_idx))
         return ctx.ret(Value{});
     // Converted only once the canvas is known to exist: with no drawing area nothing is drawn, so
     // an `__str` must not run either.
     std::string text = drawn_text(args, argc, 0);
-    float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
     // Only the anchors that need the text MEASURED pay for it: measuring walks the whole string,
     // and a baseline needs the font's ascent alone. Guarding both axes at once made "left" plus
     // "baseline" — what the Primitives sample uses — measure for nothing.
     if (s_text_mode != TEXT_LEFT || s_text_valign == TEXT_BOTTOM || s_text_valign == TEXT_MIDDLE) {
-        Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, spacing);
+        Vector2 size = engine_text_size(s_font_idx, text.c_str(), s_font_size);
         if (s_text_mode == TEXT_CENTER)
             pos.x -= size.x / 2.0f;
         else if (s_text_mode == TEXT_RIGHT)
@@ -1209,8 +1200,8 @@ static int gfx_text(CallCtx& ctx) {
             pos.y -= size.y / 2.0f;
     }
     if (s_text_valign == TEXT_BASELINE)
-        pos.y -= engine_font_ascent(font, s_font_size);
-    engine_draw_text(s_font_idx, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
+        pos.y -= engine_font_ascent(s_font_idx, s_font_size);
+    engine_draw_text(s_font_idx, text.c_str(), pos, s_font_size, s_stroke_color);
     return ctx.ret(Value{});
 }
 

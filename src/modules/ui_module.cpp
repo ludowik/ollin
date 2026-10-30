@@ -272,15 +272,14 @@ Metrics metrics() {
 
 // Widgets are always drawn with the engine's default font, whatever font the script chose for its own
 // drawing: the interface keeps its appearance no matter what the program does.
-Font ui_font() {
-    return engine_font(engine_font_default());
+int ui_font() {
+    return engine_font_default();
 }
 
 float text_width(const std::string& text, float font_size) {
-    Font font = ui_font();
-    if (font.texture.id == 0 || font.baseSize == 0)
+    if (!engine_font_usable(ui_font()))
         return (float)text.size() * font_size * 0.5f;   // no canvas: an estimate
-    return MeasureTextEx(font, text.c_str(), font_size, font_size / (float)font.baseSize).x;
+    return engine_text_size(ui_font(), text.c_str(), font_size).x;
 }
 
 // Label of the back row: "<" followed by the parent menu, the root being anonymous.
@@ -723,11 +722,10 @@ void draw_handle(const Rectangle& rect, const Metrics& m) {
 }
 
 void draw_text_at(const std::string& text, float x, const Rectangle& rect, const Metrics& m, Color color) {
-    Font f = ui_font();
-    if (f.texture.id == 0 || f.baseSize == 0)
+    if (!engine_font_usable(ui_font()))
         return;
     Vector2 pos = {x, rect.y + (rect.height - m.font) * 0.5f};
-    engine_draw_text(engine_font_default(), text.c_str(), pos, m.font, m.font / (float)f.baseSize, color);
+    engine_draw_text(ui_font(), text.c_str(), pos, m.font, color);
 }
 
 } // namespace
