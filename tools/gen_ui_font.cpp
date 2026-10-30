@@ -51,7 +51,8 @@ int main(int argc, char** argv) {
     Font font = {0};
     font.baseSize = size;
     font.glyphPadding = 0;   // the distance field carries its own margin inside every glyph's rectangle
-    font.glyphs = LoadFontData(fileData, fileSize, size, points.data(), (int)points.size(), FONT_SDF, &font.glyphCount);
+    font.glyphs =
+        LoadFontData(fileData, fileSize, size, points.data(), (int)points.size(), FONT_SDF, &font.glyphCount);
     UnloadFileData(fileData);
     Image atlas = GenImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, size, 0, 1);
     font.texture = LoadTextureFromImage(atlas);

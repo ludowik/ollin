@@ -217,14 +217,14 @@ static int cam_orbit(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// The camera's own axes, unit vectors: where it looks (forward), what is to the right of the screen and what
-// is up on it. The up the camera was given is only a hint (it need not be square to the view): `up` here is
-// the axis it implies, square to both. A target equal to the position, or an up along the view, leaves the
-// axes that cannot be worked out as null vectors.
 static Vector3 camera_forward(const Camera3D& camera) {
     return Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 }
 
+// The camera's own axes, unit vectors: where it looks (forward), what is to the right of the screen and what
+// is up on it. The up the camera was given is only a hint (it need not be square to the view): `up` here is
+// the axis it implies, square to both. A target equal to the position, or an up along the view, leaves the
+// axes that cannot be worked out as null vectors.
 struct CameraAxes {
     Vector3 forward;
     Vector3 right;
