@@ -211,3 +211,20 @@ end
 assert(catText == catWant)
 var cN = 5
 assert("{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}{cN}" == "5555555555555555555555555555555555555555555555555555555555555555555555")
+
+## ── float operands take their own fast path: same results as the general one ──
+var fa, fb = 1.5, 0.25
+assert(fa + fb == 1.75 and fa - fb == 1.25 and fa * fb == 0.375)
+assert(fa > fb and fa >= fb and fb < fa and fb <= fa and not (fa < fb) and not (fa <= fb))
+assert(fa >= 1.5 and fa <= 1.5)
+var finf = 1e308 * 10.0
+var fnan = finf - finf
+assert(not (fnan < fa) and not (fnan > fa) and not (fnan <= fnan) and not (fnan >= fnan))
+assert(7 / 2 == 3.5 and 7 / 2.0 == 3.5 and 7.0 / 2 == 3.5 and 6 / 3 == 2)
+var fok = false
+try
+    var z = fa / 0.0
+catch e
+    fok = true
+end
+assert(fok)

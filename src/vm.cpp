@@ -875,6 +875,10 @@ void VM::run_goto(size_t stop_depth) {
             R[A] = Value(bv.as_int() + cv.as_int()); \
             NEXT(); \
         } \
+        if (bv.is_float() && cv.is_float()) { /* float + float: no promotion, no meta-method to look for */ \
+            R[A] = Value(bv.as_float() + cv.as_float()); \
+            NEXT(); \
+        } \
         if (bv.is_string() || cv.is_string()) { \
             { \
                 /* Copy the operands BEFORE value_to_string: if one is an instance with __str, */ \
@@ -906,6 +910,10 @@ void VM::run_goto(size_t stop_depth) {
             R[A] = Value(bv.as_int() - cv.as_int()); \
             NEXT(); \
         } \
+        if (bv.is_float() && cv.is_float()) { /* float - float: no promotion, no meta-method to look for */ \
+            R[A] = Value(bv.as_float() - cv.as_float()); \
+            NEXT(); \
+        } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().sub_, base + A, bv, cv)) { \
                 ip = addr; \
@@ -923,6 +931,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int * int */ \
             R[A] = Value(bv.as_int() * cv.as_int()); \
+            NEXT(); \
+        } \
+        if (bv.is_float() && cv.is_float()) { /* float * float: no promotion, no meta-method to look for */ \
+            R[A] = Value(bv.as_float() * cv.as_float()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { \
@@ -980,6 +992,10 @@ void VM::run_goto(size_t stop_depth) {
             R[A] = Value::make_bool(bv.as_int() > cv.as_int()); \
             NEXT(); \
         } \
+        if (bv.is_float() && cv.is_float()) { /* float > float: no promotion, no meta-method to look for */ \
+            R[A] = Value::make_bool(bv.as_float() > cv.as_float()); \
+            NEXT(); \
+        } \
         if (is_instance(cv)) { /* the instance on the right: a > b is b < a, hence b.__lt(a) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) { \
                 ip = addr; \
@@ -1007,6 +1023,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int < int */ \
             R[A] = Value::make_bool(bv.as_int() < cv.as_int()); \
+            NEXT(); \
+        } \
+        if (bv.is_float() && cv.is_float()) { /* float < float: no promotion, no meta-method to look for */ \
+            R[A] = Value::make_bool(bv.as_float() < cv.as_float()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a < b is a.__lt(b) */ \
@@ -1039,6 +1059,10 @@ void VM::run_goto(size_t stop_depth) {
             R[A] = Value::make_bool(bv.as_int() >= cv.as_int()); \
             NEXT(); \
         } \
+        if (bv.is_float() && cv.is_float()) { /* float >= float: no promotion, no meta-method to look for */ \
+            R[A] = Value::make_bool(bv.as_float() >= cv.as_float()); \
+            NEXT(); \
+        } \
         if (is_instance(cv)) { /* the instance on the right: a >= b is b <= a, hence b.__le(a) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) { \
                 ip = addr; \
@@ -1066,6 +1090,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int <= int */ \
             R[A] = Value::make_bool(bv.as_int() <= cv.as_int()); \
+            NEXT(); \
+        } \
+        if (bv.is_float() && cv.is_float()) { /* float <= float: no promotion, no meta-method to look for */ \
+            R[A] = Value::make_bool(bv.as_float() <= cv.as_float()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a <= b is a.__le(b) */ \
@@ -1222,6 +1250,13 @@ dispatch_loop:
         BINARY_HANDLER_MUL(R[C])
 
     op_DIV: {
+        if (R[B].is_number() && R[C].is_number()) { // the hot path: no instance, no promotion rule to ask
+            double dv = R[C].as_num();
+            if (dv == 0.0)
+                throw std::runtime_error("runtime: division by zero");
+            R[A] = Value(R[B].as_num() / dv);
+            NEXT();
+        }
         if (is_instance(R[B])) {
             if (uint32_t addr = try_meta_binary(MK().div_, base + A, R[B], R[C])) {
                 ip = addr;
