@@ -558,3 +558,23 @@ assert(dropped == nil)
 var kept = makeSelfDropping(1)
 var again = kept
 assert(kept(1) == 2 and again(1) == 3)
+
+## ── An indexed write reads its container and key BEFORE the value runs code ────
+## The key and the container are read in place (no copy) when nothing to their right can run code; with a call
+## on the right, a captured local the call changes must still be read as it was before.
+var wrI = 1
+var wrArr = [10, 20, 30]
+func wrBump()
+    wrI = wrI + 1
+    return 99
+end
+wrArr[wrI] = wrBump()
+assert(wrArr[1] == 99 and wrArr[2] == 20 and wrI == 2)
+var wrRows = [[0, 0], [0, 0]]
+var wrR = 1
+func wrNext()
+    wrR = 2
+    return 7
+end
+wrRows[wrR][wrR] = wrNext()
+assert(wrRows[1][1] == 7 and wrRows[2][2] == 0)

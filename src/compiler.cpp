@@ -2171,6 +2171,21 @@ void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_ex
                              (field.empty() ? "" : " element '" + field + "'"));
 }
 
+// Whether evaluating `e` can run script code, which could change a local that a closure captured. Such an
+// expression is evaluated AFTER the operands to its left have been read, so a bare local to its left must be
+// copied first (any other operand already lands in a temporary, at its place in the order).
+static bool runs_script_code(const Expr& e) {
+    if (dynamic_cast<const CallExpr*>(&e) || dynamic_cast<const MethodCallExpr*>(&e) ||
+        dynamic_cast<const ExprCallExpr*>(&e) || dynamic_cast<const FuncExpr*>(&e))
+        return true; // (an operator or a `__str` reached through a piece of text can too, but so can any `a + b`)
+    bool found = false;
+    e.for_each_child([&](const Expr& c) {
+        if (!found && runs_script_code(c))
+            found = true;
+    });
+    return found;
+}
+
 // An expression as an OPERAND: a named local answers with its own register, so no MOVE copies it
 // (and retains, then releases, the array or map it holds); anything else lands in a temporary.
 // The register is kept alive until the caller is done with it.
@@ -2197,7 +2212,15 @@ void Compiler::visit(const IndexAssignStmt& s) {
         // Chained target (a.b.c, a[i][j]…): the container is an expression, evaluated into a
         // register. Maps and arrays being ref-counted, the SET_INDEX that follows does mutate the
         // original object.
-        obj_r = operand_reg(*s.obj_expr);
+        // Read in place only when nothing written to its right can run code: `a[i][j] = f()` must index
+        // with the `a[i]` it had BEFORE f ran.
+        if (dynamic_cast<const VarExpr*>(s.obj_expr.get()) &&
+            (runs_script_code(*s.key) || runs_script_code(*s.value))) {
+            obj_r = alloc_reg();
+            compile_into(*s.obj_expr, obj_r);
+        } else {
+            obj_r = operand_reg(*s.obj_expr);
+        }
     } else {
         const int* it = scopes().regs.find(s.obj);
         if (it != nullptr) {
@@ -2219,7 +2242,15 @@ void Compiler::visit(const IndexAssignStmt& s) {
     // read it from there, and `key_r` stays unused.
     PoolIdx key_idx;
     bool key_const = const_key(*s.key, key_idx);
-    int key_r = key_const ? 0 : operand_reg(*s.key);
+    int key_r = 0;
+    if (!key_const) {
+        if (dynamic_cast<const VarExpr*>(s.key.get()) && runs_script_code(*s.value)) { // `arr[i] = f()`, f changing the captured i: the key is the i of BEFORE
+            key_r = alloc_reg();
+            compile_into(*s.key, key_r);
+        } else {
+            key_r = operand_reg(*s.key);
+        }
+    }
     auto get_at = [&](int dest) {
         chunk.emit(key_const ? make_abc(Op::GET_INDEXK, dest, obj_r, key_idx) : make_abc(Op::GET_INDEX, dest, obj_r, key_r));
     };

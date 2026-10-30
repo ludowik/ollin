@@ -2356,7 +2356,7 @@ Mesuré (`bash bench/icount.sh`, avant/après ce changement) : `fib` −2,9 %, b
   +0,00 % sur `invaders`. La descente coûte une recherche de `__class__` puis une du nom dans la
   classe ; la validation d'une entrée coûte autant. Ne pas refaire sans une idée qui change ce
   bilan — par exemple supprimer la recherche de `__class__` elle-même.
-- `Map::version` = `++g_map_epoch` (époque globale monotone) à chaque `Map::set` **et** au recyclage dans `MapPool::release` → insensible à la réutilisation d'adresse.
+- Deux compteurs, tous deux tirés de `++g_map_epoch` (époque globale monotone, donc insensibles à la réutilisation d'adresse) : `Map::layout` bouge quand une entrée APPARAÎT ou DISPARAÎT (et au recyclage dans `MapPool::release`) — c'est lui que lit le cache, puisque seul cela déplace un emplacement ; `Map::version` bouge à CHAQUE `Map::set`, écrasement en place compris — c'est lui que lisent les consommateurs du CONTENU (le cache de caméra de `graphics3d.cpp`). Écraser une valeur en place laisse donc le cache de `GET_INDEX` valide, et le prochain accès lit la nouvelle valeur.
 - `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.
 - **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
 
@@ -2464,13 +2464,13 @@ std::vector<UpvalDesc> upvals;  // dans FuncProto
 ### Frame (`vm.h`)
 
 ```cpp
-std::vector<Upvalue*> upvals;       // upvals de la closure appelante (si T_CLOSURE)
-std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
+ClosureRef closure;                 // la closure que le cadre exécute (retenue ; ses upvals se lisent dedans, sans copie)
+OpenUpvals open_upvals;             // upvals ouvertes créées par ce frame (vecteur alloué à la demande)
 ```
 
 ### Cycle de vie
 
-1. `MAKE_CLOSURE` — crée `Closure{func_idx}`, pour chaque `UpvalDesc` : si `is_local` → crée ou réutilise un `Upvalue*` pointant dans `regs[frame_base + reg_idx]`, si non local → reprend `frame.upvals[idx]`.
+1. `MAKE_CLOSURE` — crée `Closure{func_idx}`, pour chaque `UpvalDesc` : si `is_local` → crée ou réutilise un `Upvalue*` pointant dans `regs[frame_base + reg_idx]`, si non local → reprend `frame.closure->upvals[idx]`.
 2. Upvalue **ouverte** : `GET_UPVAL`/`SET_UPVAL` accèdent à `regs[frame_base + reg_idx]` du frame parent via le pointeur.
 3. `RETURN` / `THROW` — ferme toutes les `open_upvals` du frame : copie `regs[base+idx]` dans `uv->val`, pose `closed=true`.
 4. Upvalue **fermée** : accès via `uv->val` (le frame parent n'existe plus).
