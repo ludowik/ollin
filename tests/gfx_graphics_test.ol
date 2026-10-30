@@ -407,6 +407,11 @@ func scene_f()
     graphics.font("pixel")
     graphics.text("C", 30, 56)                         ## a bitmap font: not read through the shader
     graphics.font("sans")
+    graphics.text("D", 72, 16)                         ## waits in the batch...
+    graphics.translate(0, 30)                          ## ...when a bare translate edits the matrix the batch is flushed with
+    graphics.fill(1, 1, 0)
+    graphics.noStroke()
+    graphics.rect(90, 2, 8, 8)
     graphics.screenshot(SHOT_F)
 end
 
@@ -418,6 +423,8 @@ func check_f()
     assert(is(s, 3, 41, 0, 0.25, 0))                   ## the quarter-opaque sprite is still a quarter
     assert(lit(s, 2, 56, 25, 78) > 20)                 ## the text after the sprite
     assert(lit(s, 30, 56, 45, 78) > 3)                 ## the bitmap-font text
+    assert(lit(s, 72, 16, 88, 36) > 20 and lit(s, 72, 46, 88, 66) == 0)   ## "D" stayed where it was written
+    assert(is(s, 94, 36, 1, 1, 0))                     ## and the shape after the translate is moved
     image.unload(s)
 end
 

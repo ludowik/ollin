@@ -1539,8 +1539,12 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   bitmap ; 268 une fois le shader gardé). Tout ce qui n'est ni un texte SDF ni une forme simple doit
   FERMER la série avant de dessiner, sinon l'alpha doux d'un sprite serait coupé à un demi. **La sûreté
   tient au défaut** : `with_area` (graphics_internal.h) ferme, et seules les fonctions déclarées
-  `with_area_text_safe` — texte, formes, pile de transformations — la laissent ouverte ; en oublier une ne
-  coûte que de la vitesse. Les formes de raylib passent par un texel blanc opaque, que le shader laisse tel
+  `with_area_text_safe` — texte, formes, `push`/`pop` — la laissent ouverte ; en oublier une ne
+  coûte que de la vitesse. ⚠ **`translate`, `rotate*`, `scale` et `resetTransform` FERMENT** : hors d'un `push`
+  ils modifient la matrice de vue, que rlgl applique au VIDAGE du lot, et un texte encore en attente se
+  déplacerait avec elle (reproduit : un « A » écrit avant un `translate(60, 0)` sortait 60 px plus loin).
+  Les FORMES ont déjà ce défaut sans texte (un `rect`, un `translate` nu, un `rect` : le premier bouge
+  aussi) ; non corrigé, hors du sujet. Les formes de raylib passent par un texel blanc opaque, que le shader laisse tel
   quel. Le moteur ferme aussi à la fin de `draw()`, de l'interface et d'une image en erreur
   (`engine_font_reset` y revient pour un programme relancé sur le même contexte). Gardé par la scène F de
   `tests/gfx_graphics_test.ol` ; sans la fermeture de `with_area`, la scène B échoue.
