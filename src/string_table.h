@@ -14,25 +14,38 @@ struct InternedStr {
     InternedStr& operator=(InternedStr&&) = delete;
 };
 
+// The table holds the strings themselves, hashed by the hash they already carry: a new string is
+// hashed ONCE, when it is looked up, and the insertion, the rehash and the erase reuse that value.
+// (Keyed by a string_view into the string, as before, each of those hashed the bytes again.)
 struct StringTable {
-    // The key is a string_view into InternedStr::str (heap-allocated, hence stable), so the
-    // bytes exist exactly once.
-    robin_hood::unordered_map<std::string_view, InternedStr*> table_;
+    struct Hash {
+        size_t operator()(const InternedStr* p) const noexcept {
+            return p->hash;
+        }
+    };
+    struct Equal {
+        bool operator()(const InternedStr* a, const InternedStr* b) const noexcept {
+            return a == b || (a->hash == b->hash && a->str == b->str);
+        }
+    };
+    robin_hood::unordered_flat_set<InternedStr*, Hash, Equal> table_;
 
     InternedStr* intern(std::string s) {
-        auto it = table_.find(std::string_view(s));
+        // A probe on the stack carries the text and its hash for the lookup; on a miss the text moves
+        // on into the heap string that stays.
+        InternedStr probe{1, (uint32_t)std::hash<std::string>{}(s), std::move(s)};
+        auto it = table_.find(&probe);
         if (it != table_.end()) {
-            ++it->second->refcount;
-            return it->second;
+            ++(*it)->refcount;
+            return *it;
         }
-        auto h = (uint32_t)std::hash<std::string>{}(s);
-        auto* p = new InternedStr{1, h, std::move(s)};
-        table_.emplace(std::string_view(p->str), p); // a view into p->str, with no copy
+        auto* p = new InternedStr{1, probe.hash, std::move(probe.str)};
+        table_.insert(p);
         return p;
     }
 
     void erase(InternedStr* p) {
-        table_.erase(std::string_view(p->str)); // BEFORE the delete: the view must still be valid
+        table_.erase(p); // BEFORE the delete: the hash and the text are read from p
         delete p;
     }
 };
