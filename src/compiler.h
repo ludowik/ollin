@@ -209,6 +209,8 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // that allocates its own register land on dest itself instead of being copied there.
     void compile_into(const Expr& e, int dest, bool dest_at_top = false);
     int operand_reg(const Expr& e);
+    bool const_key(const Expr& key, PoolIdx& index);
+    void emit_get_member(int dest, int obj_r, const std::string& name);
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);

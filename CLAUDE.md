@@ -904,6 +904,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | ADDK/SUBK/MULK/EQK/NEQK/GTK/LTK/GEK/LEK | ABC | A=dst, B=lhs, C=index de constante | comme `ADD`… mais l'opérande DROIT est `constants[C]` : un littéral n'a plus de `LOAD_K` (cf. « Opérande constant à droite ») |
+| GET_INDEXK / SET_INDEXK | ABC | `R[A] = R[B][constants[C]]` / `R[A][constants[B]] = R[C]` | la CLÉ est une constante du pool (nom de champ, indice littéral) : plus de `LOAD_K` avant l'accès ; repli sur `LOAD_K` + `GET_INDEX`/`SET_INDEX` au-delà de 65 535 constantes. Même corps que la forme à registre (`goto get_index` / `set_index` : seule la source de la clé change) |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Commentaires : un BLANC, jeté au découpage

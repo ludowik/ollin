@@ -1,7 +1,7 @@
 #!/bin/bash
 # CONSTANT-OPERAND guard: past the last constant the instruction field can name, a literal falls back to
 # LOAD_K and the generic opcode (ADDK and its siblings read their right operand from the pool, C being its
-# index, and C is a 16-bit field).
+# index, and C is a 16-bit field; GET_INDEXK and SET_INDEXK do the same for a field name).
 #
 # The program is GENERATED, and nothing about the ceiling is written down but the field's width: 70 000
 # distinct constants first, then the operations whose constants land beyond it.
@@ -27,6 +27,11 @@ out += [
     "assert(n < 99999999 and n <= 99999999 and not (n > 99999999) and not (n >= 99999999))",
     "assert(n <> 123456789 and not (n == 123456789))",
     'assert("x" + "far away" == "xfar away")',
+    'var o = {"far key": 5, "other far key": 6}',
+    'assert(o["far key"] == 5 and o["other far key"] == 6)',
+    'o["far key"] += 1',
+    'o["third far key"] = 9',
+    'assert(o["far key"] == 6 and o["third far key"] == 9 and o.len() == 3)',
     "n += 123456789",
     "assert(n == 123456796 and len(a) == 70000)",
     'print("pool overflow ok")',

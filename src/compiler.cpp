@@ -441,6 +441,31 @@ bool Compiler::const_operand(Op& op, const Expr& right, PoolIdx& index) {
     return true;
 }
 
+// A key known at compile time (a field name, a literal index) whose pool index fits the field: the
+// access can then read it from the pool, with no LOAD_K.
+bool Compiler::const_key(const Expr& key, PoolIdx& index) {
+    Value v;
+    if (!const_value(key, v))
+        return false;
+    PoolIdx idx = chunk.add_constant(v);
+    if (idx > k_field_max)
+        return false;
+    index = idx;
+    return true;
+}
+
+// R[dest] = R[obj][name], the name being a field written in the source.
+void Compiler::emit_get_member(int dest, int obj_r, const std::string& name) {
+    PoolIdx idx = chunk.add_constant(Value(name));
+    if (idx <= k_field_max) {
+        chunk.emit(make_abc(Op::GET_INDEXK, dest, obj_r, idx));
+        return;
+    }
+    int key_r = alloc_reg();
+    chunk.emit(make_abx(Op::LOAD_K, key_r, idx));
+    chunk.emit(make_abc(Op::GET_INDEX, dest, obj_r, key_r));
+}
+
 void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
     // The direct paths below need dest < reg_top_, so that operand temporaries never overlap it.
     if (dest_at_top)
@@ -1691,11 +1716,18 @@ void Compiler::visit(const MapExpr& e) {
     chunk.emit(make_abc(Op::NEW_MAP, dest, 0, 0));
     for (auto& entry : e.entries) {
         int saved = reg_top_;
-        int key_reg = alloc_reg();
-        compile_into(*entry.key, key_reg); // a literal StringExpr OR a computed key
-        int val_reg = alloc_reg();
-        compile_into(*entry.value, val_reg);
-        chunk.emit(make_abc(Op::SET_INDEX, dest, key_reg, val_reg));
+        PoolIdx key_idx;
+        if (const_key(*entry.key, key_idx)) {
+            int val_reg = alloc_reg();
+            compile_into(*entry.value, val_reg);
+            chunk.emit(make_abc(Op::SET_INDEXK, dest, key_idx, val_reg));
+        } else {
+            int key_reg = alloc_reg();
+            compile_into(*entry.key, key_reg); // a computed key
+            int val_reg = alloc_reg();
+            compile_into(*entry.value, val_reg);
+            chunk.emit(make_abc(Op::SET_INDEX, dest, key_reg, val_reg));
+        }
         reg_top_ = saved;
     }
     last_reg_ = dest;
@@ -1716,6 +1748,13 @@ void Compiler::visit(const IndexExpr& e) {
     // reallocate over the object (same as in BinaryExpr). See f().x and f()[i].
     if (reg_top_ <= obj_r)
         reserve_regs_to(obj_r + 1);
+    PoolIdx key_idx;
+    if (const_key(*e.key, key_idx)) {
+        int dest = alloc_reg();
+        chunk.emit(make_abc(Op::GET_INDEXK, dest, obj_r, key_idx));
+        last_reg_ = dest;
+        return;
+    }
     int saved2 = reg_top_;
     e.key->accept(*this);
     int key_r = last_reg_;
@@ -2119,16 +2158,24 @@ void Compiler::visit(const IndexAssignStmt& s) {
         }
     }
 
-    int key_r = operand_reg(*s.key);
+    // The key is a pool constant when the source writes a literal: the three accesses below then
+    // read it from there, and `key_r` stays unused.
+    PoolIdx key_idx;
+    bool key_const = const_key(*s.key, key_idx);
+    int key_r = key_const ? 0 : operand_reg(*s.key);
+    auto get_at = [&](int dest) {
+        chunk.emit(key_const ? make_abc(Op::GET_INDEXK, dest, obj_r, key_idx) : make_abc(Op::GET_INDEX, dest, obj_r, key_r));
+    };
+    auto set_at = [&](int val_r) {
+        chunk.emit(key_const ? make_abc(Op::SET_INDEXK, obj_r, key_idx, val_r) : make_abc(Op::SET_INDEX, obj_r, key_r, val_r));
+    };
 
     if (s.op == TokenType::EQUALS) {
-        // Simple assignment: SET_INDEX obj_r, key_r, val_r
-        int val_r = operand_reg(*s.value);
-        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, val_r));
+        set_at(operand_reg(*s.value));
     } else {
         // Compound assignment: get current, apply op, store back
         int cur_r = alloc_reg();
-        chunk.emit(make_abc(Op::GET_INDEX, cur_r, obj_r, key_r));
+        get_at(cur_r);
         Op op = token_to_op(s.op);
         PoolIdx rhs;
         if (!const_operand(op, *s.value, rhs)) {
@@ -2138,7 +2185,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         int result_r = alloc_reg();
         bump_reg_count();
         chunk.emit(make_abc(op, result_r, cur_r, rhs));
-        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, result_r));
+        set_at(result_r);
     }
     reg_top_ = saved;
 }
@@ -2390,13 +2437,12 @@ void Compiler::visit(const MethodCallExpr& e) {
         chunk.emit(make_abc(Op::MOVE, call_base, self_src, 0));
 
         // Temporaries: tmp holds the parent class (a global), key_r the key.
-        int tmp = alloc_reg(), key_r = alloc_reg();
+        int tmp = alloc_reg();
 
         // tmp = <the lexically enclosing parent class>
         chunk.emit(make_abx(Op::LOAD_GLOBAL, tmp, chunk.add_identifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
-        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string(e.method)))));
-        chunk.emit(make_abc(Op::GET_INDEX, (call_base + 1), tmp, key_r));
+        emit_get_member(call_base + 1, tmp, std::string(e.method));
         reserve_regs_to(call_base + 2);
     } else {
         // R[call_base] = receiver (self)
@@ -2404,9 +2450,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         reserve_regs_to(call_base + 1);
 
         // R[call_base+1] = GET_INDEX(receiver, method_name)
-        int key_r = alloc_reg();
-        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string(e.method)))));
-        chunk.emit(make_abc(Op::GET_INDEX, (call_base + 1), call_base, key_r));
+        emit_get_member(call_base + 1, call_base, std::string(e.method));
         reserve_regs_to(call_base + 2);
     }
 

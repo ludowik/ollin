@@ -134,6 +134,10 @@ enum class Op : OpByte {
     LTK,
     GEK,
     LEK,
+    // The key is a constant of the pool (a field name, a literal index): the access no longer costs a LOAD_K.
+    // GET_INDEXK: R[A] = R[B][constants[C]]. SET_INDEXK: R[A][constants[B]] = R[C].
+    GET_INDEXK,
+    SET_INDEXK,
     HALT,
 };
 

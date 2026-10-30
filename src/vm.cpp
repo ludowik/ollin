@@ -1166,11 +1166,14 @@ void VM::run_goto(size_t stop_depth) {
         &&op_LTK,
         &&op_GEK,
         &&op_LEK,
+        &&op_GET_INDEXK,
+        &&op_SET_INDEXK,
         &&op_HALT,
     };
 
     Instr _i = 0;
     Field A = 0;
+    const Value* index_key = nullptr; // the key of GET_INDEX / SET_INDEX, from a register or from the pool
     int argc_dyn = 0; // CALL_DYN and CALL_VA differ only by it, and share one body
     int base = call_stack.back().reg_base;
     // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
@@ -1481,9 +1484,15 @@ dispatch_loop:
         regs[base + A] = Value::make_map();
         NEXT();
 
-    op_GET_INDEX: {
+    op_GET_INDEXK:
+        index_key = &ch->constants[C];
+        goto get_index;
+
+    op_GET_INDEX:
+        index_key = &regs[base + C];
+    get_index : {
         const Value& obj = regs[base + B];
-        const Value& key = regs[base + C];
+        const Value& key = *index_key;
         // Capture BEFORE writing regs[base+A]: the destination may alias the key register
         // (A==C) or the object one (A==B), so reading obj or key after `regs[A] = found` would
         // read the overwritten value.
@@ -1569,9 +1578,15 @@ dispatch_loop:
         NEXT();
     }
 
-    op_SET_INDEX: {
+    op_SET_INDEXK:
+        index_key = &ch->constants[B];
+        goto set_index;
+
+    op_SET_INDEX:
+        index_key = &regs[base + B];
+    set_index : {
         Value& obj = regs[base + A];
-        const Value& key = regs[base + B];
+        const Value& key = *index_key;
         if (obj.is_map() || obj.is_class()) {
             if (obj.mptr->kind == Map::ENUM)
                 throw std::runtime_error("cannot modify an enum" +
