@@ -4,6 +4,7 @@
 //   graphics3d.cpp       3D: camera, lighting, instanced batcher, 3D primitives
 // The statics are NOT exposed wholesale: what crosses is a set of accessors for the style state
 // (defined on the 2D side, read on the 3D side) and a few function bridges between the files.
+#include "engine_font.h"
 #include "value.h"
 #include <raylib.h>
 #include <string>
@@ -72,6 +73,16 @@ bool gfx_view_map(float* x, float* y);
 void gfx_need_area();
 
 template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
+    gfx_need_area();
+    engine_text_run_end();   // the engine fonts leave their shader bound between texts: see engine_text_run_end
+    return F(ctx);
+}
+
+// The same for the functions that can follow a text without closing its run: the text itself, the shapes
+// (raylib draws them through a white texel, which the distance-field shader leaves as it is) and the
+// transform and style stack (no draw at all). A function belongs here only if it never draws a texture
+// that has soft alpha; the default, with_area, is the safe side — the cost of a forgotten one is speed.
+template <int (*F)(CallCtx&)> int with_area_text_safe(CallCtx& ctx) {
     gfx_need_area();
     return F(ctx);
 }

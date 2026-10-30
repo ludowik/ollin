@@ -42,6 +42,7 @@ const float SDF_MARGIN = 4.0f;
 
 Shader s_sdf = {0};
 bool s_sdf_ready = false;
+bool s_text_run_open = false;   // s_sdf is bound: see engine_text_run_end
 
 void load_sdf_shader() {
     std::string fs = std::string(k_shader_header) + k_sdf_fragment_src;
@@ -101,18 +102,32 @@ Vector2 engine_text_size(int idx, const char* text, float size) {
     return MeasureTextEx(font, text, size, size / (float)font.baseSize);
 }
 
+void engine_text_run_end() {
+    if (s_text_run_open) {
+        s_text_run_open = false;
+        EndShaderMode();   // draws what is pending through the distance-field shader, then restores the default
+    }
+}
+
 void engine_draw_text(int idx, const char* text, Vector2 pos, float size, Color color) {
     Entry& e = entry_for(idx);
     Font font = engine_font(idx);
-    bool sdf = is_sdf(e) && e.ready;
-    if (sdf)
-        BeginShaderMode(s_sdf);
+    if (is_sdf(e) && e.ready) {
+        if (!s_text_run_open) {
+            BeginShaderMode(s_sdf);
+            s_text_run_open = true;
+        }
+    } else {
+        engine_text_run_end();   // a bitmap font is read as it is: its soft edge would be cut by the shader
+    }
     DrawTextEx(font, text, pos, size, size / (float)font.baseSize, color);
-    if (sdf)
-        EndShaderMode();
 }
 
 void engine_font_reset() {
+    // A frame that failed halfway leaves the shader bound, and in the browser the context outlives the program.
+    if (IsWindowReady())
+        engine_text_run_end();
+    s_text_run_open = false;
     for (int i = 0; i < FONT_COUNT; ++i)
         s_fonts[i].ready = false;
     s_sdf_ready = false;   // the shader belongs to the previous program's context, like the textures

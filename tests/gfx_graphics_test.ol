@@ -8,6 +8,7 @@ const SHOT_B = "/tmp/ollin_gfx_graphics_b.png"
 const SHOT_C = "/tmp/ollin_gfx_graphics_c.png"
 const SHOT_D = "/tmp/ollin_gfx_graphics_d.png"
 const SHOT_E = "/tmp/ollin_gfx_graphics_e.png"
+const SHOT_F = "/tmp/ollin_gfx_graphics_f.png"
 
 global frames = 0
 global updates = 0
@@ -58,6 +59,7 @@ end
 func setup()
     graphics.canvas(100, 80, "graphics test")
     graphics.antialias(false)
+    quarterSprite = image.fromPattern(["####", "####"], {"#": Color(0, 1, 0, 0.25)})
     dot = image.fromPattern(["##", "##"], {"#": Color(0, 1, 0)})   ## made OUTSIDE draw: creating a target there unbinds the frame's
 end
 
@@ -189,6 +191,7 @@ end
 
 ## ── scene B: transforms, text, blending, tint, sprites ────────────────────
 global dot = nil
+global quarterSprite = nil
 
 func scene_b()
     graphics.clear(0, 0, 0)
@@ -383,6 +386,41 @@ func check_e()
     image.unload(s)
 end
 
+## ── scene F: a text leaves its shader bound, and what follows must not be drawn through it ──
+## The distance-field shader would cut a soft alpha at one half: a quarter-opaque sprite would vanish, and
+## a bitmap-font text would lose its edge. Shapes, which it leaves alone, may follow a text freely.
+func scene_f()
+    graphics.clear(0, 0, 0)
+    graphics.stroke(1, 1, 1)
+    graphics.fontSize(20)
+    graphics.textMode("left", "top")
+    graphics.text("A", 2, 2)                            ## opens the run
+    graphics.noStroke()
+    graphics.fill(1, 0, 0)
+    graphics.rect(40, 2, 10, 10)                       ## a shape: the run stays open, the colour is untouched
+    graphics.fill(0, 0, 1, 0.5)
+    graphics.rect(56, 2, 10, 10)                       ## and so does its translucency
+    graphics.spriteMode("corner")
+    graphics.sprite(quarterSprite, 2, 40)                    ## a texture: closes the run first
+    graphics.stroke(1, 1, 1)
+    graphics.text("B", 2, 56)                          ## a text again, after the sprite
+    graphics.font("pixel")
+    graphics.text("C", 30, 56)                         ## a bitmap font: not read through the shader
+    graphics.font("sans")
+    graphics.screenshot(SHOT_F)
+end
+
+func check_f()
+    var s = image.load(SHOT_F)
+    assert(lit(s, 2, 2, 25, 25) > 20)                  ## the first text
+    assert(is(s, 45, 7, 1, 0, 0))                      ## the red square after it, exact
+    assert(is(s, 61, 7, 0, 0, 0.5))                    ## the half-opaque blue one: half of it, not all or none
+    assert(is(s, 3, 41, 0, 0.25, 0))                   ## the quarter-opaque sprite is still a quarter
+    assert(lit(s, 2, 56, 25, 78) > 20)                 ## the text after the sprite
+    assert(lit(s, 30, 56, 45, 78) > 3)                 ## the bitmap-font text
+    image.unload(s)
+end
+
 ## ── the viewport variables ────────────────────────────────────────────────
 func check_viewport()
     graphics.viewport(50, 40)
@@ -415,6 +453,9 @@ func draw()
         scene_e()
     elseif frames == 8 then
         check_e()
+        scene_f()
+    elseif frames == 9 then
+        check_f()
         assert(updates >= 5 and lastDt >= 0)
         var gone = image.fromPattern(["#"])
         image.unload(gone)

@@ -1533,6 +1533,17 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   glyphes SDF portent une marge de 4 px de l'atlas (`SDF_MARGIN`) que `engine_font_ascent` retire, sinon
   la ligne de base descend. Mesuré (`tests/gfx_graphics_test.ol`, scène E) : un « H » de 70 px a un
   bord d'un pixel et ses montants restent à 255. `"pixel"` reste un bitmap, sans shader.
+  ⚠ **Le shader reste LIÉ entre deux textes** (`engine_text_run_end`, engine_font.h) : changer de shader
+  vide le lot de rlgl, et à un vidage par texte (deux avec la forme précédente) un écran de 100 cases coûtait
+  1,7 fois plus (mesuré au navigateur en rendu logiciel : 202 images en 6 s contre 342 pour la police
+  bitmap ; 268 une fois le shader gardé). Tout ce qui n'est ni un texte SDF ni une forme simple doit
+  FERMER la série avant de dessiner, sinon l'alpha doux d'un sprite serait coupé à un demi. **La sûreté
+  tient au défaut** : `with_area` (graphics_internal.h) ferme, et seules les fonctions déclarées
+  `with_area_text_safe` — texte, formes, pile de transformations — la laissent ouverte ; en oublier une ne
+  coûte que de la vitesse. Les formes de raylib passent par un texel blanc opaque, que le shader laisse tel
+  quel. Le moteur ferme aussi à la fin de `draw()`, de l'interface et d'une image en erreur
+  (`engine_font_reset` y revient pour un programme relancé sur le même contexte). Gardé par la scène F de
+  `tests/gfx_graphics_test.ol` ; sans la fermeture de `with_area`, la scène B échoue.
 - `engine_font(idx)` charge l'atlas au PREMIER usage : le construire crée une texture,
   donc exige un contexte graphique, absent quand les widgets sont déclarés. Repli sur
   `GetFontDefault()` en cas d'échec. Filtre BILINEAR, l'atlas étant le plus souvent réduit.

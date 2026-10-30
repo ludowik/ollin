@@ -1712,6 +1712,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         run_user_callbacks(draw_fn);
+        engine_text_run_end();
         *tex = false;
         EndTextureMode();
 
@@ -1760,6 +1761,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // The screenshot in between only READS pixels, so no blend state is restored for it.
         BeginBlendMode(BLEND_ALPHA);
         ui_draw();
+        engine_text_run_end();
         flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
@@ -1772,6 +1774,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             rlViewport(0, 0, s_physW, s_physH);
         run_user_callbacks(draw_fn);
         ui_draw();                       // no composition here, so the interface follows the scene
+        engine_text_run_end();
         flush_pending_screenshot();      // captures the screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
@@ -1790,6 +1793,7 @@ static void emscripten_frame() {
     try {
         render_frame(s_run_callback, &tex, &drawing);
     } catch (const std::exception& e) {
+        engine_text_run_end();     // and the text shader a failed frame left bound
         if (tex)                   // close the blocks left open, without ending twice
             EndTextureMode();
         if (drawing)
@@ -2044,14 +2048,14 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("noFill")), Value::make_builtin(gfx_no_fill));
     m.map_set(Value(std::string("tint")), Value::make_builtin(gfx_tint));
     m.map_set(Value(std::string("noTint")), Value::make_builtin(gfx_no_tint));
-    m.map_set(Value(std::string("line")), Value::make_builtin(with_area<gfx_line>));
-    m.map_set(Value(std::string("rect")), Value::make_builtin(with_area<gfx_rect>));
+    m.map_set(Value(std::string("line")), Value::make_builtin(with_area_text_safe<gfx_line>));
+    m.map_set(Value(std::string("rect")), Value::make_builtin(with_area_text_safe<gfx_rect>));
     m.map_set(Value(std::string("fps")), Value::make_builtin(gfx_fps));
     m.map_set(Value(std::string("screenshot")), Value::make_builtin(gfx_screenshot));
-    m.map_set(Value(std::string("text")), Value::make_builtin(with_area<gfx_text>));
+    m.map_set(Value(std::string("text")), Value::make_builtin(with_area_text_safe<gfx_text>));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
     m.map_set(Value(std::string("font")), Value::make_builtin(gfx_font));
-    m.map_set(Value(std::string("textSize")), Value::make_builtin(with_area<gfx_text_size>));
+    m.map_set(Value(std::string("textSize")), Value::make_builtin(with_area_text_safe<gfx_text_size>));
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
     m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));
@@ -2060,25 +2064,25 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("close")), Value::make_builtin(with_area<gfx_close>));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(with_area<gfx_run>));
-    m.map_set(Value(std::string("push")), Value::make_builtin(with_area<gfx_push>));
-    m.map_set(Value(std::string("pop")), Value::make_builtin(with_area<gfx_pop>));
-    m.map_set(Value(std::string("pushMatrix")), Value::make_builtin(with_area<gfx_push_matrix>));
-    m.map_set(Value(std::string("popMatrix")), Value::make_builtin(with_area<gfx_pop_matrix>));
+    m.map_set(Value(std::string("push")), Value::make_builtin(with_area_text_safe<gfx_push>));
+    m.map_set(Value(std::string("pop")), Value::make_builtin(with_area_text_safe<gfx_pop>));
+    m.map_set(Value(std::string("pushMatrix")), Value::make_builtin(with_area_text_safe<gfx_push_matrix>));
+    m.map_set(Value(std::string("popMatrix")), Value::make_builtin(with_area_text_safe<gfx_pop_matrix>));
     m.map_set(Value(std::string("pushStyle")), Value::make_builtin(gfx_push_style));
-    m.map_set(Value(std::string("popStyle")), Value::make_builtin(with_area<gfx_pop_style>));
-    m.map_set(Value(std::string("translate")), Value::make_builtin(with_area<gfx_translate>));
-    m.map_set(Value(std::string("rotate")), Value::make_builtin(with_area<gfx_rotate>));
-    m.map_set(Value(std::string("rotateX")), Value::make_builtin(with_area<gfx_rotate_x>));
-    m.map_set(Value(std::string("rotateY")), Value::make_builtin(with_area<gfx_rotate_y>));
-    m.map_set(Value(std::string("rotateZ")), Value::make_builtin(with_area<gfx_rotate_z>));
-    m.map_set(Value(std::string("scale")), Value::make_builtin(with_area<gfx_scale>));
-    m.map_set(Value(std::string("resetTransform")), Value::make_builtin(with_area<gfx_reset_transform>));
-    m.map_set(Value(std::string("polygon")), Value::make_builtin(with_area<gfx_polygon>));
-    m.map_set(Value(std::string("polyline")), Value::make_builtin(with_area<gfx_polyline>));
-    m.map_set(Value(std::string("ellipse")), Value::make_builtin(with_area<gfx_ellipse>));
-    m.map_set(Value(std::string("circle")), Value::make_builtin(with_area<gfx_circle>));
-    m.map_set(Value(std::string("arc")), Value::make_builtin(with_area<gfx_arc>));
-    m.map_set(Value(std::string("point")), Value::make_builtin(with_area<gfx_point>));
+    m.map_set(Value(std::string("popStyle")), Value::make_builtin(with_area_text_safe<gfx_pop_style>));
+    m.map_set(Value(std::string("translate")), Value::make_builtin(with_area_text_safe<gfx_translate>));
+    m.map_set(Value(std::string("rotate")), Value::make_builtin(with_area_text_safe<gfx_rotate>));
+    m.map_set(Value(std::string("rotateX")), Value::make_builtin(with_area_text_safe<gfx_rotate_x>));
+    m.map_set(Value(std::string("rotateY")), Value::make_builtin(with_area_text_safe<gfx_rotate_y>));
+    m.map_set(Value(std::string("rotateZ")), Value::make_builtin(with_area_text_safe<gfx_rotate_z>));
+    m.map_set(Value(std::string("scale")), Value::make_builtin(with_area_text_safe<gfx_scale>));
+    m.map_set(Value(std::string("resetTransform")), Value::make_builtin(with_area_text_safe<gfx_reset_transform>));
+    m.map_set(Value(std::string("polygon")), Value::make_builtin(with_area_text_safe<gfx_polygon>));
+    m.map_set(Value(std::string("polyline")), Value::make_builtin(with_area_text_safe<gfx_polyline>));
+    m.map_set(Value(std::string("ellipse")), Value::make_builtin(with_area_text_safe<gfx_ellipse>));
+    m.map_set(Value(std::string("circle")), Value::make_builtin(with_area_text_safe<gfx_circle>));
+    m.map_set(Value(std::string("arc")), Value::make_builtin(with_area_text_safe<gfx_arc>));
+    m.map_set(Value(std::string("point")), Value::make_builtin(with_area_text_safe<gfx_point>));
     m.map_set(Value(std::string("sprite")), Value::make_builtin(with_area<gfx_sprite>));
     register3d_graphics(m);   // 3D: the camera, begin3d/end3d, the primitives, the lighting and the texture — graphics3d.cpp
     // The colour constants are NOT here: use the `colors` module.
