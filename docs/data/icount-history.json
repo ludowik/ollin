@@ -475,6 +475,30 @@
       "loop": 30543166,
       "map": 55456095,
       "subject": "Constant right operands: ADDK, SUBK, MULK, EQK, NEQK, GTK, LTK, GEK, LEK read a literal from the pool instead of a LOAD_K"
+    },
+    {
+      "date": "2026-10-23",
+      "commit": "31d12a8",
+      "fib": 59923781,
+      "loop": 30553545,
+      "map": 55466995,
+      "subject": "Dead code: the OR opcode, which nothing emits, is removed (icount neutral on fib, loop and map); the unused Iterator::primary_is_val stays, its removal measured +0.86 % on map; tests for the paths that were only unexercised (prototype chain of maps, math.log, Color from a map, shared keys, every tween curve, two variables over a range)"
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "15ccaa7",
+      "fib": 59923832,
+      "loop": 30553532,
+      "map": 55466982,
+      "subject": "Compiler: a function ending in an if or switch that returns in its branch gets its own epilogue (it fell off its end into the next code)"
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "acbca8c",
+      "fib": 59923832,
+      "loop": 30553532,
+      "map": 55466982,
+      "subject": "Review fixes: graphics.specular refuses NaN, stale OR opcode texts, the Earth header, the upvalue guard's message"
     }
   ]
 }

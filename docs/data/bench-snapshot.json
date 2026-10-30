@@ -1,9 +1,9 @@
 {
   "_": "READING of execution times, produced by bench/bench_all.sh (best of N runs, PROCESSOR time). This is NOT a historical series: a time is only valid for the machine and the moment it was measured on, so this file is REPLACED by every new reading, never extended. Read by docs/views/perf.js.",
-  "date": "2026-10-16",
-  "commit": "6b76e85",
+  "date": "2026-10-30",
+  "commit": "9041c47",
   "runs": 3,
-  "machine": "Intel Xeon 2.80 GHz, 4 cores - Linux x86-64 container",
+  "machine": "Intel Xeon 2.30 GHz, 4 cores - Linux x86-64 container",
   "build": "GCC 13.3, CMake Release, computed-goto",
   "reference": {
     "id": "lua",
@@ -16,11 +16,11 @@
     },
     {
       "id": "python",
-      "name": "Python 3.11.15"
+      "name": "Python 3.11.17"
     },
     {
       "id": "java",
-      "name": "Java 21.0.10"
+      "name": "Java 21.0.12.1"
     },
     {
       "id": "luajit",
@@ -32,101 +32,101 @@
       "id": "fib",
       "name": "fib(35) recursive",
       "what": "calls and conditional jumps",
-      "lua": 0.7733,
-      "ollin": 1.35766,
-      "python": 1.5693,
-      "java": 0.0448,
-      "luajit": 0.0861
+      "lua": 0.4374,
+      "ollin": 0.591582,
+      "python": 0.8679,
+      "java": 0.0288,
+      "luajit": 0.0386
     },
     {
       "id": "loop",
       "name": "loop 10M",
       "what": "a numeric loop and arithmetic",
-      "lua": 0.054,
-      "ollin": 0.086677,
-      "python": 0.9674,
-      "java": 0.0035,
-      "luajit": 0.0126
+      "lua": 0.0334,
+      "ollin": 0.045501,
+      "python": 0.442,
+      "java": 0.0027,
+      "luajit": 0.0053
     },
     {
       "id": "map",
       "name": "map 100K",
       "what": "building a table and reading it",
-      "lua": 0.0321,
-      "ollin": 0.046545,
-      "python": 0.0479,
-      "java": 0.0563,
+      "lua": 0.0159,
+      "ollin": 0.034326,
+      "python": 0.023,
+      "java": 0.0262,
       "luajit": 0.0001
     },
     {
       "id": "array",
       "name": "array 1M",
       "what": "indexed access",
-      "lua": 0.0347,
-      "ollin": 0.073991,
-      "python": 0.2286,
-      "java": 0.0079,
-      "luajit": 0.0097
+      "lua": 0.0178,
+      "ollin": 0.04028,
+      "python": 0.0988,
+      "java": 0.0053,
+      "luajit": 0.0056
     },
     {
       "id": "calls",
       "name": "calls 1M",
       "what": "a function call",
-      "lua": 0.0211,
-      "ollin": 0.033253,
-      "python": 0.15,
-      "java": 0.0009,
-      "luajit": 0.0013
+      "lua": 0.0125,
+      "ollin": 0.022582,
+      "python": 0.0658,
+      "java": 0.0005,
+      "luajit": 0.0006
     },
     {
       "id": "closures",
       "name": "closures 1M",
       "what": "closure creation (one upvalue) and a call",
-      "lua": 0.1412,
-      "ollin": 0.202458,
-      "python": 0.3848,
-      "java": 0.0004,
-      "luajit": 0.1098
+      "lua": 0.0772,
+      "ollin": 0.098553,
+      "python": 0.185,
+      "java": 0.0005,
+      "luajit": 0.0551
     },
     {
       "id": "strings",
       "name": "strings 200K",
       "what": "concatenation and interpolation",
-      "lua": 0.1266,
-      "ollin": 0.205011,
-      "python": 0.1319,
-      "java": 0.1438,
-      "luajit": 0.0204
+      "lua": 0.0565,
+      "ollin": 0.115675,
+      "python": 0.0533,
+      "java": 0.0919,
+      "luajit": 0.0137
     },
     {
       "id": "classes",
       "name": "classes 200K",
       "what": "instantiation, methods, inheritance",
-      "lua": 0.1227,
-      "ollin": 0.171476,
-      "python": 0.1243,
-      "java": 0.0029,
-      "luajit": 0.0004
+      "lua": 0.0621,
+      "ollin": 0.091905,
+      "python": 0.0624,
+      "java": 0.002,
+      "luajit": 0.0003
     },
     {
       "id": "iter",
       "name": "iter 2.4M",
       "what": "for … in over an array and a map",
-      "lua": 0.0932,
-      "ollin": 0.052925,
-      "python": 0.2503,
-      "java": 0.0113,
-      "luajit": 0.0041
+      "lua": 0.0497,
+      "ollin": 0.028851,
+      "python": 0.1064,
+      "java": 0.0053,
+      "luajit": 0.0022
     },
     {
       "id": "mandelbrot",
       "name": "mandelbrot 200x200",
       "what": "floating-point arithmetic",
-      "lua": 0.0556,
-      "ollin": 0.097933,
-      "python": 0.289,
-      "java": 0.0035,
-      "luajit": 0.0032
+      "lua": 0.0182,
+      "ollin": 0.032305,
+      "python": 0.1284,
+      "java": 0.0022,
+      "luajit": 0.0017
     }
   ]
 }
