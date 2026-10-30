@@ -499,6 +499,14 @@
       "loop": 30553532,
       "map": 55466982,
       "subject": "Review fixes: graphics.specular refuses NaN, stale OR opcode texts, the Earth header, the upvalue guard's message"
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "bab54af",
+      "fib": 51358682,
+      "loop": 25739958,
+      "map": 46842690,
+      "subject": "Ten engine commits: indexed writes read their operands in place, GET_INDEXK/SET_INDEXK and CONCAT, a frame holds its closure, run_goto keeps a pointer to its registers, the string table hashes once, the map cache survives an overwrite, float and compare-and-jump paths"
     }
   ]
 }

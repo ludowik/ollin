@@ -1,9 +1,9 @@
 {
   "_": "READING of execution times, produced by bench/bench_all.sh (best of N runs, PROCESSOR time). This is NOT a historical series: a time is only valid for the machine and the moment it was measured on, so this file is REPLACED by every new reading, never extended. Read by docs/views/perf.js.",
   "date": "2026-10-30",
-  "commit": "9041c47",
+  "commit": "bab54af",
   "runs": 3,
-  "machine": "Intel Xeon 2.30 GHz, 4 cores - Linux x86-64 container",
+  "machine": "Intel Xeon 2.80 GHz, 4 cores - Linux x86-64 container",
   "build": "GCC 13.3, CMake Release, computed-goto",
   "reference": {
     "id": "lua",
@@ -32,101 +32,101 @@
       "id": "fib",
       "name": "fib(35) recursive",
       "what": "calls and conditional jumps",
-      "lua": 0.4374,
-      "ollin": 0.591582,
-      "python": 0.8679,
-      "java": 0.0288,
-      "luajit": 0.0386
+      "lua": 0.6172,
+      "ollin": 0.857825,
+      "python": 1.2497,
+      "java": 0.0442,
+      "luajit": 0.0913
     },
     {
       "id": "loop",
       "name": "loop 10M",
       "what": "a numeric loop and arithmetic",
-      "lua": 0.0334,
-      "ollin": 0.045501,
-      "python": 0.442,
-      "java": 0.0027,
-      "luajit": 0.0053
+      "lua": 0.0465,
+      "ollin": 0.068056,
+      "python": 0.7194,
+      "java": 0.0042,
+      "luajit": 0.0122
     },
     {
       "id": "map",
       "name": "map 100K",
       "what": "building a table and reading it",
-      "lua": 0.0159,
-      "ollin": 0.034326,
-      "python": 0.023,
-      "java": 0.0262,
+      "lua": 0.0243,
+      "ollin": 0.02605,
+      "python": 0.0356,
+      "java": 0.0465,
       "luajit": 0.0001
     },
     {
       "id": "array",
       "name": "array 1M",
       "what": "indexed access",
-      "lua": 0.0178,
-      "ollin": 0.04028,
-      "python": 0.0988,
-      "java": 0.0053,
-      "luajit": 0.0056
+      "lua": 0.0261,
+      "ollin": 0.036543,
+      "python": 0.1599,
+      "java": 0.006,
+      "luajit": 0.0075
     },
     {
       "id": "calls",
       "name": "calls 1M",
       "what": "a function call",
-      "lua": 0.0125,
-      "ollin": 0.022582,
-      "python": 0.0658,
-      "java": 0.0005,
-      "luajit": 0.0006
+      "lua": 0.0176,
+      "ollin": 0.024713,
+      "python": 0.1063,
+      "java": 0.0004,
+      "luajit": 0.0013
     },
     {
       "id": "closures",
       "name": "closures 1M",
       "what": "closure creation (one upvalue) and a call",
-      "lua": 0.0772,
-      "ollin": 0.098553,
-      "python": 0.185,
-      "java": 0.0005,
-      "luajit": 0.0551
+      "lua": 0.1094,
+      "ollin": 0.113611,
+      "python": 0.3149,
+      "java": 0.0004,
+      "luajit": 0.0817
     },
     {
       "id": "strings",
       "name": "strings 200K",
       "what": "concatenation and interpolation",
-      "lua": 0.0565,
-      "ollin": 0.115675,
-      "python": 0.0533,
-      "java": 0.0919,
-      "luajit": 0.0137
+      "lua": 0.0946,
+      "ollin": 0.071584,
+      "python": 0.0957,
+      "java": 0.112,
+      "luajit": 0.018
     },
     {
       "id": "classes",
       "name": "classes 200K",
       "what": "instantiation, methods, inheritance",
-      "lua": 0.0621,
-      "ollin": 0.091905,
-      "python": 0.0624,
-      "java": 0.002,
+      "lua": 0.0927,
+      "ollin": 0.110567,
+      "python": 0.1026,
+      "java": 0.0022,
       "luajit": 0.0003
     },
     {
       "id": "iter",
       "name": "iter 2.4M",
       "what": "for … in over an array and a map",
-      "lua": 0.0497,
-      "ollin": 0.028851,
-      "python": 0.1064,
-      "java": 0.0053,
-      "luajit": 0.0022
+      "lua": 0.0744,
+      "ollin": 0.045099,
+      "python": 0.2048,
+      "java": 0.0095,
+      "luajit": 0.0041
     },
     {
       "id": "mandelbrot",
       "name": "mandelbrot 200x200",
       "what": "floating-point arithmetic",
-      "lua": 0.0182,
-      "ollin": 0.032305,
-      "python": 0.1284,
-      "java": 0.0022,
-      "luajit": 0.0017
+      "lua": 0.0258,
+      "ollin": 0.045465,
+      "python": 0.2033,
+      "java": 0.0033,
+      "luajit": 0.0029
     }
   ]
 }
