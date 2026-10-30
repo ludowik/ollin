@@ -18,8 +18,6 @@ std::size_t ValueHash::other(const Value& v) noexcept {
         }
         return std::hash<double>{}(d);
     }
-    case Value::T_STRING:
-        return v.str_hash;
     case Value::T_MAP:
         return std::hash<void*>{}((void*)v.mptr);
     case Value::T_ARRAY:
@@ -54,8 +52,6 @@ bool ValueEqual::other(const Value& a, const Value& b) noexcept {
             return a.as_int() == b.as_int();
         case Value::T_FLOAT:
             return a.as_float() == b.as_float();
-        case Value::T_STRING:
-            return a.sptr == b.sptr;
         case Value::T_MAP:
             return a.mptr == b.mptr;
         case Value::T_ARRAY:
@@ -106,8 +102,7 @@ void Map::set(const Value& k, const Value& v) {
     // made len() overcount and a `for k, v in m` walk visit a key the script meant to drop.
     // `layout` moves when an entry appears or disappears, which is what can move or invalidate the slot a
     // GET_INDEX cache points at; overwriting a value in place leaves the slot where it is, so a cached read
-    // still lands on it and sees the new value. (A field updated in a loop used to knock its object's cache
-    // out at every write.) `version` moves on every write, for the readers of the content.
+    // still lands on it and sees the new value. `version` moves on every write, for the readers of the content.
     version = ++g_map_epoch;
     if (v.is_nil()) {
         if (data.erase(k) != 0)

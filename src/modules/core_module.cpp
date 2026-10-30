@@ -105,7 +105,7 @@ static int core_fmt(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 2 || !args[1].is_string())
         throw std::runtime_error("__fmt: expected (value, spec)");
-    std::vector<Value> vargs(args, args + argc);   // a copy: format_one may reallocate regs, through __str
+    std::vector<Value> vargs(args, args + argc);   // a copy: format_one runs Ollin code, through __str
     return ctx.ret(Value(format_one(vargs[0], vargs[1].as_string())));
 }
 

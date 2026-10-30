@@ -2,7 +2,6 @@
 #include <cstdint>  // uint32_t/uint64_t, required by robin_hood.h
 #include "robin_hood.h"
 #include <string>
-#include <string_view>
 
 // Interned string: refcount, hash and bytes live together, so retain is a single increment
 // and only release — when the count reaches zero — needs a table lookup.
@@ -16,7 +15,6 @@ struct InternedStr {
 
 // The table holds the strings themselves, hashed by the hash they already carry: a new string is
 // hashed ONCE, when it is looked up, and the insertion, the rehash and the erase reuse that value.
-// (Keyed by a string_view into the string, as before, each of those hashed the bytes again.)
 struct StringTable {
     struct Hash {
         size_t operator()(const InternedStr* p) const noexcept {

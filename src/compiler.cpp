@@ -430,22 +430,17 @@ static Op k_form(Op op) {
 // with __add.
 bool Compiler::const_operand(Op& op, const Expr& right, PoolIdx& index) {
     Op k = k_form(op);
-    Value v;
-    if (k == Op::HALT || !const_value(right, v))
-        return false;
-    PoolIdx idx = chunk.add_constant(v);
-    if (idx > k_field_max)
+    if (k == Op::HALT || !const_key(right, index))
         return false;
     op = k;
-    index = idx;
     return true;
 }
 
-// A key known at compile time (a field name, a literal index) whose pool index fits the field: the
-// access can then read it from the pool, with no LOAD_K.
-bool Compiler::const_key(const Expr& key, PoolIdx& index) {
+// A value known at compile time (a literal, a field name, a frozen enum member) whose pool index fits the field:
+// the instruction can then read it from the pool, with no LOAD_K.
+bool Compiler::const_key(const Expr& e, PoolIdx& index) {
     Value v;
-    if (!const_value(key, v))
+    if (!const_value(e, v))
         return false;
     PoolIdx idx = chunk.add_constant(v);
     if (idx > k_field_max)
@@ -485,13 +480,10 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
         // dest, so aliasing is harmless even when dest is also an operand (a = a - b gives
         // SUB Ra,Ra,Rb). Every caller has dest < reg_top_, so operand temporaries — allocated
         // from reg_top_ up — never overlap dest.
-        if (bin->op == '+') {
-            std::vector<ConcatPiece> pieces;
-            if (concat_chain(*bin, pieces)) {
-                emit_concat(pieces, dest);
-                last_reg_ = dest;
-                return;
-            }
+        if (std::vector<ConcatPiece> pieces; concat_chain(*bin, pieces)) {
+            emit_concat(pieces, dest);
+            last_reg_ = dest;
+            return;
         }
         int saved = reg_top_;
         bin->left->accept(*this);
@@ -1398,10 +1390,7 @@ void Compiler::visit(const InterpExpr& e) {
     }
     if (!e.literals.back().empty() || pieces.empty())
         pieces.push_back({nullptr, &e.literals.back()});
-    int w = reg_top_;
-    emit_concat(pieces, w);
-    reg_top_ = w + 1;
-    last_reg_ = w;
+    last_reg_ = compile_concat(pieces);
 }
 
 // The operands of a chain `s + a + b ...` whose LEFTMOST operand is a string literal, in order, or false.
@@ -1409,27 +1398,40 @@ void Compiler::visit(const InterpExpr& e) {
 // the chain is exactly CONCAT of its operands; any other leftmost operand may be a number, and then
 // `1 + 2 + "x"` adds before it concatenates.
 bool Compiler::concat_chain(const BinaryExpr& e, std::vector<ConcatPiece>& pieces) {
-    std::vector<const Expr*> rights;
+    size_t n = 0; // the `+` of the chain, walked down its left spine before anything is collected
     const Expr* node = &e;
-    while (auto* b = dynamic_cast<const BinaryExpr*>(node)) {
-        if (b->op != '+')
+    for (;;) {
+        auto* b = dynamic_cast<const BinaryExpr*>(node);
+        if (!b || b->op != '+')
             break;
-        rights.push_back(b->right.get());
+        ++n;
         node = b->left.get();
     }
-    if (rights.empty() || !dynamic_cast<const StringExpr*>(node))
+    if (n == 0 || !dynamic_cast<const StringExpr*>(node))
         return false;
-    pieces.push_back({node, nullptr});
-    for (size_t i = rights.size(); i-- > 0;)
-        pieces.push_back({rights[i], nullptr});
+    pieces.resize(n + 1);
+    pieces[0] = {node, nullptr};
+    node = &e;
+    for (size_t i = n; i > 0; --i) {
+        auto* b = static_cast<const BinaryExpr*>(node);
+        pieces[i] = {b->right.get(), nullptr};
+        node = b->left.get();
+    }
     return true;
+}
+
+// The pieces joined into a fresh register, which is left allocated.
+int Compiler::compile_concat(const std::vector<ConcatPiece>& pieces) {
+    int w = reg_top_;
+    emit_concat(pieces, w);
+    reg_top_ = w + 1;
+    return w;
 }
 
 // R[dest] = the pieces joined. They are compiled into consecutive registers from reg_top_, and a long
 // list goes through the accumulator by windows, so that no more than k_concat_window registers are held at once.
 void Compiler::emit_concat(const std::vector<ConcatPiece>& pieces, int dest) {
     constexpr int k_concat_window = 64;
-    int saved = reg_top_;
     int w = reg_top_;
     size_t i = 0;
     int filled = 0;
@@ -1448,7 +1450,7 @@ void Compiler::emit_concat(const std::vector<ConcatPiece>& pieces, int dest) {
         filled = 1; // the accumulator opens the next window
         reg_top_ = w + 1;
     } while (i < pieces.size());
-    reg_top_ = saved;
+    reg_top_ = w;
 }
 
 void Compiler::visit(const BoolExpr& e) {
@@ -1525,15 +1527,9 @@ void Compiler::visit(const BinaryExpr& e) {
         last_reg_ = dst;
         return;
     }
-    if (e.op == '+') {
-        std::vector<ConcatPiece> pieces;
-        if (concat_chain(e, pieces)) {
-            int w = reg_top_;
-            emit_concat(pieces, w);
-            reg_top_ = w + 1;
-            last_reg_ = w;
-            return;
-        }
+    if (std::vector<ConcatPiece> pieces; concat_chain(e, pieces)) {
+        last_reg_ = compile_concat(pieces);
+        return;
     }
     e.left->accept(*this);
     int r_l = last_reg_;
@@ -1798,13 +1794,9 @@ void Compiler::visit(const IndexExpr& e) {
         last_reg_ = dest;
         return;
     }
-    e.obj->accept(*this);
-    int obj_r = last_reg_;
-    // Reserve the object's register before evaluating the key: a 0-argument call leaves
-    // reg_top_ at its own result register, so without this guard evaluating the key would
-    // reallocate over the object (same as in BinaryExpr). See f().x and f()[i].
-    if (reg_top_ <= obj_r)
-        reserve_regs_to(obj_r + 1);
+    // operand_reg keeps the object's register reserved before the key is evaluated: a 0-argument call
+    // leaves reg_top_ at its own result register (see f().x and f()[i]).
+    int obj_r = operand_reg(*e.obj);
     PoolIdx key_idx;
     if (const_key(*e.key, key_idx)) {
         int dest = alloc_reg();
@@ -1968,20 +1960,26 @@ void Compiler::visit(const ForIterStmt& s) {
     compile_iterator_loop(*s.iter_expr, s.var1, s.var2, s.body);
 }
 
+// Whether `pred` holds for `e` or for any expression under it.
+template <class Pred>
+static bool expr_any(const Expr& e, Pred pred) {
+    if (pred(e))
+        return true;
+    bool found = false;
+    e.for_each_child([&](const Expr& c) {
+        if (!found)
+            found = expr_any(c, pred);
+    });
+    return found;
+}
+
 // True when the expression contains a lambda, which could capture the loop variable. The
 // descent goes through Expr::for_each_child, so no list of expression kinds is maintained here:
 // the previous cascade of dynamic_cast answered "yes, conservatively" for anything it did not
 // list, and an interpolated string was in that case — one in a loop body was enough to forbid
 // recycling the loop registers, though it carries no function at all.
 static bool expr_has_lambda(const Expr& e) {
-    if (dynamic_cast<const FuncExpr*>(&e))
-        return true;
-    bool found = false;
-    e.for_each_child([&found](const Expr& c) {
-        if (!found)
-            found = expr_has_lambda(c);
-    });
-    return found;
+    return expr_any(e, [](const Expr& n) { return dynamic_cast<const FuncExpr*>(&n) != nullptr; });
 }
 
 // True when the body is safe for aliasing the loop variable 'v' onto the control register: no
@@ -2175,15 +2173,11 @@ void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_ex
 // expression is evaluated AFTER the operands to its left have been read, so a bare local to its left must be
 // copied first (any other operand already lands in a temporary, at its place in the order).
 static bool runs_script_code(const Expr& e) {
-    if (dynamic_cast<const CallExpr*>(&e) || dynamic_cast<const MethodCallExpr*>(&e) ||
-        dynamic_cast<const ExprCallExpr*>(&e) || dynamic_cast<const FuncExpr*>(&e))
-        return true; // (an operator or a `__str` reached through a piece of text can too, but so can any `a + b`)
-    bool found = false;
-    e.for_each_child([&](const Expr& c) {
-        if (!found && runs_script_code(c))
-            found = true;
+    // (an operator or a `__str` reached through a piece of text can too, but so can any `a + b`)
+    return expr_any(e, [](const Expr& n) {
+        return dynamic_cast<const CallExpr*>(&n) || dynamic_cast<const MethodCallExpr*>(&n) ||
+               dynamic_cast<const ExprCallExpr*>(&n) || dynamic_cast<const FuncExpr*>(&n);
     });
-    return found;
 }
 
 // An expression as an OPERAND: a named local answers with its own register, so no MOVE copies it
@@ -2206,21 +2200,25 @@ void Compiler::visit(const IndexAssignStmt& s) {
         reject_enum_write(s.obj, s.obj_expr.get(), key_lit ? key_lit->value : std::string(), s.line, s.file_idx);
     }
 
+    // A bare local is read in place, unless code on its right could change it first: `arr[i] = f()` with f
+    // changing the captured i stores at the i of BEFORE the call.
+    const bool value_runs = runs_script_code(*s.value);
+    auto read_before = [&](const Expr& e, bool later_runs_code) {
+        if (later_runs_code && dynamic_cast<const VarExpr*>(&e)) {
+            int r = alloc_reg();
+            compile_into(e, r);
+            return r;
+        }
+        return operand_reg(e);
+    };
+
     // Load the container (map or array) to index.
     int obj_r;
     if (s.obj_expr) {
         // Chained target (a.b.c, a[i][j]…): the container is an expression, evaluated into a
         // register. Maps and arrays being ref-counted, the SET_INDEX that follows does mutate the
         // original object.
-        // Read in place only when nothing written to its right can run code: `a[i][j] = f()` must index
-        // with the `a[i]` it had BEFORE f ran.
-        if (dynamic_cast<const VarExpr*>(s.obj_expr.get()) &&
-            (runs_script_code(*s.key) || runs_script_code(*s.value))) {
-            obj_r = alloc_reg();
-            compile_into(*s.obj_expr, obj_r);
-        } else {
-            obj_r = operand_reg(*s.obj_expr);
-        }
+        obj_r = read_before(*s.obj_expr, value_runs || runs_script_code(*s.key));
     } else {
         const int* it = scopes().regs.find(s.obj);
         if (it != nullptr) {
@@ -2242,15 +2240,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
     // read it from there, and `key_r` stays unused.
     PoolIdx key_idx;
     bool key_const = const_key(*s.key, key_idx);
-    int key_r = 0;
-    if (!key_const) {
-        if (dynamic_cast<const VarExpr*>(s.key.get()) && runs_script_code(*s.value)) { // `arr[i] = f()`, f changing the captured i: the key is the i of BEFORE
-            key_r = alloc_reg();
-            compile_into(*s.key, key_r);
-        } else {
-            key_r = operand_reg(*s.key);
-        }
-    }
+    int key_r = key_const ? 0 : read_before(*s.key, value_runs);
     auto get_at = [&](int dest) {
         chunk.emit(key_const ? make_abc(Op::GET_INDEXK, dest, obj_r, key_idx) : make_abc(Op::GET_INDEX, dest, obj_r, key_r));
     };
@@ -2524,13 +2514,13 @@ void Compiler::visit(const MethodCallExpr& e) {
         reserve_regs_to(call_base + 1);
         chunk.emit(make_abc(Op::MOVE, call_base, self_src, 0));
 
-        // Temporaries: tmp holds the parent class (a global), key_r the key.
+        // Temporary: tmp holds the parent class (a global).
         int tmp = alloc_reg();
 
         // tmp = <the lexically enclosing parent class>
         chunk.emit(make_abx(Op::LOAD_GLOBAL, tmp, chunk.add_identifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
-        emit_get_member(call_base + 1, tmp, std::string(e.method));
+        emit_get_member(call_base + 1, tmp, e.method);
         reserve_regs_to(call_base + 2);
     } else {
         // R[call_base] = receiver (self)
@@ -2538,7 +2528,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         reserve_regs_to(call_base + 1);
 
         // R[call_base+1] = GET_INDEX(receiver, method_name)
-        emit_get_member(call_base + 1, call_base, std::string(e.method));
+        emit_get_member(call_base + 1, call_base, e.method);
         reserve_regs_to(call_base + 2);
     }
 

@@ -58,7 +58,7 @@ struct Map {
     Value get(const Value& k) const;
     // Location of the value, or nullptr when absent. This is what lets the GET_INDEX inline
     // cache keep a NON-owning reference: the map itself keeps the value alive as long as its
-    // version does not change. Only dereference after validating (Map*, version).
+    // version does not change. Only dereference after validating (Map*, layout).
     const Value* find_ptr(const Value& k) const;
     void set(const Value& k, const Value& v);
 };

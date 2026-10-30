@@ -107,7 +107,7 @@ class VM {
     // long after the script dropped it, and cost a retain/release on every fill.
     struct GetIndexCache {
         const Map* map = nullptr;
-        uint64_t version = 0; // the map's `layout` when the entry was cached
+        uint64_t layout = 0; // the map's layout when the entry was cached
         const InternedStr* key = nullptr;
         const Value* val = nullptr;
     };
@@ -122,12 +122,12 @@ class VM {
         if (!key_sptr)
             return m->find_ptr(key);
         GetIndexCache& c = gicache_[ip - 1];
-        if (c.map == m && c.version == m->layout && c.key == key_sptr)
+        if (c.map == m && c.layout == m->layout && c.key == key_sptr)
             return c.val;
         const Value* slot = m->find_ptr(key);
         if (slot) {
             c.map = m;
-            c.version = m->layout;
+            c.layout = m->layout;
             c.key = key_sptr;
             c.val = slot;
         }
@@ -186,8 +186,8 @@ class VM {
     // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and
     // by the C++ catch(runtime_error).
     void unwind_to_handler(const Handler& h, Value thrown);
-    // grows by doubling, up to 4096, and never shrinks. The test stays inline: nearly every call
-    // finds the file already large enough, and was paying a function call to hear it.
+    // Grows the register file to `needed` (up to k_max_regs, reserved once by execute, so nothing ever moves). The
+    // test stays inline: nearly every call finds the file already large enough.
     static constexpr size_t k_max_regs = 4096;
     void grow_regs(size_t needed) {
         if (regs.size() < needed)
@@ -327,8 +327,8 @@ class VM {
 };
 
 // The result slots are addressed through VM::regs and the index CallCtx carries, never through the
-// `args` pointer: a builtin that calls Ollin code (an `__str`, a callback) may have grown the
-// register file in between, and grow_regs reallocates it.
+// `args` pointer: a builtin that calls Ollin code (an `__str`, a callback) may have resized the
+// register file in between (see CallCtx::regs_base).
 inline int CallCtx::ret(const Value& v) {
     if (result_cap <= 0)
         return 0;

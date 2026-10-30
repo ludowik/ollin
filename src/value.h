@@ -48,11 +48,11 @@ struct CallCtx {
     int    result_cap = 0;
     // Index of the first result slot in VM::regs, or -1 when the slots live in a buffer of their
     // own (the call_value path). The slots are addressed through THIS index and not through
-    // `args`, because a builtin that calls Ollin code — `__str`, a map callback — grows the
-    // register file, and grow_regs doubles its capacity, which REALLOCATES it. `args` then
-    // dangles, and writing the return value landed in freed memory: `graphics.textSize` on an
-    // instance whose `__str` recurses gave back a non-number, and `[1,2,3].map(f)` with a
-    // recursive `f` gave nil, nil, nil.
+    // `args`, because a builtin that calls Ollin code — `__str`, a map callback — resizes the
+    // register file meanwhile. The file itself never moves any more (see VM::execute), but a write through
+    // `args` could still land in a slot that the nested call shrank away; the index names the live slot.
+    // (Before the file was allocated once, `args` dangled outright: `graphics.textSize` on an instance whose
+    // `__str` recurses gave back a non-number, and `[1,2,3].map(f)` with a recursive `f` gave nil, nil, nil.)
     //
     // Reading is still the caller's business: `args` must be read BEFORE calling Ollin code.
     int    regs_base = -1;

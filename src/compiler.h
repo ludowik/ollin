@@ -216,7 +216,8 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     };
     bool concat_chain(const BinaryExpr& e, std::vector<ConcatPiece>& pieces);
     void emit_concat(const std::vector<ConcatPiece>& pieces, int dest);
-    bool const_key(const Expr& key, PoolIdx& index);
+    int compile_concat(const std::vector<ConcatPiece>& pieces);
+    bool const_key(const Expr& e, PoolIdx& index);
     void emit_get_member(int dest, int obj_r, const std::string& name);
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.

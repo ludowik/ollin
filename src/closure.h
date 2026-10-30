@@ -113,8 +113,7 @@ inline ClosurePool& closure_pool() {
 
 // A frame's hold on the closure it runs. The frame reads its captured upvalues straight from it
 // (the vector of a closure never changes once built), and the retain keeps them alive if the script
-// drops the last other reference to the running closure. This replaced a COPY of that vector,
-// allocated on every call of a closure.
+// drops the last other reference to the running closure.
 class ClosureRef {
   public:
     ClosureRef() = default;

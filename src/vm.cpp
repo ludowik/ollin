@@ -97,8 +97,10 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
 
 // Grows the register file to exactly `needed`, up to k_max_regs: the capacity was reserved by execute, so nothing moves.
 void VM::grow_regs_slow(size_t needed) {
+    static_assert(k_max_regs == 4096, "the message below names the limit");
     if (needed > k_max_regs)
-        throw std::runtime_error("runtime: stack overflow (max 4096 registers)");
+        throw std::runtime_error("runtime: stack overflow (max 4096 registers)"); // (a std::to_string(k_max_regs) here moved
+                                                                                    // run_goto's inlining: +0.3 % on fib)
     regs.resize(needed);
 }
 
@@ -164,7 +166,7 @@ static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
                                 const char* not_callable);
 
 // invoke_str: a mini-loop that calls __str without recursing.
-std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not invalidate obj
+std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the register obj came from
     Value cls = obj.map_get(MK().class_);
     if (cls.is_nil())
         return "{map}";
@@ -476,7 +478,7 @@ void VM::close_upvals_above(int threshold) {
     ouv->resize(kept);
 }
 
-// Resolves a function value to func_idx plus upvals.
+// Resolves a function value to func_idx, plus the closure to hold while it runs when it captured upvalues.
 static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
                                 const char* not_callable) {
     if (fv.is_func_val()) {
@@ -865,8 +867,6 @@ void VM::run_goto(size_t stop_depth) {
 #define C i_c(_i)
 #define Bx i_bx(_i)
 
-// The handlers of the binary operators whose right operand may be a register or, in the K form, a constant of
-// the pool: ONE body each, instantiated twice, so that the two forms cannot drift apart.
 // The result of a comparison, written to R[A]. When the very next instruction is the JUMP_IF_FALSE that
 // tests it (an `if` or a `while` condition), the jump is taken here: one dispatch and one decode less per
 // test. R[A] is still written, since `a < b and c` keeps the comparison as its value when it is false,
@@ -881,6 +881,8 @@ void VM::run_goto(size_t stop_depth) {
         NEXT();                                                                                                        \
     } while (0)
 
+// The handlers of the binary operators whose right operand may be a register or, in the K form, a constant of
+// the pool: ONE body each, instantiated twice, so that the two forms cannot drift apart.
 #define BINARY_HANDLER_ADD(RHS) \
     { \
         const Value& bv = R[B]; \
@@ -1446,7 +1448,7 @@ dispatch_loop:
                 // instead of through invoke_str/call_value_multi's nested run_goto, which shrink
                 // regs back themselves once it returns. Left unshrunk here, every operator
                 // meta-method call in a loop (`a + b`, `a == b`...) permanently consumed a few
-                // registers of the 4096-register budget, overflowing after a few hundred calls
+                // registers of the register budget, overflowing after a few hundred calls
                 // with no recursion in sight — the message named a depth nothing had reached.
                 regs.resize(base);
             }
@@ -1541,11 +1543,11 @@ dispatch_loop:
         const Map* obj_map = (obj.is_map() || obj.is_class()) ? obj.mptr : nullptr;
         const InternedStr* key_sptr = key.is_string() ? key.sptr : nullptr;
         // Inline cache (string key): a hit needs the same map or class (mptr), unmutated since
-        // (version), and the same interned key (sptr). Only hits on the object's own data
+        // (layout), and the same interned key (sptr). Only hits on the object's own data
         // of the object (see the fill below).
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
-            if (c.map == obj_map && c.version == obj_map->layout && c.key == key_sptr) {
+            if (c.map == obj_map && c.layout == obj_map->layout && c.key == key_sptr) {
                 {
                     // Copy BEFORE writing the register: if the destination aliases the object
                     // (A==B) and held the last reference to the map, the write would destroy
@@ -1565,14 +1567,14 @@ dispatch_loop:
             // the class method.
             const Value* slot = own->find_ptr(key);
             if (slot && !slot->is_nil()) {
-                // Found directly, so validity depends ONLY on (mptr, version): cacheable even
-                // on an instance, since mutating the instance bumps its version,
+                // Found directly, so validity depends ONLY on (mptr, layout): cacheable even
+                // on an instance, since adding or removing a field bumps its layout,
                 // and its own data always shadows the class). No
                 // is_instance here — it would cost a "__class__" lookup on every access.
                 if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
                     c.map = own;
-                    c.version = own->layout;
+                    c.layout = own->layout;
                     c.key = key_sptr;
                     c.val = slot;
                 }
@@ -1580,7 +1582,7 @@ dispatch_loop:
                 R[A] = std::move(hit);
             } else {
                 // Absent from the own data: walk the prototype chain (__class__ / __parent__).
-                // NOT cached, because mutating the CLASS does not bump the instance's version.
+                // NOT cached, because mutating the CLASS does not bump the instance's layout.
                 // The map module's pseudo-methods (len, keys, values, has, delete) are only an
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
                 // path — never tried for an INSTANCE (!has_class_key), same restriction `len`
