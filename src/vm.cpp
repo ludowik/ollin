@@ -1505,7 +1505,7 @@ dispatch_loop:
         // of the object (see the fill below).
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
-            if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
+            if (c.map == obj_map && c.version == obj_map->layout && c.key == key_sptr) {
                 {
                     // Copy BEFORE writing the register: if the destination aliases the object
                     // (A==B) and held the last reference to the map, the write would destroy
@@ -1532,7 +1532,7 @@ dispatch_loop:
                 if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
                     c.map = own;
-                    c.version = own->version;
+                    c.version = own->layout;
                     c.key = key_sptr;
                     c.val = slot;
                 }

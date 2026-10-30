@@ -99,14 +99,15 @@ class VM {
     };
 
     // Monomorphic inline cache for GET_INDEX, one slot per instruction. A hit needs the same
-    // map, the same version (bumped on every mutation, see Map::version / g_map_epoch) and the
-    // same interned key; it then answers without proto_chain_get.
-    // `val` is a NON-owning pointer into the map. A hit implies the version is unchanged, so
-    // the entry is still there and keeps the value alive. Owning a copy would retain the object
+    // map, the same layout (bumped when an entry appears or disappears, see Map::layout / g_map_epoch)
+    // and the same interned key; it then answers without proto_chain_get.
+    // `val` is a NON-owning pointer into the map. A hit implies the layout is unchanged, so
+    // the entry is still there and keeps the value alive; an in-place overwrite leaves the slot where
+    // it is, and the next hit reads the new value. Owning a copy would retain the object
     // long after the script dropped it, and cost a retain/release on every fill.
     struct GetIndexCache {
         const Map* map = nullptr;
-        uint64_t version = 0;
+        uint64_t version = 0; // the map's `layout` when the entry was cached
         const InternedStr* key = nullptr;
         const Value* val = nullptr;
     };
@@ -121,12 +122,12 @@ class VM {
         if (!key_sptr)
             return m->find_ptr(key);
         GetIndexCache& c = gicache_[ip - 1];
-        if (c.map == m && c.version == m->version && c.key == key_sptr)
+        if (c.map == m && c.version == m->layout && c.key == key_sptr)
             return c.val;
         const Value* slot = m->find_ptr(key);
         if (slot) {
             c.map = m;
-            c.version = m->version;
+            c.version = m->layout;
             c.key = key_sptr;
             c.val = slot;
         }

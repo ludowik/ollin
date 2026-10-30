@@ -3,12 +3,23 @@
 #include "fixed_pool.h"
 #include "robin_hood.h"
 
+// Nearly every key is a string, so that case is answered inline and the rest goes out of line.
 struct ValueHash {
-    std::size_t operator()(const Value& v) const noexcept;
+    std::size_t operator()(const Value& v) const noexcept {
+        if (v.tag == Value::T_STRING)
+            return v.str_hash;
+        return other(v);
+    }
+    static std::size_t other(const Value& v) noexcept;
 };
 
 struct ValueEqual {
-    bool operator()(const Value& a, const Value& b) const noexcept;
+    bool operator()(const Value& a, const Value& b) const noexcept {
+        if (a.tag == Value::T_STRING) // strings are interned: equal means the same object
+            return b.tag == Value::T_STRING && a.sptr == b.sptr;
+        return other(a, b);
+    }
+    static bool other(const Value& a, const Value& b) noexcept;
 };
 
 // Monotonic global epoch: every map mutation gets a unique version. The GET_INDEX inline cache
@@ -38,6 +49,11 @@ struct Map {
     uint8_t kind = PLAIN;
     void* userdata = nullptr;
     uint64_t version = 0;   // = ++g_map_epoch on every mutation; 0 means never mutated
+    // = ++g_map_epoch when an entry appears or disappears (and on recycling), NOT when a value is overwritten in
+    // place: that is what moves or invalidates a slot, and so the only thing a GET_INDEX cache holding a pointer
+    // to a value has to watch. `version` still tells a reader of the CONTENT (the camera cache) that something
+    // changed.
+    uint64_t layout = 0;
 
     Value get(const Value& k) const;
     // Location of the value, or nullptr when absent. This is what lets the GET_INDEX inline
@@ -69,7 +85,7 @@ struct MapPool {
             return;
         }
         m->data.clear();  // this can re-enter the pool through nested releases (see FixedPool)
-        m->version = ++g_map_epoch;  // recycling: invalidates every inline cache aimed at this Map*
+        m->version = m->layout = ++g_map_epoch;  // recycling: invalidates every inline cache aimed at this Map*
         m->kind = Map::PLAIN;             // otherwise a recycled map would come back frozen (enum) or as a module
         pool.store_or_delete(m);
     }

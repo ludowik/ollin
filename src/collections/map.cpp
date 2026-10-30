@@ -1,6 +1,6 @@
 #include "value.h"
 
-std::size_t ValueHash::operator()(const Value& v) const noexcept {
+std::size_t ValueHash::other(const Value& v) noexcept {
     switch (v.tag) {
     case Value::T_NIL:
         return 0;
@@ -45,7 +45,7 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
     }
 }
 
-bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
+bool ValueEqual::other(const Value& a, const Value& b) noexcept {
     if (a.tag == b.tag) {
         switch (a.tag) {
         case Value::T_NIL:
@@ -104,9 +104,15 @@ void Map::set(const Value& k, const Value& v) {
     // A nil value REMOVES the key, matching Lua's `t[k] = nil` — a read can never tell "never set"
     // from "set to nil" apart anyway (m.k reads nil either way), so keeping a ghost entry only
     // made len() overcount and a `for k, v in m` walk visit a key the script meant to drop.
-    if (v.is_nil())
-        data.erase(k);
-    else
-        data.insert_or_assign(k, v);
-    version = ++g_map_epoch;   // invalidates the GET_INDEX inline caches aimed at this map
+    // `layout` moves when an entry appears or disappears, which is what can move or invalidate the slot a
+    // GET_INDEX cache points at; overwriting a value in place leaves the slot where it is, so a cached read
+    // still lands on it and sees the new value. (A field updated in a loop used to knock its object's cache
+    // out at every write.) `version` moves on every write, for the readers of the content.
+    version = ++g_map_epoch;
+    if (v.is_nil()) {
+        if (data.erase(k) != 0)
+            layout = version;
+    } else if (data.insert_or_assign(k, v).second) {
+        layout = version;
+    }
 }

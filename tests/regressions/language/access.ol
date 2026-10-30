@@ -76,3 +76,39 @@ assert(nsh.m() == "klass")     ## the class method stays reachable
 var nlen = {x: 1}
 nlen["len"] = nil
 assert(nlen.len() == 1)         ## the one REAL key; the built-in `len` fallback still resolves
+
+## ── A cached field read follows an in-place overwrite ────────────────────────
+## Overwriting a field leaves its slot where it is, so the inline cache of a GET_INDEX keeps answering —
+## and must answer with the NEW value. Adding or deleting a key moves slots and must drop it.
+var cacheObj = {a: 1, b: 2}
+var cacheSeen = 0
+for cacheI = 1, 6 do
+    cacheSeen = cacheSeen * 10 + cacheObj.a
+    cacheObj.a = cacheObj.a + 1
+end
+assert(cacheSeen == 123456)
+var cacheLog = []
+for cacheI = 1, 5 do
+    cacheLog.push(cacheObj.b)
+    if cacheI == 2 then
+        cacheObj.b = nil               ## the entry disappears: the read must see nil, not the old slot
+    elseif cacheI == 3 then
+        cacheObj.b = 7                 ## and appears again, in a possibly different slot
+    end
+end
+assert(cacheLog[1] == 2 and cacheLog[2] == 2 and cacheLog[3] == nil and cacheLog[4] == 7 and cacheLog[5] == 7)
+class CachePt
+    func init()
+        self.n = 0
+    end
+    func bump()
+        self.n = self.n + 1
+        return self.n
+    end
+end
+var cachePt = CachePt()
+var cacheSum = 0
+for cacheI = 1, 10 do
+    cacheSum = cacheSum + cachePt.bump()
+end
+assert(cacheSum == 55 and cachePt.n == 10)
