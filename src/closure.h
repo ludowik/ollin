@@ -111,6 +111,86 @@ inline ClosurePool& closure_pool() {
     return s_closure_pool;
 }
 
+// A frame's hold on the closure it runs. The frame reads its captured upvalues straight from it
+// (the vector of a closure never changes once built), and the retain keeps them alive if the script
+// drops the last other reference to the running closure. This replaced a COPY of that vector,
+// allocated on every call of a closure.
+class ClosureRef {
+  public:
+    ClosureRef() = default;
+    explicit ClosureRef(Closure* c) : p_(c) {
+        ++c->refcount;
+    }
+    ClosureRef(ClosureRef&& o) noexcept : p_(o.p_) {
+        o.p_ = nullptr;
+    }
+    ClosureRef& operator=(ClosureRef&& o) noexcept {
+        if (this != &o) {
+            drop();
+            p_ = o.p_;
+            o.p_ = nullptr;
+        }
+        return *this;
+    }
+    ClosureRef(const ClosureRef&) = delete;
+    ClosureRef& operator=(const ClosureRef&) = delete;
+    ~ClosureRef() {
+        drop();
+    }
+    explicit operator bool() const {
+        return p_ != nullptr;
+    }
+    Closure* operator->() const {
+        return p_;
+    }
+
+  private:
+    Closure* p_ = nullptr;
+    void drop() {
+        if (p_ && --p_->refcount == 0)
+            release_cold(p_);
+    }
+    // Out of line, so the test above is all that the hot path (every return) carries.
+    [[gnu::noinline]] static void release_cold(Closure* c) {
+        closure_pool().release(c);
+    }
+};
+
+// Owns the vector of the upvalues a frame has opened, almost always none. A std::unique_ptr's
+// destructor was a call of its own on every return; this one is the null test, inline.
+class OpenUpvals {
+  public:
+    OpenUpvals() = default;
+    OpenUpvals(OpenUpvals&& o) noexcept : p_(o.p_) {
+        o.p_ = nullptr;
+    }
+    OpenUpvals(const OpenUpvals&) = delete;
+    OpenUpvals& operator=(const OpenUpvals&) = delete;
+    OpenUpvals& operator=(OpenUpvals&&) = delete;
+    ~OpenUpvals() {
+        if (__builtin_expect(p_ != nullptr, 0))
+            destroy(p_);
+    }
+    explicit operator bool() const {
+        return p_ != nullptr;
+    }
+    std::vector<Upvalue*>& operator*() const {
+        return *p_;
+    }
+    std::vector<Upvalue*>* operator->() const {
+        return p_;
+    }
+    void create() {
+        p_ = new std::vector<Upvalue*>();
+    }
+
+  private:
+    std::vector<Upvalue*>* p_ = nullptr;
+    [[gnu::noinline]] static void destroy(std::vector<Upvalue*>* v) {
+        delete v;
+    }
+};
+
 // Pairs with std::unique_ptr for exception safety at the one construction site (MAKE_CLOSURE):
 // if capturing an upvalue throws partway through, the partially-built Closure is returned to the
 // pool — its already-retained upvalues correctly released by release_upvals() — instead of

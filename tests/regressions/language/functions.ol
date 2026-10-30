@@ -539,3 +539,22 @@ var endLambda = func(x)
 end
 assert(endLambda(0) == "zero")
 assert(endLambda(1) == nil)
+
+## ── A running closure keeps its upvalues alive ──────────────────────────────
+## The frame holds the closure it runs: when the script drops the last other reference in the middle of
+## the call, the captured variable must still be readable, and a closure called again afterwards is intact.
+var dropped = nil
+func makeSelfDropping(seed)
+    var n = seed
+    return func(x)
+        dropped = nil
+        n = n + x
+        return n
+    end
+end
+dropped = makeSelfDropping(10)
+assert(dropped(5) == 15)
+assert(dropped == nil)
+var kept = makeSelfDropping(1)
+var again = kept
+assert(kept(1) == 2 and again(1) == 3)

@@ -94,8 +94,8 @@ class VM {
         int return_dest = -1;       // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
         bool negate_result = false; // true: RETURN logically negates the result before return_dest
                                     // (used by <> through __eq, and by >/>=/</<= on the flipped side)
-        std::unique_ptr<std::vector<Upvalue*>> upvals;
-        std::unique_ptr<std::vector<Upvalue*>> open_upvals;
+        ClosureRef closure;   // the closure this frame runs, if it captured anything
+        OpenUpvals open_upvals;
     };
 
     // Monomorphic inline cache for GET_INDEX, one slot per instruction. A hit needs the same
@@ -185,7 +185,13 @@ class VM {
     // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and
     // by the C++ catch(runtime_error).
     void unwind_to_handler(const Handler& h, Value thrown);
-    void grow_regs(size_t needed); // grows by doubling, up to 4096, and never shrinks
+    // grows by doubling, up to 4096, and never shrinks. The test stays inline: nearly every call
+    // finds the file already large enough, and was paying a function call to hear it.
+    void grow_regs(size_t needed) {
+        if (regs.size() < needed)
+            grow_regs_slow(needed);
+    }
+    void grow_regs_slow(size_t needed);
 
     // Calls a builtin: builds the CallCtx, invokes it, updates last_results_ and returns the
     // number of values produced. It is the SINGLE entry point of the six builtin call sites, so
@@ -240,7 +246,7 @@ class VM {
     // ⚠ NO default argument on `return_dest`, on purpose: a removed parameter once let a stale
     // `false` slide into it in SILENCE, a bool converting to int. Spelled out at every site, the
     // next signature change is a compile error wherever it lands instead of a wrong register.
-    uint32_t push_frame(int new_base, FuncIdx fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+    uint32_t push_frame(int new_base, FuncIdx fi, int argc, ClosureRef fuv,
                         uint32_t return_ip, int return_dest);
 
     // THE CALLING CONVENTION, in one place. Every call ends at push_frame, but getting the
@@ -263,14 +269,14 @@ class VM {
     // A frame born ABOVE everything, its arguments copied in from outside the register file — the
     // `__str` bridge, a meta-method, and the native-to-Ollin call all did this by hand. A `self`
     // is simply the first of those arguments.
-    uint32_t push_frame_copied(FuncIdx fi, const Value* args, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+    uint32_t push_frame_copied(FuncIdx fi, const Value* args, int argc, ClosureRef fuv,
                                uint32_t return_ip, int return_dest);
 
     // A frame at a register the caller reserved, with `self` INSERTED at its base: the arguments
     // already sit at base + arg_off and slide to base + 1. Both callers — a constructor and a
     // method call — wrote the two directions of that slide themselves.
     uint32_t push_frame_self(int base, FuncIdx fi, int argc, int arg_off, Value self,
-                             std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
+                             ClosureRef fuv, uint32_t return_ip);
     // THE INVARIANT under all of it: no frame's window or vararg area ever overlaps another live
     // frame's. It is enforced by lifting the varargs of EVERY live frame above whatever is about
     // to be written — never the immediate caller's alone, which is the statement that let a
