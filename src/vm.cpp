@@ -95,14 +95,10 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
     return Value{};
 }
 
-// Grows by doubling, capped at 4096; size stays exact.
+// Grows the register file to exactly `needed`, up to k_max_regs: the capacity was reserved by execute, so nothing moves.
 void VM::grow_regs_slow(size_t needed) {
-    if (needed > 4096)
+    if (needed > k_max_regs)
         throw std::runtime_error("runtime: stack overflow (max 4096 registers)");
-    size_t cap = regs.capacity() < 32 ? 32 : regs.capacity();
-    while (cap < needed)
-        cap *= 2;
-    regs.reserve(cap < 4096 ? cap : 4096);
     regs.resize(needed);
 }
 
@@ -832,8 +828,7 @@ __attribute__((noinline)) uint32_t VM::finish_return(Value* rvs, int total) {
     uint32_t rip = fr.return_ip;
     int rbase = fr.reg_base;
     call_stack.pop_back(); // fr is dangling from here on, hence the copies above
-    if ((int)regs.size() < rbase + total)
-        regs.resize(rbase + total);
+    grow_regs((size_t)(rbase + total));
     for (int i = 0; i < total; ++i)
         regs[rbase + i] = std::move(rvs[i]);
     if (total == 0)
@@ -861,6 +856,11 @@ void VM::run_goto(size_t stop_depth) {
         A = i_a(_i);                                                                                                   \
         goto* dt[i_op(_i)];                                                                                            \
     } while (0)
+#define SET_BASE(b)                                                                                                    \
+    do {                                                                                                               \
+        base = (b);                                                                                                    \
+        R = R0 + base;                                                                                                 \
+    } while (0)
 #define B i_b(_i)
 #define C i_c(_i)
 #define Bx i_bx(_i)
@@ -869,10 +869,10 @@ void VM::run_goto(size_t stop_depth) {
 // the pool: ONE body each, instantiated twice, so that the two forms cannot drift apart.
 #define BINARY_HANDLER_ADD(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int + int */ \
-            regs[base + A] = Value(bv.as_int() + cv.as_int()); \
+            R[A] = Value(bv.as_int() + cv.as_int()); \
             NEXT(); \
         } \
         if (bv.is_string() || cv.is_string()) { \
@@ -883,209 +883,209 @@ void VM::run_goto(size_t stop_depth) {
                 /* NEXT(). */ \
                 Value b2 = bv; \
                 Value c2 = cv; \
-                regs[base + A] = Value(value_to_string(b2) + value_to_string(c2)); \
+                R[A] = Value(value_to_string(b2) + value_to_string(c2)); \
             } \
             NEXT(); \
         } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().add_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
-        regs[base + A] = Value(as_double(bv) + as_double(cv)); \
+        R[A] = Value(as_double(bv) + as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_SUB(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int - int */ \
-            regs[base + A] = Value(bv.as_int() - cv.as_int()); \
+            R[A] = Value(bv.as_int() - cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().sub_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
-        regs[base + A] = Value(as_double(bv) - as_double(cv)); \
+        R[A] = Value(as_double(bv) - as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_MUL(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int * int */ \
-            regs[base + A] = Value(bv.as_int() * cv.as_int()); \
+            R[A] = Value(bv.as_int() * cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().mul_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
-        regs[base + A] = Value(as_double(bv) * as_double(cv)); \
+        R[A] = Value(as_double(bv) * as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_EQ(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int == int */ \
-            regs[base + A] = Value::make_bool(bv.as_int() == cv.as_int()); \
+            R[A] = Value::make_bool(bv.as_int() == cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
-        regs[base + A] = Value::make_bool(values_equal(bv, cv)); \
+        R[A] = Value::make_bool(values_equal(bv, cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_NEQ(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         /* a <> b goes through __eq then negates, otherwise == and <> could both be true. */ \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv, /*negate=*/true)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
-        regs[base + A] = Value::make_bool(!values_equal(bv, cv)); \
+        R[A] = Value::make_bool(!values_equal(bv, cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_GT(RHS) \
     { \
         /* GT(a,b) == LT(b,a): check __lt on rhs */ \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int > int */ \
-            regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int()); \
+            R[A] = Value::make_bool(bv.as_int() > cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(cv)) { /* the instance on the right: a > b is b < a, hence b.__lt(a) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } else if (is_instance(bv)) { /* the instance on the left: a > b is not(a <= b), hence not a.__le(b) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv, /*negate=*/true)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
         if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
-            regs[base + A] = Value::make_bool(bv.as_string() > cv.as_string()); \
+            R[A] = Value::make_bool(bv.as_string() > cv.as_string()); \
             NEXT(); \
         } \
-        regs[base + A] = Value::make_bool(as_double(bv) > as_double(cv)); \
+        R[A] = Value::make_bool(as_double(bv) > as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_LT(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int < int */ \
-            regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int()); \
+            R[A] = Value::make_bool(bv.as_int() < cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a < b is a.__lt(b) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } else if (is_instance(cv)) { /* the instance on the right: a < b is not(b <= a), hence not b.__le(a) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv, /*negate=*/true)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
         if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
-            regs[base + A] = Value::make_bool(bv.as_string() < cv.as_string()); \
+            R[A] = Value::make_bool(bv.as_string() < cv.as_string()); \
             NEXT(); \
         } \
-        regs[base + A] = Value::make_bool(as_double(bv) < as_double(cv)); \
+        R[A] = Value::make_bool(as_double(bv) < as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_GE(RHS) \
     { \
         /* GE(a,b) == LE(b,a): check __le on rhs */ \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int >= int */ \
-            regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int()); \
+            R[A] = Value::make_bool(bv.as_int() >= cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(cv)) { /* the instance on the right: a >= b is b <= a, hence b.__le(a) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } else if (is_instance(bv)) { /* the instance on the left: a >= b is not(a < b), hence not a.__lt(b) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv, /*negate=*/true)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
         if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
-            regs[base + A] = Value::make_bool(bv.as_string() >= cv.as_string()); \
+            R[A] = Value::make_bool(bv.as_string() >= cv.as_string()); \
             NEXT(); \
         } \
-        regs[base + A] = Value::make_bool(as_double(bv) >= as_double(cv)); \
+        R[A] = Value::make_bool(as_double(bv) >= as_double(cv)); \
         NEXT(); \
     }
 
 #define BINARY_HANDLER_LE(RHS) \
     { \
-        const Value& bv = regs[base + B]; \
+        const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int <= int */ \
-            regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int()); \
+            R[A] = Value::make_bool(bv.as_int() <= cv.as_int()); \
             NEXT(); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a <= b is a.__le(b) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } else if (is_instance(cv)) { /* the instance on the right: a <= b is not(b < a), hence not b.__lt(a) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv, /*negate=*/true)) { \
                 ip = addr; \
-                base = call_stack.back().reg_base; \
+                SET_BASE(call_stack.back().reg_base); \
                 NEXT(); \
             } \
         } \
         if (bv.is_string() && cv.is_string()) { /* lexicographic order */ \
-            regs[base + A] = Value::make_bool(bv.as_string() <= cv.as_string()); \
+            R[A] = Value::make_bool(bv.as_string() <= cv.as_string()); \
             NEXT(); \
         } \
-        regs[base + A] = Value::make_bool(as_double(bv) <= as_double(cv)); \
+        R[A] = Value::make_bool(as_double(bv) <= as_double(cv)); \
         NEXT(); \
 }
 
@@ -1174,6 +1174,10 @@ void VM::run_goto(size_t stop_depth) {
     const Value* index_key = nullptr; // the key of GET_INDEX / SET_INDEX, from a register or from the pool
     int argc_dyn = 0; // CALL_DYN and CALL_VA differ only by it, and share one body
     int base = call_stack.back().reg_base;
+    // regs never reallocates (its capacity is reserved once, in execute), so the window of the running frame
+    // is a plain pointer, recomputed only when `base` changes.
+    Value* const R0 = regs.data();
+    Value* R = R0 + base;
     // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
     // reentrancy (a run_goto nested through call_value) the chunk is the same, so the size
     // matches and this is a no-op.
@@ -1184,79 +1188,79 @@ dispatch_loop:
         NEXT();
 
     op_LOAD_K:
-        regs[base + A] = ch->constants[Bx];
+        R[A] = ch->constants[Bx];
         NEXT();
 
     op_LOAD_NIL:
-        regs[base + A] = Value{};
+        R[A] = Value{};
         last_results_ = 1; // e.g. the nil branch of an optional call f?() (multi-return)
         NEXT();
 
     op_MOVE:
-        regs[base + A] = regs[base + B];
+        R[A] = R[B];
         NEXT();
 
     op_LOAD_GLOBAL:
         if (!globals_init[Bx])
             throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
-        regs[base + A] = globals[Bx];
+        R[A] = globals[Bx];
         NEXT();
 
     op_STORE_GLOBAL:
-        globals[Bx] = regs[base + A];
+        globals[Bx] = R[A];
         globals_init[Bx] = true;
         NEXT();
 
     op_ADD:
-        BINARY_HANDLER_ADD(regs[base + C])
+        BINARY_HANDLER_ADD(R[C])
 
     op_SUB:
-        BINARY_HANDLER_SUB(regs[base + C])
+        BINARY_HANDLER_SUB(R[C])
 
     op_MUL:
-        BINARY_HANDLER_MUL(regs[base + C])
+        BINARY_HANDLER_MUL(R[C])
 
     op_DIV: {
-        if (is_instance(regs[base + B])) {
-            if (uint32_t addr = try_meta_binary(MK().div_, base + A, regs[base + B], regs[base + C])) {
+        if (is_instance(R[B])) {
+            if (uint32_t addr = try_meta_binary(MK().div_, base + A, R[B], R[C])) {
                 ip = addr;
-                base = call_stack.back().reg_base;
+                SET_BASE(call_stack.back().reg_base);
                 NEXT();
             }
         }
-        double dv = as_double(regs[base + C]);
+        double dv = as_double(R[C]);
         if (dv == 0.0)
             throw std::runtime_error("runtime: division by zero");
-        regs[base + A] = Value(as_double(regs[base + B]) / dv);
+        R[A] = Value(as_double(R[B]) / dv);
         NEXT();
     }
 
     op_MOD: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (bv.is_integer() && cv.is_integer()) { // the hot path: int % int
             if (cv.as_int() == 0)
                 throw std::runtime_error("runtime: modulo by zero");
-            regs[base + A] = Value(bv.as_int() % cv.as_int());
+            R[A] = Value(bv.as_int() % cv.as_int());
             NEXT();
         }
         if (is_instance(bv)) {
             if (uint32_t addr = try_meta_binary(MK().mod_, base + A, bv, cv)) {
                 ip = addr;
-                base = call_stack.back().reg_base;
+                SET_BASE(call_stack.back().reg_base);
                 NEXT();
             }
         }
         double dv = as_double(cv);
         if (dv == 0.0)
             throw std::runtime_error("runtime: modulo by zero");
-        regs[base + A] = Value(std::fmod(as_double(bv), dv));
+        R[A] = Value(std::fmod(as_double(bv), dv));
         NEXT();
     }
 
     op_IDIV: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (bv.is_integer() && cv.is_integer()) {
             if (cv.as_int() == 0)
                 throw std::runtime_error("runtime: division by zero");
@@ -1264,20 +1268,20 @@ dispatch_loop:
             // floor division: adjust if signs differ and there is a remainder
             if ((bv.as_int() ^ cv.as_int()) < 0 && q * cv.as_int() != bv.as_int())
                 q--;
-            regs[base + A] = Value(q);
+            R[A] = Value(q);
         } else {
             double dv = as_double(cv);
             if (dv == 0.0)
                 throw std::runtime_error("runtime: division by zero");
-            regs[base + A] = Value(std::floor(as_double(bv) / dv));
+            R[A] = Value(std::floor(as_double(bv) / dv));
         }
         NEXT();
     }
 
     op_POW: {
         {
-            const Value& bv = regs[base + B]; // read before R[A] is written, so the reference is safe
-            const Value& cv = regs[base + C];
+            const Value& bv = R[B]; // read before R[A] is written, so the reference is safe
+            const Value& cv = R[C];
             if (bv.is_integer() && cv.is_integer() && cv.as_int() >= 0) {
                 int64_t b = bv.as_int(), e = cv.as_int(), r = 1;
                 while (e > 0) {
@@ -1286,51 +1290,51 @@ dispatch_loop:
                     b *= b;
                     e >>= 1;
                 }
-                regs[base + A] = Value(r);
+                R[A] = Value(r);
             } else {
-                regs[base + A] = Value(std::pow(as_double(bv), as_double(cv)));
+                R[A] = Value(std::pow(as_double(bv), as_double(cv)));
             }
         }
         NEXT();
     }
     op_NEGATE: {
-        if (is_instance(regs[base + B])) {
-            if (uint32_t addr = try_meta_unary(MK().neg_, base + A, regs[base + B])) {
+        if (is_instance(R[B])) {
+            if (uint32_t addr = try_meta_unary(MK().neg_, base + A, R[B])) {
                 ip = addr;
-                base = call_stack.back().reg_base;
+                SET_BASE(call_stack.back().reg_base);
                 NEXT();
             }
         }
-        const Value& bv = regs[base + B];
-        regs[base + A] = bv.is_integer() ? Value(-bv.as_int()) : Value(-as_double(bv));
+        const Value& bv = R[B];
+        R[A] = bv.is_integer() ? Value(-bv.as_int()) : Value(-as_double(bv));
         NEXT();
     }
 
     op_NOT:
-        regs[base + A] = Value::make_bool(is_falsy(regs[base + B]));
+        R[A] = Value::make_bool(is_falsy(R[B]));
         NEXT();
 
     op_AND:
-        regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) && !is_falsy(regs[base + C]));
+        R[A] = Value::make_bool(!is_falsy(R[B]) && !is_falsy(R[C]));
         NEXT();
 
     op_EQ:
-        BINARY_HANDLER_EQ(regs[base + C])
+        BINARY_HANDLER_EQ(R[C])
 
     op_NEQ:
-        BINARY_HANDLER_NEQ(regs[base + C])
+        BINARY_HANDLER_NEQ(R[C])
 
     op_GT:
-        BINARY_HANDLER_GT(regs[base + C])
+        BINARY_HANDLER_GT(R[C])
 
     op_LT:
-        BINARY_HANDLER_LT(regs[base + C])
+        BINARY_HANDLER_LT(R[C])
 
     op_GE:
-        BINARY_HANDLER_GE(regs[base + C])
+        BINARY_HANDLER_GE(R[C])
 
     op_LE:
-        BINARY_HANDLER_LE(regs[base + C])
+        BINARY_HANDLER_LE(R[C])
 
     op_ADDK:
         BINARY_HANDLER_ADD(ch->constants[C])
@@ -1364,13 +1368,13 @@ dispatch_loop:
         NEXT();
 
     op_JUMP_IF_FALSE:
-        if (is_falsy(regs[base + A]))
+        if (is_falsy(R[A]))
             ip = Bx;
         NEXT();
 
     op_CALL_FUNC: {
         ip = push_frame(base + A, (FuncIdx)B, C, ClosureRef(), ip, -1);
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1390,7 +1394,7 @@ dispatch_loop:
             // result_base, an axis this frame no longer has.
             if (n > 0 && A != 0)
                 for (int i = 0; i < n; ++i)
-                    regs[base + i] = std::move(regs[base + A + i]);
+                    R[i] = std::move(R[A + i]);
             else if (n == 0)
                 nil_result_slot(base); // a valueless return still leaves nil where the caller reads
             call_stack.pop_back();     // fr is dangling from here on
@@ -1410,7 +1414,7 @@ dispatch_loop:
         }
         if (call_stack.size() <= stop_depth)
             return;
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1421,11 +1425,10 @@ dispatch_loop:
             int count = B; // 0 = all of them; otherwise a fixed count, padded with nil
             int n = (count == 0) ? n_va : count;
             size_t needed = (size_t)(base + A + n);
-            if ((int)regs.size() < (int)needed)
-                regs.resize(needed);
+            grow_regs(needed);
             int va_src = fr.varargs_base;
             for (int i = 0; i < n; ++i)
-                regs[base + A + i] = (i < n_va) ? regs[va_src + i] : Value{};
+                R[A + i] = (i < n_va) ? regs[va_src + i] : Value{};
             last_results_ = n; // the count is published, for a spread [..., ...] and for CALL_VA
         }
         NEXT();
@@ -1440,14 +1443,14 @@ dispatch_loop:
             int total = n_expl + n_va;
             RetBuf rvs(total);
             for (int i = 0; i < n_expl; ++i)
-                rvs.p[i] = std::move(regs[base + A + i]);
+                rvs.p[i] = std::move(R[A + i]);
             for (int i = 0; i < n_va; ++i)
                 rvs.p[n_expl + i] = std::move(regs[va_src + i]);
             ip = finish_return(rvs.p, total);
         }
         if (call_stack.size() <= stop_depth)
             return;
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1461,7 +1464,7 @@ dispatch_loop:
 
     op_THROW: {
         {
-            Value thrown = regs[base + A];
+            Value thrown = R[A];
             if (handler_stack.empty())
                 throw std::runtime_error("unhandled exception: " + value_to_string(thrown));
             // A handler opened BELOW this invocation's floor belongs to an enclosing run_goto —
@@ -1474,12 +1477,12 @@ dispatch_loop:
             handler_stack.pop_back();
             unwind_to_handler(h, std::move(thrown));
         }
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
     op_NEW_MAP:
-        regs[base + A] = Value::make_map();
+        R[A] = Value::make_map();
         NEXT();
 
     op_GET_INDEXK:
@@ -1487,9 +1490,9 @@ dispatch_loop:
         goto get_index;
 
     op_GET_INDEX:
-        index_key = &regs[base + C];
+        index_key = &R[C];
     get_index : {
-        const Value& obj = regs[base + B];
+        const Value& obj = R[B];
         const Value& key = *index_key;
         // Capture BEFORE writing regs[base+A]: the destination may alias the key register
         // (A==C) or the object one (A==B), so reading obj or key after `regs[A] = found` would
@@ -1508,7 +1511,7 @@ dispatch_loop:
                     // it — and c.val points INSIDE that map. The temporary retains first. Block
                     // closed before NEXT(), per the computed-goto rule.
                     Value hit = *c.val;
-                    regs[base + A] = std::move(hit);
+                    R[A] = std::move(hit);
                 }
                 NEXT();
             }
@@ -1533,7 +1536,7 @@ dispatch_loop:
                     c.val = slot;
                 }
                 Value hit = *slot; // read before writing the register (see the cache hit)
-                regs[base + A] = std::move(hit);
+                R[A] = std::move(hit);
             } else {
                 // Absent from the own data: walk the prototype chain (__class__ / __parent__).
                 // NOT cached, because mutating the CLASS does not bump the instance's version.
@@ -1544,9 +1547,9 @@ dispatch_loop:
                 Value chained = proto_chain_rest(obj, key);
                 if (chained.is_nil() && key_sptr && !has_class_key(obj)) {
                     const Value* meth = module_member(map_module_, key, key_sptr);
-                    regs[base + A] = meth ? *meth : Value{};
+                    R[A] = meth ? *meth : Value{};
                 } else {
-                    regs[base + A] = std::move(chained);
+                    R[A] = std::move(chained);
                 }
             }
         } else if (obj.is_string()) {
@@ -1554,7 +1557,7 @@ dispatch_loop:
             // every pass after the first is a cache hit.
             // (The module lives as long as the VM, so there is no aliasing risk.)
             const Value* meth = module_member(string_module_, key, key_sptr);
-            regs[base + A] = meth ? *meth : Value{};
+            R[A] = meth ? *meth : Value{};
         } else if (obj.is_array()) {
             if (key_sptr) {
                 // Pseudo-methods: a single lookup in the map built at startup (see
@@ -1563,11 +1566,11 @@ dispatch_loop:
                 const Value* meth = module_member(array_module_, key, key_sptr);
                 if (!meth)
                     throw std::runtime_error("runtime: array has no field '" + key.as_string() + "'");
-                regs[base + A] = *meth;
+                R[A] = *meth;
             } else {
                 if (!key.is_integer())
                     throw std::runtime_error("runtime: array index must be integer");
-                regs[base + A] = obj.array_get(key.as_int());
+                R[A] = obj.array_get(key.as_int());
             }
         } else {
             throw std::runtime_error("cannot index " + std::string(obj.type_name()) +
@@ -1581,19 +1584,19 @@ dispatch_loop:
         goto set_index;
 
     op_SET_INDEX:
-        index_key = &regs[base + B];
+        index_key = &R[B];
     set_index : {
-        Value& obj = regs[base + A];
+        Value& obj = R[A];
         const Value& key = *index_key;
         if (obj.is_map() || obj.is_class()) {
             if (obj.mptr->kind == Map::ENUM)
                 throw std::runtime_error("cannot modify an enum" +
                                          (key.is_string() ? " (field '" + key.as_string() + "')" : ""));
-            obj.map_set(key, regs[base + C]);
+            obj.map_set(key, R[C]);
         } else if (obj.is_array()) {
             if (!key.is_integer())
                 throw std::runtime_error("runtime: array index must be integer");
-            obj.array_set(key.as_int(), regs[base + C]);
+            obj.array_set(key.as_int(), R[C]);
         } else {
             throw std::runtime_error("cannot assign index on " + std::string(obj.type_name()) +
                                      (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
@@ -1602,47 +1605,47 @@ dispatch_loop:
     }
 
     op_MAKE_ITER:
-        regs[base + A] = Value::make_iter_from(regs[base + B]);
+        R[A] = Value::make_iter_from(R[B]);
         NEXT();
 
     op_BAND: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (!bv.is_integer() || !cv.is_integer())
             throw std::runtime_error("runtime: & requires integer operands");
-        regs[base + A] = Value(bv.as_int() & cv.as_int());
+        R[A] = Value(bv.as_int() & cv.as_int());
         NEXT();
     }
 
     op_BOR: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (!bv.is_integer() || !cv.is_integer())
             throw std::runtime_error("runtime: | requires integer operands");
-        regs[base + A] = Value(bv.as_int() | cv.as_int());
+        R[A] = Value(bv.as_int() | cv.as_int());
         NEXT();
     }
 
     op_BXOR: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (!bv.is_integer() || !cv.is_integer())
             throw std::runtime_error("runtime: ^ requires integer operands");
-        regs[base + A] = Value(bv.as_int() ^ cv.as_int());
+        R[A] = Value(bv.as_int() ^ cv.as_int());
         NEXT();
     }
 
     op_BNOT: {
-        const Value& bv = regs[base + B];
+        const Value& bv = R[B];
         if (!bv.is_integer())
             throw std::runtime_error("runtime: ~ requires integer operand");
-        regs[base + A] = Value(~bv.as_int());
+        R[A] = Value(~bv.as_int());
         NEXT();
     }
 
     op_SWITCH: {
         const SwitchTable& t = ch->switch_tables[Bx];
-        const Value& subj = regs[base + A];
+        const Value& subj = R[A];
         if (subj.is_integer()) {
             uint64_t idx = (uint64_t)(subj.ival - t.base);
             ip = idx < t.targets.size() ? t.targets[idx] : t.else_addr;
@@ -1653,44 +1656,44 @@ dispatch_loop:
     }
 
     op_LEN: {
-        regs[base + A] = value_len(regs[base + B]);
+        R[A] = value_len(R[B]);
         NEXT();
     }
 
     op_BLSHIFT: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (!bv.is_integer() || !cv.is_integer())
             throw std::runtime_error("runtime: << requires integer operands");
-        regs[base + A] = Value((int64_t)((uint64_t)bv.as_int() << (cv.as_int() & 63)));
+        R[A] = Value((int64_t)((uint64_t)bv.as_int() << (cv.as_int() & 63)));
         NEXT();
     }
 
     op_BRSHIFT: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
+        const Value& bv = R[B];
+        const Value& cv = R[C];
         if (!bv.is_integer() || !cv.is_integer())
             throw std::runtime_error("runtime: >> requires integer operands");
-        regs[base + A] = Value(bv.as_int() >> (cv.as_int() & 63));
+        R[A] = Value(bv.as_int() >> (cv.as_int() & 63));
         NEXT();
     }
 
     op_NEW_ARRAY:
-        regs[base + A] = Value::make_array();
+        R[A] = Value::make_array();
         NEXT();
 
     op_ARRAY_PUSH:
-        regs[base + A].array_push(regs[base + B]);
+        R[A].array_push(R[B]);
         NEXT();
 
     op_FOR_ITER_NEXT:
-        if (!regs[base + A].iptr->next(regs[base + A + 1], regs[base + A + 2]))
+        if (!R[A].iptr->next(R[A + 1], R[A + 2]))
             ip = Bx;
         NEXT();
 
     op_FOR_ITER_NEXT1: {
         {
-            Iterator* it = regs[base + A].iptr;
+            Iterator* it = R[A].iptr;
             Value primary;
             // Devirtualized range case: a direct, inlinable call to advance() instead of one
             // vtable indirection per element. Other iterators keep the virtual path, and the
@@ -1700,14 +1703,14 @@ dispatch_loop:
             if (!ok) {
                 ip = Bx;
             } else {
-                regs[base + A + 1] = std::move(primary);
+                R[A + 1] = std::move(primary);
             }
         }
         NEXT();
     }
 
     op_LOAD_FUNC:
-        regs[base + A] = Value::make_func((FuncIdx)Bx);
+        R[A] = Value::make_func((FuncIdx)Bx);
         NEXT();
 
     op_CALL_DYN: {
@@ -1735,24 +1738,24 @@ dispatch_loop:
         argc_dyn = C + last_results_;
 
     call_dyn_common:
-        if (regs[base + B].is_builtin()) {
-            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, argc_dyn);
+        if (R[B].is_builtin()) {
+            invoke_builtin_regs(R[B].as_builtin(), base + A, argc_dyn);
             NEXT();
         }
-        if (regs[base + B].is_class()) {
+        if (R[B].is_class()) {
             bool done; // instantiation: the arguments sit at ctor_base+0.., hence arg_off = 0
-            uint32_t addr = instantiate_class(base + A, 0, argc_dyn, regs[base + B], done);
+            uint32_t addr = instantiate_class(base + A, 0, argc_dyn, R[B], done);
             if (!done)
                 ip = addr;
             goto call_dyn_done;
         }
         {
             ClosureRef fuv;
-            FuncIdx fi = resolve_func_val(regs[base + B], fuv, CALL_NOT_CALLABLE);
+            FuncIdx fi = resolve_func_val(R[B], fuv, CALL_NOT_CALLABLE);
             ip = push_frame(base + A, fi, argc_dyn, std::move(fuv), ip, -1);
         }
     call_dyn_done:
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1760,7 +1763,7 @@ dispatch_loop:
         {
             int n = last_results_;
             for (int i = 0; i < n; ++i)
-                regs[base + A].array_push(regs[base + B + i]);
+                R[A].array_push(R[B + i]);
         }
         NEXT();
     }
@@ -1771,7 +1774,7 @@ dispatch_loop:
             int n_va = cur.n_varargs;
             int va_src = cur.varargs_base;
             for (int i = 0; i < n_va; ++i)
-                regs[base + A].array_push(regs[va_src + i]);
+                R[A].array_push(regs[va_src + i]);
         }
         NEXT();
     }
@@ -1781,7 +1784,7 @@ dispatch_loop:
             int n = last_results_;
             if (A != B) // A < B, copying downwards, so a forward loop is safe
                 for (int i = 0; i < n; ++i)
-                    regs[base + A + i] = std::move(regs[base + B + i]);
+                    R[A + i] = std::move(R[B + i]);
         }
         NEXT();
     }
@@ -1800,7 +1803,7 @@ dispatch_loop:
         }
         if (call_stack.size() <= stop_depth)
             return;
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1842,28 +1845,28 @@ dispatch_loop:
                 }
                 cl->upvals.push_back(uv);
             }
-            regs[base + A] = Value::make_closure(cl.release());
+            R[A] = Value::make_closure(cl.release());
         }
         NEXT();
     }
 
     op_GET_UPVAL: {
         Upvalue* uv = call_stack.back().closure->upvals[B];
-        regs[base + A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
+        R[A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
         NEXT();
     }
 
     op_SET_UPVAL: {
         Upvalue* uv = call_stack.back().closure->upvals[B];
         if (uv->closed)
-            uv->val = regs[base + A];
+            uv->val = R[A];
         else
-            regs[uv->frame_base + uv->reg_idx] = regs[base + A];
+            regs[uv->frame_base + uv->reg_idx] = R[A];
         NEXT();
     }
 
     op_NEW_CLASS:
-        regs[base + A] = Value::make_class();
+        R[A] = Value::make_class();
         NEXT();
 
     op_CALL_METHOD: {
@@ -1942,7 +1945,7 @@ dispatch_loop:
         }
         ip = fp_addr;
     call_method_done:
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         NEXT();
     }
 
@@ -1957,12 +1960,12 @@ dispatch_loop:
                     return v.as_float();
                 throw std::runtime_error("runtime: range bound must be a number");
             };
-            double start = toDouble_(regs[base + B]);
-            double end = toDouble_(regs[base + B + 1]);
-            double step = has_step ? toDouble_(regs[base + B + 2]) : 1.0;
+            double start = toDouble_(R[B]);
+            double end = toDouble_(R[B + 1]);
+            double step = has_step ? toDouble_(R[B + 2]) : 1.0;
             validate_numeric_range(start, end, step);
             Range* r = new Range{1, start, end, step, incl_right};
-            regs[base + A] = Value::make_range(r);
+            R[A] = Value::make_range(r);
         }
         NEXT();
     }
@@ -1974,9 +1977,9 @@ dispatch_loop:
         // bound.
         bool empty;
         {
-            Value& vi = regs[base + A];
-            Value& vl = regs[base + A + 1];
-            Value& vs = regs[base + A + 2];
+            Value& vi = R[A];
+            Value& vl = R[A + 1];
+            Value& vs = R[A + 2];
             if (!vi.is_number() || !vl.is_number() || !vs.is_number())
                 throw std::runtime_error("runtime: for: expected numeric bounds");
             if (vi.is_integer() && vl.is_integer() && vs.is_integer()) {
@@ -1991,14 +1994,14 @@ dispatch_loop:
                     // by this counter.
                     uint64_t ustep = (st > 0) ? (uint64_t)st : (0ull - (uint64_t)st);
                     uint64_t urange = (st > 0) ? ((uint64_t)lim - (uint64_t)i0) : ((uint64_t)i0 - (uint64_t)lim);
-                    regs[base + A + 1] = Value((int64_t)(urange / ustep));
+                    R[A + 1] = Value((int64_t)(urange / ustep));
                 }
             } else {
                 double di = vi.as_num(), dl = vl.as_num(), ds = vs.as_num();
                 validate_numeric_range(di, dl, ds);
-                regs[base + A] = Value(di); // normalises everything to double
-                regs[base + A + 1] = Value(dl);
-                regs[base + A + 2] = Value(ds);
+                R[A] = Value(di); // normalises everything to double
+                R[A + 1] = Value(dl);
+                R[A + 2] = Value(ds);
                 empty = (ds > 0) ? (di > dl) : (di < dl);
             }
         }
@@ -2010,9 +2013,9 @@ dispatch_loop:
     op_FOR_LOOP: {
         bool cont;
         {
-            Value& vi = regs[base + A];
-            Value& vl = regs[base + A + 1];
-            Value& vs = regs[base + A + 2];
+            Value& vi = R[A];
+            Value& vl = R[A + 1];
+            Value& vs = R[A + 2];
             if (vi.is_integer()) { // the type was frozen by FOR_PREP
                 // R[A+1] holds the remaining-turn counter set by FOR_PREP. While it is non-zero,
                 // decrement it and step i. No overflow guard is needed: the counter guarantees
@@ -2029,7 +2032,7 @@ dispatch_loop:
                 double ni = vi.as_num() + vs.as_num();
                 cont = (vs.as_num() > 0) ? (ni <= vl.as_num()) : (ni >= vl.as_num());
                 if (cont)
-                    regs[base + A] = Value(ni);
+                    R[A] = Value(ni);
             }
         }
         if (cont)
@@ -2042,13 +2045,13 @@ dispatch_loop:
         // Set the remaining targets (A+last_results_ .. A+B-1) to nil, otherwise they would read
         // stale registers.
         for (int i = last_results_; i < B; ++i)
-            regs[base + A + i] = Value{};
+            R[A + i] = Value{};
         NEXT();
 
     // Sealing an enum, emitted AFTER it is filled — the filling itself goes through SET_INDEX,
     // and may evaluate calls to produce the values.
     op_SEAL_ENUM: {
-        Value& target = regs[base + A];
+        Value& target = R[A];
         if (target.is_map())
             target.mptr->kind = Map::ENUM;
         NEXT();
@@ -2074,7 +2077,7 @@ dispatch_loop:
         Handler h = handler_stack.back();
         handler_stack.pop_back();
         unwind_to_handler(h, std::move(t.value));
-        base = call_stack.back().reg_base;
+        SET_BASE(call_stack.back().reg_base);
         goto dispatch_loop;
     } catch (const std::runtime_error& e) {
         // A CAUGHT error reaches the script as it was thrown, with no location: the message is
@@ -2087,7 +2090,7 @@ dispatch_loop:
             handler_stack.pop_back();
             unwind_to_handler(h, Value(bare));
             // `base` (a local) is restored here, as in op_THROW; unwind_to_handler already set ip.
-            base = call_stack.back().reg_base;
+            SET_BASE(call_stack.back().reg_base);
             goto dispatch_loop;
         }
         // UNCAUGHT: THE one place a runtime error is given its source line, and it is given
@@ -2104,6 +2107,7 @@ dispatch_loop:
     }
 
 #undef NEXT
+#undef SET_BASE
 #undef B
 #undef C
 #undef Bx
@@ -2119,6 +2123,9 @@ dispatch_loop:
 }
 
 void VM::execute(Chunk chunk) {
+    // The whole register file is allocated here, once: run_goto keeps a pointer into it, which a
+    // growth must therefore never move. grow_regs refuses to go past this size.
+    regs.reserve(k_max_regs);
     owned_chunk = std::move(chunk);
     ch = &owned_chunk;
     ip = 0;

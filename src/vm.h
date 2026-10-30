@@ -187,6 +187,7 @@ class VM {
     void unwind_to_handler(const Handler& h, Value thrown);
     // grows by doubling, up to 4096, and never shrinks. The test stays inline: nearly every call
     // finds the file already large enough, and was paying a function call to hear it.
+    static constexpr size_t k_max_regs = 4096;
     void grow_regs(size_t needed) {
         if (regs.size() < needed)
             grow_regs_slow(needed);
@@ -207,8 +208,7 @@ class VM {
     // register allocation of run_goto, shared by every handler, shifting. noinline brings loop
     // and map back to their reference counts and leaves fib 0.55 % below it.
     __attribute__((noinline)) void nil_result_slot(int slot) {
-        if ((int)regs.size() <= slot)
-            regs.resize(slot + 1);
+        grow_regs((size_t)(slot + 1));
         regs[slot] = Value();
     }
     // The values a multi-value return gathers, on the STACK up to eight: a heap vector per return

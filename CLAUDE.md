@@ -2745,6 +2745,11 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   l'énonçait avant, ce qui a laissé vivre la corruption des varargs. Un `frames_top()` qui le
   CALCULAIT a été écrit puis retiré : personne ne l'appelait, et un invariant tient par ce qui
   l'impose, pas par une fonction qui le décrit.
+- **Le fichier de registres ne se réalloue JAMAIS** : `execute` en réserve la capacité entière (`k_max_regs`, 4096) et
+  `grow_regs` refuse d'aller au-delà. C'est ce qui permet à `run_goto` de tenir `R`, un pointeur sur la fenêtre du cadre
+  (`R0 + base`), recalculé par `SET_BASE` à chaque changement de `base` et nulle part ailleurs. Tout nouveau site qui
+  fait CROÎTRE `regs` passe par `grow_regs`, jamais par `regs.resize` : rétrécir est sûr, grandir hors de la capacité
+  déplacerait le tampon et laisserait `R` pendant. Mesuré : `loop` −13 %, `float` −8 %, `array` −10 % d'instructions.
 - ⚠ **Un relèvement porte sur TOUS les cadres vivants, jamais sur le seul appelant.** La fenêtre
   d'un appelé dépasse celle de son appelant de son propre `reg_count`, donc elle peut couvrir
   plusieurs zones de varargs d'un coup. Ne protéger que l'appelant immédiat enterrait les varargs
