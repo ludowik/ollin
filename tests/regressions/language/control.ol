@@ -164,3 +164,33 @@ for k, v in [1;3] do
     cxPairs += v
 end
 assert(cxPairs == 6)
+
+## ── a comparison that feeds a jump still leaves its value in its register ───────
+## The VM takes the jump of an `if` or `while` condition together with the comparison; `a < b and c` keeps the
+## comparison as the value of the whole expression when it is false, so the register must still be written.
+var jc1, jc2 = 1, 2
+var jv = jc1 > jc2 and 5
+assert(jv == false and typeof(jv) == "bool")
+jv = jc1 < jc2 and 5
+assert(jv == 5)
+jv = jc1 >= jc2 or "other"
+assert(jv == "other")
+var jcount = 0
+var ji = 0
+while ji < 10 and jcount < 100 do
+    ji += 1
+    if ji == 3 then
+        jcount += 10
+    elseif ji >= 8 then
+        jcount += 1
+    end
+end
+assert(ji == 10 and jcount == 13)
+var jf = 0.5
+var jtaken = ""
+if jf < 1.5 then jtaken = jtaken + "a" end
+if jf > 1.5 then jtaken = jtaken + "b" end
+if jf <= 0.5 then jtaken = jtaken + "c" end
+if jf >= 0.75 then jtaken = jtaken + "d" end
+if jc1 == 1 then jtaken = jtaken + "e" end
+assert(jtaken == "ace")

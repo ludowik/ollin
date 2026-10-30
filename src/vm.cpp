@@ -867,6 +867,20 @@ void VM::run_goto(size_t stop_depth) {
 
 // The handlers of the binary operators whose right operand may be a register or, in the K form, a constant of
 // the pool: ONE body each, instantiated twice, so that the two forms cannot drift apart.
+// The result of a comparison, written to R[A]. When the very next instruction is the JUMP_IF_FALSE that
+// tests it (an `if` or a `while` condition), the jump is taken here: one dispatch and one decode less per
+// test. R[A] is still written, since `a < b and c` keeps the comparison as its value when it is false,
+// and the jump instruction itself stays in the code for every path that reaches it from elsewhere.
+#define CMP_JUMP(expr)                                                                                                 \
+    do {                                                                                                               \
+        bool cmp_result = (expr);                                                                                      \
+        R[A] = Value::make_bool(cmp_result);                                                                           \
+        Instr next_i = ch->code[ip];                                                                                   \
+        if (i_op(next_i) == static_cast<OpByte>(Op::JUMP_IF_FALSE) && i_a(next_i) == A)                                \
+            ip = cmp_result ? ip + 1 : i_bx(next_i);                                                                   \
+        NEXT();                                                                                                        \
+    } while (0)
+
 #define BINARY_HANDLER_ADD(RHS) \
     { \
         const Value& bv = R[B]; \
@@ -953,8 +967,7 @@ void VM::run_goto(size_t stop_depth) {
         const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int == int */ \
-            R[A] = Value::make_bool(bv.as_int() == cv.as_int()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_int() == cv.as_int()); \
         } \
         if (is_instance(bv)) { \
             if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv)) { \
@@ -989,12 +1002,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int > int */ \
-            R[A] = Value::make_bool(bv.as_int() > cv.as_int()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_int() > cv.as_int()); \
         } \
         if (bv.is_float() && cv.is_float()) { /* float > float: no promotion, no meta-method to look for */ \
-            R[A] = Value::make_bool(bv.as_float() > cv.as_float()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_float() > cv.as_float()); \
         } \
         if (is_instance(cv)) { /* the instance on the right: a > b is b < a, hence b.__lt(a) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) { \
@@ -1022,12 +1033,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int < int */ \
-            R[A] = Value::make_bool(bv.as_int() < cv.as_int()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_int() < cv.as_int()); \
         } \
         if (bv.is_float() && cv.is_float()) { /* float < float: no promotion, no meta-method to look for */ \
-            R[A] = Value::make_bool(bv.as_float() < cv.as_float()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_float() < cv.as_float()); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a < b is a.__lt(b) */ \
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) { \
@@ -1056,12 +1065,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int >= int */ \
-            R[A] = Value::make_bool(bv.as_int() >= cv.as_int()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_int() >= cv.as_int()); \
         } \
         if (bv.is_float() && cv.is_float()) { /* float >= float: no promotion, no meta-method to look for */ \
-            R[A] = Value::make_bool(bv.as_float() >= cv.as_float()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_float() >= cv.as_float()); \
         } \
         if (is_instance(cv)) { /* the instance on the right: a >= b is b <= a, hence b.__le(a) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) { \
@@ -1089,12 +1096,10 @@ void VM::run_goto(size_t stop_depth) {
         const Value& bv = R[B]; \
         const Value& cv = RHS; \
         if (bv.is_integer() && cv.is_integer()) { /* the hot path: int <= int */ \
-            R[A] = Value::make_bool(bv.as_int() <= cv.as_int()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_int() <= cv.as_int()); \
         } \
         if (bv.is_float() && cv.is_float()) { /* float <= float: no promotion, no meta-method to look for */ \
-            R[A] = Value::make_bool(bv.as_float() <= cv.as_float()); \
-            NEXT(); \
+            CMP_JUMP(bv.as_float() <= cv.as_float()); \
         } \
         if (is_instance(bv)) { /* the instance on the left: a <= b is a.__le(b) */ \
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) { \
@@ -2161,6 +2166,7 @@ dispatch_loop:
 
 #undef NEXT
 #undef SET_BASE
+#undef CMP_JUMP
 #undef B
 #undef C
 #undef Bx
