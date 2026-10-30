@@ -2075,6 +2075,17 @@ void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_ex
                              (field.empty() ? "" : " element '" + field + "'"));
 }
 
+// An expression as an OPERAND: a named local answers with its own register, so no MOVE copies it
+// (and retains, then releases, the array or map it holds); anything else lands in a temporary.
+// The register is kept alive until the caller is done with it.
+int Compiler::operand_reg(const Expr& e) {
+    e.accept(*this);
+    int r = last_reg_;
+    if (reg_top_ <= r)
+        reserve_regs_to(r + 1);
+    return r;
+}
+
 void Compiler::visit(const IndexAssignStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
@@ -2090,8 +2101,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         // Chained target (a.b.c, a[i][j]…): the container is an expression, evaluated into a
         // register. Maps and arrays being ref-counted, the SET_INDEX that follows does mutate the
         // original object.
-        obj_r = alloc_reg();
-        compile_into(*s.obj_expr, obj_r);
+        obj_r = operand_reg(*s.obj_expr);
     } else {
         const int* it = scopes().regs.find(s.obj);
         if (it != nullptr) {
@@ -2109,14 +2119,11 @@ void Compiler::visit(const IndexAssignStmt& s) {
         }
     }
 
-    // Compile key
-    int key_r = alloc_reg();
-    compile_into(*s.key, key_r);
+    int key_r = operand_reg(*s.key);
 
     if (s.op == TokenType::EQUALS) {
         // Simple assignment: SET_INDEX obj_r, key_r, val_r
-        int val_r = alloc_reg();
-        compile_into(*s.value, val_r);
+        int val_r = operand_reg(*s.value);
         chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, val_r));
     } else {
         // Compound assignment: get current, apply op, store back
