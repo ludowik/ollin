@@ -26,13 +26,11 @@ bool engine_font_usable(int idx);
 // it is meant to match cannot disagree. The caller checks engine_font_usable first.
 Vector2 engine_text_size(int idx, const char* text, float size);
 void engine_draw_text(int idx, const char* text, Vector2 pos, float size, Color color);
-// A signed distance field is read by a shader, and switching shader empties rlgl's batch. So the shader
-// is left BOUND after a text and the batch keeps filling — a run of texts and shapes is one draw call
-// instead of two per text. Anything that is not text or a plain shape would then be drawn through the
-// distance-field shader (a sprite's soft alpha would be cut at one half), so the run is CLOSED here before
-// it: by every graphics function unless it is declared safe (see with_area, graphics_internal.h), by
-// the bitmap font, and by the engine at the end of draw(), of the interface and of a failed frame. Closing
-// when nothing is open costs one test.
+// A signed distance field is read by a shader, and switching shader empties rlgl's batch: so the shader
+// stays BOUND after a text, and a run of texts and shapes is one draw call. The contract: close the run
+// before drawing anything that is not an SDF text or a plain shape (a sprite's soft alpha would be cut at
+// one half). `with_area` (graphics_internal.h) does it for every graphics function unless declared safe;
+// the bitmap font and the engine's frame boundaries do it by themselves. Cheap when nothing is open.
 void engine_text_run_end();
 // Forgets the fonts WITHOUT unloading them: their textures belong to the previous program's
 // context, which is already destroyed. Called when a program starts.

@@ -72,13 +72,8 @@ bool gfx_view_map(float* x, float* y);
 // image_module.cpp uses this too, which is why the header serves three units and not two.
 void gfx_need_area();
 
-template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
-    gfx_need_area();
-    engine_text_run_end();   // the engine fonts leave their shader bound between texts: see engine_text_run_end
-    return F(ctx);
-}
 
-// The same for the functions that can follow a text without closing its run: the text itself, the shapes
+// For the functions that can follow a text without closing its run: the text itself, the shapes
 // (raylib draws them through a white texel, which the distance-field shader leaves as it is) and the
 // save/restore of the stack. A function belongs here only if it never draws a texture that has soft
 // alpha AND never changes what the pending vertices will be drawn with: a bare translate or rotate edits
@@ -88,6 +83,13 @@ template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
 template <int (*F)(CallCtx&)> int with_area_text_safe(CallCtx& ctx) {
     gfx_need_area();
     return F(ctx);
+}
+
+// The default: needs an area like the above, and first closes the text run (the engine fonts leave their
+// shader bound between texts, see engine_text_run_end) so that nothing drawn here goes through it.
+template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
+    engine_text_run_end();
+    return with_area_text_safe<F>(ctx);
 }
 
 // Inside a begin3d/end3d block? Defined on the 3D side, read by the 2D side's graphics.scale,

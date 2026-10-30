@@ -1533,21 +1533,19 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   glyphes SDF portent une marge de 4 px de l'atlas (`SDF_MARGIN`) que `engine_font_ascent` retire, sinon
   la ligne de base descend. Mesuré (`tests/gfx_graphics_test.ol`, scène E) : un « H » de 70 px a un
   bord d'un pixel et ses montants restent à 255. `"pixel"` reste un bitmap, sans shader.
-  ⚠ **Le shader reste LIÉ entre deux textes** (`engine_text_run_end`, engine_font.h) : changer de shader
-  vide le lot de rlgl, et à un vidage par texte (deux avec la forme précédente) un écran de 100 cases coûtait
-  1,7 fois plus (mesuré au navigateur en rendu logiciel : 202 images en 6 s contre 342 pour la police
-  bitmap ; 268 une fois le shader gardé). Tout ce qui n'est ni un texte SDF ni une forme simple doit
-  FERMER la série avant de dessiner, sinon l'alpha doux d'un sprite serait coupé à un demi. **La sûreté
-  tient au défaut** : `with_area` (graphics_internal.h) ferme, et seules les fonctions déclarées
-  `with_area_text_safe` — texte, formes, `push`/`pop` — la laissent ouverte ; en oublier une ne
-  coûte que de la vitesse. ⚠ **`translate`, `rotate*`, `scale` et `resetTransform` FERMENT** : hors d'un `push`
-  ils modifient la matrice de vue, que rlgl applique au VIDAGE du lot, et un texte encore en attente se
-  déplacerait avec elle (reproduit : un « A » écrit avant un `translate(60, 0)` sortait 60 px plus loin).
-  Les FORMES ont déjà ce défaut sans texte (un `rect`, un `translate` nu, un `rect` : le premier bouge
-  aussi) ; non corrigé, hors du sujet. Les formes de raylib passent par un texel blanc opaque, que le shader laisse tel
-  quel. Le moteur ferme aussi à la fin de `draw()`, de l'interface et d'une image en erreur
-  (`engine_font_reset` y revient pour un programme relancé sur le même contexte). Gardé par la scène F de
-  `tests/gfx_graphics_test.ol` ; sans la fermeture de `with_area`, la scène B échoue.
+  ⚠ **Le shader reste LIÉ entre deux textes** (le mécanisme et sa règle : `engine_text_run_end`,
+  engine_font.h, et `with_area` / `with_area_text_safe`, graphics_internal.h). **Pourquoi** : à un vidage de
+  lot par texte, 100 cases rectangle + texte coûtaient 1,7 fois plus (mesuré au navigateur, rendu
+  logiciel : 202 images en 6 s contre 342 pour la police bitmap ; 268 une fois le shader gardé). **La
+  sûreté tient au défaut** : tout ce qui n'est pas déclaré sûr ferme, donc oublier une fonction ne coûte que
+  de la vitesse. ⚠ **`translate`, `rotate*`, `scale` et `resetTransform` ferment, même dans un `push`** :
+  hors d'un `push` ils modifient la matrice de vue, que rlgl applique au VIDAGE du lot, et un texte encore
+  en attente se déplacerait avec elle (reproduit : un « A » écrit avant un `translate(60, 0)` sortait 60 px
+  plus loin). Dans un `push` ils s'appliquent à la soumission et pourraient rester ouverts, mais cela
+  demande un compteur de profondeur à garder juste (surcompter est le sens dangereux : remise à zéro à
+  chaque image et à `begin3d`/`end3d`) — non fait. Les FORMES ont déjà ce défaut sans texte (un `rect`, un
+  `translate` nu, un `rect` : le premier bouge aussi) ; non corrigé, hors du sujet. Gardé par les scènes B
+  et F de `tests/gfx_graphics_test.ol`.
 - `engine_font(idx)` charge l'atlas au PREMIER usage : le construire crée une texture,
   donc exige un contexte graphique, absent quand les widgets sont déclarés. Repli sur
   `GetFontDefault()` en cas d'échec. Filtre BILINEAR, l'atlas étant le plus souvent réduit.

@@ -124,7 +124,8 @@ void engine_draw_text(int idx, const char* text, Vector2 pos, float size, Color 
 }
 
 void engine_font_reset() {
-    // A frame that failed halfway leaves the shader bound, and in the browser the context outlives the program.
+    // A frame that failed halfway (a throw the frame's own handler does not see) leaves the shader bound, and
+    // in the browser the context outlives the program; a second canvas() reaches here too.
     if (IsWindowReady())
         engine_text_run_end();
     s_text_run_open = false;

@@ -440,6 +440,7 @@ static int gfx_canvas(CallCtx& ctx) {
         }
         reset3d_graphics_state();   // free the 3D GL resources before any reinitialisation
         reset_fxaa_shader();
+        engine_font_reset();        // InitWindow below makes a new context: the font atlases and their shader are gone
     }
     set_phys_size(w, h);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -1664,6 +1665,13 @@ static void run_user_callbacks(const Value& draw_fn) {
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // a no-op outside 3D; otherwise it flushes and closes, should draw() have forgotten end3d
+    engine_text_run_end();   // likewise for the text shader: the composition and the overlay must not read through it
+}
+
+// The interface is drawn with the engine fonts too, and leaves their shader bound like a script does.
+static void draw_interface() {
+    ui_draw();
+    engine_text_run_end();
 }
 
 static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
@@ -1712,7 +1720,6 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         run_user_callbacks(draw_fn);
-        engine_text_run_end();
         *tex = false;
         EndTextureMode();
 
@@ -1760,8 +1767,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // Normal blending from here to the end of the frame: the interface, then the FPS overlay.
         // The screenshot in between only READS pixels, so no blend state is restored for it.
         BeginBlendMode(BLEND_ALPHA);
-        ui_draw();
-        engine_text_run_end();
+        draw_interface();
         flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
@@ -1773,8 +1779,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
         run_user_callbacks(draw_fn);
-        ui_draw();                       // no composition here, so the interface follows the scene
-        engine_text_run_end();
+        draw_interface();                // no composition here, so the interface follows the scene
         flush_pending_screenshot();      // captures the screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
