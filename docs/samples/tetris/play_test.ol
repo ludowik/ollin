@@ -381,6 +381,8 @@ step()
 assert(game.state == "over", "START does nothing while the curtain falls")
 steps(ROWS * config.curtainFrames + 2)
 assert(curtainRows() == ROWS)
+press({confirm: true, cw: true})
+assert(game.state == "over", "a turn pressed in the rush of the end does not leave the game over screen")
 game.pressed = {start: true}
 step()
 assert(game.state == "level", "START after a game leaves it for the choice of a level")

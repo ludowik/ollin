@@ -348,7 +348,7 @@ end
 func stepOver()
     if not overDone() then
         game.wait += 1
-    elseif confirmed() then
+    elseif game.pressed.start then
         game.state = "level"
         game.focus = "level"
     end
