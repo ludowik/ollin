@@ -7,9 +7,12 @@ import "play.ol"
 gameInit()
 math.seed(11)
 
-## A game just begun at `level`: the first piece is at the top.
+## An A game just begun at `level`: the first piece is at the top.
 func begin(level)
-    game.state = "title"
+    game.state = "level"
+    game.focus = "level"
+    game.type = "A"
+    game.height = 0
     game.startLevel = level
     game.held = {left: false, right: false, down: false}
     game.pressed = {start: true}
@@ -51,24 +54,67 @@ func cellsFilled()
     end))
 end
 
-## ── The title screen ──
-game.pressed = {left: true}
-step()
-assert(game.startLevel == 0, "the level does not go below 0")
-for i = 1, 12 do
-    game.pressed = {right: true}
+## ── The screens before the game ──
+func press(events)
+    game.pressed = events
     step()
 end
+
+game.state = "title"
+press({cw: true})
+press({up: true})
+press({ccw: true})
+assert(game.state == "title", "only START or A leaves the title, not a turn")
+press({start: true})
+assert(game.state == "menu" and game.focus == "type")
+
+press({right: true})
+assert(game.type == "B", "an arrow changes the type")
+press({left: true})
+assert(game.type == "A")
+press({down: true})
+assert(game.focus == "music")
+var musicWas = music.on
+press({right: true})
+assert(music.on == not musicWas, "on the music line an arrow switches the music")
+press({left: true})
+assert(music.on == musicWas)
+press({up: true})
+assert(game.focus == "type")
+press({ccw: true})
+assert(game.state == "title", "B goes back")
+press({confirm: true})
+assert(game.state == "menu", "A leaves the title as well")
+press({confirm: true})
+assert(game.state == "level" and game.focus == "level")
+
+press({left: true})
+assert(game.startLevel == 0, "the level does not go below 0")
+for i = 1, 12 do
+    press({right: true})
+end
 assert(game.startLevel == config.maxStartLevel, "the level stops at {config.maxStartLevel}")
-game.pressed = {left: true}
-step()
-assert(game.startLevel == config.maxStartLevel - 1)
-assert(game.state == "title")
-game.pressed = {cw: true}
-step()
-game.pressed = {ccw: true}
-step()
-assert(game.state == "title", "only START starts a game, not a turn (the arrows may be tried on the title screen)")
+press({up: true})
+assert(game.startLevel == config.maxStartLevel - 5, "up goes to the row above")
+press({down: true})
+assert(game.startLevel == config.maxStartLevel and game.focus == "level", "an A game has no height to choose")
+press({down: true})
+assert(game.focus == "level")
+press({ccw: true})
+assert(game.state == "menu", "B goes back to the menu")
+press({confirm: true})
+game.type = "B"
+press({down: true})
+assert(game.focus == "height", "down from the lower row of levels reaches the height of a B game")
+for i = 1, 9 do
+    press({right: true})
+end
+assert(game.height == config.maxHeight and game.startLevel == config.maxStartLevel, "the height stops at {config.maxHeight}")
+press({left: true})
+assert(game.height == config.maxHeight - 1)
+press({up: true})
+assert(game.focus == "level")
+game.type = "A"
 
 ## ── A new game ──
 begin(3)
@@ -237,7 +283,51 @@ rowsFilled([ROWS - 1], [4, 5])
 place(Piece.O, 1, 3, ROWS - 3)
 game.fall = fallFrames(5) - 1
 step()
-assert(game.lines == 1 and game.level == 5, "a game begun at level 5 stays there until level 6 is earned")
+assert(game.lines == 1 and game.level == 5, "a game begun at level 5 stays there until ten lines are made")
+begin(5)
+game.lines = 9
+rowsFilled([ROWS - 1], [4, 5])
+place(Piece.O, 1, 3, ROWS - 3)
+game.fall = fallFrames(5) - 1
+step()
+assert(game.lines == 10 and game.level == 6, "ten lines from level 5 make level 6")
+
+## ── A B game: the rubble, one level all along, and the goal lines that win ──
+game.state = "level"
+game.focus = "level"
+game.type = "B"
+game.startLevel = 3
+game.height = 2
+game.best = 0
+game.held = {left: false, right: false, down: false}
+press({start: true})
+assert(game.state == "play" and game.level == 3 and game.lines == 0)
+var rubble = cellsFilled()
+assert(rubble > 0 and rubble <= 4 * (COLS - 1) and len(fullRows(game.well)) == 0, "two rows of rubble per step of height")
+game.well = newWell()
+game.lines = config.goalLines - 2
+rowsFilled([ROWS - 1], [4, 5])
+place(Piece.O, 1, 3, ROWS - 3)
+game.fall = fallFrames(3) - 1
+step()
+assert(game.lines == config.goalLines - 1 and game.level == 3 and not game.won, "a B game keeps its level")
+steps(config.clearFrames)
+assert(game.state == "play")
+rowsFilled([ROWS - 1], [4, 5])
+place(Piece.O, 1, 3, ROWS - 3)
+game.fall = fallFrames(3) - 1
+step()
+assert(game.lines == config.goalLines and game.won and game.state == "clearing")
+steps(config.clearFrames)
+assert(game.state == "over" and game.won, "the goal lines end the game once the rows have gone")
+assert(data.get(config.bestKeyB) == game.score and game.best == game.score, "a B game keeps its own best score")
+press({start: true})
+assert(game.state == "over", "START waits a moment")
+steps(config.wonFrames)
+press({start: true})
+assert(game.state == "level")
+game.type = "A"
+loadBest()
 
 ## ── The score has a ceiling ──
 addScore(10000000)
@@ -293,7 +383,7 @@ steps(ROWS * config.curtainFrames + 2)
 assert(curtainRows() == ROWS)
 game.pressed = {start: true}
 step()
-assert(game.state == "title")
+assert(game.state == "level", "START after a game leaves it for the choice of a level")
 begin(0)
 assert(game.score == 0 and game.lines == 0 and cellsFilled() == 0 and not game.newBest, "a new game starts clean")
 game.score = 100

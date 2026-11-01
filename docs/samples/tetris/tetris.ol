@@ -1,10 +1,13 @@
 ## Tetris, as the handheld of 1989 plays it: a well of 10 by 18, the seven pieces turning by the original
 ## Nintendo rotation (no wall kicks, no hold, no ghost, no hard drop), the score of 40, 100, 300 and 1200 times the
-## level, a speed that grows every ten lines, and the folk tune of Type A.
+## level, a speed that grows with the level, and the folk tune of Type A. The screens are the handheld's: the title,
+## the choice of A-TYPE (the level rises every ten lines) or B-TYPE (rubble to dig through, 25 lines to clear) and of
+## the music, then the level, and for B-TYPE the height of the rubble.
 ##
 ## Left and right move a piece (held, they repeat after a short wait), down drops it faster and pays a point a row,
-## X or up turns it clockwise and Z counter-clockwise. Enter starts and pauses, M switches the music. On a touch
-## screen the pads appear with the first touch: a cross, the two buttons A and B, and START.
+## X or up turns it clockwise and Z counter-clockwise. On the screens before the game the arrows choose, X or Enter
+## confirms and Z goes back. Enter starts and pauses, M switches the music. On a touch screen the pads appear with
+## the first touch: a cross, the two buttons A and B, and START.
 ##
 ## rules.ol holds the rules, sounds.ol the sound and play.ol the game itself, which runs on a clock of 60 steps a
 ## second whatever the speed of the screen, so that the counts of frames of the rules mean what they say; this file
@@ -26,7 +29,6 @@ global look = {
         [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]
     ],
     nextBox: {x: 108, y: 98, w: 48, h: 40},
-    musicHit: {x: 36, y: 114, w: 88, h: 12},   ## where a tap switches the music on the title screen
     shade: [
         [0.608, 0.737, 0.059, 1],   ## the lightest green, the screen itself
         [0.545, 0.675, 0.059, 1],
@@ -58,16 +60,23 @@ global view = {
     layout: {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false}
 }
 
-## The pad buttons that start an event of the game when they go down, and the event.
-const PAD_EVENTS = {a: "cw", b: "ccw", start: "start", left: "left", right: "right"}
+## The pad buttons that start events of the game when they go down, and the events (A turns a piece and confirms).
+const PAD_EVENTS = {
+    a: ["cw", "confirm"], b: ["ccw"], start: ["start"], left: ["left"], right: ["right"], up: ["up"], down: ["down"]
+}
 
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 func keyboard.keypressed(key)
     var p = game.pressed
-    if key == "x" or key == "up" or key == "w" then
+    if key == "x" then
         p.cw = true
-        p.start = p.start or (key == "x" and game.state == "title")
+        p.confirm = true
+    elseif key == "up" or key == "w" then
+        p.cw = true
+        p.up = true
+    elseif key == "down" or key == "s" then
+        p.down = true
     elseif key == "z" then
         p.ccw = true
     elseif key == "return" or key == "p" or key == "escape" or (key == "space" and game.state <> "play") then
@@ -102,13 +111,6 @@ func inButton(b, px, py)
     return math.abs(px - b.x) <= b.w / 2 and math.abs(py - b.y) <= b.h / 2
 end
 
-func inScreenRect(r, px, py)
-    var L = view.layout
-    var x = L.ox + r.x * L.s
-    var y = L.oy + r.y * L.s
-    return px >= x and px <= x + r.w * L.s and py >= y and py <= y + r.h * L.s
-end
-
 ## Reads the keyboard, the pads and the taps once a frame. A direction and down are HELD, tested by the steps; a
 ## turn, START and a tap are EVENTS, kept until a step uses them.
 func readInput()
@@ -128,20 +130,15 @@ func readInput()
     end
     var before = view.pads
     var ev = game.pressed
-    for name, event in PAD_EVENTS do
+    for name, events in PAD_EVENTS do
         if pads[name] and not before[name] then
-            ev[event] = true
+            for event in events do
+                ev[event] = true
+            end
         end
     end
-    if pads.a and not before.a then
-        ev.start = ev.start or game.state == "title"
-    end
-    if tap and (game.state == "title" or game.state == "paused" or game.state == "over") and len(pads) == 0 then
-        if game.state == "title" and inScreenRect(look.musicHit, pts[1].x, pts[1].y) then
-            setMusic(not music.on)
-        else
-            ev.start = true
-        end
+    if tap and not running() and len(pads) == 0 then
+        ev.start = true
     end
     view.pointer = len(pts) > 0
     view.pads = pads
@@ -301,10 +298,10 @@ end
 func drawPanel()
     box(108, 8, 48, 24)
     label("LEVEL", 132, 15, 8, 4)
-    label("{game.level}", 132, 25, 8, 4)
+    label("{game.level:02d}", 132, 25, 8, 4)
     box(108, 36, 48, 24)
     label("LINES", 132, 43, 8, 4)
-    label("{game.lines}", 132, 53, 8, 4)
+    label("{linesShown():03d}", 132, 53, 8, 4)
     box(108, 64, 48, 28)
     label("SCORE", 132, 72, 8, 4)
     label("{game.score:06d}", 132, 83, 8, 4)
@@ -327,10 +324,10 @@ func drawWellText()
     if game.state == "paused" then
         box(cx - 28, 60, 56, 24)
         label("PAUSE", cx, 72, 10, 4)
-    elseif game.state == "over" and curtainRows() == ROWS then
+    elseif game.state == "over" and overDone() then
         box(cx - 32, 44, 64, 56)
-        label("GAME", cx, 50, 10, 4)
-        label("OVER", cx, 62, 10, 4)
+        label(game.won and "WELL" or "GAME", cx, 50, 10, 4)
+        label(game.won and "DONE" or "OVER", cx, 62, 10, 4)
         if game.newBest then
             label("NEW BEST", cx, 77, 8, 3)
         else
@@ -351,32 +348,74 @@ func drawGame()
     if game.state <> "paused" then
         drawWell()
     end
-    if game.state == "over" then
+    if game.state == "over" and not game.won then
         drawCurtain()
     end
     drawPanel()
     drawWellText()
 end
 
-## The first screen: the name, the starting level, the best score and the music.
-func drawTitle()
+## A cell of a choice: dark with light ink when it is the one chosen, a plain box otherwise. The chosen one of the
+## line the arrows are on blinks.
+func choice(str, x, y, w, h, size, chosen, focused)
+    var on = chosen and (not focused or game.frame % 40 < 28)
+    if on then
+        block(x, y, w, h, 4)
+    else
+        box(x, y, w, h)
+    end
+    label(str, x + w / 2, y + h / 2, size, on and 1 or 4)
+end
+
+func drawScreenFrame()
     block(0, 0, look.screenW, look.screenH, 1)
     box(4, 4, 152, 136)
-    label("TETRIS", 80, 23, 24, 4)
+end
+
+## The first screen: the name, and the pieces, until START.
+func drawTitle()
+    drawScreenFrame()
+    label("TETRIS", 80, 30, 24, 4)
     for item in look.titlePieces do
-        drawPiece(item[1], 1, item[2], item[3] - 8)
+        drawPiece(item[1], 1, item[2], item[3] + 4)
     end
-    var arrows = game.frame % 40 < 28
-    label("LEVEL  {game.startLevel}", 80, 98, 10, 4)
-    if arrows then
-        label("<", 38, 98, 10, 4)
-        label(">", 122, 98, 10, 4)
-    end
-    label("HIGH {game.best:06d}", 80, 110, 8, 3)
-    label("MUSIC " + (music.on and "ON" or "OFF"), 80, 120, 8, 3)
     if game.frame % 60 < 40 then
-        label("PUSH START", 80, 130, 8, 4)
+        label("PUSH START", 80, 124, 8, 4)
     end
+end
+
+## The second screen: the type of game, and the music.
+func drawMenu()
+    drawScreenFrame()
+    label("GAME TYPE", 80, 20, 8, 4)
+    var onType = game.focus == "type"
+    choice("A-TYPE", 18, 30, 60, 28, 8, game.type == "A", onType)
+    choice("B-TYPE", 82, 30, 60, 28, 8, game.type == "B", onType)
+    label("MUSIC", 80, 78, 8, 4)
+    var onMusic = game.focus == "music"
+    choice("MUSIC-A", 18, 88, 60, 20, 8, music.on, onMusic)
+    choice("OFF", 82, 88, 60, 20, 8, not music.on, onMusic)
+    if game.frame % 60 < 40 then
+        label("PUSH START", 80, 124, 8, 4)
+    end
+end
+
+## The third screen: the level the game begins at, and for a B game the height of its rubble.
+func drawLevelScreen()
+    drawScreenFrame()
+    label(game.type + "-TYPE", 80, 16, 10, 4)
+    label("LEVEL", 80, 32, 8, 4)
+    var onLevel = game.focus == "level"
+    for i = 0, config.maxStartLevel do
+        choice("{i}", 20 + i % 5 * 24, 40 + i // 5 * 18, 20, 14, 8, i == game.startLevel, onLevel)
+    end
+    if game.type == "B" then
+        label("HEIGHT", 80, 88, 8, 4)
+        for i = 0, config.maxHeight do
+            choice("{i}", 12 + i * 22, 96, 18, 14, 8, i == game.height, not onLevel)
+        end
+    end
+    label("HIGH {game.best:06d}", 80, 124, 8, 3)
 end
 
 ## The ink of a pad button: lit while a finger is on it.
@@ -426,6 +465,10 @@ func draw()
     graphics.clear(look.frameInk[1], look.frameInk[2], look.frameInk[3])
     if game.state == "title" then
         drawTitle()
+    elseif game.state == "menu" then
+        drawMenu()
+    elseif game.state == "level" then
+        drawLevelScreen()
     else
         drawGame()
     end

@@ -122,9 +122,27 @@ for level = 1, 20 do
     assert(fallFrames(level) <= fallFrames(level - 1))
 end
 
-## The level: every ten lines, and never below the one the game began at.
-assert(levelFor(0, 0) == 0 and levelFor(0, 9) == 0 and levelFor(0, 10) == 1 and levelFor(0, 95) == 9)
-assert(levelFor(5, 0) == 5 and levelFor(5, 59) == 5 and levelFor(5, 60) == 6)
+## The level: an A game goes up with every ten lines from its own level, a B game does not move.
+assert(levelFor(0, 0, "A") == 0 and levelFor(0, 9, "A") == 0 and levelFor(0, 10, "A") == 1 and levelFor(0, 95, "A") == 9)
+assert(levelFor(5, 0, "A") == 5 and levelFor(5, 9, "A") == 5 and levelFor(5, 10, "A") == 6, "an A game climbs from its own level")
+assert(levelFor(5, 24, "B") == 5, "a B game stays at its own level")
+
+## The start of a B game: two rows of rubble for each step of height, none of them full.
+for height = 0, 5 do
+    var rubble = newWell()
+    addGarbage(rubble, height)
+    assert(len(fullRows(rubble)) == 0, "no row is full at height {height}")
+    var cells = len(rubble.filter(func(v)
+        return v <> 0
+    end))
+    for r = 0, ROWS - height * 2 - 1 do
+        for c = 0, COLS - 1 do
+            assert(rubble[wellIdx(c, r)] == 0, "nothing above the rubble")
+        end
+    end
+    assert(cells <= height * 2 * (COLS - 1), "a hole is left in every row")
+    assert(height == 0 and cells == 0 or height > 0 and cells > 0, "the rubble is there from height 1")
+end
 
 ## The wait before the next piece grows as the last one rests higher.
 assert(entryDelay(ROWS - 1) == 10 and entryDelay(0) == 18)

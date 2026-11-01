@@ -159,9 +159,25 @@ func fallFrames(level)
     return FALL_FRAMES[math.min(level, len(FALL_FRAMES) - 1) + 1]
 end
 
-## The level goes up with every ten lines, and a game that began higher keeps its level until then.
-func levelFor(startLevel, lines)
-    return math.max(startLevel, lines // 10)
+## The level of an A game goes up with every ten lines, from the one it began at; a B game stays at its own.
+func levelFor(startLevel, lines, gameType)
+    if gameType == "B" then
+        return startLevel
+    end
+    return startLevel + lines // 10
+end
+
+## The rows of a B game's start: two rows for each step of height, each cell filled or not by chance with one hole
+## left in the row, so that no row is full from the start.
+func addGarbage(well, height)
+    for r = ROWS - height * 2, ROWS - 1 do
+        var hole = math.randInt(0, COLS - 1)
+        for c = 0, COLS - 1 do
+            if c <> hole and math.randInt(1, 2) == 1 then
+                well[wellIdx(c, r)] = math.randInt(1, KINDS)
+            end
+        end
+    end
 end
 
 ## The frames before the next piece appears: the higher the last one came to rest, the longer.
