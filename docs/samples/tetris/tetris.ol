@@ -11,6 +11,8 @@
 ## is what the player touches: the keyboard and the pads, and the picture. The picture is drawn in the 160 by 144
 ## points of the handheld's screen, scaled to fit the area (graphics.fitArea) and placed again whenever it is needed.
 
+import "rules.ol"
+import "sounds.ol"
 import "play.ol"
 import "../lib/draw.ol"
 
@@ -19,6 +21,10 @@ global look = {
     screenW: 160,               ## the handheld's screen, in points
     screenH: 144,
     wellX: 16,
+    titlePieces: [
+        [Piece.I, 14, 48], [Piece.O, 54, 48], [Piece.T, 78, 48], [Piece.Z, 110, 44],
+        [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]
+    ],
     nextBox: {x: 108, y: 98, w: 48, h: 40},
     musicHit: {x: 36, y: 114, w: 88, h: 12},   ## where a tap switches the music on the title screen
     shade: [
@@ -46,12 +52,14 @@ look.blocks[Piece.L] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 3], [1, 1, 6, 1, 1]]
 
 ## What belongs to the screen and the fingers, not to the game.
 global view = {
-    pads: {},                   ## the pad buttons down now, and a step ago
-    padsBefore: {},
+    pads: {},                   ## the pad buttons down at the last frame
     pointer: false,             ## a finger or the mouse was down at the last frame
     touchSeen: false,           ## a finger has touched the screen, so the pads are shown
-    layout: {s: 1, ox: 0, oy: 0, buttons: [], left: nil, right: nil, pill: nil}
+    layout: {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false}
 }
+
+## The pad buttons that start an event of the game when they go down, and the event.
+const PAD_EVENTS = {a: "cw", b: "ccw", start: "start", left: "left", right: "right"}
 
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -118,33 +126,24 @@ func readInput()
             end
         end
     end
-    var before = view.padsBefore
+    var before = view.pads
     var ev = game.pressed
+    for name, event in PAD_EVENTS do
+        if pads[name] and not before[name] then
+            ev[event] = true
+        end
+    end
     if pads.a and not before.a then
-        ev.cw = true
         ev.start = ev.start or game.state == "title"
     end
-    if pads.b and not before.b then
-        ev.ccw = true
-    end
-    if pads.start and not before.start then
-        ev.start = true
-    end
-    if pads.left and not before.left then
-        ev.left = true
-    end
-    if pads.right and not before.right then
-        ev.right = true
-    end
     if tap and (game.state == "title" or game.state == "paused" or game.state == "over") and len(pads) == 0 then
-        if game.state == "title" and len(pts) > 0 and inScreenRect(look.musicHit, pts[1].x, pts[1].y) then
+        if game.state == "title" and inScreenRect(look.musicHit, pts[1].x, pts[1].y) then
             setMusic(not music.on)
         else
             ev.start = true
         end
     end
     view.pointer = len(pts) > 0
-    view.padsBefore = pads
     view.pads = pads
     held.left = keyboard.isDown("left") or keyboard.isDown("a") or pads.left == true
     held.right = keyboard.isDown("right") or keyboard.isDown("d") or pads.right == true
@@ -153,52 +152,69 @@ end
 
 ## ── Layout ─────────────────────────────────────────────────────────────────────────────────────────
 
+## A button of the pads: the area that answers a touch, and how it is drawn (`round` is the radius of its corners, and
+## `text` the letters on it).
+func padButton(name, x, y, w, h, round, text)
+    return {name: name, x: x, y: y, w: w, h: h, round: round, text: text}
+end
+
 ## Where the screen and the pads go. The screen keeps the handheld's proportions; with the pads shown it takes the
-## top of a tall area, or the middle of a wide one, the pads standing below it or on either side.
+## top of a tall area, or the middle of a wide one, the pads standing below it or on either side. It is worked out
+## again only when the area or the pads shown change.
 func layoutCompute()
     var L = view.layout
     var pads = view.touchSeen
+    if L.w == W and L.h == H and L.padsShown == pads then
+        return
+    end
+    L.w = W
+    L.h = H
+    L.padsShown = pads
     var portrait = H > W * 1.1
     var s
-    L.buttons = []
+    var lx
+    var ly
+    var rx
+    var ry
+    var px
+    var py
+    var u
     if pads and portrait then
         s = math.min(W / look.screenW, H * 0.66 / look.screenH)
         L.ox = math.floor((W - look.screenW * s) / 2)
         L.oy = math.floor(math.max((H * 0.68 - look.screenH * s) / 2, 0))
         var top = L.oy + look.screenH * s
         var rest = H - top
-        var u = math.min(W * 0.065, rest * 0.14)
-        L.left = {x: W * 0.27, y: top + rest * 0.45, u: u}
-        L.right = {x: W * 0.72, y: top + rest * 0.45, u: u}
-        L.pill = {x: W * 0.5, y: top + rest * 0.88, w: u * 5, h: u * 1.6}
+        u = math.min(W * 0.065, rest * 0.14)
+        lx, ly = W * 0.27, top + rest * 0.45
+        rx, ry = W * 0.72, top + rest * 0.45
+        px, py = W * 0.5, top + rest * 0.88
     elseif pads then
         s = math.min(H / look.screenH, W / (look.screenW * 1.7))
         L.ox = math.floor((W - look.screenW * s) / 2)
         L.oy = math.floor((H - look.screenH * s) / 2)
-        var u = math.min(L.ox * 0.11, H * 0.1)
-        L.left = {x: L.ox / 2, y: H * 0.58, u: u}
-        L.right = {x: W - L.ox / 2, y: H * 0.58, u: u}
-        L.pill = {x: W - L.ox / 2, y: H * 0.16, w: u * 5, h: u * 1.6}
+        u = math.min(L.ox * 0.11, H * 0.1)
+        lx, ly = L.ox / 2, H * 0.58
+        rx, ry = W - L.ox / 2, H * 0.58
+        px, py = W - L.ox / 2, H * 0.16
     else
         s = math.min(W / look.screenW, H / look.screenH)
         L.ox = math.floor((W - look.screenW * s) / 2)
         L.oy = math.floor((H - look.screenH * s) / 2)
-        L.left = nil
-        L.right = nil
-        L.pill = nil
     end
     L.s = s
+    L.buttons = []
+    L.cross = nil
     if pads then
-        var l = L.left
-        var r = L.right
+        L.cross = {x: lx, y: ly, u: u}
         L.buttons = [
-            {name: "up", x: l.x, y: l.y - 2 * l.u, w: 2 * l.u, h: 2 * l.u},
-            {name: "left", x: l.x - 2 * l.u, y: l.y, w: 2 * l.u, h: 2 * l.u},
-            {name: "right", x: l.x + 2 * l.u, y: l.y, w: 2 * l.u, h: 2 * l.u},
-            {name: "down", x: l.x, y: l.y + 2 * l.u, w: 2 * l.u, h: 2 * l.u},
-            {name: "b", x: r.x - 1.7 * r.u, y: r.y + 0.9 * r.u, r: 1.9 * r.u},
-            {name: "a", x: r.x + 1.7 * r.u, y: r.y - 0.9 * r.u, r: 1.9 * r.u},
-            {name: "start", x: L.pill.x, y: L.pill.y, w: L.pill.w, h: L.pill.h}
+            padButton("up", lx, ly - 2 * u, 2 * u, 2 * u, 0.3 * u, nil),
+            padButton("left", lx - 2 * u, ly, 2 * u, 2 * u, 0.3 * u, nil),
+            padButton("right", lx + 2 * u, ly, 2 * u, 2 * u, 0.3 * u, nil),
+            padButton("down", lx, ly + 2 * u, 2 * u, 2 * u, 0.3 * u, nil),
+            {name: "b", x: rx - 1.7 * u, y: ry + 0.9 * u, r: 1.9 * u, text: "B"},
+            {name: "a", x: rx + 1.7 * u, y: ry - 0.9 * u, r: 1.9 * u, text: "A"},
+            padButton("start", px, py, u * 5, u * 1.6, u * 0.8, "START")
         ]
     end
 end
@@ -216,9 +232,9 @@ func block(x, y, w, h, shade)
 end
 
 ## A text at a point of the screen, `size` points high, in one of the greens.
-func label(str, x, y, size, h, shade)
+func label(str, x, y, size, shade)
     var L = view.layout
-    drawText(str, L.ox + x * L.s, L.oy + y * L.s, size * L.s, h, "center", look.shade[shade])
+    drawText(str, L.ox + x * L.s, L.oy + y * L.s, size * L.s, "center", "center", look.shade[shade])
 end
 
 func drawBlock(px, py, kind)
@@ -234,8 +250,8 @@ func box(x, y, w, h)
 end
 
 ## The brick wall at either side of the well.
-func drawWall(x, rows)
-    for r = 0, rows - 1 do
+func drawWall(x)
+    for r = 0, ROWS - 1 do
         block(x, r * 8, 8, 8, 3)
         block(x, r * 8 + 7, 8, 1, 4)
         block(x + (r % 2 == 0 and 3 or 7), r * 8, 1, 7, 4)
@@ -243,7 +259,7 @@ func drawWall(x, rows)
 end
 
 func drawPiece(kind, turn, px, py)
-    for c in shapes.turns[kind][turn] do
+    for c in shapes[kind][turn] do
         drawBlock(px + c[1] * 8, py + c[2] * 8, kind)
     end
 end
@@ -251,15 +267,11 @@ end
 func drawWell()
     var wx = look.wellX
     var flash = game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
-    var rowsClearing = {}
-    for r in game.clearing do
-        rowsClearing[r] = true
-    end
     for r = 0, ROWS - 1 do
         for c = 0, COLS - 1 do
             var v = game.well[wellIdx(c, r)]
             if v <> 0 then
-                if rowsClearing[r] then
+                if game.clearing.contains(r) then
                     block(wx + c * 8, r * 8, 8, 8, flash and 1 or 4)
                 else
                     drawBlock(wx + c * 8, r * 8, v)
@@ -267,8 +279,8 @@ func drawWell()
             end
         end
     end
-    if game.kind <> 0 and (game.state == "play") then
-        for c in shapes.turns[game.kind][game.turn] do
+    if game.state == "play" then
+        for c in shapes[game.kind][game.turn] do
             if game.y + c[2] >= 0 then
                 drawBlock(wx + (game.x + c[1]) * 8, (game.y + c[2]) * 8, game.kind)
             end
@@ -278,7 +290,7 @@ end
 
 ## The curtain that falls over a lost game, row by row from the bottom.
 func drawCurtain()
-    for i = 0, game.curtain - 1 do
+    for i = 0, curtainRows() - 1 do
         var r = ROWS - 1 - i
         for c = 0, COLS - 1 do
             block(look.wellX + c * 8, r * 8, 8, 8, (c + r) % 2 == 0 and 3 or 4)
@@ -288,26 +300,19 @@ end
 
 func drawPanel()
     box(108, 8, 48, 24)
-    label("LEVEL", 132, 15, 8, "center", 4)
-    label("{game.level}", 132, 25, 8, "center", 4)
+    label("LEVEL", 132, 15, 8, 4)
+    label("{game.level}", 132, 25, 8, 4)
     box(108, 36, 48, 24)
-    label("LINES", 132, 43, 8, "center", 4)
-    label("{game.lines}", 132, 53, 8, "center", 4)
+    label("LINES", 132, 43, 8, 4)
+    label("{game.lines}", 132, 53, 8, 4)
     box(108, 64, 48, 28)
-    label("SCORE", 132, 72, 8, "center", 4)
-    label("{game.score:06d}", 132, 83, 8, "center", 4)
+    label("SCORE", 132, 72, 8, 4)
+    label("{game.score:06d}", 132, 83, 8, 4)
     var nb = look.nextBox
     box(nb.x, nb.y, nb.w, nb.h)
-    label("NEXT", nb.x + nb.w / 2, nb.y + 7, 8, "center", 4)
-    if game.state <> "title" and game.state <> "paused" then
-        var cells = shapes.turns[game.next][1]
-        var x0, x1, y0, y1 = 9, -9, 9, -9
-        for c in cells do
-            x0 = math.min(x0, c[1])
-            x1 = math.max(x1, c[1])
-            y0 = math.min(y0, c[2])
-            y1 = math.max(y1, c[2])
-        end
+    label("NEXT", nb.x + nb.w / 2, nb.y + 7, 8, 4)
+    if game.state <> "paused" then
+        var x0, x1, y0, y1 = shapeBounds(game.next, 1)
         var w = (x1 - x0 + 1) * 8
         var h = (y1 - y0 + 1) * 8
         var cx = nb.x + (nb.w - w) / 2 - x0 * 8
@@ -321,27 +326,27 @@ func drawWellText()
     var cx = look.wellX + COLS * 4
     if game.state == "paused" then
         box(cx - 28, 60, 56, 24)
-        label("PAUSE", cx, 72, 10, "center", 4)
-    elseif game.state == "over" and game.curtain >= ROWS then
+        label("PAUSE", cx, 72, 10, 4)
+    elseif game.state == "over" and curtainRows() == ROWS then
         box(cx - 32, 44, 64, 56)
-        label("GAME", cx, 50, 10, "center", 4)
-        label("OVER", cx, 62, 10, "center", 4)
+        label("GAME", cx, 50, 10, 4)
+        label("OVER", cx, 62, 10, 4)
         if game.newBest then
-            label("NEW BEST", cx, 77, 8, "center", 3)
+            label("NEW BEST", cx, 77, 8, 3)
         else
-            label("BEST", cx, 77, 8, "center", 3)
-            label("{game.best:06d}", cx, 87, 8, "center", 3)
+            label("BEST", cx, 77, 8, 3)
+            label("{game.best:06d}", cx, 87, 8, 3)
         end
         if game.frame % 60 < 40 then
-            label("PUSH START", cx, 91, 8, "center", 4)
+            label("PUSH START", cx, 91, 8, 4)
         end
     end
 end
 
 func drawGame()
-    drawWall(0, ROWS)
-    drawWall(8, ROWS)
-    drawWall(look.wellX + COLS * 8, ROWS)
+    drawWall(0)
+    drawWall(8)
+    drawWall(look.wellX + COLS * 8)
     block(look.wellX, 0, COLS * 8, ROWS * 8, 1)
     if game.state <> "paused" then
         drawWell()
@@ -355,60 +360,48 @@ end
 
 ## The first screen: the name, the starting level, the best score and the music.
 func drawTitle()
-    block(0, 0, 160, 144, 1)
+    block(0, 0, look.screenW, look.screenH, 1)
     box(4, 4, 152, 136)
-    label("TETRIS", 80, 23, 24, "center", 4)
-    var show = [
-        [Piece.I, 14, 48], [Piece.O, 54, 48], [Piece.T, 78, 48], [Piece.Z, 110, 44],
-        [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]
-    ]
-    for item in show do
+    label("TETRIS", 80, 23, 24, 4)
+    for item in look.titlePieces do
         drawPiece(item[1], 1, item[2], item[3] - 8)
     end
     var arrows = game.frame % 40 < 28
-    label("LEVEL  {game.startLevel}", 80, 98, 10, "center", 4)
+    label("LEVEL  {game.startLevel}", 80, 98, 10, 4)
     if arrows then
-        label("<", 38, 98, 10, "center", 4)
-        label(">", 122, 98, 10, "center", 4)
+        label("<", 38, 98, 10, 4)
+        label(">", 122, 98, 10, 4)
     end
-    label("HIGH {game.best:06d}", 80, 110, 8, "center", 3)
-    label("MUSIC " + (music.on and "ON" or "OFF"), 80, 120, 8, "center", 3)
+    label("HIGH {game.best:06d}", 80, 110, 8, 3)
+    label("MUSIC " + (music.on and "ON" or "OFF"), 80, 120, 8, 3)
     if game.frame % 60 < 40 then
-        label("PUSH START", 80, 130, 8, "center", 4)
+        label("PUSH START", 80, 130, 8, 4)
     end
 end
 
-func padLit(name)
-    return view.pads[name] == true
+## The ink of a pad button: lit while a finger is on it.
+func padFill(name)
+    return view.pads[name] == true and look.padLit or look.padFill
 end
 
-func drawArm(name, x, y, u)
-    fillC(padLit(name) and look.padLit or look.padFill)
-    graphics.rect(x - u, y - u, 2 * u, 2 * u, u * 0.3)
-end
-
-## The cross, the two buttons and START, drawn over the area outside the screen.
+## The cross, the two buttons and START, drawn over the area outside the screen from the very buttons that answer a
+## touch.
 func drawPads()
-    var L = view.layout
-    var l = L.left
-    var r = L.right
-    drawArm("up", l.x, l.y - 2 * l.u, l.u)
-    drawArm("left", l.x - 2 * l.u, l.y, l.u)
-    drawArm("right", l.x + 2 * l.u, l.y, l.u)
-    drawArm("down", l.x, l.y + 2 * l.u, l.u)
+    var c = view.layout.cross
     fillC(look.padFill)
-    graphics.rect(l.x - l.u, l.y - l.u, 2 * l.u, 2 * l.u)
-    var names = ["b", "a"]
-    var xs = [r.x - 1.7 * r.u, r.x + 1.7 * r.u]
-    var ys = [r.y + 0.9 * r.u, r.y - 0.9 * r.u]
-    for i = 1, 2 do
-        fillC(padLit(names[i]) and look.padLit or look.padFill)
-        graphics.circle(xs[i], ys[i], 1.9 * r.u)
-        drawText(names[i].upper(), xs[i], ys[i], r.u * 1.6, "center", "center", look.padInk)
+    graphics.rect(c.x - c.u, c.y - c.u, 2 * c.u, 2 * c.u)
+    for b in view.layout.buttons do
+        fillC(padFill(b.name))
+        if b.r then
+            graphics.circle(b.x, b.y, b.r)
+            drawText(b.text, b.x, b.y, b.r * 0.84, "center", "center", look.padInk)
+        else
+            graphics.rect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, b.round)
+            if b.text then
+                drawText(b.text, b.x, b.y, b.h * 0.5, "center", "center", look.padInk)
+            end
+        end
     end
-    fillC(padLit("start") and look.padLit or look.padFill)
-    graphics.rect(L.pill.x - L.pill.w / 2, L.pill.y - L.pill.h / 2, L.pill.w, L.pill.h, L.pill.h / 2)
-    drawText("START", L.pill.x, L.pill.y, L.pill.h * 0.5, "center", "center", look.padInk)
 end
 
 ## ── Engine entry points ────────────────────────────────────────────────────────────────────────────

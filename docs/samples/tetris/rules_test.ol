@@ -5,14 +5,8 @@ import "rules.ol"
 
 ## A position as text, trimmed to the cells it holds: "XXX/.X." for the T as it appears.
 func shapeText(kind, turn)
-    var cells = shapes.turns[kind][turn]
-    var x0, x1, y0, y1 = 99, -99, 99, -99
-    for c in cells do
-        x0 = math.min(x0, c[1])
-        x1 = math.max(x1, c[1])
-        y0 = math.min(y0, c[2])
-        y1 = math.max(y1, c[2])
-    end
+    var cells = shapes[kind][turn]
+    var x0, x1, y0, y1 = shapeBounds(kind, turn)
     var rows = []
     for y = y0, y1 do
         var line = ""
@@ -41,10 +35,10 @@ var expected = {
     [Piece.L]: ["XXX/X..", "XX/.X/.X", "..X/XXX", "X./X./XX"]
 }
 for kind = 1, KINDS do
-    assert(len(shapes.turns[kind]) == len(expected[kind]), "piece {kind} has {len(shapes.turns[kind])} positions")
+    assert(len(shapes[kind]) == len(expected[kind]), "piece {kind} has {len(shapes[kind])} positions")
     for turn, text in expected[kind] do
         assert(shapeText(kind, turn) == text, "piece {kind}, position {turn}: {shapeText(kind, turn)}, wanted {text}")
-        assert(len(shapes.turns[kind][turn]) == 4)
+        assert(len(shapes[kind][turn]) == 4)
     end
 end
 
@@ -67,10 +61,8 @@ assert(turnedBy(Piece.T, 1, 1) == 2 and turnedBy(Piece.T, 1, -1) == 4)
 var well = newWell()
 assert(len(well) == COLS * ROWS)
 for kind = 1, KINDS do
-    var top = 99
-    for c in shapes.turns[kind][1] do
-        top = math.min(top, SPAWN_Y + c[2])
-    end
+    var firstColumn, lastColumn, firstRow = shapeBounds(kind, 1)
+    var top = SPAWN_Y + firstRow
     assert(top == 0, "piece {kind} appears on row {top}")
     assert(fits(well, kind, 1, SPAWN_X, SPAWN_Y))
 end
@@ -106,13 +98,9 @@ assert(len(rows) == 2 and rows[1] == ROWS - 3 and rows[2] == ROWS - 1)
 collapse(well, rows)
 assert(len(fullRows(well)) == 0)
 assert(well[wellIdx(3, ROWS - 1)] == Piece.T and well[wellIdx(0, ROWS - 2)] == Piece.S, "what was above falls by the rows below it")
-var filled = 0
-for v in well do
-    if v <> 0 then
-        filled += 1
-    end
-end
-assert(filled == 2, "only the two loose cells are left")
+assert(len(well.filter(func(v)
+    return v <> 0
+end)) == 2, "only the two loose cells are left")
 
 ## Four rows at once, at the top and at the bottom of the well.
 well = newWell()

@@ -12,7 +12,7 @@ global music = {on: true, beat: 0, next: 1, events: [], voice: nil, bass: nil}
 const TEMPO = 150               ## beats a minute: a beat is a quarter note
 const GATE = 0.88               ## the part of a note's length it sounds, the rest separating it from the next
 
-## The melody, bar by bar (a bar is four beats). A nil note is a rest.
+## The melody, bar by bar (a bar is four beats).
 const MELODY = [
     ["E5", 1], ["B4", 0.5], ["C5", 0.5], ["D5", 1], ["C5", 0.5], ["B4", 0.5],
     ["A4", 1], ["A4", 0.5], ["C5", 0.5], ["E5", 1], ["D5", 0.5], ["C5", 0.5],
@@ -40,9 +40,7 @@ func buildEvents()
     var events = []
     var beat = 0
     for n in MELODY do
-        if n[1] <> nil then
-            events.push({beat: beat, voice: "voice", note: n[1], beats: n[2]})
-        end
+        events.push({beat: beat, voice: "voice", note: n[1], beats: n[2]})
         beat += n[2]
     end
     for bar, pair in BASS do
@@ -61,6 +59,15 @@ func squareAt(f, t)
     return (t * f) % 1 < 0.5 and 1 or -1
 end
 
+## A rising run of square notes, one every `stepLength` seconds, fading at the rate `decay`.
+func arpeggio(notes, stepLength, length, decay)
+    var freqs = notes.map(sound.note)
+    return sound.generate(length, func(t)
+        var i = math.min(math.floor(t / stepLength) + 1, len(freqs))
+        return squareAt(freqs[i], t) * math.exp(-t * decay) * 0.5
+    end)
+end
+
 func buildSounds()
     music.voice = sound.square(440).envelope(0.004, 0.06, 0.55, 0.04).volume(0.10)
     music.bass = sound.triangle(110).envelope(0.004, 0.08, 0.6, 0.05).volume(0.26)
@@ -68,23 +75,10 @@ func buildSounds()
     sounds.move = sound.tone(300, 0.025, "square").envelope(0.001, 0.01, 0.6, 0.01).volume(0.10)
     sounds.turn = sound.tone(480, 0.045, "square").envelope(0.001, 0.02, 0.5, 0.02).volume(0.12)
     sounds.lock = sound.tone(110, 0.09, "triangle").envelope(0.002, 0.05, 0.4, 0.03).volume(0.35)
-    sounds.start = sound.tone(sound.note("C6"), 0.08, "square").envelope(0.002, 0.03, 0.5, 0.03).volume(0.12)
-    ## Lines: a rising arpeggio of four steps, longer and brighter when more rows go at once.
-    sounds.lines = sound.generate(0.26, func(t)
-        var steps = [sound.note("C5"), sound.note("E5"), sound.note("G5"), sound.note("C6")]
-        var i = math.min(math.floor(t / 0.06) + 1, 4)
-        return squareAt(steps[i], t) * math.exp(-t * 6) * 0.5
-    end).volume(0.16)
-    sounds.tetris = sound.generate(0.7, func(t)
-        var steps = [sound.note("C5"), sound.note("E5"), sound.note("G5"), sound.note("C6"), sound.note("E6"), sound.note("G6")]
-        var i = math.min(math.floor(t / 0.075) + 1, 6)
-        return squareAt(steps[i], t) * math.exp(-t * 2.5) * 0.5
-    end).volume(0.18)
-    sounds.level = sound.generate(0.4, func(t)
-        var steps = [sound.note("G5"), sound.note("C6"), sound.note("E6"), sound.note("G6")]
-        var i = math.min(math.floor(t / 0.09) + 1, 4)
-        return squareAt(steps[i], t) * math.exp(-t * 3) * 0.5
-    end).volume(0.16)
+    sounds.start = sound.tone("C6", 0.08, "square").envelope(0.002, 0.03, 0.5, 0.03).volume(0.12)
+    sounds.lines = arpeggio(["C5", "E5", "G5", "C6"], 0.06, 0.26, 6).volume(0.16)
+    sounds.tetris = arpeggio(["C5", "E5", "G5", "C6", "E6", "G6"], 0.075, 0.7, 2.5).volume(0.18)
+    sounds.level = arpeggio(["G5", "C6", "E6", "G6"], 0.09, 0.4, 3).volume(0.16)
     sounds.over = sound.generate(1.1, func(t)
         return squareAt(330 - 200 * t, t) * math.exp(-t * 2.2) * 0.5
     end).volume(0.18)
@@ -95,16 +89,15 @@ func playSound(name)
     sounds[name].play()
 end
 
-func musicRestart()
-    music.beat = 0
-    music.next = 1
+func musicStop()
     music.voice.release()
     music.bass.release()
 end
 
-func musicStop()
-    music.voice.release()
-    music.bass.release()
+func musicRestart()
+    musicStop()
+    music.beat = 0
+    music.next = 1
 end
 
 ## Advances the tune by dt seconds and starts the notes that fall due. A long frame plays the notes it skipped over
@@ -117,7 +110,7 @@ func musicUpdate(dt)
     while music.next <= len(music.events) and music.events[music.next].beat <= music.beat do
         var e = music.events[music.next]
         var v = music[e.voice]
-        v.freq(sound.note(e.note)).trigger(e.beats * 60 / TEMPO * GATE)
+        v.freq(e.note).trigger(e.beats * 60 / TEMPO * GATE)
         music.next += 1
     end
     if music.beat >= musicLength() then

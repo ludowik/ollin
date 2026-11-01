@@ -46,13 +46,9 @@ func rowsFilled(rows, except)
 end
 
 func cellsFilled()
-    var n = 0
-    for v in game.well do
-        if v <> 0 then
-            n += 1
-        end
-    end
-    return n
+    return len(game.well.filter(func(v)
+        return v <> 0
+    end))
 end
 
 ## ── The title screen ──
@@ -179,20 +175,17 @@ game.held.down = false
 ## ── A piece comes to rest: the wait before the next one grows with the height ──
 begin(0)
 var nextKindWas = game.next
-game.well = newWell()
 place(Piece.O, 1, 3, ROWS - 3)
 game.fall = fallFrames(0) - 1
 step()
 assert(game.state == "entry" and game.wait == entryDelay(ROWS - 1), "the piece rests on the floor")
 assert(game.well[wellIdx(4, ROWS - 1)] == Piece.O and game.well[wellIdx(5, ROWS - 2)] == Piece.O)
-assert(game.kind == 0, "no piece falls during the wait")
 steps(game.wait - 1)
 assert(game.state == "entry")
 step()
 assert(game.state == "play" and game.kind == nextKindWas, "the piece shown as next appears")
 
 begin(0)
-game.well = newWell()
 rowsFilled([8], [0, 1, 2, 7, 8, 9])
 place(Piece.O, 1, 3, 5)
 game.fall = fallFrames(0) - 1
@@ -202,7 +195,6 @@ assert(game.wait > entryDelay(ROWS - 1))
 
 ## ── One row: it flashes, then goes ──
 begin(0)
-game.well = newWell()
 rowsFilled([ROWS - 1], [4, 5])
 game.well[wellIdx(0, ROWS - 2)] = Piece.S
 place(Piece.O, 1, 3, ROWS - 3)
@@ -211,7 +203,6 @@ step()
 assert(game.state == "clearing" and game.wait == config.clearFrames)
 assert(game.lines == 1 and game.score == 40, "one row at level 0 is worth 40")
 assert(len(game.clearing) == 1 and game.clearing[1] == ROWS - 1)
-assert(game.kind == 0)
 steps(config.clearFrames - 1)
 assert(game.state == "clearing", "the row is still there while it flashes")
 assert(game.well[wellIdx(0, ROWS - 1)] == Piece.Z)
@@ -223,7 +214,6 @@ assert(cellsFilled() == 3, "the row is gone: the loose cells are left")
 
 ## ── Four rows at once, with the score of the level, and a level gained ──
 begin(2)
-game.well = newWell()
 rowsFilled([ROWS - 4, ROWS - 3, ROWS - 2, ROWS - 1], [9])
 place(Piece.I, 2, 7, ROWS - 4)
 game.fall = fallFrames(2) - 1
@@ -233,7 +223,6 @@ assert(game.level == 2)
 steps(config.clearFrames)
 assert(cellsFilled() == 0, "the four rows are gone")
 begin(0)
-game.well = newWell()
 game.lines = 8
 rowsFilled([ROWS - 2, ROWS - 1], [4, 5])
 place(Piece.O, 1, 3, ROWS - 3)
@@ -244,7 +233,6 @@ assert(game.level == 1 and game.levelUp, "ten lines make level 1")
 steps(config.clearFrames)
 assert(game.level == 1 and not game.levelUp)
 begin(5)
-game.well = newWell()
 rowsFilled([ROWS - 1], [4, 5])
 place(Piece.O, 1, 3, ROWS - 3)
 game.fall = fallFrames(5) - 1
@@ -288,7 +276,6 @@ assert(game.state == "entry" and game.wait == waitLeft, "a pause during the wait
 
 ## ── The end of a game: the next piece has no room ──
 begin(0)
-game.well = newWell()
 rowsFilled([0], [9])
 game.score = 777
 game.best = 0
@@ -303,7 +290,7 @@ game.pressed = {start: true}
 step()
 assert(game.state == "over", "START does nothing while the curtain falls")
 steps(ROWS * config.curtainFrames + 2)
-assert(game.curtain == ROWS)
+assert(curtainRows() == ROWS)
 game.pressed = {start: true}
 step()
 assert(game.state == "title")

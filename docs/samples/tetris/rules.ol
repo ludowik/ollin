@@ -3,8 +3,8 @@
 ##
 ## The well is a flat array of COLS * ROWS numbers, 0 for an empty cell and the number of the piece for a filled one.
 ## Columns and rows are 0-based here, rows counting down from the top, as the pieces are drawn. Imported by
-## tetris.ol, which reads COLS, ROWS and Piece from here — a const or an enum declared by a module is visible to the
-## functions of the file that imports it.
+## play.ol and by tetris.ol, which read COLS, ROWS and Piece from here — a const or an enum declared by a module is
+## visible to the functions of the file that imports it.
 
 const COLS = 10
 const ROWS = 18             ## the handheld shows 18 rows, not the 20 of the home computers
@@ -17,8 +17,8 @@ enum Piece
 end
 const KINDS = 7
 
-## Where a piece is, in its box: shapes.turns[kind][turn] is its four cells as [x, y], x to the right and y down.
-global shapes = {turns: []}
+## Where a piece is, in its box: shapes[kind][turn] is its four cells as [x, y], x to the right and y down.
+global shapes = []
 
 ## A turn of a piece in a 3x3 box, a quarter turn clockwise about the centre of the box.
 func turnClockwise(cells)
@@ -37,25 +37,32 @@ func turnsFrom(spawn, count)
     return list
 end
 
-func buildShapes()
-    shapes.turns = []
-    shapes.turns[Piece.I] = [
-        [[0, 1], [1, 1], [2, 1], [3, 1]],
-        [[2, 0], [2, 1], [2, 2], [2, 3]]
-    ]
-    shapes.turns[Piece.O] = [[[1, 1], [2, 1], [1, 2], [2, 2]]]
-    shapes.turns[Piece.T] = turnsFrom([[0, 1], [1, 1], [2, 1], [1, 2]], 4)
-    shapes.turns[Piece.S] = turnsFrom([[1, 1], [2, 1], [0, 2], [1, 2]], 2)
-    shapes.turns[Piece.Z] = turnsFrom([[0, 1], [1, 1], [1, 2], [2, 2]], 2)
-    shapes.turns[Piece.J] = turnsFrom([[0, 1], [1, 1], [2, 1], [2, 2]], 4)
-    shapes.turns[Piece.L] = turnsFrom([[0, 1], [1, 1], [2, 1], [0, 2]], 4)
-end
+shapes[Piece.I] = [
+    [[0, 1], [1, 1], [2, 1], [3, 1]],
+    [[2, 0], [2, 1], [2, 2], [2, 3]]
+]
+shapes[Piece.O] = [[[1, 1], [2, 1], [1, 2], [2, 2]]]
+shapes[Piece.T] = turnsFrom([[0, 1], [1, 1], [2, 1], [1, 2]], 4)
+shapes[Piece.S] = turnsFrom([[1, 1], [2, 1], [0, 2], [1, 2]], 2)
+shapes[Piece.Z] = turnsFrom([[0, 1], [1, 1], [1, 2], [2, 2]], 2)
+shapes[Piece.J] = turnsFrom([[0, 1], [1, 1], [2, 1], [2, 2]], 4)
+shapes[Piece.L] = turnsFrom([[0, 1], [1, 1], [2, 1], [0, 2]], 4)
 
-buildShapes()
+## The smallest rectangle of the box that holds the cells of a position: its first and last column, first and last row.
+func shapeBounds(kind, turn)
+    var x0, x1, y0, y1 = 9, -9, 9, -9
+    for c in shapes[kind][turn] do
+        x0 = math.min(x0, c[1])
+        x1 = math.max(x1, c[1])
+        y0 = math.min(y0, c[2])
+        y1 = math.max(y1, c[2])
+    end
+    return x0, x1, y0, y1
+end
 
 ## The position a quarter turn from `turn`: dir is 1 clockwise or -1 counter-clockwise.
 func turnedBy(kind, turn, dir)
-    var n = len(shapes.turns[kind])
+    var n = len(shapes[kind])
     return (turn - 1 + dir + n) % n + 1
 end
 
@@ -74,7 +81,7 @@ end
 ## True when the piece fits in the well with its box at (x, y): inside the walls and the floor, on empty cells. The
 ## cells above the first row are free, since a piece appears half above it.
 func fits(well, kind, turn, x, y)
-    for c in shapes.turns[kind][turn] do
+    for c in shapes[kind][turn] do
         var cx = x + c[1]
         var cy = y + c[2]
         if cx < 0 or cx >= COLS or cy >= ROWS then
@@ -90,7 +97,7 @@ end
 ## Writes the piece into the well. The lowest row it touches is returned, which tells how high it came to rest.
 func lockPiece(well, kind, turn, x, y)
     var lowest = -1
-    for c in shapes.turns[kind][turn] do
+    for c in shapes[kind][turn] do
         var cy = y + c[2]
         if cy >= 0 then
             well[wellIdx(x + c[1], cy)] = kind
@@ -120,13 +127,9 @@ end
 
 ## Removes the rows given: what was above them falls, and the top is left empty.
 func collapse(well, rows)
-    var dead = {}
-    for r in rows do
-        dead[r] = true
-    end
     var to = ROWS - 1
     for from = ROWS - 1, 0, -1 do
-        if not dead[from] then
+        if not rows.contains(from) then
             if to <> from then
                 for c = 0, COLS - 1 do
                     well[wellIdx(c, to)] = well[wellIdx(c, from)]

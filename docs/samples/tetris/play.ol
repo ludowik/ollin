@@ -31,7 +31,7 @@ global game = {
     state: "title",             ## title, play, clearing (full rows flash), entry (the wait before a piece), paused, over
     resume: "play",             ## where a pause returns to
     well: [],
-    kind: 0,                    ## the piece falling, and its position; 0 when there is none
+    kind: 0,                    ## the piece falling, and its position, while the state is play
     turn: 1,
     x: 0,
     y: 0,
@@ -50,7 +50,6 @@ global game = {
     wait: 0,                    ## frames left of a clearing or of the wait before a piece
     clearing: [],               ## the rows that flash
     levelUp: false,             ## the lines in flight raised the level
-    curtain: 0,                 ## rows of the curtain that have come down, once the game is over
     frame: 0,                   ## steps since the program began, which blinks the texts
     clock: 0,                   ## seconds not yet spent in steps
     held: {left: false, right: false, down: false},
@@ -66,11 +65,6 @@ func startGame()
     game.level = game.startLevel
     game.newBest = false
     game.levelUp = false
-    game.curtain = 0
-    game.fall = 0
-    game.softFrames = 0
-    game.downLock = true
-    game.kind = 0
     game.next = nextKind(0)
     data.set(config.levelKey, game.startLevel)
     playSound("start")
@@ -87,6 +81,7 @@ func spawnPiece()
     game.y = SPAWN_Y
     game.fall = 0
     game.softFrames = 0
+    game.downLock = true
     if fits(game.well, game.kind, game.turn, game.x, game.y) then
         game.state = "play"
     else
@@ -96,7 +91,6 @@ end
 
 func endGame()
     game.state = "over"
-    game.curtain = 0
     game.wait = 0
     musicStop()
     playSound("over")
@@ -115,8 +109,6 @@ end
 ## this one came to rest high.
 func lockCurrent()
     var row = lockPiece(game.well, game.kind, game.turn, game.x, game.y)
-    game.kind = 0
-    game.downLock = true
     var rows = fullRows(game.well)
     if len(rows) == 0 then
         playSound("lock")
@@ -210,7 +202,6 @@ func stepPlay()
         game.softFrames = 0
         game.fall += 1
         if game.fall >= fallFrames(game.level) then
-            game.fall = 0
             dropOne(false)
         end
     end
@@ -239,23 +230,24 @@ end
 
 func stepTitle()
     if game.pressed.left then
-        game.startLevel = math.max(game.startLevel - 1, 0)
+        game.startLevel = math.clamp(game.startLevel - 1, 0, config.maxStartLevel)
     end
     if game.pressed.right then
-        game.startLevel = math.min(game.startLevel + 1, config.maxStartLevel)
+        game.startLevel = math.clamp(game.startLevel + 1, 0, config.maxStartLevel)
     end
     if game.pressed.start then
         startGame()
     end
 end
 
+## The rows of the curtain that have come down, once the game is over.
+func curtainRows()
+    return math.min(game.wait // config.curtainFrames, ROWS)
+end
+
 func stepOver()
-    if game.curtain < ROWS then
+    if curtainRows() < ROWS then
         game.wait += 1
-        if game.wait >= config.curtainFrames then
-            game.wait = 0
-            game.curtain += 1
-        end
     elseif game.pressed.start then
         game.state = "title"
     end
@@ -303,8 +295,6 @@ end
 func gameInit()
     game.best = data.get(config.bestKey, 0)
     game.startLevel = math.min(data.get(config.levelKey, 0), config.maxStartLevel)
-    game.well = newWell()
-    game.next = nextKind(0)
     buildSounds()
     music.on = data.get(config.musicKey, true)
 end
