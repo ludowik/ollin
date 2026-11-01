@@ -25,6 +25,8 @@ Value make_sound_module();
 Value make_touch_module();
 Value make_motion_module();
 Value make_date_module();
+Value make_json_module();
+Value make_https_module();
 
 static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "core",     make_core_module     },
@@ -47,6 +49,8 @@ static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "touch",    make_touch_module    },
     { "motion",   make_motion_module   },
     { "date",     make_date_module     },
+    { "json",     make_json_module     },
+    { "https",    make_https_module    },
 };
 
 const std::vector<std::string>& builtin_module_names() {

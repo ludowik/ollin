@@ -412,6 +412,26 @@ ui.slider("Size", ref v, "a", 10)' \
     "must be numbers"
 
 
+check_error "https with an unencrypted address" \
+    'https.get("http://example.org", func(r) end)' \
+    "only https:// addresses are accepted"
+
+check_error "https without a callback" \
+    'https.get("https://example.org")' \
+    "expected (url [, options], callback)"
+
+check_error "https with an unknown option" \
+    'https.get("https://example.org", {retries: 3}, func(r) end)' \
+    "unknown option 'retries'"
+
+check_error "json.parse of a broken text" \
+    'json.parse("[1, 2")' \
+    "expected ',' or ']' at position 6"
+
+check_error "json.stringify of a function" \
+    'json.stringify(func() return 1 end)' \
+    "cannot write a function"
+
 check_error "tween.to with zero duration" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 0)' \

@@ -140,7 +140,7 @@ ollin/
 │   ├── shaders/       lit.vert / lit.frag (la 3D), fxaa.frag (la composition), sdf.frag (le texte) — le GLSL, EMBARQUÉ (cf. « Shaders »)
 │   ├── modules/       modules natifs : core, math, string, color, date, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
-│   │                  image (+ image_stub), ui (+ ui_stub), tween, + modules.h/.cpp, module_utils.h
+│   │                  image (+ image_stub), ui (+ ui_stub), tween, https (+ https_internal.h : moteur web ou stub), json, + modules.h/.cpp, module_utils.h
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
@@ -171,6 +171,8 @@ ollin/
 │                      convert_helmet_glb.py (idem pour docs/samples/helmet.glb — Damaged Helmet,
 │                      crédit obligatoire et NON commercial, cf. plus bas),
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
+│                      test-https-browser.js (essaie le moteur WASM du module https contre un vrai serveur HTTPS local, dans
+│                      Chromium — à la MAIN, cf. « Modules `https` et `json` »),
 │                      gen_cpp_source.py (engendre docs/samples/{lexer,parser}/cpp_source.ol — le texte des fonctions de
 │                      lexer.cpp et de parser.cpp que les deux animations suivent ligne à ligne ; ne pas l'éditer à la
 │                      main, cf. check_trace_source.sh),
@@ -1514,6 +1516,44 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
   donneraient sinon une progression qui saute.
 - **Hors périmètre** (à demander explicitement) : `then`, `wait` comme méthode, chemins et
   splines, vitesse globale, délai entre répétitions, rappel par tour.
+
+## Modules `https` et `json` (implémentation)
+
+> API : voir le tutoriel (`docs/views/tutorial.html`, sections « The https module » et « The json module »).
+
+**Décision de l'utilisateur : WASM d'abord.** `https` n'a qu'un moteur réel, le `fetch()` du navigateur ; tout build
+natif a un moteur « stub » qui répond `"unsupported"` (le module n'est jamais nil, comme `motion`). Le natif réel
+n'est PAS écrit, et le choix reste ouvert : libcurl (une API pour toutes les plateformes, mais moteur TLS et
+certificats à régler par plateforme), les API du système (zéro dépendance, un moteur par plateforme), ou mbedTLS avec
+un client HTTP écrit à la main — dans ce dernier cas **il faut embarquer et tenir à jour les certificats racines**, une
+bibliothèque TLS portable ne lisant pas le magasin du système. Les en-têtes de libcurl ne sont pas installés dans le
+conteneur, et GitHub y est bloqué (pas de `FetchContent`).
+
+- **Frontière** : `https_module.cpp` (arguments, requêtes en cours, rappels) ne connaît que `https_internal.h` ;
+  `https_engine_web.cpp` (EM_ASM) et `https_engine_stub.cpp` sont les deux moteurs, choisis par les listes de sources
+  de `CMakeLists.txt` (quatre endroits : deux WASM, deux natifs).
+- **Un programme sans `draw()` ne reçoit JAMAIS de réponse** : les rappels sont livrés par `https_poll()`, appelé
+  dans `run_user_callbacks` avant `update()`. Sans boucle d'images (test, natif sans écran), le script appelle
+  `https.update()` lui-même ; ce n'est un no-op que lorsque le moteur livre déjà (même règle que `tween.update`).
+- **Une réponse n'est acceptée que si sa requête est encore dans `pending`** (côté JS) : annuler ou réinitialiser
+  retire l'entrée d'abord, donc une réponse tardive ne trouve personne. `https_reset()` (dans `ollin_run`) en dépend,
+  et les identifiants ne sont jamais réutilisés. Les poignées sont `{slot, gen}`, comme `tween` et `ui`.
+- **Les identifiants d'un EM_ASM** : le bloc est un argument de macro, donc ni littéral d'objet ni `var a = 1, b = 2`
+  au niveau supérieur (cf. « Module `touch` »). Les chaînes passent en UTF-8 par `TextEncoder` avec leur longueur : un
+  corps peut contenir un NUL.
+- **Pas de cookies** (`credentials: 'omit'`), `redirect: 'follow'`, un délai par `AbortController`. CORS est la règle
+  du navigateur : un serveur qui ne l'autorise pas donne `error` et rien d'autre.
+- **`json`** : un `null` d'un objet n'est pas rangé (une map ne tient pas de nil), celui d'un tableau garde sa place ;
+  les clés de `stringify` sont triées (une map n'a pas d'ordre) ; un entier sans fraction ni exposant reste entier.
+  Un littéral de chaîne du langage ne peut pas contenir `"` (aucune échappe hors `\{`) : les tests écrivent `'` puis
+  remplacent.
+- **Vérifié** : `tests/regressions/modules/{https,json}.ol` (moteur stub, sans réseau) et, au navigateur, contre un
+  vrai serveur HTTPS à certificat auto-signé : `NODE_PATH=$(npm root -g) node tools/test-https-browser.js` (CORS refusé,
+  404, redirection, délai, en-tête personnalisé avec requête de pré-vérification, corps de 3 Mo, annulation, requête
+  lancée depuis un rappel). ⚠ **Open-Meteo n'a JAMAIS été joint** : pas de réseau ici. L'exemple `weather/` est vérifié
+  sur des réponses fabriquées d'après la documentation du service, et le CORS du service est supposé.
+- ⚠ **`Playwright route.fulfill` contourne CORS** : un test par `page.route` ne peut pas prouver qu'une réponse sans
+  en-tête CORS est refusée ; il faut un vrai serveur (ce qu'est le script ci-dessus).
 
 ## Polices du moteur (`engine_font.h`)
 

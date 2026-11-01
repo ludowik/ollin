@@ -5,6 +5,7 @@
 #include "motion_module.h"
 #include "ui_module.h"
 #include "tween_module.h"
+#include "https_module.h"
 #include "engine_font.h"
 #include "image_module.h"
 #include "module_utils.h"
@@ -1662,6 +1663,9 @@ static void run_user_callbacks(const Value& draw_fn) {
     // The tweens are advanced BEFORE the logic and the drawing, so update() and draw() both see this
     // frame's values. Same dt as the deltaTime global.
     tween_update_all(s_frame_dt);
+    // The answers that have come in are delivered before update() too, for the same reason: it sees them
+    // in the frame they arrived.
+    https_poll();
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // a no-op outside 3D; otherwise it flushes and closes, should draw() have forgotten end3d

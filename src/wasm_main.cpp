@@ -9,6 +9,7 @@
 #include "modules/engine_font.h"
 #include "modules/ui_module.h"
 #include "modules/tween_module.h"
+#include "modules/https_module.h"
 #include "modules/data_module.h"
 #include "modules/graphics_internal.h"
 #include "modules/image_module.h"
@@ -34,6 +35,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     camera_reset();
     ui_reset();   // the previous program's widgets: the statics outlive the VM
     tween_reset();   // likewise: a surviving tween would retain the previous program's objects
+    https_reset();   // and an answer still on its way would reach the wrong program
     audio_reset();   // the master volume, which a previous program may have turned down
     sound_reset();   // otherwise an oscillator of the previous program would keep sounding
     touch_reset();   // a finger left "down" would look like a gesture under way

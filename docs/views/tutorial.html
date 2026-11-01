@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-01 12:33</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-01 20:59</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -448,6 +448,8 @@ pre:hover .code-actions,
   <a href="#sound">Sound (audio + sound)</a>
   <a href="#data">The data module</a>
   <a href="#date">The date module</a>
+  <a href="#https">The https module</a>
+  <a href="#json">The json module</a>
   <a href="#image">The image module</a>
   <a href="#window">The window module</a>
 </nav>
@@ -455,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-01 12:33</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-01 20:59</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2796,6 +2798,91 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <span class="cmt">## an instant of one's own: the parts of a stored date</span>
 <span class="kw">var</span> then_ = <span class="bi">date</span>.utc(<span class="num">1_700_000_000</span>)   <span class="cmt">## 2023-11-14 22:13:20 UTC</span></code></pre>
 <div class="callout">There is no formatting function: interpolation does the job, and it leaves the layout to whoever writes it — <code>"{d.hour}:{d.minute}"</code>. Nor is there any arithmetic on dates: add seconds to the number <code>time()</code> gives you, then decode.</div>
+</section>
+
+<section id="https">
+<h2>The <code>https</code> module</h2>
+<p>Asks a server for something over HTTPS — a weather forecast, a score table, a text — and gives the answer to a function of yours <strong>when it comes</strong>. An answer takes a while, so <code>https.get</code> does not wait for it: it returns at once with a <strong>request</strong>, the program carries on drawing, and the function you gave runs between two frames once the server has answered. Available without any <code>import</code>.</p>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>https.get(url [, options], callback)</code></td><td>Asks for the address. <code>callback(response)</code> runs <strong>once</strong>, later. Returns the request</td></tr>
+    <tr><td><code>https.urlEncode(text)</code></td><td><code>text</code> written to travel inside an address: <code>"a b&amp;é"</code> becomes <code>"a%20b%26%C3%A9"</code></td></tr>
+    <tr><td><code>https.query(url, fields)</code></td><td>The address followed by the fields of a map, in the order of their names: <code>?name=value&amp;…</code>. A <code>nil</code> field is left out; a value is a string, a number or a boolean</td></tr>
+    <tr><td><code>https.update()</code></td><td>Delivers the answers by hand. Only a program with <strong>no</strong> <code>draw()</code> (a test) needs it: when the engine runs a loop it delivers by itself, and this call then does nothing</td></tr>
+    <tr><td><code>req.cancel()</code></td><td>The callback will not run. Harmless once the request is answered</td></tr>
+    <tr><td><code>req.done()</code></td><td><code>true</code> once the request is answered or cancelled</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>headers</code></td><td>A map of strings, sent with the request: <code>{Accept: "application/json"}</code></td></tr>
+    <tr><td><code>timeout</code></td><td>Seconds the server has to answer, from more than 0 to 600 (30 by default)</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Field of the response</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td><code>ok</code></td><td><code>true</code> for a status from 200 to 299</td></tr>
+    <tr><td><code>status</code>, <code>statusText</code></td><td>What the server said: <code>404</code>, <code>"Not Found"</code>. <code>0</code> when nothing came back</td></tr>
+    <tr><td><code>body</code></td><td>The text of the answer (UTF-8), <code>""</code> when nothing came back</td></tr>
+    <tr><td><code>headers</code></td><td>A map of the answer's headers, the names in <strong>lower case</strong></td></tr>
+    <tr><td><code>error</code></td><td><code>nil</code>, unless nothing came back: <code>"timeout"</code>, <code>"unsupported"</code> (a build with no browser), or the browser's own words</td></tr>
+    <tr><td><code>url</code></td><td>Where the answer came from, after any redirection</td></tr>
+  </tbody>
+</table>
+<pre><code><span class="kw">global</span> temperature = <span class="kw">nil</span>
+
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"weather"</span>)
+    <span class="kw">var</span> url = <span class="bi">https</span>.query(<span class="str">"https://api.open-meteo.com/v1/forecast"</span>, {
+        latitude: <span class="num">48.85</span>, longitude: <span class="num">2.35</span>, current: <span class="str">"temperature_2m"</span>
+    })
+    <span class="bi">https</span>.get(url, {timeout: <span class="num">10</span>}, <span class="kw">func</span>(res)
+        <span class="kw">if</span> <span class="kw">not</span> res.ok <span class="kw">then</span>
+            temperature = <span class="str">"no answer: {res.error or res.status}"</span>
+            <span class="kw">return</span>
+        <span class="kw">end</span>
+        temperature = <span class="bi">json</span>.parse(res.body).current.temperature_2m
+    <span class="kw">end</span>)
+<span class="kw">end</span>
+
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
+    <span class="bi">graphics</span>.text(temperature <span class="kw">or</span> <span class="str">"loading…"</span>, CX, CY)
+<span class="kw">end</span></code></pre>
+<div class="callout"><strong>Two kinds of failure.</strong> A mistake in the call — an address that is not <code>https://</code>, an option that does not exist, a callback missing — is an <strong>error raised at once</strong>. A failure of the exchange itself — no network, a server that does not answer — is <strong>not</strong>: the callback runs with <code>ok</code> false, <code>status</code> 0 and <code>error</code> telling why. A refusal by the server (404, 500…) is an answer like another: it has its <code>status</code> and its <code>body</code>, and <code>error</code> is <code>nil</code>.</div>
+<div class="callout"><strong>Only <code>https://</code>.</strong> <code>http://</code> is refused, and the certificate of the server is always checked. In the browser the request is made by the browser itself, so its rules apply: the server must <strong>allow this page to read its answer</strong> (CORS), or the callback gets <code>error</code> set and nothing else. No cookie is sent. Outside the browser every request fails at once with <code>"unsupported"</code>.</div>
+<div class="callout">At most <strong>32</strong> requests at a time. The answers arrive in the order in which they <strong>complete</strong>, not the order of the requests. A callback may start another request; its answer comes at the next delivery. Keep the request in a variable to <code>cancel()</code> it when it is no longer wanted (a new search replacing the previous one): its answer would otherwise reach the callback.</div>
+</section>
+
+<section id="json">
+<h2>The <code>json</code> module</h2>
+<p>Reads and writes JSON, the text in which most services answer. Available without any <code>import</code>.</p>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>json.parse(text)</code></td><td>The value the text describes. A malformed text is an error that gives the <strong>position</strong> of the fault: <code>expected ',' or ']' at position 6</code></td></tr>
+    <tr><td><code>json.stringify(value [, indent])</code></td><td>The text of a value. With <code>indent</code> (0 to 16), one line per element, indented by that many spaces a level; without, a single compact line</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>JSON</th><th>Ollin</th></tr></thead>
+  <tbody>
+    <tr><td>object, array</td><td>map, array</td></tr>
+    <tr><td>string</td><td>string (the <code>\uXXXX</code> escapes become UTF-8, a surrogate pair giving one character)</td></tr>
+    <tr><td>number</td><td>an <strong>integer</strong> when written without fraction or exponent, a float otherwise (and an integer too large for 64 bits)</td></tr>
+    <tr><td><code>true</code> <code>false</code></td><td>booleans</td></tr>
+    <tr><td><code>null</code></td><td><code>nil</code> — an array keeps its place for it; in an object the key is simply <strong>absent</strong>, a map holding no <code>nil</code></td></tr>
+  </tbody>
+</table>
+<pre><code><span class="kw">var</span> text = <span class="bi">json</span>.stringify({name: <span class="str">"Paris"</span>, days: [<span class="num">12.5</span>, <span class="num">9</span>]})
+<span class="bi">print</span>(text)                       <span class="cmt">## {"days":[12.5,9],"name":"Paris"}</span>
+<span class="kw">var</span> back = <span class="bi">json</span>.parse(text)
+<span class="bi">print</span>(back.days[<span class="num">1</span>])               <span class="cmt">## 12.5</span></code></pre>
+<div class="callout"><code>stringify</code> writes the keys of a map <strong>in alphabetical order</strong> — a map has none of its own, and the same value must give the same text. An instance is written by its fields. A function, a number that is not finite or a map whose key is not a string cannot be written, and a value that contains itself is refused. A string literal cannot hold a double quote, so a JSON text written by hand is usually built with <code>string.fromCode(34)</code> or comes from a service.</div>
 </section>
 
 <section id="image">

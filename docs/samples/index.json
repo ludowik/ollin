@@ -35,5 +35,6 @@
   { "group": "Games", "name": "Tetris", "file": "tetris/tetris.ol", "icon": "icons/tetris.png" },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
-  { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }
+  { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" },
+  { "group": "Device and storage", "name": "Weather (https)", "file": "weather/weather.ol" }
 ]
