@@ -99,8 +99,8 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
 void VM::grow_regs_slow(size_t needed) {
     static_assert(k_max_regs == 4096, "the message below names the limit");
     if (needed > k_max_regs)
-        throw std::runtime_error("runtime: stack overflow (max 4096 registers)"); // (a std::to_string(k_max_regs) here moved
-                                                                                    // run_goto's inlining: +0.3 % on fib)
+        // (writing the limit with std::to_string(k_max_regs) moved run_goto's inlining: +0.3 % on fib)
+        throw std::runtime_error("runtime: stack overflow (max 4096 registers)");
     regs.resize(needed);
 }
 

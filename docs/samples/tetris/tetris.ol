@@ -59,6 +59,7 @@ func keyboard.keypressed(key)
     var p = game.pressed
     if key == "x" or key == "up" or key == "w" then
         p.cw = true
+        p.start = p.start or (key == "x" and game.state == "title")
     elseif key == "z" then
         p.ccw = true
     elseif key == "return" or key == "p" or key == "escape" or (key == "space" and game.state <> "play") then
@@ -121,6 +122,7 @@ func readInput()
     var ev = game.pressed
     if pads.a and not before.a then
         ev.cw = true
+        ev.start = ev.start or game.state == "title"
     end
     if pads.b and not before.b then
         ev.ccw = true

@@ -68,6 +68,11 @@ game.pressed = {left: true}
 step()
 assert(game.startLevel == config.maxStartLevel - 1)
 assert(game.state == "title")
+game.pressed = {cw: true}
+step()
+game.pressed = {ccw: true}
+step()
+assert(game.state == "title", "only START starts a game, not a turn (the arrows may be tried on the title screen)")
 
 ## ── A new game ──
 begin(3)

@@ -244,7 +244,7 @@ func stepTitle()
     if game.pressed.right then
         game.startLevel = math.min(game.startLevel + 1, config.maxStartLevel)
     end
-    if game.pressed.start or game.pressed.cw or game.pressed.ccw then
+    if game.pressed.start then
         startGame()
     end
 end
