@@ -66,24 +66,24 @@ static MetaKeys& MK() {
         return chained;
     if (key_sptr == class_key_)
         return obj.class_of();
-    if (key_sptr && !has_class_key(obj)) {
+    if (key_sptr && !is_instance(obj)) {
         const Value* meth = module_member(map_module_, key, key_sptr);
         return meth ? *meth : Value{};
     }
     return chained;
 }
 
-// A map is an instance when it has a class: a slot of the map (Map::proto), read in one load.
 // `noipa`: with so small a body GCC infers which registers the call leaves alone and reallocates run_goto's around
-// that, which cost fib +0.61 % of instructions (two per call) for a path fib never takes — measured, and gone with this
+// that, which cost fib +0.6 % of instructions (two per call) for a path fib never takes — measured, and gone with this
 // attribute. Clang has no such attribute, and no such inference.
 #if defined(__clang__)
 #define OLLIN_NOIPA
 #else
 #define OLLIN_NOIPA [[gnu::noipa]]
 #endif
-OLLIN_NOIPA bool VM::has_class_key(const Value& v) {
-    assert(v.is_map() || v.is_class());
+OLLIN_NOIPA bool VM::is_instance(const Value& v) {
+    if (!v.is_map() && !v.is_class())
+        return false;
     return !v.mptr->proto.is_nil();
 }
 
@@ -1629,7 +1629,7 @@ dispatch_loop:
                 // NOT cached, because mutating the CLASS does not bump the instance's layout.
                 // The map module's pseudo-methods (len, keys, values, has, delete) are only an
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
-                // path — never tried for an INSTANCE (!has_class_key), same restriction `len`
+                // path — never tried for an INSTANCE (!is_instance), same restriction `len`
                 // always had: an instance is expected to define or inherit its own fields.
                 {
                     Value found = map_member_miss(obj, key, key_sptr);
