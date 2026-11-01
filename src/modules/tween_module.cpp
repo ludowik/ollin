@@ -344,7 +344,7 @@ int handle_slot(const CallCtx& ctx, const char* fn) {
 }
 
 // A tween handle is a map like any other: without this test it would be taken for the object to
-// animate, and the refusal would complain about a missing '__class__' field instead of naming the
+// animate, and the refusal would complain about a missing field instead of naming the
 // real cause, which is that nesting is not supported.
 bool is_tween_handle(const Value& v) {
     if (!v.is_map())
@@ -444,7 +444,7 @@ void drop_conflicts(const std::vector<Chan>& chans) {
 void add_map_chans(std::vector<Chan>& out, const Value& obj, const Value& to_map, const char* fn) {
     // The only two ways to pass a tween where numbers are expected. Without these tests the handle
     // would be animated like an ordinary map, and the refusal would complain about a missing
-    // '__class__' field.
+    // field.
     if (is_tween_handle(to_map))
         throw std::runtime_error(std::string(fn) +
                                  ": a tween cannot be a target — sequences do not nest");

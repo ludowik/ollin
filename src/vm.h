@@ -163,9 +163,9 @@ class VM {
 
     // Split in two ON PURPOSE. The tag test answers "no" for every number, string and boolean —
     // that is, for almost every operand of an arithmetic or comparison opcode — so it is inlined
-    // at the eighteen sites that ask; only the __class__ lookup, which is the expensive half and
-    // means a hash probe, stays out of line. Bundled together they were one out-of-line call, and
-    // a comparison of two floats paid it twice just to be told no.
+    // at the eighteen sites that ask; only the read of the class slot stays out of line (noipa, cf.
+    // vm.cpp). Bundled together they were one out-of-line call, and a comparison of two floats paid
+    // it twice just to be told no.
     // ONLY on a map or a class: it reads mptr, which shares its union with an int64 and a double.
     static bool has_class_key(const Value& v);
     [[gnu::noinline]] void set_class_checked(Value& obj, const Value& cls); // out of line: run_goto hosts every hot path
