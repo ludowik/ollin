@@ -186,6 +186,34 @@ assert(failure(func() https.query("https://a.b", {x: [1]}) end) ==
 assert(failure(func() https.query("https://a.b") end) == "https.query: expected (url, fields)")
 assert(failure(func() https.query("https://a.b", {[1]: 2}) end) == "https.query: a field name must be a string")
 
+## ── A query goes before a fragment, and an empty address is refused ────────
+assert(https.query("https://a.b/p#top", {q: 1}) == "https://a.b/p?q=1#top")
+assert(https.query("https://a.b/p?x=1#top", {q: 1}) == "https://a.b/p?x=1&q=1#top")
+assert(https.query("https://a.b/p#top", {}) == "https://a.b/p#top")
+assert(failure(func() https.query("", {a: 1}) end) == "https.query: the address is empty")
+assert(failure(func() https.query("#top", {a: 1}) end) == "https.query: the address is empty")
+
+## ── Headers the browser would refuse are refused at the call ───────────────
+assert(failure(func() https.get("https://example.org", {headers: {"X(Y": "a"}}, ignore) end) == "https.get: 'X(Y' is not a header name")
+assert(failure(func() https.get("https://example.org", {headers: {"X Y": "a"}}, ignore) end) == "https.get: 'X Y' is not a header name")
+assert(failure(func() https.get("https://example.org", {headers: {"X-Name": "Jean €"}}, ignore) end) ==
+       "https.get: the header 'X-Name' holds a character that a header cannot carry")
+assert(failure(func() https.get("https://example.org", {headers: {"X-Name": "a" + string.fromCode(1)}}, ignore) end) ==
+       "https.get: the header 'X-Name' holds a character that a header cannot carry")
+https.get("https://example.org", {headers: {"X-Name": "Jean é" + string.fromCode(9) + "ok", "Accept-Language": "fr-FR, en;q=0.8"}}, ignore)
+https.update()
+
+## ── A method taken off its request is refused, not read from a stale register ──
+var detached = https.get("https://example.org/d", ignore)
+var cancelFn = detached.cancel
+var doneFn = detached.done
+assert(failure(func() cancelFn() end) == "request.cancel: expected a request")
+assert(failure(func() doneFn() end) == "request.done: expected a request")
+assert(failure(func() cancelFn(5) end) == "request.cancel: expected a request")
+assert(failure(func() doneFn({}) end) == "request.done: expected a request")
+assert(failure(func() doneFn({__class__: 5}) end) == "request.done: expected a request")
+https.update()
+
 ## ── A request handle is a Request ──────────────────────────────────────────
 var r = https.get("https://example.org/t", ignore)
 assert(r.__class__.__name__ == "Request")

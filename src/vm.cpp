@@ -64,6 +64,14 @@ bool VM::has_class_key(const Value& v) {
     return v.mptr->find_ptr(MK().class_) != nullptr;
 }
 
+// A `__class__` entry is followed ONLY when it holds a class or a map (a plain map works as a class, so
+// that prototype chains of maps exist): a script can store anything under that key (`m["__class__"] = 5`, or a
+// JSON text with such a key), and reading a number as a map reads its bits as a pointer. Such a map is an
+// ordinary map that happens to carry a field of that name.
+static bool is_proto(const Value& v) {
+    return v.is_map() || v.is_class();
+}
+
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
         Value v = obj.map_get(key);
@@ -71,7 +79,7 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
             return v;
         if (obj.is_map()) {
             Value cls = obj.map_get(MK().class_);
-            if (!cls.is_nil())
+            if (is_proto(cls))
                 return proto_chain_get(cls, key);
         } else {
             Value par = obj.map_get(MK().parent_);
@@ -85,7 +93,7 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
 Value VM::proto_chain_rest(const Value& obj, const Value& key) {
     if (obj.is_map()) {
         Value cls = obj.map_get(MK().class_);
-        if (!cls.is_nil())
+        if (is_proto(cls))
             return proto_chain_get(cls, key);
     } else if (obj.is_class()) {
         Value par = obj.map_get(MK().parent_);
@@ -168,7 +176,7 @@ static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the register obj came from
     Value cls = obj.map_get(MK().class_);
-    if (cls.is_nil())
+    if (!is_proto(cls))
         return "{map}";
     Value str_fn = proto_chain_get(cls, MK().str_);
     // A CLASS is callable, so it passes is_callable, but it is not a __str: naming the class is
@@ -215,7 +223,7 @@ std::string value_to_string_plain(const Value& v) {
         // An instance wears its class name, which is a plain map read; only value_to_string goes
         // on to call its __str.
         Value cls = v.map_get(MK().class_);
-        if (!cls.is_nil()) {
+        if (is_proto(cls)) {
             Value nm = cls.map_get(MK().name_);
             return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
         }
@@ -237,7 +245,7 @@ std::string value_to_string(const Value& v) {
         VM* vm = VM::current();
         if (vm) {
             Value cls = v.map_get(MK().class_);
-            if (!cls.is_nil())
+            if (is_proto(cls))
                 return vm->invoke_str(v);
         }
     }

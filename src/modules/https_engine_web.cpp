@@ -79,13 +79,6 @@ void https_engine_start(int id, const HttpsRequest& request) {
             var method = UTF8ToString($2);
             var flat = UTF8ToString($3);
             var timeout = $4;
-            var parts = flat.length ? flat.split('\n') : [];
-            var headers = new Headers();
-            try {
-                for (var i = 0; i + 1 < parts.length; i += 2)
-                    headers.append(parts[i], parts[i + 1]);
-            } catch (e) {
-            }
             var entry = {};
             entry.ctl = new AbortController();
             entry.timedOut = false;
@@ -114,6 +107,12 @@ void https_engine_start(int id, const HttpsRequest& request) {
                 finish(rec);
             };
             try {
+                // The module has checked the headers; if the browser still refuses one, the request fails with
+                // its reason instead of leaving without the headers that follow.
+                var parts = flat.length ? flat.split('\n') : [];
+                var headers = new Headers();
+                for (var i = 0; i + 1 < parts.length; i += 2)
+                    headers.append(parts[i], parts[i + 1]);
                 fetch(url, {method: method, headers: headers, signal: entry.ctl.signal, credentials: 'omit', redirect: 'follow'})
                     .then(function(r) {
                         var flatHeaders = [];
@@ -122,10 +121,10 @@ void https_engine_start(int id, const HttpsRequest& request) {
                             flatHeaders.push(v);
                         });
                         return r.text().then(function(t) {
-                            if (t.length > 16777216) {
-                                // The module's memory is fixed, and a body is copied into it whole.
+                            // The module's memory is fixed and a body is copied into it more than once: 16 MB at
+                            // most. Only a long text is measured in bytes (3 per UTF-16 unit at worst).
+                            if (t.length > 4194304 && new TextEncoder().encode(t).length > 16777216)
                                 throw new Error('response too large');
-                            }
                             var rec = {};
                             rec.sent = 1;
                             rec.status = r.status;

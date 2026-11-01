@@ -226,3 +226,11 @@ var cxProtoBase = {__str: func(self) return "viaBase" end}
 var cxProtoMid = {__class__: cxProtoBase}
 var cxProtoObj = {__class__: cxProtoMid}
 assert("{cxProtoObj}" == "viaBase")
+
+## A `__class__` field that holds neither a class nor a map is a field like another: reading the number as a map used to
+## read its bits as a pointer (a crash, from a script or from a JSON text). The map prints as a map and answers its fields.
+var cxSpoof = {a: 1}
+cxSpoof["__class__"] = 5
+assert("{cxSpoof}" == "{map}" and cxSpoof.a == 1 and cxSpoof.zzz == nil)
+var cxSpoofText = {__class__: "text", a: 2}
+assert("{cxSpoofText}" == "{map}" and cxSpoofText.a == 2)

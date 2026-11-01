@@ -53,6 +53,16 @@ assert(len(holes) == 3 and holes[1] == 1 and holes[2] == nil and holes[3] == 3, 
 var deep = json.parse(string.repeat("[", 150) + string.repeat("]", 150))
 assert(len(deep) == 1)
 
+## The last of two equal keys wins, a null included.
+var twice = json.parse(q("\{'a':1,'a':null,'b':1,'b':2}"))
+assert(not twice.has("a") and twice.b == 2, "a repeated key takes its last value")
+
+## A key that the engine reads as the class of an instance can come from a text: the map stays a map.
+var spoof = json.parse(q("\{'__class__':5,'a':1}"))
+assert(spoof.a == 1 and spoof.__class__ == 5)
+assert("{spoof}" == "{map}", "it prints as a map, whatever its __class__ holds")
+assert(json.stringify(spoof) == q("\{'__class__':5,'a':1}"), "and is written back with that field")
+
 ## ── parse: what it refuses, and where ──────────────────────────────────────
 assert(failure(func() json.parse("[1, 2") end) == "json.parse: expected ',' or ']' at position 6")
 assert(failure(func() json.parse(q("\{'a' 1}")) end) == "json.parse: expected ':' at position 6")

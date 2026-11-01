@@ -1,11 +1,13 @@
 #include "https_module.h"
 #include "https_internal.h"
 #include "module_utils.h"
+#include "utf8.h"
 #include "value.h"
 #include "vm.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <stdexcept>
 #include <string>
@@ -108,19 +110,33 @@ void check_url(const std::string& url, const char* fn) {
     }
 }
 
+// The characters of a header NAME (RFC 9110, a "token"): the browser refuses any other, and refusing it here
+// raises the error at the call instead of losing the header — and the ones after it — on the way.
+bool is_token_char(unsigned char c) {
+    return std::isalnum(c) || (c < 0x80 && std::strchr("!#$%&'*+-.^_`|~", c) != nullptr && c != 0);
+}
+
 void check_header(const std::string& name, const Value& value, const char* fn) {
     if (name.empty())
         throw std::runtime_error(std::string(fn) + ": a header has an empty name");
     for (unsigned char c : name) {
-        if (c <= 0x20 || c == 0x7f || c == ':')
+        if (!is_token_char(c))
             throw std::runtime_error(std::string(fn) + ": '" + shown(name) + "' is not a header name");
     }
     if (!value.is_string())
         throw std::runtime_error(std::string(fn) + ": the header '" + name + "' must be a string, got " +
                                  value.type_name());
-    for (unsigned char c : value.as_string()) {
-        if (c == '\n' || c == '\r' || c == 0)
+    // A value is made of characters up to U+00FF, without the control ones (a tab is allowed).
+    const std::string& text = value.as_string();
+    for (size_t i = 0; i < text.size();) {
+        size_t n = 1;
+        uint32_t cp = utf8_decode(text, i, &n);
+        if (cp == '\n' || cp == '\r')
             throw std::runtime_error(std::string(fn) + ": the header '" + name + "' holds a line break");
+        if (cp > 0xFF || (cp < 0x20 && cp != '\t') || cp == 0x7f)
+            throw std::runtime_error(std::string(fn) + ": the header '" + name +
+                                     "' holds a character that a header cannot carry");
+        i += n;
     }
 }
 
@@ -177,6 +193,11 @@ Value make_handle(int slot) {
 // The handle's slot, or -1 once the request is answered or cancelled. Holding on to the handle of a
 // request that has finished is normal, not a mistake.
 int handle_slot(const Value& self, const char* fn) {
+    // A method taken off its request (`var f = req.cancel`) is called with no receiver at all, and the
+    // register that should hold it is then whatever the call left there.
+    Value cls = self.is_map() ? self.map_get(Value(std::string("__class__"))) : Value{};
+    if (!cls.is_class() || cls.as_map() != https_class().as_map())
+        throw std::runtime_error(std::string(fn) + ": expected a request");
     Value slot = self.map_get(Value(std::string("slot")));
     Value gen = self.map_get(Value(std::string("gen")));
     if (!slot.is_integer() || !gen.is_integer())
@@ -303,6 +324,15 @@ int https_query(CallCtx& ctx) {
     std::string url = str_arg(ctx.args, ctx.argc, 0, fn);
     if (ctx.argc < 2 || !ctx.args[1].is_map())
         throw std::runtime_error("https.query: expected (url, fields)");
+    // The fields go before a fragment (#…): fetch never sends what follows it, so a query put after it is lost.
+    std::string fragment;
+    size_t hash = url.find('#');
+    if (hash != std::string::npos) {
+        fragment = url.substr(hash);
+        url.resize(hash);
+    }
+    if (url.empty())
+        throw std::runtime_error("https.query: the address is empty");
     std::vector<std::pair<std::string, Value>> fields;
     for (auto& kv : ctx.args[1].mptr->data) {
         if (!kv.first.is_string())
@@ -325,13 +355,15 @@ int https_query(CallCtx& ctx) {
         url += '=';
         percent_encode(v.is_string() ? v.as_string() : value_to_string_plain(v), url);
     }
-    return ctx.ret(Value(url));
+    return ctx.ret(Value(url + fragment));
 }
 
 // ── Request methods ──────────────────────────────────────────────────────────────────────────────
 // CALL_METHOD puts the receiver in args[0] for an instance.
 
 int method_cancel(CallCtx& ctx) {
+    if (ctx.argc < 1)
+        throw std::runtime_error("request.cancel: expected a request");
     int slot = handle_slot(ctx.args[0], "request.cancel");
     if (slot >= 0) {
         https_engine_cancel(s_reqs[slot].id);
@@ -341,6 +373,8 @@ int method_cancel(CallCtx& ctx) {
 }
 
 int method_done(CallCtx& ctx) {
+    if (ctx.argc < 1)
+        throw std::runtime_error("request.done: expected a request");
     return ctx.ret(Value::make_bool(handle_slot(ctx.args[0], "request.done") < 0));
 }
 

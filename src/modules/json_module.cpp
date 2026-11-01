@@ -210,8 +210,7 @@ struct Parser {
                     fail("expected ':'");
                 i++;
                 Value v = value(depth + 1);
-                if (!v.is_nil())
-                    m.map_set(Value(key), v);
+                m.map_set(Value(key), v);   // a nil removes the key: the LAST of two equal keys wins, null included
                 skip_space();
                 if (i < s.size() && s[i] == ',') {
                     i++;
@@ -358,7 +357,7 @@ struct Writer {
                 if (!kv.first.is_string())
                     throw std::runtime_error("json.stringify: a map key must be a string, got " +
                                              std::string(kv.first.type_name()));
-                if (kv.first.as_string() == "__class__")
+                if (kv.first.as_string() == "__class__" && (kv.second.is_class() || kv.second.is_map()))
                     continue;   // an instance is written by its fields
                 fields.emplace_back(kv.first.as_string(), kv.second);
             }
