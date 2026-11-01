@@ -402,3 +402,29 @@ var twR3 = {__ref: true, get: func() return twV3 end, set: func(v) twV3 = v if v
 twH3 = tween.value(twR3, 10, 0.5, "linear").repeat(2)
 tween.update(1.0)
 assert(tween.count() == 0 and twV3 == 10)
+
+## ── A method taken off its tween is refused, not read from a stale register ──────────────────────────────────
+## `var f = t.cancel` then `f()` calls the method with no receiver: it used to read whatever the call had left in the
+## first register as the tween (a crash), for all seven methods.
+func twFailure(f)
+    var message = nil
+    try
+        f()
+    catch e
+        message = e
+    end
+    return message
+end
+var twHolder = {x: 0}
+var twMine = tween.to(twHolder, {x: 1}, 1.0)
+for name in ["pause", "resume", "cancel", "isDone", "progress", "delay", "repeat"] do
+    var detached = twMine[name]
+    var expected = "tween.{name}: expected a tween"
+    assert(twFailure(func() detached() end) == expected, "{name} with no receiver")
+    assert(twFailure(func() detached(5) end) == expected, "{name} on a number")
+    assert(twFailure(func() detached({}) end) == expected, "{name} on a map")
+    assert(twFailure(func() detached({slot: 1, gen: 1}) end) == expected, "{name} on a map that only looks like a handle")
+    assert(twFailure(func() detached(twHolder) end) == expected, "{name} on another object")
+end
+assert(twMine.isDone() == false, "the tween itself is untouched")
+twMine.cancel()

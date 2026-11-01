@@ -326,7 +326,14 @@ Value make_handle(int slot) {
 
 // A handle's slot, or -1 when the tween is finished or cancelled. A stale handle is NOT a mistake:
 // keeping the handle of a finished animation is perfectly normal.
-int handle_slot(const Value& self, const char* fn) {
+bool is_tween_handle(const Value& v);
+
+int handle_slot(const CallCtx& ctx, const char* fn) {
+    // A method taken off its tween (`var f = t.cancel`) is called with no receiver at all, and the register that
+    // should hold it is then whatever the call left there: the receiver is checked before anything is read from it.
+    if (ctx.argc < 1 || !is_tween_handle(ctx.args[0]))
+        throw std::runtime_error(std::string(fn) + ": expected a tween");
+    const Value& self = ctx.args[0];
     Value slot = self.map_get(Value(std::string("slot")));
     Value gen = self.map_get(Value(std::string("gen")));
     if (!slot.is_integer() || !gen.is_integer())
@@ -706,33 +713,33 @@ int tween_update(CallCtx& ctx) {
 // CALL_METHOD injects the receiver as args[0] for an instance, so the user arguments start at
 // args[1], as in ui_module.
 int method_pause(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.pause");
+    int slot = handle_slot(ctx, "tween.pause");
     if (slot >= 0)
         s_tweens[slot].paused = true;
     return ctx.ret(ctx.args[0]);
 }
 
 int method_resume(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.resume");
+    int slot = handle_slot(ctx, "tween.resume");
     if (slot >= 0)
         s_tweens[slot].paused = false;
     return ctx.ret(ctx.args[0]);
 }
 
 int method_cancel(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.cancel");
+    int slot = handle_slot(ctx, "tween.cancel");
     if (slot >= 0)
         free_tween(slot);
     return ctx.ret(ctx.args[0]);
 }
 
 int method_is_done(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.isDone");
+    int slot = handle_slot(ctx, "tween.isDone");
     return ctx.ret(Value::make_bool(slot < 0));
 }
 
 int method_progress(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.progress");
+    int slot = handle_slot(ctx, "tween.progress");
     if (slot < 0)
         return ctx.ret(Value(1.0));
     const Tw& t = s_tweens[slot];
@@ -776,7 +783,7 @@ int method_repeat(CallCtx& ctx) {
             throw std::runtime_error(std::string(FN) + ": repeat count must be an integer >= 1");
     }
     bool ping_pong = ctx.argc > 2 && !is_falsy(ctx.args[2]);
-    int slot = handle_slot(ctx.args[0], FN);
+    int slot = handle_slot(ctx, FN);
     if (slot >= 0) {
         Tw& t = s_tweens[slot];
         std::vector<int8_t> one_pass = t.plan;
@@ -794,10 +801,10 @@ int method_repeat(CallCtx& ctx) {
 // Delays the START: the initial value is read at the first real advance, hence after the delay, so a
 // delayed tween starts from whatever the variable holds at that moment.
 int method_delay(CallCtx& ctx) {
+    int slot = handle_slot(ctx, "tween.delay");
     double d = num_arg(ctx.args, ctx.argc, 1, "tween.delay");
     if (d < 0.0)
         throw std::runtime_error("tween.delay: delay must be >= 0");
-    int slot = handle_slot(ctx.args[0], "tween.delay");
     if (slot >= 0)
         s_tweens[slot].delay = d;
     return ctx.ret(ctx.args[0]);
