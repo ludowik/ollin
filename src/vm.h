@@ -168,6 +168,8 @@ class VM {
     // a comparison of two floats paid it twice just to be told no.
     // ONLY on a map or a class: it reads mptr, which shares its union with an int64 and a double.
     static bool has_class_key(const Value& v);
+    [[gnu::noinline]] void set_class_checked(Value& obj, const Value& cls); // out of line: run_goto hosts every hot path
+    Value map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr);
     static bool is_instance(const Value& v) {
         if (!v.is_map() && !v.is_class())
             return false;
@@ -324,6 +326,9 @@ class VM {
             throw std::runtime_error("runtime: expected number, got boolean");
         throw std::runtime_error("runtime: expected number, got string");
     }
+
+    // The interned key `__class__`, compared by pointer in the write and the read of that key (set in execute).
+    const InternedStr* class_key_ = nullptr;
 };
 
 // The result slots are addressed through VM::regs and the index CallCtx carries, never through the

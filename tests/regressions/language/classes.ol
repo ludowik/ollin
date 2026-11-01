@@ -227,10 +227,40 @@ var cxProtoMid = {__class__: cxProtoBase}
 var cxProtoObj = {__class__: cxProtoMid}
 assert("{cxProtoObj}" == "viaBase")
 
-## A `__class__` field that holds neither a class nor a map is a field like another: reading the number as a map used to
-## read its bits as a pointer (a crash, from a script or from a JSON text). The map prints as a map and answers its fields.
-var cxSpoof = {a: 1}
-cxSpoof["__class__"] = 5
-assert("{cxSpoof}" == "{map}" and cxSpoof.a == 1 and cxSpoof.zzz == nil)
-var cxSpoofText = {__class__: "text", a: 2}
-assert("{cxSpoofText}" == "{map}" and cxSpoofText.a == 2)
+## The class of an object is a slot of the map, set by the engine, and `__class__` is the way to read and write it:
+## a script cannot store anything else there. (It used to be an ordinary field, and a number stored under it was read
+## as a pointer to a map: a crash, from a script or from a JSON text.)
+func cxFails(f)
+    var message = nil
+    try
+        f()
+    catch e
+        message = e
+    end
+    return message
+end
+var cxSlot = {a: 1}
+assert(cxFails(func() cxSlot["__class__"] = 5 end) == "runtime: '__class__' must be a class or a map, got int")
+assert(cxFails(func() cxSlot.__class__ = "text" end) == "runtime: '__class__' must be a class or a map, got string")
+assert(cxFails(func() cxSlot.__class__ = [1] end) == "runtime: '__class__' must be a class or a map, got array")
+assert(cxFails(func() cxSlot.__class__ = cxSlot end) == "runtime: '__class__' would make the object its own class")
+assert(cxFails(func() cxProtoBase.__class__ = cxProtoObj end) == "runtime: '__class__' would make the object its own class", "nor through a chain")
+assert(cxFails(func() var bad = {__class__: 5} end) == "runtime: '__class__' must be a class or a map, got int", "nor in a literal")
+assert(cxSlot.__class__ == nil and "{cxSlot}" == "{map}", "a map with no class says so")
+
+cxSlot.__class__ = cxProtoBase
+assert(cxSlot.__class__ == cxProtoBase and "{cxSlot}" == "viaBase", "a map can be given a class, and reads it back")
+cxSlot.__class__ = nil
+assert(cxSlot.__class__ == nil and "{cxSlot}" == "{map}", "nil takes the link away")
+
+## The slot is not a field: an instance has no `__class__` key, and an empty one is still true.
+class CxEmpty
+end
+var cxEmpty = CxEmpty()
+var cxSeen = 0
+for k in cxEmpty do
+    cxSeen += 1
+end
+assert(len(cxEmpty) == 0 and cxSeen == 0, "an instance with no field has none, and iterating it finds none")
+assert(cxEmpty.__class__ == CxEmpty and (cxEmpty and true), "and it is truthy all the same")
+assert(not ({} and true), "while an empty map is still false")

@@ -357,8 +357,6 @@ struct Writer {
                 if (!kv.first.is_string())
                     throw std::runtime_error("json.stringify: a map key must be a string, got " +
                                              std::string(kv.first.type_name()));
-                if (kv.first.as_string() == "__class__" && (kv.second.is_class() || kv.second.is_map()))
-                    continue;   // an instance is written by its fields
                 fields.emplace_back(kv.first.as_string(), kv.second);
             }
             std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) { return a.first < b.first; });

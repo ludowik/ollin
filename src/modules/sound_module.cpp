@@ -24,7 +24,7 @@ Value osc_class();
 
 Value make_handle(int slot) {
     Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), osc_class());
+    h.set_class(osc_class());
     h.map_set(Value(std::string("slot")), Value((int64_t)slot));
     h.map_set(Value(std::string("gen")), Value((int64_t)voices()[slot].gen));
     return h;
@@ -259,7 +259,7 @@ Value buffer_class();
 
 Value make_buffer_handle(int slot) {
     Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), buffer_class());
+    h.set_class(buffer_class());
     h.map_set(Value(std::string("slot")), Value((int64_t)slot));
     h.map_set(Value(std::string("gen")), Value((int64_t)bufs()[slot].gen));
     return h;

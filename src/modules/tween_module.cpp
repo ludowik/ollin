@@ -318,7 +318,7 @@ Value tween_class();
 
 Value make_handle(int slot) {
     Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), tween_class());
+    h.set_class(tween_class());
     h.map_set(Value(std::string("slot")), Value((int64_t)slot));
     h.map_set(Value(std::string("gen")), Value((int64_t)s_tweens[slot].gen));
     return h;
@@ -342,7 +342,7 @@ int handle_slot(const Value& self, const char* fn) {
 bool is_tween_handle(const Value& v) {
     if (!v.is_map())
         return false;
-    Value cls = v.map_get(Value(std::string("__class__")));
+    Value cls = v.class_of();
     return cls.is_class() && cls.as_map() == tween_class().as_map();
 }
 
@@ -357,8 +357,8 @@ bool is_object(const Value& v) {
 // object, it does not replace it.
 void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt, const std::string& field,
                       const char* fn) {
-    Value cls_a = cur.map_get(Value(std::string("__class__")));
-    Value cls_b = tgt.map_get(Value(std::string("__class__")));
+    Value cls_a = cur.class_of();
+    Value cls_b = tgt.class_of();
     if (cls_a.is_nil() || !cls_b.is_class() || cls_a.as_map() != cls_b.as_map()) {
         throw std::runtime_error(std::string(fn) + ": '" + field +
                                  "': both values must be instances of the same class");

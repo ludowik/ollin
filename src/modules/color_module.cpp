@@ -91,7 +91,7 @@ static int color_pastel(CallCtx& ctx) {
     double g = color_field(self, "g").as_num();
     double b = color_field(self, "b").as_num();
     double a = color_field(self, "a").as_num();
-    Value cls = self.map_get(Value(std::string("__class__")));
+    Value cls = self.class_of();
     return ctx.ret(make_color_instance(cls, r * 0.5 + 0.5, g * 0.5 + 0.5, b * 0.5 + 0.5, a));
 }
 
@@ -105,7 +105,7 @@ static int color_grayscale(CallCtx& ctx) {
     double b = color_field(self, "b").as_num();
     double a = color_field(self, "a").as_num();
     double lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    Value cls = self.map_get(Value(std::string("__class__")));
+    Value cls = self.class_of();
     return ctx.ret(make_color_instance(cls, lum, lum, lum, a));
 }
 
@@ -136,7 +136,7 @@ Value make_color_class() {
 
 
 static Value make_color_instance(const Value& cls, double r, double g, double b, double a) {
-    return MapBuilder().set("__class__", cls).num("r", r).num("g", g).num("b", b).num("a", a).done();
+    return MapBuilder().klass(cls).num("r", r).num("g", g).num("b", b).num("a", a).done();
 }
 
 Value make_colors_module() {

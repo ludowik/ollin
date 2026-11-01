@@ -56,20 +56,35 @@ static MetaKeys& MK() {
     return mk;
 }
 
-// find_ptr and not map_get: the latter RETURNS the class by value, so a retain and a release on
-// every test — and this is asked for each method call and for each arithmetic operand that is not
-// a plain number.
-bool VM::has_class_key(const Value& v) {
-    assert(v.is_map() || v.is_class());
-    return v.mptr->find_ptr(MK().class_) != nullptr;
+// What `obj.key` gives when `obj`'s own data has no such entry: the prototype chain, then `obj.__class__` itself
+// (the class link is a slot of the map, not an entry of its data), then the map module's pseudo-methods
+// (len, keys, values, has, delete) — an all-cold fallback, never tried for an INSTANCE: an instance is expected to
+// define or inherit its own fields. Out of line, so that none of it sits in run_goto.
+[[gnu::noinline]] Value VM::map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr) {
+    Value chained = proto_chain_rest(obj, key);
+    if (!chained.is_nil())
+        return chained;
+    if (key_sptr == class_key_)
+        return obj.class_of();
+    if (key_sptr && !has_class_key(obj)) {
+        const Value* meth = module_member(map_module_, key, key_sptr);
+        return meth ? *meth : Value{};
+    }
+    return chained;
 }
 
-// A `__class__` entry is followed ONLY when it holds a class or a map (a plain map works as a class, so
-// that prototype chains of maps exist): a script can store anything under that key (`m["__class__"] = 5`, or a
-// JSON text with such a key), and reading a number as a map reads its bits as a pointer. Such a map is an
-// ordinary map that happens to carry a field of that name.
-static bool is_proto(const Value& v) {
-    return v.is_map() || v.is_class();
+// A map is an instance when it has a class: a slot of the map (Map::proto), read in one load.
+// `noipa`: with so small a body GCC infers which registers the call leaves alone and reallocates run_goto's around
+// that, which cost fib +0.61 % of instructions (two per call) for a path fib never takes — measured, and gone with this
+// attribute. Clang has no such attribute, and no such inference.
+#if defined(__clang__)
+#define OLLIN_NOIPA
+#else
+#define OLLIN_NOIPA [[gnu::noipa]]
+#endif
+OLLIN_NOIPA bool VM::has_class_key(const Value& v) {
+    assert(v.is_map() || v.is_class());
+    return !v.mptr->proto.is_nil();
 }
 
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
@@ -78,8 +93,8 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
         if (!v.is_nil())
             return v;
         if (obj.is_map()) {
-            Value cls = obj.map_get(MK().class_);
-            if (is_proto(cls))
+            const Value& cls = obj.class_of();
+            if (!cls.is_nil())
                 return proto_chain_get(cls, key);
         } else {
             Value par = obj.map_get(MK().parent_);
@@ -92,8 +107,8 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
 
 Value VM::proto_chain_rest(const Value& obj, const Value& key) {
     if (obj.is_map()) {
-        Value cls = obj.map_get(MK().class_);
-        if (is_proto(cls))
+        const Value& cls = obj.class_of();
+        if (!cls.is_nil())
             return proto_chain_get(cls, key);
     } else if (obj.is_class()) {
         Value par = obj.map_get(MK().parent_);
@@ -101,6 +116,23 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
             return proto_chain_get(par, key);
     }
     return Value{};
+}
+
+// `obj.__class__ = cls`, the only way a script sets the class link: a class, a map used as one, or nil to
+// take the link away. Refusing anything else is what lets every reader of the link trust it.
+void VM::set_class_checked(Value& obj, const Value& cls) {
+    if (cls.is_nil()) {
+        obj.set_class(Value{});
+        return;
+    }
+    if (!cls.is_map() && !cls.is_class())
+        throw std::runtime_error("runtime: '__class__' must be a class or a map, got " + std::string(cls.type_name()));
+    // A chain that came back to obj would send every lookup round it for ever.
+    for (const Value* p = &cls; !p->is_nil(); p = &p->class_of()) {
+        if (p->mptr == obj.mptr)
+            throw std::runtime_error("runtime: '__class__' would make the object its own class");
+    }
+    obj.set_class(cls);
 }
 
 // Grows the register file to exactly `needed`, up to k_max_regs: the capacity was reserved by execute, so nothing moves.
@@ -175,8 +207,8 @@ static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
 
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the register obj came from
-    Value cls = obj.map_get(MK().class_);
-    if (!is_proto(cls))
+    Value cls = obj.class_of();
+    if (cls.is_nil())
         return "{map}";
     Value str_fn = proto_chain_get(cls, MK().str_);
     // A CLASS is callable, so it passes is_callable, but it is not a __str: naming the class is
@@ -222,8 +254,8 @@ std::string value_to_string_plain(const Value& v) {
     if (v.is_map()) {
         // An instance wears its class name, which is a plain map read; only value_to_string goes
         // on to call its __str.
-        Value cls = v.map_get(MK().class_);
-        if (is_proto(cls)) {
+        const Value& cls = v.class_of();
+        if (!cls.is_nil()) {
             Value nm = cls.map_get(MK().name_);
             return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
         }
@@ -244,8 +276,7 @@ std::string value_to_string(const Value& v) {
     if (v.is_map()) {
         VM* vm = VM::current();
         if (vm) {
-            Value cls = v.map_get(MK().class_);
-            if (is_proto(cls))
+            if (!v.class_of().is_nil())
                 return vm->invoke_str(v);
         }
     }
@@ -377,7 +408,7 @@ static const struct {
 // The caller sets ip = addr, then dispatches (NEXT() or continue in switch).
 
 uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate) {
-    Value fn = proto_chain_get(lhs.map_get(MK().class_), name);
+    Value fn = proto_chain_get(lhs.class_of(), name);
     if (!fn.is_callable())
         return 0;
     ClosureRef fuv;
@@ -390,7 +421,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
 }
 
 uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
-    Value fn = proto_chain_get(lhs.map_get(MK().class_), name);
+    Value fn = proto_chain_get(lhs.class_of(), name);
     if (!fn.is_callable())
         return 0;
     ClosureRef fuv;
@@ -415,7 +446,7 @@ void VM::unwind_to_handler(const Handler& h, Value thrown) {
 uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done) {
     done = false;
     Value inst = Value::make_map();
-    inst.map_set(MK().class_, cls);
+    inst.set_class(cls);
     // The two paths that open NO call frame, hence have no `return` for the compiler to shape:
     // an instantiation yields the object, and one value. Said once here, and by the bytecode
     // everywhere else.
@@ -1583,8 +1614,7 @@ dispatch_loop:
             if (slot && !slot->is_nil()) {
                 // Found directly, so validity depends ONLY on (mptr, layout): cacheable even
                 // on an instance, since adding or removing a field bumps its layout,
-                // and its own data always shadows the class). No
-                // is_instance here — it would cost a "__class__" lookup on every access.
+                // and its own data always shadows the class).
                 if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
                     c.map = own;
@@ -1601,12 +1631,9 @@ dispatch_loop:
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
                 // path — never tried for an INSTANCE (!has_class_key), same restriction `len`
                 // always had: an instance is expected to define or inherit its own fields.
-                Value chained = proto_chain_rest(obj, key);
-                if (chained.is_nil() && key_sptr && !has_class_key(obj)) {
-                    const Value* meth = module_member(map_module_, key, key_sptr);
-                    R[A] = meth ? *meth : Value{};
-                } else {
-                    R[A] = std::move(chained);
+                {
+                    Value found = map_member_miss(obj, key, key_sptr);
+                    R[A] = std::move(found); // after the lookup: A may alias obj
                 }
             }
         } else if (obj.is_string()) {
@@ -1649,7 +1676,10 @@ dispatch_loop:
             if (obj.mptr->kind == Map::ENUM)
                 throw std::runtime_error("cannot modify an enum" +
                                          (key.is_string() ? " (field '" + key.as_string() + "')" : ""));
-            obj.map_set(key, R[C]);
+            if (key.is_string() && key.sptr == class_key_)
+                set_class_checked(obj, R[C]); // `__class__` is the class link, a slot of the map
+            else
+                obj.map_set(key, R[C]);
         } else if (obj.is_array()) {
             if (!key.is_integer())
                 throw std::runtime_error("runtime: array index must be integer");
@@ -2201,6 +2231,7 @@ void VM::execute(Chunk chunk) {
     // The whole register file is allocated here, once: run_goto keeps a pointer into it, which a
     // growth must therefore never move. grow_regs refuses to go past this size.
     regs.reserve(k_max_regs);
+    class_key_ = MK().class_.sptr;
     owned_chunk = std::move(chunk);
     ch = &owned_chunk;
     ip = 0;

@@ -251,6 +251,12 @@ struct Value {
     static Value make_map();
     Value map_get(const Value& key) const;
     void map_set(const Value& key, const Value& val);
+    // The class link of a map (cf. Map::proto): nil for an object that has none. The caller has checked
+    // that this is a map or a class.
+    const Value& class_of() const;
+    // Makes this map an instance of `cls` (a class, or a map used as one). For the engine and the native
+    // modules; a script goes through the guarded write of `__class__`.
+    void set_class(const Value& cls);
 
     static Value make_array();
     Value array_get(int64_t idx) const;            // 1-based
@@ -302,6 +308,12 @@ inline Value Value::map_get(const Value& k) const {
 }
 inline void Value::map_set(const Value& k, const Value& v) {
     mptr->set(k, v);
+}
+inline const Value& Value::class_of() const {
+    return mptr->proto;
+}
+inline void Value::set_class(const Value& cls) {
+    mptr->proto = cls;
 }
 
 inline Value Value::array_get(int64_t idx) const {
@@ -509,7 +521,7 @@ inline Value::~Value() {
     if (v.is_array())
         return v.array_size() == 0;
     if (v.is_map())
-        return v.map_size() == 0; // an instance has at least one key (__class__), hence truthy
+        return v.map_size() == 0 && v.class_of().is_nil(); // an instance is truthy even with no field
     return false;                // T_CLASS, range, closure, function → truthy
 }
 

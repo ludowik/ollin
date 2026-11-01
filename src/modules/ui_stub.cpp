@@ -14,7 +14,7 @@ Value inert_class();
 
 Value make_inert() {
     return MapBuilder()
-        .set("__class__", inert_class())
+        .klass(inert_class())
         .done();
 }
 

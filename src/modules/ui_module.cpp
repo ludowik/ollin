@@ -178,7 +178,7 @@ Value element_class();
 
 Value make_handle(int slot) {
     return MapBuilder()
-        .set("__class__", element_class())
+        .klass(element_class())
         .int_num("slot", slot)
         .int_num("gen", (int64_t)s_nodes[slot].gen)
         .done();

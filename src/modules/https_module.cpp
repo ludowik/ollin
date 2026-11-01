@@ -184,7 +184,7 @@ Value https_class();
 
 Value make_handle(int slot) {
     Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), https_class());
+    h.set_class(https_class());
     h.map_set(Value(std::string("slot")), Value((int64_t)slot));
     h.map_set(Value(std::string("gen")), Value((int64_t)s_reqs[slot].gen));
     return h;
@@ -195,7 +195,7 @@ Value make_handle(int slot) {
 int handle_slot(const Value& self, const char* fn) {
     // A method taken off its request (`var f = req.cancel`) is called with no receiver at all, and the
     // register that should hold it is then whatever the call left there.
-    Value cls = self.is_map() ? self.map_get(Value(std::string("__class__"))) : Value{};
+    Value cls = self.is_map() ? self.class_of() : Value{};
     if (!cls.is_class() || cls.as_map() != https_class().as_map())
         throw std::runtime_error(std::string(fn) + ": expected a request");
     Value slot = self.map_get(Value(std::string("slot")));

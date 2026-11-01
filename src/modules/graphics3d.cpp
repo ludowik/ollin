@@ -287,7 +287,7 @@ static Value camera_class() {
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
-    cam.map_set(Value(std::string("__class__")), camera_class());
+    cam.set_class(camera_class());
     cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.camera")));
     cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.camera")));
     cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.camera")));
@@ -304,7 +304,7 @@ static int gfx_camera(CallCtx& ctx) {
 static int gfx_camera_ortho(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
-    cam.map_set(Value(std::string("__class__")), camera_class());
+    cam.set_class(camera_class());
     cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.cameraOrtho")));
     cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.cameraOrtho")));
     cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.cameraOrtho")));
@@ -1049,7 +1049,7 @@ static int gfx_light(CallCtx& ctx) {
     float z = (float)num_arg(args, argc, 3, "graphics.light");
     Color c = color_arg_or_white(args, argc, 4);
     Value inst = Value::make_map();
-    inst.map_set(Value(std::string("__class__")), light_class());
+    inst.set_class(light_class());
     inst.map_set(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
     inst.map_set(Value(std::string("dx")), Value((double)x));
     inst.map_set(Value(std::string("dy")), Value((double)y));

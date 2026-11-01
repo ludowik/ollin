@@ -111,3 +111,7 @@ void Map::set(const Value& k, const Value& v) {
         layout = version;
     }
 }
+
+void Map::drop_proto() {
+    proto = Value();
+}

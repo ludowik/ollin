@@ -211,7 +211,7 @@ assert(failure(func() cancelFn() end) == "request.cancel: expected a request")
 assert(failure(func() doneFn() end) == "request.done: expected a request")
 assert(failure(func() cancelFn(5) end) == "request.cancel: expected a request")
 assert(failure(func() doneFn({}) end) == "request.done: expected a request")
-assert(failure(func() doneFn({__class__: 5}) end) == "request.done: expected a request")
+assert(failure(func() doneFn({a: 1}) end) == "request.done: expected a request")
 https.update()
 
 ## ── A request handle is a Request ──────────────────────────────────────────

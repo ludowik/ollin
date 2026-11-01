@@ -90,6 +90,11 @@ struct MapBuilder {
         map.map_set(Value(std::string(key)), v);
         return *this;
     }
+    // The class of an instance being built (cf. Map::proto): not a field, so not `set("__class__", …)`.
+    MapBuilder& klass(const Value& cls) {
+        map.set_class(cls);
+        return *this;
+    }
     MapBuilder& fn(const char* key, Value::BuiltinFn f) {
         return set(key, Value::make_builtin(f));
     }
