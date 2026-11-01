@@ -572,6 +572,12 @@ void VM::run_entry_hooks() {
     // `graphics` may be nil (the native stub, or a script that never mentions it) or reassigned
     // to a non-map, so the is_map() guard before map_get is mandatory.
     Value gfx = get_global("graphics");
+    if (gfx.is_nil()) {
+        // execute() builds only the modules the program NAMES, so a script whose draw() never writes
+        // `graphics` has no such global — yet a draw() alone must start a session (the implicit canvas
+        // below). Ask for the module itself; the native stub answers nil, and nothing starts.
+        gfx = make_builtin_module("graphics");
+    }
     Value draw = get_global("draw");
     bool graphical = draw.is_callable() && gfx.is_map();
 

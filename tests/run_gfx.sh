@@ -28,4 +28,16 @@ if command -v xvfb-run >/dev/null 2>&1; then
         fi
     done
 fi
+## A draw() alone, in a script that never names `graphics`, has no way to quit: it ends by a failed assertion.
+if command -v xvfb-run >/dev/null 2>&1; then
+    f=tests/gfx_implicit_canvas_test.ol
+    out=$(timeout 60 bash tools/run-headless.sh "$f" 2>&1)
+    if [ $? -ne 0 ] && echo "$out" | grep -q "the implicit canvas started the loop"; then
+        echo "OK   $f (Xvfb)"
+    else
+        echo "FAIL $f (Xvfb): the frame loop never started"
+        echo "$out" | grep -v "^INFO\|^WARNING" | tail -3 | sed 's/^/     /'
+        fails=$((fails + 1))
+    fi
+fi
 [ $fails -eq 0 ]
