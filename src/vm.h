@@ -161,8 +161,18 @@ class VM {
     // (see op_GET_INDEX).
     static Value proto_chain_rest(const Value& obj, const Value& key);
 
-    // A map or a class is an INSTANCE when it has a class link (Map::proto). Out of line, cf. vm.cpp.
-    static bool is_instance(const Value& v);
+    // A map or a class is an INSTANCE when it has a class link (Map::proto). Split in two ON PURPOSE: the tag
+    // test answers "no" for every number, string and boolean, that is for almost every operand of an arithmetic or
+    // comparison opcode, so it is inlined at the sites that ask; only the read of the link stays out of line
+    // (cf. vm.cpp). Bundled together they were one out-of-line call, and a comparison of two floats paid it just
+    // to be told no (mandelbrot +4.4 % of instructions, measured).
+    // has_class_link reads mptr, which shares its union with an int64 and a double: ONLY on a map or a class.
+    static bool has_class_link(const Value& v);
+    static bool is_instance(const Value& v) {
+        if (!v.is_map() && !v.is_class())
+            return false;
+        return has_class_link(v);
+    }
     [[gnu::noinline]] void set_class_checked(Value& obj, const Value& cls); // out of line: run_goto hosts every hot path
     Value map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr);
 

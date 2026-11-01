@@ -81,9 +81,8 @@ static MetaKeys& MK() {
 #else
 #define OLLIN_NOIPA [[gnu::noipa]]
 #endif
-OLLIN_NOIPA bool VM::is_instance(const Value& v) {
-    if (!v.is_map() && !v.is_class())
-        return false;
+OLLIN_NOIPA bool VM::has_class_link(const Value& v) {
+    assert(v.is_map() || v.is_class());
     return !v.mptr->proto.is_nil();
 }
 
