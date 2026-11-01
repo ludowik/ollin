@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <deque>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -20,7 +21,10 @@
 //    handle kept after the answer is recognised as finished instead of designating the request that
 //    took the slot;
 //  - no reference into s_reqs is kept across a call to script code;
-//  - the answers are all collected first, the callbacks run afterwards.
+//  - the answers are all collected first, the callbacks run afterwards, one by one from a queue: a callback
+//    that raises an error leaves the answers behind it in the queue for the next delivery instead of losing
+//    them, and a request cancelled while its answer waits there is still cancelled (its slot stays alive
+//    until the callback is about to run).
 
 namespace {
 
@@ -38,6 +42,7 @@ struct Req {
 
 std::vector<Req> s_reqs;
 std::vector<int> s_free;
+std::deque<std::pair<int, Value>> s_ready;   // (request id, response) of the answers not yet delivered
 int s_next_id = 1;   // never reset: an answer from before a reset must not meet a new request
 bool s_engine_driven = false;
 
@@ -241,19 +246,24 @@ Value make_response(const HttpsAnswer& a) {
 }
 
 void deliver() {
+    // Nothing in flight, nothing waiting: no answer can have come, and the engine is not asked (in the browser
+    // that is a crossing of the JavaScript boundary, which every frame of every program would pay).
+    if (s_ready.empty() && inflight() == 0)
+        return;
     std::vector<HttpsAnswer> answers;
     https_engine_collect(answers);
-    std::vector<std::pair<Value, Value>> ready;
-    for (auto& a : answers) {
-        int slot = find_by_id(a.id);
+    for (auto& a : answers)
+        s_ready.emplace_back(a.id, make_response(a));
+    while (!s_ready.empty()) {
+        std::pair<int, Value> item = std::move(s_ready.front());
+        s_ready.pop_front();
+        int slot = find_by_id(item.first);
         if (slot < 0)
             continue;   // cancelled meanwhile
         Value cb = s_reqs[slot].callback;
         free_req(slot);
-        ready.emplace_back(cb, make_response(a));
+        VM::current()->call_value(cb, item.second);
     }
-    for (auto& r : ready)
-        VM::current()->call_value(r.first, r.second);
 }
 
 // https.update() delivers by hand, for a program with NO render loop (a test, headless native). It does
@@ -356,6 +366,7 @@ void https_poll() {
 
 void https_reset() {
     https_engine_reset();
+    s_ready.clear();
     s_reqs.clear();
     s_free.clear();
     s_engine_driven = false;

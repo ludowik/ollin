@@ -54,6 +54,7 @@ const api = https.createServer(certificate(), (req, res) => {
   else if (u === '/redirect') { res.writeHead(302, { ...cors, location: '/hello' }); res.end() }
   else if (u === '/slow') { /* never answers */ }
   else if (u === '/echo') { res.writeHead(200, { ...cors, 'content-type': 'application/json' }); res.end(JSON.stringify({ x: req.headers['x-test'] || null })) }
+  else if (u === '/huge') { res.writeHead(200, { ...cors, 'content-type': 'text/plain' }); res.end('x'.repeat(17 * 1024 * 1024)) }
   else if (u === '/big') { res.writeHead(200, { ...cors, 'content-type': 'text/plain' }); res.end('x'.repeat(3 * 1024 * 1024)) }
   else { res.writeHead(500, cors); res.end('?') }
 })
@@ -78,6 +79,7 @@ func setup()
     https.get("${API}/slow", {timeout: 0.5}, func(r) note("slow", r) end)
     https.get("${API}/echo", {headers: {"X-Test": "abc"}}, func(r) note("echo", r) end)
     https.get("${API}/big", func(r) note("big", r) end)
+    https.get("${API}/huge", func(r) note("huge", r) end)
     var c = https.get("${API}/hello", func(r) note("cancelled", r) end)
     c.cancel()
     https.get("${API}/hello", func(r)
@@ -98,6 +100,7 @@ function check(results, API) {
   expect('slow', r.slow && !r.slow.ok && r.slow.error === 'timeout' && r.slow.status === 0, r.slow)
   expect('echo', r.echo && r.echo.ok && r.echo.head === '{"x":"abc"}', r.echo)
   expect('big', r.big && r.big.ok && r.big.len === 3 * 1024 * 1024, r.big)
+  expect('huge', r.huge && !r.huge.ok && r.huge.status === 0 && r.huge.error === 'response too large' && r.huge.len === 0, r.huge)
   expect('cancelled', r.cancelled === undefined, r.cancelled)
   expect('chain', r.chain1 && r.chain1.ok && r.chain2 && r.chain2.status === 404, [r.chain1, r.chain2])
   return failures
@@ -133,5 +136,5 @@ function check(results, API) {
     console.error('FAILED\n  ' + failures.join('\n  '))
     process.exit(1)
   }
-  console.log('https engine ok: 9 checks against a local HTTPS server')
+  console.log('https engine ok: 10 checks against a local HTTPS server')
 })()

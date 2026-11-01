@@ -38,6 +38,10 @@ std::string take_field(const char* name) {
             var s = String(window.__ollinHttps.cur[UTF8ToString($0)]);
             var bytes = new TextEncoder().encode(s);
             var ptr = _malloc(bytes.length + 1);
+            if (!ptr) {
+                HEAP32[$1 >> 2] = 0;
+                return 0;
+            }
             HEAPU8.set(bytes, ptr);
             HEAPU8[ptr + bytes.length] = 0;
             HEAP32[$1 >> 2] = bytes.length;
@@ -118,6 +122,10 @@ void https_engine_start(int id, const HttpsRequest& request) {
                             flatHeaders.push(v);
                         });
                         return r.text().then(function(t) {
+                            if (t.length > 16777216) {
+                                // The module's memory is fixed, and a body is copied into it whole.
+                                throw new Error('response too large');
+                            }
                             var rec = {};
                             rec.sent = 1;
                             rec.status = r.status;

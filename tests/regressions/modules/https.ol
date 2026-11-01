@@ -83,6 +83,25 @@ old.cancel()
 https.update()
 assert(chain[len(chain)] == "new", "cancelling through a stale handle did nothing")
 
+## ── A callback that raises an error does not make the other answers vanish ──
+var delivered = []
+var bad = https.get("https://example.org/bad", func(r)
+    throw "boom"
+end)
+var after = https.get("https://example.org/after", func(r)
+    delivered.push("after")
+end)
+var dropped = https.get("https://example.org/dropped", func(r)
+    delivered.push("dropped")
+end)
+assert(failure(func() https.update() end) == "boom", "the error reaches the caller of the delivery")
+assert(len(delivered) == 0 and bad.done() == true and after.done() == false, "the answer behind it waits")
+dropped.cancel()
+assert(dropped.done() == true, "a request whose answer is waiting can still be cancelled")
+https.update()
+assert(len(delivered) == 1 and delivered[1] == "after", "the next delivery runs what was left, minus what was cancelled")
+assert(after.done() == true)
+
 ## ── Options ────────────────────────────────────────────────────────────────
 var optionsRan = 0
 https.get("https://example.org/o", {headers: {Accept: "application/json", "X-Key": "k"}, timeout: 5}, func(r)

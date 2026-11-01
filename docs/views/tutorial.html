@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-01 21:19</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-01 21:23</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-01 21:19</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-01 21:23</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2855,7 +2855,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <span class="kw">end</span></code></pre>
 <div class="callout"><strong>Two kinds of failure.</strong> A mistake in the call — an address that is not <code>https://</code>, an option that does not exist, a callback missing — is an <strong>error raised at once</strong>. A failure of the exchange itself — no network, a server that does not answer — is <strong>not</strong>: the callback runs with <code>ok</code> false, <code>status</code> 0 and <code>error</code> telling why. A refusal by the server (404, 500…) is an answer like another: it has its <code>status</code> and its <code>body</code>, and <code>error</code> is <code>nil</code>.</div>
 <div class="callout"><strong>Only <code>https://</code>.</strong> <code>http://</code> is refused, and the certificate of the server is always checked. In the browser the request is made by the browser itself, so its rules apply: the server must <strong>allow this page to read its answer</strong> (CORS), or the callback gets <code>error</code> set and nothing else. No cookie is sent. Outside the browser every request fails at once with <code>"unsupported"</code>.</div>
-<div class="callout">At most <strong>32</strong> requests at a time. The answers arrive in the order in which they <strong>complete</strong>, not the order of the requests. A callback may start another request; its answer comes at the next delivery. Keep the request in a variable to <code>cancel()</code> it when it is no longer wanted (a new search replacing the previous one): its answer would otherwise reach the callback.</div>
+<div class="callout">At most <strong>32</strong> requests at a time, and an answer longer than about <strong>16 million characters</strong> is refused (<code>error</code> is <code>"response too large"</code>): the memory of the program is fixed. The answers arrive in the order in which they <strong>complete</strong>, not the order of the requests. A callback may start another request; its answer comes at the next delivery. Keep the request in a variable to <code>cancel()</code> it when it is no longer wanted (a new search replacing the previous one): its answer would otherwise reach the callback.</div>
 </section>
 
 <section id="json">

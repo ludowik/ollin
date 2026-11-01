@@ -16,7 +16,8 @@
 // json.stringify(value [, indent]) writes them back.
 //
 //   object -> map, array -> array, string -> string, true/false -> bool, null -> nil,
-//   a number without fraction or exponent -> int (a double when it does not fit in 64 bits), any other -> float.
+//   a number without fraction or exponent -> int (a double when it does not fit in 64 bits), any other -> float
+//   (a text whose value is too large for a double, 1e999, is refused: the language has no value for it).
 //
 // A nil inside an array is written as null and read back as nil. A nil value in a map is not stored
 // at all (a map has no nil), so a key read as null is simply absent.
@@ -178,7 +179,10 @@ struct Parser {
             if (errno == 0)
                 return Value((int64_t)v);
         }
-        return Value(std::strtod(text.c_str(), nullptr));
+        double d = std::strtod(text.c_str(), nullptr);
+        if (!std::isfinite(d))
+            fail("number out of range");   // 1e999: the language has no value for it
+        return Value(d);
     }
 
     Value value(int depth) {
