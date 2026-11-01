@@ -507,6 +507,14 @@
       "loop": 25739958,
       "map": 46842690,
       "subject": "Ten engine commits: indexed writes read their operands in place, GET_INDEXK/SET_INDEXK and CONCAT, a frame holds its closure, run_goto keeps a pointer to its registers, the string table hashes once, the map cache survives an overwrite, float and compare-and-jump paths"
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "43a7c86",
+      "fib": 51374192,
+      "loop": 25756267,
+      "map": 46796485,
+      "subject": "The class of an object is a slot of its map (set by the engine, no longer a data key), one is_instance for the class link test"
     }
   ]
 }
