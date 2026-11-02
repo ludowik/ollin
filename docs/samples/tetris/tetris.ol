@@ -17,6 +17,7 @@
 import "rules.ol"
 import "sounds.ol"
 import "play.ol"
+import "pictures.ol"
 import "../lib/draw.ol"
 
 ## How it looks: the four greens of the screen, and where a few things sit on it.
@@ -42,231 +43,25 @@ global look = {
 
 ## ── Pictures ───────────────────────────────────────────────────────────────────────────────────────
 
-## The pictures are drawn as the handheld draws them, a point at a time, from rows of text: ' ' is the lightest green,
-## '.' the next, '+' the next and '#' the darkest, and '_' leaves the point as it is.
-func inkOf(ch)
-    if ch == " " then
-        return 1
-    elseif ch == "." then
-        return 2
-    elseif ch == "+" then
-        return 3
-    elseif ch == "#" then
-        return 4
-    end
-    return 0
-end
-
-## The rectangles {x, y, w, h, shade} that paint a picture: a run of one green is one rectangle, and the same run in
-## the rows below makes it taller, so that a picture costs few rectangles.
-func pictureRects(rows)
-    var out = []
-    var open = {}
-    for j = 1, len(rows) do
-        var row = rows[j]
-        var n = len(row)
-        var fresh = {}
-        var i = 1
-        while i <= n do
-            var ch = row.char(i)
-            var shade = inkOf(ch)
-            var k = i
-            while k < n and row.char(k + 1) == ch do
-                k += 1
-            end
-            if shade > 0 then
-                var key = "{i},{k},{shade}"
-                var rect = open[key]
-                if rect then
-                    rect[4] += 1
-                else
-                    rect = [i - 1, j - 1, k - i + 1, 1, shade]
-                    out.push(rect)
-                end
-                fresh[key] = rect
-            end
-            i = k + 1
-        end
-        open = fresh
-    end
-    return out
-end
-
-## The rows of a framed box: its four corners are the same `corner` picture turned over, and between them the frame is
-## `rings`, one character a point from the outside in, with `inside` in the middle.
-func boxRows(w, h, corner, rings, inside)
-    var n = len(corner)
-    var rows = []
-    for j = 0, h - 1 do
-        var jj = math.min(j, h - 1 - j)
-        var row = ""
-        for i = 0, w - 1 do
-            var ii = math.min(i, w - 1 - i)
-            var ch = inside
-            if ii < n and jj < n then
-                ch = corner[jj + 1].char(ii + 1)
-            elseif math.min(ii, jj) < len(rings) then
-                ch = rings.char(math.min(ii, jj) + 1)
-            end
-            row = row + ch
-        end
-        rows.push(row)
-    end
-    return rows
-end
-
-func borderOn(sides, bit)
-    return (sides & bit) <> 0
-end
-
-## How each piece's block is painted in its 8 by 8 points. The shades are told apart by their pattern as well as by
-## their darkness, as on the handheld. The long piece is a stipple that has a dark edge only where the piece ends:
-## stipple[sides + 1] is it with the edges 1 left, 2 right, 4 top and 8 bottom.
-look.dots = ["..+..+", "+.....", "...+.+", ".+....", ".....+", "+.+...", "....+.", ".+...."]
+## The pictures of pictures.ol, as the rectangles that paint them. The long piece has a block for each of its 16 sets of
+## edges (look.stipple[sides + 1], the sides being 1 left, 2 right, 4 top and 8 bottom), the others one block each.
 look.stipple = []
 for sides = 0, 15 do
-    var rows = []
-    for j = 1, 8 do
-        var row = ""
-        for i = 1, 8 do
-            var ch = "."
-            if i > 1 and i < 8 then
-                ch = look.dots[j].char(i - 1)
-            end
-            if (i == 1 and borderOn(sides, 1)) or (i == 8 and borderOn(sides, 2)) then
-                ch = "#"
-            end
-            if (j == 1 and borderOn(sides, 4)) or (j == 8 and borderOn(sides, 8)) then
-                ch = "#"
-            end
-            row = row + ch
-        end
-        rows.push(row)
-    end
-    look.stipple[sides + 1] = pictureRects(rows)
+    look.stipple[sides + 1] = pictureRects(STIPPLE_ROWS["{sides}"] or stippleRows(STIPPLE_DOTS, sides))
 end
-## The six cells the handheld shows of it, a bar standing (its top, a middle, its bottom) and a bar lying (its left end,
-## a middle, its right end), with the dots exactly where it puts them.
-look.stipple[8] = pictureRects([
-    "########", "#...+..#", "#.+...+#", "#......#", "#+..+..#", "#.....+#", "#.+.+..#", "#......#"
-])
-look.stipple[4] = pictureRects([
-    "#..+..+#", "#+.....#", "#...+.+#", "#.+....#", "#.....+#", "#+.+...#", "#....+.#", "#.+....#"
-])
-look.stipple[12] = pictureRects([
-    "#.....+#", "#..+...#", "#+...+.#", "#..+...#", "#+....+#", "#...+..#", "#.+....#", "########"
-])
-look.stipple[14] = pictureRects([
-    "########", "#.+..+..", "#.......", "#+..+.+.", "#.......", "#.+...+.", "#...+...", "########"
-])
-look.stipple[13] = pictureRects([
-    "########", "+.+.+...", "......+.", "..+.....", "+....+..", "...+...+", ".+...+..", "########"
-])
-look.stipple[15] = pictureRects([
-    "########", "+...+..#", "..+....#", ".....+.#", ".+.+...#", "......+#", "..+.+..#", "########"
-])
 look.blocks = []
 look.blocks[Piece.I] = []
-look.blocks[Piece.O] = pictureRects([
-    "########", "#      #", "# #### #", "# #### #", "# #### #", "# #### #", "#      #", "########"
-])
-look.blocks[Piece.T] = pictureRects([
-    "########", "#......#", "#.    .#", "#. ..#.#", "#. ..#.#", "#.####.#", "#......#", "########"
-])
-look.blocks[Piece.S] = pictureRects([
-    "########", "#++++++#", "#+####+#", "#+#  #+#", "#+#  #+#", "#+####+#", "#++++++#", "########"
-])
-look.blocks[Piece.Z] = pictureRects([
-    "########", "#......#", "#......#", "#..##..#", "#..##..#", "#......#", "#......#", "########"
-])
-look.blocks[Piece.J] = pictureRects([
-    "########", "#++++++#", "#++++++#", "#++++++#", "#++++++#", "#++++++#", "#++++++#", "########"
-])
-look.blocks[Piece.L] = pictureRects([
-    "########", "#++++++#", "#++  ++#", "#+    +#", "#+    +#", "#++  ++#", "#++++++#", "########"
-])
-
-## The handheld's letters and digits, 6 points wide and 6 high on a pitch of 8; '#' is ink, '_' is not.
+look.blocks[Piece.O] = pictureRects(BLOCK_ROWS.O)
+look.blocks[Piece.T] = pictureRects(BLOCK_ROWS.T)
+look.blocks[Piece.S] = pictureRects(BLOCK_ROWS.S)
+look.blocks[Piece.Z] = pictureRects(BLOCK_ROWS.Z)
+look.blocks[Piece.J] = pictureRects(BLOCK_ROWS.J)
+look.blocks[Piece.L] = pictureRects(BLOCK_ROWS.L)
 look.font = {}
-for g in [
-    ["S", "_####_", "##____", "_####_", "___###", "#__###", "_####_"],
-    ["C", "_####_", "##__##", "##____", "##____", "##__##", "_####_"],
-    ["O", "_####_", "##__##", "##__##", "##__##", "##__##", "_####_"],
-    ["R", "#####_", "##__##", "##__##", "#####_", "##_#__", "##__##"],
-    ["E", "######", "##____", "#####_", "##____", "##____", "######"],
-    ["L", "##____", "##____", "##____", "##____", "##____", "######"],
-    ["V", "#___##", "#___##", "#___##", "#___##", "_#_##_", "__##__"],
-    ["I", "_####_", "__##__", "__##__", "__##__", "__##__", "_####_"],
-    ["N", "#___##", "##__##", "###_##", "#_####", "#__###", "#___##"],
-    ["0", "_####_", "##__##", "##__##", "##__##", "##__##", "_####_"],
-    ["1", "__##__", "_###__", "__##__", "__##__", "__##__", "_####_"],
-    ["2", "_####_", "#__###", "___###", "_####_", "###___", "######"],
-    ["3", "#####_", "___###", "_####_", "___###", "___###", "#####_"],
-    ["4", "___##_", "__###_", "_#_##_", "#__##_", "######", "___##_"],
-    ["5", "######", "##____", "#####_", "___###", "#__###", "_####_"],
-    ["6", "_####_", "##____", "#####_", "##__##", "##__##", "_####_"],
-    ["7", "######", "____##", "___##_", "__##__", "_##___", "_##___"],
-    ["8", "_####_", "##__##", "_####_", "##__##", "##__##", "_####_"],
-    ["9", "_####_", "#__###", "#__###", "_#####", "___###", "_####_"]
-] do
-    look.font[g[1]] = pictureRects([g[2], g[3], g[4], g[5], g[6], g[7]])
+for ch, rows in FONT_ROWS do
+    look.font[ch] = pictureRects(rows)
 end
-
-func addPicture(art, rects, ox, oy)
-    for r in rects do
-        art.push([ox + r[1], oy + r[2], r[3], r[4], r[5]])
-    end
-end
-
-## The rectangles of a text in that font.
-func textRects(str)
-    var out = []
-    for i = 1, len(str) do
-        var glyph = look.font[str.char(i)]
-        if glyph then
-            addPicture(out, glyph, (i - 1) * 8, 0)
-        end
-    end
-    return out
-end
-
-## What the screen of a game shows whatever happens: the wall of bricks, the well, and the panel with its frames and
-## its three words. The panel is a dark ground with a light line at its edge, boxes framed in a light and a mid-dark
-## line, a ribbon of the same behind the score, and the box of the next piece, framed in four greens.
-look.wallTile = pictureRects(["_# __# _", "_#___#__", "########", " __# __#", "___#___#", "########"])
-look.panelCorner = ["_   ", "  ++", " ++ ", " +  "]
-look.nextCorner = ["__...", "_.   ", ".  .+", ". .+#", ". +# "]
-
-func addWall(art, x)
-    art.push([x, 0, 8, 144, 2])
-    for t = 0, 23 do
-        addPicture(art, look.wallTile, x, t * 6)
-    end
-end
-
-func buildArt()
-    var art = []
-    art.push([0, 0, 160, 144, 4])
-    art.push([7, 0, 1, 144, 1])
-    addWall(art, 8)
-    art.push([16, 0, 80, 144, 1])
-    addWall(art, 96)
-    art.push([104, 0, 1, 144, 1])
-    art.push([104, 13, 56, 1, 1])
-    art.push([105, 14, 55, 7, 3])
-    art.push([104, 21, 56, 14, 1])
-    art.push([105, 22, 55, 1, 3])
-    art.push([105, 33, 55, 1, 3])
-    addPicture(art, pictureRects(boxRows(46, 14, look.panelCorner, " +", " ")), 109, 5)
-    addPicture(art, pictureRects(boxRows(46, 22, look.panelCorner, " +", " ")), 109, 45)
-    addPicture(art, pictureRects(boxRows(46, 22, look.panelCorner, " +", " ")), 109, 69)
-    addPicture(art, pictureRects(boxRows(42, 42, look.nextCorner, ". +#", " ")), 115, 99)
-    addPicture(art, textRects("SCORE"), 113, 9)
-    addPicture(art, textRects("LEVEL"), 113, 49)
-    addPicture(art, textRects("LINES"), 113, 73)
-    return art
-end
-look.art = buildArt()
+look.art = screenArt(look.font)
 
 ## What belongs to the screen and the fingers, not to the game.
 global view = {
@@ -475,31 +270,34 @@ func box(x, y, w, h, outside = 1)
     block(x + w - 1, y + h - 1, 1, 1, outside)
 end
 
-func hasCell(cells, x, y)
-    for c in cells do
-        if c[1] == x and c[2] == y then
-            return true
-        end
-    end
-    return false
-end
-
-## The edges of a cell of the long piece: those with no cell of the piece beside them.
-func cellSides(cells, c)
+## The edges of a cell of the long piece (1 left, 2 right, 4 top, 8 bottom): those with no cell of that piece beside
+## them, `there(x, y)` telling whether one is at a place.
+func edgeSides(x, y, there)
     var sides = 0
-    if not hasCell(cells, c[1] - 1, c[2]) then
+    if not there(x - 1, y) then
         sides += 1
     end
-    if not hasCell(cells, c[1] + 1, c[2]) then
+    if not there(x + 1, y) then
         sides += 2
     end
-    if not hasCell(cells, c[1], c[2] - 1) then
+    if not there(x, y - 1) then
         sides += 4
     end
-    if not hasCell(cells, c[1], c[2] + 1) then
+    if not there(x, y + 1) then
         sides += 8
     end
     return sides
+end
+
+func cellSides(cells, c)
+    return edgeSides(c[1], c[2], func(x, y)
+        for other in cells do
+            if other[1] == x and other[2] == y then
+                return true
+            end
+        end
+        return false
+    end)
 end
 
 func drawPiece(kind, turn, px, py)
@@ -509,26 +307,10 @@ func drawPiece(kind, turn, px, py)
     end
 end
 
-func isLong(c, r)
-    return c >= 0 and c < COLS and r >= 0 and r < ROWS and game.well[wellIdx(c, r)] == Piece.I
-end
-
-## The edges of a cell of the long piece in the well: those with no other such cell beside them.
 func wellSides(c, r)
-    var sides = 0
-    if not isLong(c - 1, r) then
-        sides += 1
-    end
-    if not isLong(c + 1, r) then
-        sides += 2
-    end
-    if not isLong(c, r - 1) then
-        sides += 4
-    end
-    if not isLong(c, r + 1) then
-        sides += 8
-    end
-    return sides
+    return edgeSides(c, r, func(x, y)
+        return x >= 0 and x < COLS and y >= 0 and y < ROWS and game.well[wellIdx(x, y)] == Piece.I
+    end)
 end
 
 func drawWell()
