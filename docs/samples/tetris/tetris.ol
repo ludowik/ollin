@@ -28,7 +28,7 @@ global look = {
         [Piece.I, 14, 48], [Piece.O, 54, 48], [Piece.T, 78, 48], [Piece.Z, 110, 44],
         [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]
     ],
-    nextBox: {x: 108, y: 98, w: 48, h: 40},
+    nextBox: {x: 108, y: 98, w: 48, h: 42},
     shade: [
         [0.608, 0.737, 0.059, 1],   ## the lightest green, the screen itself
         [0.545, 0.675, 0.059, 1],
@@ -44,8 +44,15 @@ global look = {
 ## How each piece's block is painted in its 8 by 8 points: rectangles {x, y, w, h, shade}, drawn in order. The
 ## shades are told apart by their pattern as well as by their darkness, as on the handheld.
 look.blocks = []
-look.blocks[Piece.I] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 1], [2, 2, 4, 4, 4]]
-look.blocks[Piece.O] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 3], [2, 2, 2, 2, 1]]
+look.blocks[Piece.I] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 1]]
+for dy = 1, 6 do
+    for dx = 1, 6 do
+        if (dx + dy) % 2 == 0 then
+            look.blocks[Piece.I].push([dx, dy, 1, 1, 3])
+        end
+    end
+end
+look.blocks[Piece.O] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 1]]
 look.blocks[Piece.T] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 2], [3, 3, 2, 2, 4]]
 look.blocks[Piece.S] = [[0, 0, 8, 8, 3], [1, 1, 6, 6, 4], [2, 2, 3, 3, 2]]
 look.blocks[Piece.Z] = [[0, 0, 8, 8, 4], [1, 1, 6, 6, 1], [1, 1, 6, 2, 3]]
@@ -240,10 +247,14 @@ func drawBlock(px, py, kind)
     end
 end
 
-## A frame of one dark point round a lighter inside.
-func box(x, y, w, h)
+## A frame of one dark point round a lighter inside, its four corners rounded off in the green `outside` it stands on.
+func box(x, y, w, h, outside = 1)
     block(x, y, w, h, 4)
     block(x + 1, y + 1, w - 2, h - 2, 1)
+    block(x, y, 1, 1, outside)
+    block(x + w - 1, y, 1, 1, outside)
+    block(x, y + h - 1, 1, 1, outside)
+    block(x + w - 1, y + h - 1, 1, 1, outside)
 end
 
 ## The brick wall at either side of the well.
@@ -295,25 +306,28 @@ func drawCurtain()
     end
 end
 
+## A box of the panel holding a title and, under it, a number: the handheld writes the numbers as they are, with no
+## zeros in front.
+func panelBox(title, value, y, h)
+    box(108, y, 48, h, 2)
+    label(title, 132, y + 7, 8, 4)
+    label("{value}", 132, y + h - 6, 8, 4)
+end
+
 func drawPanel()
-    box(108, 8, 48, 24)
-    label("LEVEL", 132, 15, 8, 4)
-    label("{game.level:02d}", 132, 25, 8, 4)
-    box(108, 36, 48, 24)
-    label("LINES", 132, 43, 8, 4)
-    label("{linesShown():03d}", 132, 53, 8, 4)
-    box(108, 64, 48, 28)
-    label("SCORE", 132, 72, 8, 4)
-    label("{game.score:06d}", 132, 83, 8, 4)
+    var edge = look.wellX + COLS * 8 + 8
+    block(edge, 0, look.screenW - edge, look.screenH, 2)
+    panelBox("SCORE", game.score, 6, 28)
+    panelBox("LEVEL", game.level, 40, 24)
+    panelBox("LINES", linesShown(), 68, 24)
     var nb = look.nextBox
-    box(nb.x, nb.y, nb.w, nb.h)
-    label("NEXT", nb.x + nb.w / 2, nb.y + 7, 8, 4)
+    box(nb.x, nb.y, nb.w, nb.h, 2)
     if game.state <> "paused" then
         var x0, x1, y0, y1 = shapeBounds(game.next, 1)
         var w = (x1 - x0 + 1) * 8
         var h = (y1 - y0 + 1) * 8
         var cx = nb.x + (nb.w - w) / 2 - x0 * 8
-        var cy = nb.y + 12 + (nb.h - 12 - h) / 2 - y0 * 8
+        var cy = nb.y + (nb.h - h) / 2 - y0 * 8
         drawPiece(game.next, 1, cx, cy)
     end
 end
@@ -341,7 +355,7 @@ func drawWellText()
 end
 
 func drawGame()
-    drawWall(0)
+    block(0, 0, 8, ROWS * 8, 3)
     drawWall(8)
     drawWall(look.wellX + COLS * 8)
     block(look.wellX, 0, COLS * 8, ROWS * 8, 1)
