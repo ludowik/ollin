@@ -185,9 +185,7 @@ func drawPanel()
     drawNumber(game.score, 4, SCORE_CARD.y + 20)
     drawNumber(game.level, 3, LEVEL_CARD.y + 12)
     drawNumber(linesShown(), 3, LINES_CARD.y + 12)
-    if game.state <> "paused" then
-        drawPiece(game.next, 1, NEXT_GRID.x, NEXT_GRID.y)
-    end
+    drawPiece(game.next, 1, NEXT_GRID.x, NEXT_GRID.y)
 end
 
 ## The words in the well: PAUSE, and GAME OVER once the curtain is down.

@@ -131,9 +131,7 @@ func modernCards(f)
     modernCard(f.level, f.c, "LEVEL", "{game.level}")
     modernCard(f.lines, f.c, "LINES", "{linesShown()}")
     modernCard(f.next, f.c, "NEXT", nil)
-    if game.state <> "paused" then
-        modernPiece(game.next, 1, f.gridX, f.gridY, f.c)
-    end
+    modernPiece(game.next, 1, f.gridX, f.gridY, f.c)
 end
 
 ## The words in the well: PAUSE, and the end of a game once the curtain is down.
