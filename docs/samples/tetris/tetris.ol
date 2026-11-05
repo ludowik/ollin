@@ -14,11 +14,13 @@
 ## is what the player touches: the keyboard and the pads, where the picture goes, and the style it is seen in. There
 ## are two, the same game in both: the ORIGINAL (style_gb.ol), the screen of the handheld in 160 by 144 points scaled to
 ## fit the area (graphics.fitArea), and the MODERN (style_modern.ol), in the very same places. A style only reads the
-## state of the game; V or the STYLE pad changes it, and the one chosen is kept for the next run.
+## state of the game; V or the STYLE pad changes it, and the one chosen is kept for the next run. So is the game
+## itself (save.ol): a run begins on the screen the last one left, in pause if a game was on.
 
 import "rules.ol"
 import "sounds.ol"
 import "play.ol"
+import "save.ol"
 import "places.ol"
 import "style_gb.ol"
 import "style_modern.ol"
@@ -232,6 +234,7 @@ func setup()
     graphics.canvas(W, H, "Tetris")
     graphics.fitArea()
     gameInit()
+    loadGame()
     loadStyle()
     layoutCompute()
 end
@@ -240,6 +243,7 @@ func update(dt)
     readInput()
     layoutCompute()
     advance(dt)
+    autosave()
 end
 
 func draw()

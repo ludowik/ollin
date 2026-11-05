@@ -29,9 +29,10 @@ constexpr int k_max_depth = 200;   // deeper than any real document, shallower t
 struct Parser {
     const std::string& s;
     size_t i = 0;
+    const char* who = "json.parse";   // names the caller in the errors: data.get reads values with this parser too
 
     [[noreturn]] void fail(const std::string& what) const {
-        throw std::runtime_error("json.parse: " + what + " at position " + std::to_string(i + 1));
+        throw std::runtime_error(std::string(who) + ": " + what + " at position " + std::to_string(i + 1));
     }
 
     void skip_space() {
@@ -296,9 +297,9 @@ void escape(const std::string& s, std::string& out) {
 }
 
 // The shortest text that reads back as the same double, so that 0.1 stays 0.1 and not 0.1000000000000000055.
-std::string number_text(double d) {
+std::string number_text(double d, const char* who) {
     if (!std::isfinite(d))
-        throw std::runtime_error("json.stringify: a number that is not finite has no JSON form");
+        throw std::runtime_error(std::string(who) + ": a number that is not finite has no JSON form");
     char buf[40];
     for (int digits = 15; digits <= 17; digits++) {
         std::snprintf(buf, sizeof buf, "%.*g", digits, d);
@@ -314,6 +315,7 @@ std::string number_text(double d) {
 struct Writer {
     std::string out;
     int indent;   // spaces per level, 0 = compact
+    const char* who = "json.stringify";   // names the caller in the errors, as for the Parser
 
     void newline(int depth) {
         if (indent == 0)
@@ -324,7 +326,7 @@ struct Writer {
 
     void write(const Value& v, int depth) {
         if (depth > k_max_depth)
-            throw std::runtime_error("json.stringify: nested too deeply (or the value contains itself)");
+            throw std::runtime_error(std::string(who) + ": nested too deeply (or the value contains itself)");
         if (v.is_nil()) {
             out += "null";
         } else if (v.is_bool()) {
@@ -332,7 +334,7 @@ struct Writer {
         } else if (v.is_integer()) {
             out += std::to_string(v.as_int());
         } else if (v.is_float()) {
-            out += number_text(v.as_float());
+            out += number_text(v.as_float(), who);
         } else if (v.is_string()) {
             escape(v.as_string(), out);
         } else if (v.is_array()) {
@@ -355,7 +357,7 @@ struct Writer {
             std::vector<std::pair<std::string, Value>> fields;
             for (auto& kv : v.mptr->data) {
                 if (!kv.first.is_string())
-                    throw std::runtime_error("json.stringify: a map key must be a string, got " +
+                    throw std::runtime_error(std::string(who) + ": a map key must be a string, got " +
                                              std::string(kv.first.type_name()));
                 fields.emplace_back(kv.first.as_string(), kv.second);
             }
@@ -378,7 +380,7 @@ struct Writer {
             newline(depth);
             out += '}';
         } else {
-            throw std::runtime_error(std::string("json.stringify: cannot write a ") + v.type_name());
+            throw std::runtime_error(std::string(who) + ": cannot write a " + v.type_name());
         }
     }
 };
@@ -399,6 +401,21 @@ int json_stringify(CallCtx& ctx) {
 }
 
 } // namespace
+
+std::string json_encode(const Value& v, const char* who) {
+    Writer w{"", 0, who};
+    w.write(v, 0);
+    return w.out;
+}
+
+Value json_decode(const std::string& text, const char* who) {
+    Parser p{text, 0, who};
+    Value v = p.value(0);
+    p.skip_space();
+    if (p.i < text.size())
+        p.fail("unexpected text after the value");
+    return v;
+}
 
 Value make_json_module() {
     return MapBuilder().fn("parse", json_parse).fn("stringify", json_stringify).done();

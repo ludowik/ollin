@@ -1,4 +1,5 @@
 #include "data_module.h"
+#include "json_module.h"
 #include "value.h"
 #include "vm.h"
 #include <cstdio>
@@ -20,8 +21,10 @@ static std::map<std::string, std::string> s_store[2];   // [scope]: key to encod
 static std::string s_file[2];                            // native: one sidecar file per scope
 #endif
 
-// Typed encoding of a scalar Value to and from the stored string.
-// 'i'<integer>, 'f'<double>, 's'<raw>, 'b'<0|1>.
+// Typed encoding of a Value to and from the stored string.
+// 'i'<integer>, 'f'<double>, 's'<raw>, 'b'<0|1>, 'j'<JSON text> for an array or a map (nested as deep as JSON allows).
+// The JSON writes a map with its keys sorted, so the same value always gives the same text, which is what lets a write
+// of an unchanged value be skipped (data_set). A map comes back a plain map: a class instance is kept as its fields.
 // The 'b' prefix came with the boolean becoming a type of its own: `true` no longer being the
 // integer 1, it fell into the throw and data.set("flag", true) failed on a message that promised
 // booleans. A value written EARLIER as 'i1' reads back as an integer — which is what it was, and
@@ -38,7 +41,9 @@ static std::string encode_value(const Value& v) {
     }
     if (v.is_string())
         return std::string("s") + v.as_string();
-    throw std::runtime_error("data: value must be a number, string or boolean");
+    if (v.is_array() || v.tag == Value::T_MAP)
+        return std::string("j") + json_encode(v, "data.set");
+    throw std::runtime_error("data: value must be a number, string, boolean, array or map");
 }
 static Value decode_value(const std::string& enc) {
     if (enc.empty())
@@ -50,6 +55,13 @@ static Value decode_value(const std::string& enc) {
         return Value(std::stod(rest));
     if (enc[0] == 'b')
         return Value::make_bool(rest == "1");
+    if (enc[0] == 'j') {
+        try {
+            return json_decode(rest, "data.get");
+        } catch (const std::runtime_error&) {
+            return Value();   // a stored text that is no longer valid reads as a missing key, as a damaged file does
+        }
+    }
     return Value(rest);   // 's': a raw string
 }
 
@@ -188,10 +200,17 @@ static Value data_set(int scope, Value* args, int argc) {
     if (argc < 2 || !args[0].is_string())
         throw std::runtime_error("data.set: expected a string key and a value");
     const std::string& k = args[0].as_string();
-    if (args[1].is_nil())
-        s_store[scope].erase(k);
-    else
-        s_store[scope][k] = encode_value(args[1]);
+    auto it = s_store[scope].find(k);
+    if (args[1].is_nil()) {
+        if (it == s_store[scope].end())
+            return Value();
+        s_store[scope].erase(it);
+    } else {
+        std::string enc = encode_value(args[1]);
+        if (it != s_store[scope].end() && it->second == enc)
+            return Value();   // nothing changed: the blob is not written again (a game saves twice a second)
+        s_store[scope][k] = enc;
+    }
     persist(scope);
     return Value();
 }

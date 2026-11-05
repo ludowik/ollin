@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-02 18:19</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-05 20:21</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-02 18:19</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-05 20:21</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2744,7 +2744,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 
 <section id="data">
 <h2>The <code>data</code> module</h2>
-<p>It persists <strong>settings and variables from one run to the next</strong>. Two scopes: <code>data</code> (belonging to the <strong>project</strong>, isolated) and <code>data.shared</code> (<strong>shared</strong> between every project). The values are numbers, strings and booleans. Available without any <code>import</code>. Persistence is automatic — localStorage on the web, a file beside the script natively.</p>
+<p>It persists <strong>settings and variables from one run to the next</strong>. Two scopes: <code>data</code> (belonging to the <strong>project</strong>, isolated) and <code>data.shared</code> (<strong>shared</strong> between every project). A value is a number, a string, a boolean, or an <strong>array or map</strong> of such values, as deep as needed (<code>data.set("game", {score: 120, well: [0, 1, 0]})</code>). What goes in and what comes out are <strong>copies</strong>: changing the array you read does not change what is kept until you <code>set</code> it again. A <code>nil</code> inside a map is dropped, one inside an array keeps its place, and an instance of a class is kept as a plain map of its fields. Functions, classes, cycles, non-finite numbers and maps with a non-string key are refused with an error. A value that did not change is not written again. Available without any <code>import</code>. Persistence is automatic — localStorage on the web, a file beside the script natively.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>

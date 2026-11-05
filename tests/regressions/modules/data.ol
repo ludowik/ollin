@@ -62,3 +62,66 @@ assert(len(data.keys()) == 0 and not data.has("pk"))
 
 ## the shared store lists its keys too (read only: it is a single file of the machine, never cleared here)
 assert(typeof(data.shared.keys()) == "array")
+
+## ── data: arrays and maps ──────────────────────────────────────────────────────────────────────────
+## A value is no longer a scalar only: an array or a map is kept whole, to any depth, and comes back as a copy of what was
+## written — changing one afterwards changes the other no more. (A game keeps its whole state this way.)
+data.clear()
+data.set("list", [1, 2.5, "x", true, nil, [3, 4], {k: 1}])
+var list = data.get("list")
+assert(len(list) == 7 and list[1] == 1 and list[3] == "x" and list[4] == true and list[5] == nil)
+assert(typeof(list[1]) == "int" and typeof(list[2]) == "float", "an integer stays an integer, a float a float")
+assert(list[2] == 2.5 and list[6][2] == 4 and list[7].k == 1)
+var two = 4 / 2                                  ## a division gives a float even when the value is whole (a literal 2.0 is an integer)
+assert(typeof(two) == "float")
+data.set("whole", [two, 2])
+assert(typeof(data.get("whole")[1]) == "float" and typeof(data.get("whole")[2]) == "int", "a whole float stays a float in an array")
+data.set("tree", {n: 1, s: "t", deep: {list: [1, [2, [3]]], flag: false}})
+var tree = data.get("tree")
+assert(tree.n == 1 and tree.s == "t" and tree.deep.list[2][2][1] == 3 and tree.deep.flag == false)
+assert(typeof(tree) == "map" and typeof(tree.deep.list) == "array")
+
+## Copies: the one read is not the store, and the one written is not either.
+tree.n = 99
+tree.deep.list[1] = 100
+assert(data.get("tree").n == 1 and data.get("tree").deep.list[1] == 1, "a value read changed the store")
+var source = [1, 2, 3]
+data.set("source", source)
+source[1] = 50
+assert(data.get("source")[1] == 1, "a value written changed after it was kept")
+
+## Empty ones are values, not absences; a nil in a map is no value and a nil in an array keeps its place.
+data.set("e1", [])
+data.set("e2", {})
+assert(data.has("e1") and data.has("e2") and len(data.get("e1")) == 0 and len(data.get("e2")) == 0)
+data.set("withNil", {a: 1, b: nil})
+assert(data.get("withNil").a == 1 and data.get("withNil").b == nil and len(data.get("withNil")) == 1)
+data.set("arrNil", [nil, 2, nil])
+assert(len(data.get("arrNil")) == 3 and data.get("arrNil")[1] == nil and data.get("arrNil")[2] == 2)
+
+## A string of any kind inside, and a key that is not an identifier.
+var odd = "q" + string.fromCode(34) + string.fromCode(92) + string.fromCode(10) + "é"
+data.set("odd", {[odd]: [odd], "a b": 1})
+assert(data.get("odd")[odd][1] == odd and data.get("odd")["a b"] == 1)
+
+## A class instance is kept as its fields, and what comes back is a plain map.
+class Point
+    func init(x, y)
+        self.x = x
+        self.y = y
+    end
+end
+data.set("pt", Point(3, 4))
+var pt = data.get("pt")
+assert(pt.x == 3 and pt.y == 4 and typeof(pt) == "map")
+
+## Both scopes, and a value replaced by one of another sort.
+data.shared.set("sharedList", [1, 2])
+assert(data.shared.get("sharedList")[2] == 2 and not data.has("sharedList"))
+data.shared.delete("sharedList")
+data.set("swap", [1, 2])
+data.set("swap", "now a string")
+assert(data.get("swap") == "now a string")
+data.set("swap", {a: 1})
+assert(data.get("swap").a == 1)
+data.clear()

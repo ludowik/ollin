@@ -759,9 +759,23 @@ check_error "data.set with a non-string key" \
     'data.set(1, 2)' \
     "data.set: expected a string key and a value"
 
-check_error "data.set with a value that is not a scalar" \
-    'data.set("k", [1])' \
-    "data: value must be a number, string or boolean"
+check_error "data.set with a value that cannot be kept" \
+    'data.set("k", func() end)' \
+    "data: value must be a number, string, boolean, array or map"
+
+check_error "data.set with a function inside an array" \
+    'data.set("k", [1, func() end])' \
+    "data.set: cannot write a function"
+
+check_error "data.set with a map that has a key that is not a string" \
+    'data.set("k", {[1]: 2})' \
+    "data.set: a map key must be a string, got int"
+
+check_error "data.set with a value that contains itself" \
+    'var a = []
+a.push(a)
+data.set("k", a)' \
+    "data.set: nested too deeply (or the value contains itself)"
 
 check_error "data.has with a non-string key" \
     'data.has(nil)' \
