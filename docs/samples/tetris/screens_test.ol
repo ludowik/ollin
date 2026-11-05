@@ -37,7 +37,10 @@ end
 ## The title: the name, the seven pieces each once, START while it shows, and the hint of the key V.
 game.frame = 0
 var title = titleItems("V  MODERN STYLE")
-assert(title[1].text == "TETRIS" and title[1].size == 24)
+assert(title[1].text == "TETRIS" and title[1].size == 24 and title[1].logo == true)
+for it in title do
+    assert(it == title[1] or it.logo == nil, "only the name of the game is the logo")
+end
 var seen = {}
 var pieces = 0
 for it in title do

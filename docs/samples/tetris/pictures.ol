@@ -1,6 +1,6 @@
 ## The pictures of the handheld's screen, with no drawing: how a picture written as rows of text becomes the
 ## rectangles that paint it, the data of the pictures (the blocks of the pieces, the letters and digits, the wall of
-## bricks, the corners of the frames), and the screen of a game that never changes. tetris.ol paints the rectangles;
+## bricks, the corners of the frames), and the screen of a game that never changes. style_gb.ol paints the rectangles;
 ## pictures_test.ol checks the pictures against a screenshot of the handheld.
 ##
 ## A picture is rows of text, one character a point: ' ' is the lightest green, '.' the next, '+' the next and '#' the

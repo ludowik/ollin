@@ -1,6 +1,6 @@
 ## What the three screens before the game say, with no drawing: the lists of items both styles paint, so that the
 ## original and the modern one show the same thing in the same places. The places are in points of a screen of 160 by
-## 144, a style scales them; an item is a label {text, x, y, size, dim}, a choice {text, x, y, w, h, size, lit} or a
+## 144, a style scales them; an item is a label {text, x, y, size, dim} (the name of the game also has `logo`), a choice {text, x, y, w, h, size, lit} or a
 ## piece {piece, x, y}. A label is centred on its place, a choice is the box that holds its text, and a piece is its
 ## 4 by 4 cells with the top left at its place. `lit` is the choice that is on, and the chosen one of the line the arrows
 ## are on blinks, so these lists change with the frame.
@@ -27,7 +27,9 @@ end
 
 ## The first screen: the name, and the pieces, until START.
 func titleItems(hint)
-    var items = [screenLabel("TETRIS", 80, 30, 24)]
+    var logo = screenLabel("TETRIS", 80, 30, 24)
+    logo.logo = true
+    var items = [logo]
     for item in [
         [Piece.I, 14, 48], [Piece.O, 54, 48], [Piece.T, 78, 48], [Piece.Z, 110, 44],
         [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]

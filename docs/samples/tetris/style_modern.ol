@@ -215,7 +215,7 @@ func modernItem(it, m)
         end
         drawText(it.text, m.x + (it.x + it.w / 2) * m.s, m.y + (it.y + it.h / 2) * m.s, it.size * m.s * 1.2,
             "center", "center", it.lit and modernLook.accentInk or modernLook.ink)
-    elseif it.text == "TETRIS" then
+    elseif it.logo then
         modernLogo(it, m)
     else
         drawText(it.text, m.x + it.x * m.s, m.y + it.y * m.s, it.size * m.s * 1.2, "center", "center",
