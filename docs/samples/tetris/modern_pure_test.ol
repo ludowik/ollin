@@ -55,18 +55,27 @@ for size in [[800, 600], [390, 700], [700, 700], [320, 288], [1920, 1080], [360,
             end
         end
     end
-    assert(f.wide == (w >= h * 0.95), "{w}x{h}")
 end
 
-## A tall area gives most of its width to the well.
-var tall = modernFrame(390, 700)
-assert(COLS * tall.c >= 390 * 0.8, "the well is {COLS * tall.c} points wide in 390")
-var taller = modernFrame(390, 900)
-assert(COLS * taller.c >= 390 * 0.8)
+## As in the original, whatever the shape: the cards in one column at the right of the well and level with its top,
+## the next piece at the bottom of the well, and the column's width and cell kept by the area.
+for size in [[800, 600], [390, 700], [700, 700], [320, 288], [1920, 1080], [360, 780], [100, 1000], [1000, 100], [40, 40]] do
+    var f = modernFrame(size[1], size[2])
+    var well = {x: f.wellX, y: f.wellY, w: COLS * f.c, h: ROWS * f.c}
+    assert(f.score.y == well.y and f.score.x >= well.x + well.w, "{size[1]}x{size[2]}: the score is not at the top right")
+    assert(f.level.x == f.score.x and f.lines.x == f.score.x and f.next.x == f.score.x)
+    assert(f.level.w == f.score.w and f.lines.w == f.score.w and f.next.w == f.score.w)
+    assert(f.score.y < f.level.y and f.level.y < f.lines.y and f.lines.y < f.next.y, "{size[1]}x{size[2]}: the order of the cards")
+    assert(f.next.y + f.next.h == well.y + well.h, "{size[1]}x{size[2]}: the next piece is not level with the bottom of the well")
+    assert(math.abs(f.wellY - (size[2] - well.h - f.wellY)) <= 1 or f.c == 1, "{size[1]}x{size[2]}: the well is not centred up and down")
+    assert(math.abs(f.wellX - (size[1] - (f.next.x + f.next.w) )) <= 1 or f.c == 1, "{size[1]}x{size[2]}: the well and the column are not centred across")
+    assert(f.c * 16.5 <= size[1] * 0.96 + 1 or f.c == 1, "{size[1]}x{size[2]}: the well and the column are wider than the area")
+end
 
-## The cell is as large as the area allows (here the height, 94 % of it, limits a wide area), and a tall one is the other mode.
+## The cell is as large as the area allows: the height of a wide area, the width of a tall one.
 assert(modernFrame(1920, 1080).c == 56)
-assert(modernFrame(1920, 1080).wide)
-assert(not modernFrame(390, 700).wide)
+assert(modernFrame(390, 700).c == math.floor(390 * 0.96 / 16.5))
+assert(modernFrame(390, 700).c < math.floor(700 * 0.94 / ROWS))
+assert(modernFrame(390, 900).c == modernFrame(390, 700).c, "a taller area does not make the well wider")
 
 print("tetris modern pure ok")
