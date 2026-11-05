@@ -1,5 +1,6 @@
 #include "module_utils.h"
 #include "modules.h"
+#include "utf8.h"
 #include "value.h"
 #include "vm.h"
 #include <algorithm>
@@ -69,24 +70,6 @@ struct Parser {
         return v;
     }
 
-    static void put_utf8(std::string& out, unsigned cp) {
-        if (cp < 0x80) {
-            out += (char)cp;
-        } else if (cp < 0x800) {
-            out += (char)(0xC0 | (cp >> 6));
-            out += (char)(0x80 | (cp & 0x3F));
-        } else if (cp < 0x10000) {
-            out += (char)(0xE0 | (cp >> 12));
-            out += (char)(0x80 | ((cp >> 6) & 0x3F));
-            out += (char)(0x80 | (cp & 0x3F));
-        } else {
-            out += (char)(0xF0 | (cp >> 18));
-            out += (char)(0x80 | ((cp >> 12) & 0x3F));
-            out += (char)(0x80 | ((cp >> 6) & 0x3F));
-            out += (char)(0x80 | (cp & 0x3F));
-        }
-    }
-
     std::string string_body() {
         // s[i] is the opening quote.
         i++;
@@ -131,7 +114,7 @@ struct Parser {
                 } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
                     fail("lone surrogate");
                 }
-                put_utf8(out, cp);
+                utf8_encode(cp, out);
                 break;
             }
             default:
@@ -260,14 +243,17 @@ struct Parser {
     }
 };
 
-int json_parse(CallCtx& ctx) {
-    const std::string& text = str_arg(ctx.args, ctx.argc, 0, "json.parse");
-    Parser p{text};
+Value decode_text(const std::string& text, const char* who) {
+    Parser p{text, 0, who};
     Value v = p.value(0);
     p.skip_space();
     if (p.i < text.size())
         p.fail("unexpected text after the value");
-    return ctx.ret(v);
+    return v;
+}
+
+int json_parse(CallCtx& ctx) {
+    return ctx.ret(decode_text(str_arg(ctx.args, ctx.argc, 0, "json.parse"), "json.parse"));
 }
 
 // ── stringify ────────────────────────────────────────────────────────────────────────────────────
@@ -354,14 +340,7 @@ struct Writer {
             out += ']';
         } else if (v.tag == Value::T_MAP) {
             // The keys are sorted: a map has no order, and the same value must give the same text.
-            std::vector<std::pair<std::string, Value>> fields;
-            for (auto& kv : v.mptr->data) {
-                if (!kv.first.is_string())
-                    throw std::runtime_error(std::string(who) + ": a map key must be a string, got " +
-                                             std::string(kv.first.type_name()));
-                fields.emplace_back(kv.first.as_string(), kv.second);
-            }
-            std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+            auto fields = sorted_string_entries(v, std::string(who) + ": a map key", true);
             if (fields.empty()) {
                 out += "{}";
                 return;
@@ -409,12 +388,7 @@ std::string json_encode(const Value& v, const char* who) {
 }
 
 Value json_decode(const std::string& text, const char* who) {
-    Parser p{text, 0, who};
-    Value v = p.value(0);
-    p.skip_space();
-    if (p.i < text.size())
-        p.fail("unexpected text after the value");
-    return v;
+    return decode_text(text, who);
 }
 
 Value make_json_module() {

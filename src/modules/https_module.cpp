@@ -49,12 +49,7 @@ int s_next_id = 1;   // never reset: an answer from before a reset must not meet
 bool s_engine_driven = false;
 
 int inflight() {
-    int n = 0;
-    for (auto& r : s_reqs) {
-        if (r.alive)
-            n++;
-    }
-    return n;
+    return (int)(s_reqs.size() - s_free.size());
 }
 
 void free_req(int slot) {
@@ -143,25 +138,11 @@ void check_header(const std::string& name, const Value& value, const char* fn) {
 // The options map: its keys are the only ones accepted, so that a misspelt option is an error and not a
 // setting that silently does nothing.
 void read_options(const Value& options, HttpsRequest& rq, const char* fn) {
-    std::vector<std::pair<std::string, Value>> entries;
-    for (auto& kv : options.mptr->data) {
-        if (!kv.first.is_string())
-            throw std::runtime_error(std::string(fn) + ": an option name must be a string");
-        entries.emplace_back(kv.first.as_string(), kv.second);
-    }
-    std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-    for (auto& e : entries) {
+    for (auto& e : sorted_string_entries(options, std::string(fn) + ": an option name")) {
         if (e.first == "headers") {
             if (!e.second.is_map())
                 throw std::runtime_error(std::string(fn) + ": headers must be a map, got " + e.second.type_name());
-            std::vector<std::pair<std::string, Value>> hs;
-            for (auto& kv : e.second.mptr->data) {
-                if (!kv.first.is_string())
-                    throw std::runtime_error(std::string(fn) + ": a header name must be a string");
-                hs.emplace_back(kv.first.as_string(), kv.second);
-            }
-            std::sort(hs.begin(), hs.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-            for (auto& h : hs) {
+            for (auto& h : sorted_string_entries(e.second, std::string(fn) + ": a header name")) {
                 check_header(h.first, h.second, fn);
                 rq.headers.emplace_back(h.first, h.second.as_string());
             }
@@ -213,9 +194,7 @@ int https_get(CallCtx& ctx) {
     const char* fn = "https.get";
     const std::string& url = str_arg(ctx.args, ctx.argc, 0, fn);
     int last = ctx.argc - 1;
-    if (ctx.argc < 2 || !ctx.args[last].is_callable())
-        throw std::runtime_error("https.get: expected (url [, options], callback)");
-    if (ctx.argc > 3)
+    if (ctx.argc < 2 || ctx.argc > 3 || !ctx.args[last].is_callable())
         throw std::runtime_error("https.get: expected (url [, options], callback)");
     HttpsRequest rq;
     rq.url = url;
@@ -242,9 +221,8 @@ int https_get(CallCtx& ctx) {
     r.alive = true;
     r.id = s_next_id++;
     r.callback = ctx.args[last];
-    int id = r.id;
     Value handle = make_handle(slot);
-    https_engine_start(id, rq);
+    https_engine_start(r.id, rq);
     return ctx.ret(handle);
 }
 
@@ -333,13 +311,7 @@ int https_query(CallCtx& ctx) {
     }
     if (url.empty())
         throw std::runtime_error("https.query: the address is empty");
-    std::vector<std::pair<std::string, Value>> fields;
-    for (auto& kv : ctx.args[1].mptr->data) {
-        if (!kv.first.is_string())
-            throw std::runtime_error("https.query: a field name must be a string");
-        fields.emplace_back(kv.first.as_string(), kv.second);
-    }
-    std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    auto fields = sorted_string_entries(ctx.args[1], "https.query: a field name");
     char sep = url.find('?') == std::string::npos ? '?' : '&';
     if (url.back() == '?' || url.back() == '&')
         sep = 0;

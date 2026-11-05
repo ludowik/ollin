@@ -1,7 +1,27 @@
 #pragma once
 #include "value.h"
 #include "vm.h"
+#include <algorithm>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+// The entries of a map whose keys are all strings, sorted by key: a map has no order, and the modules that write one out
+// (json, https) need the same text for the same value. A key that is not a string throws "<what> must be a string".
+// `say_type` appends the type found, for the callers whose message always did.
+static inline std::vector<std::pair<std::string, Value>> sorted_string_entries(const Value& map, const std::string& what,
+                                                                                bool say_type = false) {
+    std::vector<std::pair<std::string, Value>> entries;
+    for (auto& kv : map.mptr->data) {
+        if (!kv.first.is_string())
+            throw std::runtime_error(what + " must be a string" +
+                                     (say_type ? std::string(", got ") + kv.first.type_name() : std::string()));
+        entries.emplace_back(kv.first.as_string(), kv.second);
+    }
+    std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    return entries;
+}
 
 // The parser desugars `ref x` into {__ref: true, get: func, set: func} (parser.cpp, ref_expr),
 // and a native module reads and writes the referenced variable through those two closures. The

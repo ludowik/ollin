@@ -209,7 +209,10 @@ static Value data_set(int scope, Value* args, int argc) {
         std::string enc = encode_value(args[1]);
         if (it != s_store[scope].end() && it->second == enc)
             return Value();   // nothing changed: the blob is not written again (a game saves twice a second)
-        s_store[scope][k] = enc;
+        if (it != s_store[scope].end())
+            it->second = enc;
+        else
+            s_store[scope].emplace(k, enc);
     }
     persist(scope);
     return Value();
