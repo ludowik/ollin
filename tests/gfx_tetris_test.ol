@@ -56,6 +56,7 @@ end
 func paused()
     fillWell()
     game.state = "paused"
+    game.resume = "play"
 end
 
 func lost()

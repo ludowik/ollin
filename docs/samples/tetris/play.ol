@@ -350,6 +350,11 @@ func clearFlashOn()
     return game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
 end
 
+## Whether the piece that is falling is in the well: while it plays, and in a pause that stopped it there.
+func fallingShown()
+    return game.state == "play" or (game.state == "paused" and game.resume == "play")
+end
+
 ## Whether the "PUSH START" that blinks is shown on this frame.
 func blinkOn()
     return game.frame % 60 < 40

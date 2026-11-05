@@ -429,5 +429,16 @@ assert(blinkOn() == false)
 game.frame = 60
 assert(blinkOn() == true)
 
+## The falling piece is in the well while it plays and in a pause that stopped it there, not otherwise.
+game.state = "play"
+assert(fallingShown() == true)
+game.state = "paused"
+game.resume = "play"
+assert(fallingShown() == true, "a pause hides the piece that was falling")
+game.resume = "entry"
+assert(fallingShown() == false)
+game.state = "clearing"
+assert(fallingShown() == false)
+
 data.clear()
 print("tetris play ok")

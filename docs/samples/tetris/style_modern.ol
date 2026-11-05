@@ -1,7 +1,7 @@
 ## The MODERN style of Tetris: a dark gradient, a well with a faint grid, blocks that are rounded and lit from above in
 ## the colour of their piece, and cards for the score, the level, the lines and the next piece. They stand exactly
 ## where the original's do and are as large (places.ol), and so are the pads; the text is in the font "sans". It shows
-## what the original shows, no more: no ghost piece, and the well hidden in pause. See style_gb.ol for what a style is;
+## what the original shows, no more: no ghost piece. See style_gb.ol for what a style is;
 ## every name of this file starts with `modern`.
 
 import "rules.ol"
@@ -84,9 +84,6 @@ func modernWell(f)
     for j = 1, ROWS - 1 do
         graphics.rect(x, y + j * c, COLS * c, 1)
     end
-    if game.state == "paused" then
-        return
-    end
     var flash = clearFlashOn()
     for row = 0, ROWS - 1 do
         for col = 0, COLS - 1 do
@@ -100,7 +97,7 @@ func modernWell(f)
             end
         end
     end
-    if game.state == "play" then
+    if fallingShown() then
         for cell in shapes[game.kind][game.turn] do
             if game.y + cell[2] >= 0 then
                 modernBlock(x + (game.x + cell[1]) * c, y + (game.y + cell[2]) * c, c, game.kind)

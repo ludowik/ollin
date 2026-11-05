@@ -148,7 +148,7 @@ func drawWell()
             end
         end
     end
-    if game.state == "play" then
+    if fallingShown() then
         var cells = shapes[game.kind][game.turn]
         for c in cells do
             if game.y + c[2] >= 0 then
@@ -214,9 +214,7 @@ end
 
 func gbGame()
     drawRects(look.art, 0, 0)
-    if game.state <> "paused" then
-        drawWell()
-    end
+    drawWell()
     if game.state == "over" and not game.won then
         drawCurtain()
     end
