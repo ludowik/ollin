@@ -429,6 +429,36 @@ assert(blinkOn() == false)
 game.frame = 60
 assert(blinkOn() == true)
 
+## The commands: what each order of the player asks of the game, and nothing else.
+## The events asked since the last clear, as one text in alphabetical order ("confirm cw"), to compare them.
+func askedText()
+    var names = []
+    for name, on in game.pressed do
+        assert(on == true)
+        names.push(name)
+    end
+    names.sort(func(a, b) return a < b end)
+    var text = ""
+    for name in names do
+        text = text == "" and name or text + " " + name
+    end
+    return text
+end
+
+func asked(command)
+    game.pressed = {}
+    command()
+    return askedText()
+end
+assert(asked(commandPrimary) == "confirm cw", "A turns the piece and confirms")
+assert(asked(commandSecondary) == "ccw" and asked(commandTurn) == "cw")
+assert(asked(commandStart) == "start" and asked(commandUp) == "up" and asked(commandDown) == "down")
+assert(asked(commandLeft) == "left" and asked(commandRight) == "right")
+music.on = true
+commandMusic()
+assert(music.on == false and len(asked(commandMusic)) == 0 and music.on == true, "the music command switches the tune")
+game.pressed = {}
+
 ## The falling piece is in the well while it plays and in a pause that stopped it there, not otherwise.
 game.state = "play"
 assert(fallingShown() == true)

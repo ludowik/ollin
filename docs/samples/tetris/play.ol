@@ -64,7 +64,7 @@ global game = {
     frame: 0,                   ## steps since the program began, which blinks the texts
     clock: 0,                   ## seconds not yet spent in steps
     held: {left: false, right: false, down: false},
-    pressed: {}                 ## what was pressed since the last step: cw, ccw, start, left, right
+    pressed: {}                 ## what the commands asked since the last step: cw, ccw, confirm, start, up, down, left, right
 }
 
 ## ── Starting, spawning, locking ────────────────────────────────────────────────────────────────────
@@ -409,6 +409,50 @@ func setMusic(on)
     if not on then
         musicStop()
     end
+end
+
+## ── The commands ───────────────────────────────────────────────────────────────────────────────────
+## What each order of the player means, in one place. The keyboard and the pads of tetris.ol only say which key or
+## button gives which command, and hold no rule of their own: to change what A does, change commandPrimary.
+
+## A: turn the piece clockwise, and confirm on the screens before the game.
+func commandPrimary()
+    game.pressed.cw = true
+    game.pressed.confirm = true
+end
+
+## B: turn the piece the other way.
+func commandSecondary()
+    game.pressed.ccw = true
+end
+
+## Turn the piece clockwise, and no more.
+func commandTurn()
+    game.pressed.cw = true
+end
+
+func commandStart()
+    game.pressed.start = true
+end
+
+func commandUp()
+    game.pressed.up = true
+end
+
+func commandDown()
+    game.pressed.down = true
+end
+
+func commandLeft()
+    game.pressed.left = true
+end
+
+func commandRight()
+    game.pressed.right = true
+end
+
+func commandMusic()
+    setMusic(not music.on)
 end
 
 ## Begins the program: the saved best score, level and music, the sounds, an empty well.

@@ -14,6 +14,43 @@ for st in styles do
     assert(typeof(st.game) == "function" and typeof(st.items) == "function")
 end
 
+## The bindings of keys and pad buttons: each key asks for what it always did, every button of the layout has a command,
+## and space starts only while no game is on.
+## The events asked since the last clear, as one text in alphabetical order ("confirm cw"), to compare them.
+func askedText()
+    var names = []
+    for name, on in game.pressed do
+        assert(on == true)
+        names.push(name)
+    end
+    names.sort(func(a, b) return a < b end)
+    var text = ""
+    for name in names do
+        text = text == "" and name or text + " " + name
+    end
+    return text
+end
+
+func keyAsks(key)
+    game.pressed = {}
+    keyboard.keypressed(key)
+    return askedText()
+end
+game.state = "title"
+assert(keyAsks("x") == "confirm cw" and keyAsks("z") == "ccw", "A and B on the keyboard")
+assert(keyAsks("up") == "cw up" and keyAsks("w") == "cw up", "up turns, and asks up for the menus")
+assert(keyAsks("left") == "left" and keyAsks("a") == "left" and keyAsks("d") == "right" and keyAsks("s") == "down")
+assert(keyAsks("return") == "start" and keyAsks("p") == "start" and keyAsks("escape") == "start")
+assert(keyAsks("space") == "start", "space starts on a screen before the game")
+game.state = "play"
+assert(keyAsks("space") == "", "and not during a game")
+assert(keyAsks("q") == "", "a key without a command asks nothing")
+layoutCompute()
+for b in view.layout.buttons do
+    assert(PAD_COMMANDS[b.name] <> nil, "the pad button {b.name} has no command")
+end
+game.pressed = {}
+
 ## A well half full of pieces, with long pieces side by side and stacked, and one falling.
 func fillWell()
     game.well = newWell()

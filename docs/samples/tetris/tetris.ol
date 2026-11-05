@@ -40,11 +40,6 @@ global view = {
     layout: {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false}
 }
 
-## The pad buttons that start events of the game when they go down, and the events (A turns a piece and confirms).
-const PAD_EVENTS = {
-    a: ["cw", "confirm"], b: ["ccw"], start: ["start"], left: ["left"], right: ["right"], up: ["up"], down: ["down"]
-}
-
 ## The style the game is seen in, and the one after it: the layout, the font and the smoothing follow it.
 func applyStyle()
     graphics.antialias(styles[view.style].smooth)
@@ -56,6 +51,23 @@ func toggleStyle()
     data.set(STYLE_KEY, styles[view.style].name)
     applyStyle()
 end
+
+func commandStyle()
+    toggleStyle()
+end
+
+## Which command each pad button gives when it goes down, and which each key gives. No rule here: what a command means
+## is in play.ol, and commandStyle above.
+const PAD_COMMANDS = {
+    a: commandPrimary, b: commandSecondary, start: commandStart, style: commandStyle,
+    left: commandLeft, right: commandRight, up: commandUp, down: commandDown
+}
+const KEY_COMMANDS = {
+    x: [commandPrimary], z: [commandSecondary], up: [commandTurn, commandUp], w: [commandTurn, commandUp],
+    down: [commandDown], s: [commandDown], left: [commandLeft], a: [commandLeft], right: [commandRight],
+    d: [commandRight], ["return"]: [commandStart], p: [commandStart], escape: [commandStart],
+    m: [commandMusic], v: [commandStyle]
+}
 
 func loadStyle()
     var name = data.get(STYLE_KEY, styles[1].name)
@@ -71,27 +83,13 @@ end
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 func keyboard.keypressed(key)
-    var p = game.pressed
-    if key == "x" then
-        p.cw = true
-        p.confirm = true
-    elseif key == "up" or key == "w" then
-        p.cw = true
-        p.up = true
-    elseif key == "down" or key == "s" then
-        p.down = true
-    elseif key == "z" then
-        p.ccw = true
-    elseif key == "return" or key == "p" or key == "escape" or (key == "space" and game.state <> "play") then
-        p.start = true
-    elseif key == "left" or key == "a" then
-        p.left = true
-    elseif key == "right" or key == "d" then
-        p.right = true
-    elseif key == "m" then
-        setMusic(not music.on)
-    elseif key == "v" then
-        toggleStyle()
+    var commands = KEY_COMMANDS[key]
+    if commands then
+        for command in commands do
+            command()
+        end
+    elseif key == "space" and game.state <> "play" then
+        commandStart()   ## space only starts while no game is on: during one it would be a key pressed by mistake
     end
 end
 
@@ -135,19 +133,13 @@ func readInput()
         end
     end
     var before = view.pads
-    var ev = game.pressed
-    for name, events in PAD_EVENTS do
+    for name, command in PAD_COMMANDS do
         if pads[name] and not before[name] then
-            for event in events do
-                ev[event] = true
-            end
+            command()
         end
     end
-    if pads.style and not before.style then
-        toggleStyle()
-    end
     if tap and not running() and len(pads) == 0 then
-        ev.start = true
+        commandStart()
     end
     view.pointer = len(pts) > 0
     view.pads = pads
