@@ -6,6 +6,8 @@
 ## A picture is rows of text, one character a point: ' ' is the lightest green, '.' the next, '+' the next and '#' the
 ## darkest, and '_' leaves the point as it is. A rectangle is {x, y, w, h, shade}, the shade from 1 (lightest) to 4.
 
+import "places.ol"
+
 func inkOf(ch)
     if ch == " " then
         return 1
@@ -182,8 +184,8 @@ end
 ## framed in a light and a mid-dark line, a ribbon of the same behind the score, and the box of the next piece,
 ## framed in four greens.
 func addWall(art, wall, x)
-    art.push([x, 0, 8, 144, 2])
-    for t = 0, 23 do
+    art.push([x, 0, 8, SCREEN.h, 2])
+    for t = 0, SCREEN.h // 6 - 1 do
         addPicture(art, wall, x, t * 6)
     end
 end
@@ -191,24 +193,26 @@ end
 func screenArt(font)
     var art = []
     var wall = pictureRects(WALL_ROWS)
-    var tall = pictureRects(boxRows(46, 22, PANEL_CORNER, " +", " "))
-    art.push([0, 0, 160, 144, 4])
-    art.push([7, 0, 1, 144, 1])
-    addWall(art, wall, 8)
-    art.push([16, 0, 80, 144, 1])
-    addWall(art, wall, 96)
-    art.push([104, 0, 1, 144, 1])
-    art.push([104, 13, 56, 1, 1])
-    art.push([105, 14, 55, 7, 3])
-    art.push([104, 21, 56, 14, 1])
-    art.push([105, 22, 55, 1, 3])
-    art.push([105, 33, 55, 1, 3])
-    addPicture(art, pictureRects(boxRows(46, 14, PANEL_CORNER, " +", " ")), 109, 5)
-    addPicture(art, tall, 109, 45)
-    addPicture(art, tall, 109, 69)
-    addPicture(art, pictureRects(boxRows(42, 42, NEXT_CORNER, ". +#", " ")), 115, 99)
-    addPicture(art, textRects(font, "SCORE"), 113, 9)
-    addPicture(art, textRects(font, "LEVEL"), 113, 49)
-    addPicture(art, textRects(font, "LINES"), 113, 73)
+    var tall = pictureRects(boxRows(LEVEL_CARD.w, LEVEL_CARD.h, PANEL_CORNER, " +", " "))
+    var right = WELL.x + WELL.w + 8                  ## the light line at the edge of the panel
+    var top = SCORE_CARD.y
+    art.push([0, 0, SCREEN.w, SCREEN.h, 4])
+    art.push([WELL.x - 9, 0, 1, SCREEN.h, 1])
+    addWall(art, wall, WELL.x - 8)
+    art.push([WELL.x, 0, WELL.w, SCREEN.h, 1])
+    addWall(art, wall, WELL.x + WELL.w)
+    art.push([right, 0, 1, SCREEN.h, 1])
+    art.push([right, top + 8, SCREEN.w - right, 1, 1])
+    art.push([right + 1, top + 9, SCREEN.w - right - 1, 7, 3])
+    art.push([right, top + 16, SCREEN.w - right, 14, 1])
+    art.push([right + 1, top + 17, SCREEN.w - right - 1, 1, 3])
+    art.push([right + 1, top + 28, SCREEN.w - right - 1, 1, 3])
+    addPicture(art, pictureRects(boxRows(SCORE_CARD.w, 14, PANEL_CORNER, " +", " ")), SCORE_CARD.x, SCORE_CARD.y)
+    addPicture(art, tall, LEVEL_CARD.x, LEVEL_CARD.y)
+    addPicture(art, tall, LINES_CARD.x, LINES_CARD.y)
+    addPicture(art, pictureRects(boxRows(NEXT_CARD.w, NEXT_CARD.h, NEXT_CORNER, ". +#", " ")), NEXT_CARD.x, NEXT_CARD.y)
+    addPicture(art, textRects(font, "SCORE"), SCORE_CARD.x + 4, SCORE_CARD.y + 4)
+    addPicture(art, textRects(font, "LEVEL"), LEVEL_CARD.x + 4, LEVEL_CARD.y + 4)
+    addPicture(art, textRects(font, "LINES"), LINES_CARD.x + 4, LINES_CARD.y + 4)
     return art
 end

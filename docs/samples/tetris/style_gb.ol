@@ -8,13 +8,11 @@ import "rules.ol"
 import "play.ol"
 import "pictures.ol"
 import "screens.ol"
+import "places.ol"
 import "../lib/draw.ol"
 
-## How it looks: the four greens of the screen, and where a few things sit on it.
+## How it looks: the four greens of the screen, and the ink of the pads.
 global look = {
-    screenW: 160,               ## the handheld's screen, in points
-    screenH: 144,
-    wellX: 16,
     shade: [
         [0.890, 0.973, 0.835, 1],   ## the lightest green, the screen itself
         [0.612, 0.757, 0.643, 1],
@@ -136,7 +134,7 @@ func wellSides(c, r)
 end
 
 func drawWell()
-    var wx = look.wellX
+    var wx = WELL.x
     var flash = game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
     for r = 0, ROWS - 1 do
         for c = 0, COLS - 1 do
@@ -166,34 +164,35 @@ func drawCurtain()
     for i = 0, curtainRows() - 1 do
         var r = ROWS - 1 - i
         for c = 0, COLS - 1 do
-            block(look.wellX + c * 8, r * 8, 8, 8, (c + r) % 2 == 0 and 3 or 4)
+            block(WELL.x + c * 8, r * 8, 8, 8, (c + r) % 2 == 0 and 3 or 4)
         end
     end
 end
 
-## A number on the panel, with its last digit in the slot (a place of 8 points from x = 113) and its top at y.
+## A number on the panel, with its last digit in the slot (a place of 8 points, the first 4 points in from the cards) and
+## its top at y.
 func drawNumber(n, slot, y)
     var str = "{n}"
     var count = len(str)
     for i = 1, count do
         var glyph = look.font[str.char(i)]
-        drawRects(glyph, 113 + 8 * (slot - count + i), y)
+        drawRects(glyph, SCORE_CARD.x + 4 + 8 * (slot - count + i), y)
     end
 end
 
 ## What changes on the panel: the numbers, with no zeros in front as on the handheld, and the next piece in its box.
 func drawPanel()
-    drawNumber(game.score, 4, 25)
-    drawNumber(game.level, 3, 57)
-    drawNumber(linesShown(), 3, 81)
+    drawNumber(game.score, 4, SCORE_CARD.y + 20)
+    drawNumber(game.level, 3, LEVEL_CARD.y + 12)
+    drawNumber(linesShown(), 3, LINES_CARD.y + 12)
     if game.state <> "paused" then
-        drawPiece(game.next, 1, 120, 104)
+        drawPiece(game.next, 1, NEXT_GRID.x, NEXT_GRID.y)
     end
 end
 
 ## The words in the well: PAUSE, and GAME OVER once the curtain is down.
 func drawWellText()
-    var cx = look.wellX + COLS * 4
+    var cx = WELL.x + WELL.w / 2
     if game.state == "paused" then
         box(cx - 28, 60, 56, 24)
         label("PAUSE", cx, 72, 10, 4)
@@ -236,7 +235,7 @@ func choice(it)
 end
 
 func drawScreenFrame()
-    block(0, 0, look.screenW, look.screenH, 1)
+    block(0, 0, SCREEN.w, SCREEN.h, 1)
     box(4, 4, 152, 136)
 end
 
@@ -294,7 +293,6 @@ end
 ## What tetris.ol sees of this style.
 global styleGb = {
     name: "ORIGINAL",
-    fixed: {w: look.screenW, h: look.screenH},   ## the proportions of the picture, kept whatever the area
     font: "pixel",
     smooth: false,                               ## crisp points: no smoothing of the picture
     ground: look.frameInk,

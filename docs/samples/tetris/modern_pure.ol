@@ -1,8 +1,8 @@
-## The modern style of Tetris with no drawing: its colours and where everything goes in an area of any size. The
-## drawing is in style_modern.ol; keeping this apart is what lets modern_pure_test.ol check that the well, the panels
-## and the next piece always fit in the area, however narrow or tall it is.
+## The modern style of Tetris with no drawing: its colours and where everything goes. The drawing is in
+## style_modern.ol; keeping this apart is what lets modern_pure_test.ol check it.
 
 import "rules.ol"
+import "places.ol"
 
 ## The colour of each piece, by the number the well stores it with (I, O, T, S, Z, J, L): cyan, yellow, purple, green,
 ## red, blue and orange, as in the guideline of the modern games.
@@ -31,25 +31,23 @@ func modernTone(col, k)
     return out
 end
 
-## Where things go in an area of w by h points, as in the original: the well at the left and a column of cards at its
-## right, the score, the level and the lines from the top and the next piece at the bottom, level with the bottom of
-## the well. The result is the size of a cell `c` (a whole number of points), the corner of the well, and the four cards
-## {x, y, w, h}. The well and the column together are 16.5 cells wide, which limits a tall area; the height of the
-## well limits a wide one.
-func modernFrame(w, h)
-    var c = math.max(1, math.floor(math.min(h * 0.94 / ROWS, w * 0.96 / 16.5)))
-    var panelW = math.floor(c * 5.6)
-    var gap = math.floor(c * 0.9)
-    var f = {w: w, h: h, c: c}
-    f.wellX = math.floor((w - (COLS * c + gap + panelW)) / 2)
-    f.wellY = math.floor((h - ROWS * c) / 2)
-    var x = f.wellX + COLS * c + gap
-    var cardH = math.floor(c * 2.5)
-    var step = math.floor(c * 3)
-    var nextH = math.floor(c * 5)
-    f.score = {x: x, y: f.wellY, w: panelW, h: cardH}
-    f.level = {x: x, y: f.wellY + step, w: panelW, h: cardH}
-    f.lines = {x: x, y: f.wellY + 2 * step, w: panelW, h: cardH}
-    f.next = {x: x, y: f.wellY + ROWS * c - nextH, w: panelW, h: nextH}
-    return f
+## A place of places.ol, in points of the screen, turned into pixels: the screen scaled by s with its top left at
+## (ox, oy).
+func scaled(r, s, ox, oy)
+    return {x: ox + r.x * s, y: oy + r.y * s, w: r.w * s, h: r.h * s}
+end
+
+## Where things go, exactly where the original puts them: the well and the four cards, in pixels, the size of a cell `c`,
+## and the top left of the 4 by 4 cells of the next piece.
+func modernFrame(s, ox, oy)
+    return {
+        s: s, ox: ox, oy: oy, c: CELL * s,
+        well: scaled(WELL, s, ox, oy),
+        score: scaled(SCORE_CARD, s, ox, oy),
+        level: scaled(LEVEL_CARD, s, ox, oy),
+        lines: scaled(LINES_CARD, s, ox, oy),
+        next: scaled(NEXT_CARD, s, ox, oy),
+        gridX: ox + NEXT_GRID.x * s,
+        gridY: oy + NEXT_GRID.y * s
+    }
 end

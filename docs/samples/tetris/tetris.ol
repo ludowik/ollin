@@ -19,6 +19,7 @@
 import "rules.ol"
 import "sounds.ol"
 import "play.ol"
+import "places.ol"
 import "style_gb.ol"
 import "style_modern.ol"
 
@@ -33,7 +34,7 @@ global view = {
     touchSeen: false,           ## a finger has touched the screen, so the pads are shown
     hint: "",                   ## what the title screens say of the key V
     style: 1,                   ## the index in `styles` of the style the game is seen in
-    layout: {s: 1, ox: 0, oy: 0, sw: 0, sh: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false, style: 0}
+    layout: {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false}
 }
 
 ## The pad buttons that start events of the game when they go down, and the events (A turns a piece and confirms).
@@ -160,24 +161,19 @@ func padButton(name, x, y, w, h, round, text)
 end
 
 ## Where the screen and the pads go. The screen keeps the handheld's proportions; with the pads shown it takes the
-## top of a tall area, or the middle of a wide one, the pads standing below it or on either side. It is worked out
-## again only when the area or the pads shown change.
+## top of a tall area, or the middle of a wide one, the pads standing below it or on either side. It is the same
+## whatever the style, which draws in these places. It is worked out again only when the area or the pads shown change.
 func layoutCompute()
     var L = view.layout
-    var st = styles[view.style]
     var pads = view.touchSeen
-    if L.w == W and L.h == H and L.padsShown == pads and L.style == view.style then
+    if L.w == W and L.h == H and L.padsShown == pads then
         return
     end
     L.w = W
     L.h = H
     L.padsShown = pads
-    L.style = view.style
     var portrait = H > W * 1.1
-    var fixed = st.fixed
-    var sw = fixed and fixed.w or 0
-    var sh = fixed and fixed.h or 0
-    var s = 1
+    var s
     var lx
     var ly
     var rx
@@ -188,15 +184,10 @@ func layoutCompute()
     var ky
     var u
     if pads and portrait then
-        if fixed then
-            s = math.min(W / sw, H * 0.66 / sh)
-        else
-            sw = W
-            sh = math.floor(H * 0.68)
-        end
-        L.ox = math.floor((W - sw * s) / 2)
-        L.oy = math.floor(math.max((H * 0.68 - sh * s) / 2, 0))
-        var top = L.oy + sh * s
+        s = math.min(W / SCREEN.w, H * 0.66 / SCREEN.h)
+        L.ox = math.floor((W - SCREEN.w * s) / 2)
+        L.oy = math.floor(math.max((H * 0.68 - SCREEN.h * s) / 2, 0))
+        var top = L.oy + SCREEN.h * s
         var rest = H - top
         u = math.min(W * 0.065, rest * 0.14)
         lx, ly = W * 0.27, top + rest * 0.45
@@ -204,31 +195,19 @@ func layoutCompute()
         px, py = W * 0.5, top + rest * 0.88
         kx, ky = W * 0.86, top + rest * 0.88
     elseif pads then
-        if fixed then
-            s = math.min(H / sh, W / (sw * 1.7))
-        else
-            sw = math.floor(W / 1.7)
-            sh = H
-        end
-        L.ox = math.floor((W - sw * s) / 2)
-        L.oy = math.floor((H - sh * s) / 2)
+        s = math.min(H / SCREEN.h, W / (SCREEN.w * 1.7))
+        L.ox = math.floor((W - SCREEN.w * s) / 2)
+        L.oy = math.floor((H - SCREEN.h * s) / 2)
         u = math.min(L.ox * 0.11, H * 0.1)
         lx, ly = L.ox / 2, H * 0.58
         rx, ry = W - L.ox / 2, H * 0.58
         px, py = W - L.ox / 2, H * 0.16
         kx, ky = L.ox / 2, H * 0.16
     else
-        if fixed then
-            s = math.min(W / sw, H / sh)
-        else
-            sw = W
-            sh = H
-        end
-        L.ox = math.floor((W - sw * s) / 2)
-        L.oy = math.floor((H - sh * s) / 2)
+        s = math.min(W / SCREEN.w, H / SCREEN.h)
+        L.ox = math.floor((W - SCREEN.w * s) / 2)
+        L.oy = math.floor((H - SCREEN.h * s) / 2)
     end
-    L.sw = sw
-    L.sh = sh
     L.s = s
     L.buttons = []
     L.cross = nil

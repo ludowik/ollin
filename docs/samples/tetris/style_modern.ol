@@ -1,13 +1,14 @@
 ## The MODERN style of Tetris: a dark gradient, a well with a faint grid, blocks that are rounded and lit from above in
-## the colour of their piece, and cards for the score, the level, the lines and the next piece. It fills the area it is
-## given (modern_pure.ol says where everything goes) instead of keeping the proportions of the handheld, and its
-## text is in the font "sans". It shows what the original shows, no more: no ghost piece, and the well hidden in
-## pause. See style_gb.ol for what a style is; every name of this file starts with `modern`.
+## the colour of their piece, and cards for the score, the level, the lines and the next piece. They stand exactly
+## where the original's do and are as large (places.ol), and so are the pads; the text is in the font "sans". It shows
+## what the original shows, no more: no ghost piece, and the well hidden in pause. See style_gb.ol for what a style is;
+## every name of this file starts with `modern`.
 
 import "rules.ol"
 import "play.ol"
 import "screens.ol"
 import "modern_pure.ol"
+import "places.ol"
 import "../lib/draw.ol"
 
 global modernLook = {
@@ -24,12 +25,12 @@ global modernLook = {
     frame: nil                      ## the last frame worked out, see modernNow
 }
 
-## The frame for the area of the picture: worked out again only when the area changes.
+## The frame for the screen as the layout has put it: worked out again only when that changes.
 func modernNow()
     var L = view.layout
     var f = modernLook.frame
-    if f == nil or f.w <> L.sw or f.h <> L.sh then
-        f = modernFrame(L.sw, L.sh)
+    if f == nil or f.s <> L.s or f.ox <> L.ox or f.oy <> L.oy then
+        f = modernFrame(L.s, L.ox, L.oy)
         modernLook.frame = f
     end
     return f
@@ -77,12 +78,11 @@ func modernPiece(kind, turn, x, y, c)
     end
 end
 
-func modernWell(f, ox, oy)
+func modernWell(f)
     var c = f.c
-    var x = ox + f.wellX
-    var y = oy + f.wellY
-    var pad = math.max(2, math.floor(c * 0.2))
-    modernPanel(x - pad, y - pad, COLS * c + 2 * pad, ROWS * c + 2 * pad, c * 0.3, modernLook.well)
+    var x = f.well.x
+    var y = f.well.y
+    modernPanel(x, y, f.well.w, f.well.h, c * 0.3, modernLook.well)
     fillC([1, 1, 1, 1], 0.045)
     for i = 1, COLS - 1 do
         graphics.rect(x + i * c, y, 1, ROWS * c)
@@ -123,41 +123,33 @@ func modernWell(f, ox, oy)
     end
 end
 
-## A card of the panel: its title, and under it a number that is kept inside the card whatever its width.
-func modernCard(r, ox, oy, unit, title, value)
-    var x = ox + r.x
-    var y = oy + r.y
-    var pad = unit * 0.14
-    modernPanel(x, y, r.w, r.h, unit * 0.16, modernLook.card)
-    drawText(title, x + pad, y + pad, fitSize(title, unit * 0.22, r.w - 2 * pad), "left", "top", modernLook.dim)
+## A card of the panel: its title, and under it a number that is kept inside the card whatever its width. `c` is the
+## size of a cell, which the sizes of the card follow.
+func modernCard(r, c, title, value)
+    var pad = c * 0.5
+    modernPanel(r.x, r.y, r.w, r.h, c * 0.6, modernLook.card)
+    drawText(title, r.x + pad, r.y + pad, fitSize(title, c * 0.85, r.w - 2 * pad), "left", "top", modernLook.dim)
     if value then
-        var size = fitSize(value, unit * 0.42, r.w - 2 * pad)
-        drawText(value, x + r.w - pad, y + r.h - pad, size, "right", "bottom", modernLook.ink)
+        var size = fitSize(value, c * 1.5, r.w - 2 * pad)
+        drawText(value, r.x + r.w - pad, r.y + r.h - pad, size, "right", "bottom", modernLook.ink)
     end
 end
 
-func modernCards(f, ox, oy)
-    var unit = f.score.h
-    modernCard(f.score, ox, oy, unit, "SCORE", "{game.score}")
-    modernCard(f.level, ox, oy, unit, "LEVEL", "{game.level}")
-    modernCard(f.lines, ox, oy, unit, "LINES", "{linesShown()}")
-    modernCard(f.next, ox, oy, unit, "NEXT", nil)
+func modernCards(f)
+    modernCard(f.score, f.c, "SCORE", "{game.score}")
+    modernCard(f.level, f.c, "LEVEL", "{game.level}")
+    modernCard(f.lines, f.c, "LINES", "{linesShown()}")
+    modernCard(f.next, f.c, "NEXT", nil)
     if game.state <> "paused" then
-        var r = f.next
-        var x0, x1, y0, y1 = shapeBounds(game.next, 1)
-        var top = unit * 0.46
-        var cell = math.max(1, math.floor(math.min((r.w - 2 * unit * 0.14) / 4, (r.h - top - unit * 0.12) / 2.2)))
-        var px = ox + r.x + (r.w - (x1 - x0 + 1) * cell) / 2 - x0 * cell
-        var py = oy + r.y + top + (r.h - top - (y1 - y0 + 1) * cell) / 2 - y0 * cell
-        modernPiece(game.next, 1, px, py, cell)
+        modernPiece(game.next, 1, f.gridX, f.gridY, f.c)
     end
 end
 
 ## The words in the well: PAUSE, and the end of a game once the curtain is down.
-func modernWellText(f, ox, oy)
+func modernWellText(f)
     var c = f.c
-    var cx = ox + f.wellX + COLS * c / 2
-    var cy = oy + f.wellY + ROWS * c / 2
+    var cx = f.well.x + f.well.w / 2
+    var cy = f.well.y + f.well.h / 2
     if game.state == "paused" then
         modernPanel(cx - COLS * c * 0.4, cy - c * 1.5, COLS * c * 0.8, c * 3, c * 0.4, modernLook.card)
         drawText("PAUSE", cx, cy, c * 1.3, "center", "center", modernLook.ink)
@@ -177,20 +169,18 @@ end
 
 func modernGame()
     modernBackground()
-    var L = view.layout
     var f = modernNow()
-    modernWell(f, L.ox, L.oy)
-    modernCards(f, L.ox, L.oy)
-    modernWellText(f, L.ox, L.oy)
+    modernWell(f)
+    modernCards(f)
+    modernWellText(f)
 end
 
 ## ── The screens before the game ────────────────────────────────────────────────────────────────────
 
-## The points of the screen of 160 by 144 that screens.ol speaks in, put in the area: the scale and the top left.
+## The points of the screen of 160 by 144 that places.ol and screens.ol speak in, in pixels: the scale and the top left.
 func modernUnit()
     var L = view.layout
-    var s = math.min(L.sw / 160, L.sh / 144)
-    return {s: s, x: L.ox + (L.sw - 160 * s) / 2, y: L.oy + (L.sh - 144 * s) / 2}
+    return {s: L.s, x: L.ox, y: L.oy}
 end
 
 ## TETRIS, each letter in the colour of a piece.
@@ -276,7 +266,6 @@ end
 ## What tetris.ol sees of this style.
 global styleModern = {
     name: "MODERN",
-    fixed: nil,                      ## it fills the area, whatever its shape
     font: "sans",
     smooth: true,
     ground: [0.028, 0.032, 0.078, 1],
