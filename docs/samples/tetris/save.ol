@@ -3,7 +3,8 @@
 ## well and the falling piece, the score, the level, the lines, the tune. The best scores are kept apart, as they always
 ## were (play.ol).
 ##
-## `data` keeps the map as it is, arrays included, and does not write again a value that did not change. A save that cannot be trusted — another version, a field of the wrong sort or out of its range, a
+## `data` keeps the map as it is, arrays included, and does not write again a value that did not change. A save that
+## cannot be trusted — another version, a field of the wrong sort or out of its range, a
 ## piece sitting in the rubble — is refused WHOLE and the game starts as if there were none: nothing of it is applied. A
 ## game that was running comes back in pause, with the well hidden as a pause hides it, and START goes on exactly from
 ## there: a piece that began to fall the moment a page opened would be a trap.
