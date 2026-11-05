@@ -13,7 +13,7 @@ var colSoft = colOrig.pastel()
 assert(colSoft.r == 1 and colSoft.g == 0.5 and colSoft.b == 0.5 and colSoft.a == 0.5, "half way to white, the alpha kept")
 assert(Color(0, 0, 0).pastel().r == 0.5)
 assert(colOrig.r == 1 and colOrig.g == 0 and colOrig.a == 0.5, "the colour itself does not change")
-assert(colGray.pastel().a == 0.5 and "{colSoft.grayscale()}".startsWith("Color("), "the results are colours too")
+assert(colGray.pastel().a == 0.5 and instanceOf(colSoft.grayscale(), Color), "the results are colours too, of the same class")
 
 ## ── Color.__str, Color.gray and the colors palette ──
 ## Color(...) prints its four components with six decimals; interpolation and print go through the same path.
@@ -25,18 +25,18 @@ var grayHigh = Color.gray(3)
 var grayLow = Color.gray(-1)
 assert(grayHigh.r == 1 and grayHigh.g == 1 and grayHigh.b == 1 and grayHigh.a == 1)
 assert(grayLow.r == 0 and grayLow.a == 1)
-assert(Color.gray(0.25).g == 0.25 and "{Color.gray(0.25)}".startsWith("Color("))
+assert(Color.gray(0.25).g == 0.25 and instanceOf(Color.gray(0.25), Color) and classOf(Color.gray(0.25)) == classOf(Color(0)))
 assert(Color(1, 0, 0).gray(0.5).r == 0.5, "gray ignores the receiver")
 
 ## The palette: every constant is a real Color, built from 8-bit components.
 assert(colors.BLACK.r == 0 and colors.BLACK.a == 1)
 assert(colors.WHITE.r == 1 and colors.WHITE.g == 1 and colors.WHITE.b == 1)
 assert(math.abs(colors.RED.r - 230 / 255) < 0.000001 and math.abs(colors.RED.g - 41 / 255) < 0.000001)
-assert("{colors.RED}".startsWith("Color("), "a palette constant is a Color")
+assert(instanceOf(colors.RED, Color), "a palette constant is an instance of the Color class")
 assert(colors.MAGENTA.r == 1 and colors.MAGENTA.g == 0 and colors.MAGENTA.b == 1)
 assert(colors.BLUE.pastel().a == 1, "the methods work on palette constants")
 for name in ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "GRAY", "ORANGE", "PINK", "PURPLE", "BROWN", "DARKGRAY", "SKYBLUE", "LIME", "MAGENTA"] do
-    assert("{colors[name]}".startsWith("Color("), "colors.{name} is a Color")
+    assert(instanceOf(colors[name], Color), "colors.{name} is a Color")
 end
 assert(len(map.keys(colors)) == 15, "the palette has fifteen colours")
 

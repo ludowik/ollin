@@ -243,6 +243,26 @@ var cxProto = {__str: func(self) return "viaProto" end}
 var cxWith = {__class__: cxProto}
 assert("{cxWith}" == "{map}", "a map is not given a class by that key: it has no prototype chain")
 
+## classOf and instanceOf: the only way to ask for the class of an object, which no script can read as a field.
+class CxAnimal
+end
+class CxDog extends CxAnimal
+end
+class CxCat extends CxAnimal
+end
+class CxPuppy extends CxDog
+end
+var cxPup = CxPuppy()
+assert(classOf(cxPup) == CxPuppy and classOf(CxCat()) == CxCat, "the class an instance was made from")
+assert(classOf({}) == nil and classOf(5) == nil and classOf(nil) == nil and classOf(CxDog) == nil, "nil for what is no instance")
+assert(classOf(CxPuppy()) == CxPuppy, "of an object that nothing else holds")
+assert(instanceOf(cxPup, CxPuppy) and instanceOf(cxPup, CxDog) and instanceOf(cxPup, CxAnimal), "all along the chain")
+assert(not instanceOf(cxPup, CxCat) and not instanceOf(CxDog(), CxPuppy), "not a sibling, not a subclass")
+assert(not instanceOf({}, CxAnimal) and not instanceOf(5, CxAnimal) and not instanceOf(nil, CxAnimal), "what is no instance is none")
+assert(not instanceOf(CxPuppy, CxAnimal), "a class is not an instance of its parent")
+assert(instanceOf(Color(1), Color) and classOf(Color(1)) == Color, "a native class too")
+assert(instanceOf(cxPup, CxDog) == true and typeof(instanceOf(cxPup, CxCat)) == "bool")
+
 ## The class slot is not a field: an instance has no key of its own for it, and an empty one is still true.
 class CxEmpty
 end

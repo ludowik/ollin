@@ -2235,12 +2235,8 @@ void VM::execute(Chunk chunk) {
             it = built.emplace(name, make_builtin_module(name)).first;
         return it->second;
     };
-    for (auto& name : builtin_module_names())
-        if (owned_chunk.identifier_index(name) >= 0) // do not BUILD a module the program never names
-            init_global(name, module_of(name));
-    string_module_ = module_of("string");
-    array_module_ = make_array_module();
-    map_module_ = module_of("map");
+    // core's members come FIRST: the `colors` module is built below and gives its palette the global Color class,
+    // which must exist by then, or the constants would be instances of another class that merely has the same name.
     {
         const Value& core = module_of("core");
         for (auto& [k, v] : core.mptr->data) {
@@ -2249,6 +2245,12 @@ void VM::execute(Chunk chunk) {
             init_global(k.as_string(), v);
         }
     }
+    for (auto& name : builtin_module_names())
+        if (owned_chunk.identifier_index(name) >= 0) // do not BUILD a module the program never names
+            init_global(name, module_of(name));
+    string_module_ = module_of("string");
+    array_module_ = make_array_module();
+    map_module_ = module_of("map");
     init_global("deltaTime", Value(0.0));
     init_global("elapsedTime", Value(0.0));
     // W and H are the render-area dimensions injected by the engine, defaulting to

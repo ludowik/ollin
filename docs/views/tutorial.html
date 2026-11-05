@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-05 21:12</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-05 21:26</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-05 21:12</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-05 21:26</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1536,8 +1536,21 @@ processor rather than the wall, benchmarks use <code>cpuTime()</code>.</div>
 <span class="bi">typeof</span>(math)     <span class="cmt">## "module" — a built-in module, not a plain map</span>
 <span class="bi">typeof</span>(<span class="bool">nil</span>)      <span class="cmt">## "nil"</span></code></pre>
 
+<h3>classOf and instanceOf</h3>
+<p><code>typeof</code> says <code>"map"</code> for an object, whatever its class. To ask what an object was made from, use <code>instanceOf(obj, Class)</code>, which is true when <code>obj</code> was made from <code>Class</code> <strong>or from a class that extends it</strong>, and <code>classOf(obj)</code>, which gives the class itself, or <code>nil</code> for anything that is not an instance. A plain map, a number or a class is never an instance, and <code>instanceOf</code> refuses a second argument that is not a class.</p>
+<pre><code><span class="kw">class</span> Animal
+<span class="kw">end</span>
+<span class="kw">class</span> Dog <span class="kw">extends</span> Animal
+<span class="kw">end</span>
+<span class="kw">var</span> d = Dog()
+<span class="bi">instanceOf</span>(d, Dog)       <span class="cmt">## true</span>
+<span class="bi">instanceOf</span>(d, Animal)    <span class="cmt">## true: a Dog is an Animal</span>
+<span class="bi">instanceOf</span>({}, Animal)   <span class="cmt">## false</span>
+<span class="bi">classOf</span>(d) == Dog        <span class="cmt">## true</span>
+<span class="bi">classOf</span>({})            <span class="cmt">## nil</span></code></pre>
+
 <h3>Built-in functions as values</h3>
-<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>mem</code>, <code>len</code> and <code>typeof</code> are first-class values — they can be assigned and passed as arguments:</p>
+<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>mem</code>, <code>len</code>, <code>typeof</code>, <code>classOf</code> and <code>instanceOf</code> are first-class values — they can be assigned and passed as arguments:</p>
 <pre><code><span class="kw">var</span> f = <span class="bi">print</span>
 f(<span class="str">"hello"</span>)        <span class="cmt">## hello</span>
 

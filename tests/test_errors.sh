@@ -1029,6 +1029,16 @@ check_error "len without argument" \
     'print(len())' \
     "len() requires 1 argument"
 
+check_error "instanceOf without a class" \
+    'class A
+end
+print(instanceOf(A(), 5))' \
+    "instanceOf: the second argument must be a class, got int"
+
+check_error "instanceOf with one argument" \
+    'print(instanceOf({}))' \
+    "instanceOf: expected (object, class)"
+
 check_error "a recursion without end" \
     'func f(n)
     return f(n + 1) + 1

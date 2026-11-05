@@ -90,7 +90,7 @@ const std::vector<std::string>& builtin_module_names() {
 }
 
 const std::vector<std::string>& builtin_func_names() {
-    static const std::vector<std::string> names = {"print", "printf", "__fmt", "typeof", "assert",
+    static const std::vector<std::string> names = {"print", "printf", "__fmt", "typeof", "classOf", "instanceOf", "assert",
                                                    "time", "cpuTime", "mem", "Color", "len"};
     return names;
 }

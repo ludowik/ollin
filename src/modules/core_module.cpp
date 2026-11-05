@@ -143,12 +143,42 @@ static int core_typeof(CallCtx& ctx) {
     return ctx.ret(Value(std::string(args[0].type_name())));
 }
 
+// classOf(obj): the class an instance was made from, nil for anything else (a map that is no instance, a class, a
+// number…). The class link itself is no field a script can reach: this is the way to ask for it.
+static int core_class_of(CallCtx& ctx) {
+    if (ctx.argc < 1 || !ctx.args[0].is_map())
+        return ctx.ret(Value{});
+    Value cls = ctx.args[0].class_of();   // a copy: ret() overwrites args[0], which may hold the last reference to obj
+    return ctx.ret(cls);
+}
+
+// instanceOf(obj, Class): whether obj was made from Class or from a class that extends it, all along the chain.
+static int core_instance_of(CallCtx& ctx) {
+    if (ctx.argc != 2)
+        throw std::runtime_error("instanceOf: expected (object, class)");
+    if (!ctx.args[1].is_class())
+        throw std::runtime_error(std::string("instanceOf: the second argument must be a class, got ") +
+                                 ctx.args[1].type_name());
+    bool found = false;
+    if (ctx.args[0].is_map()) {
+        const Map* wanted = ctx.args[1].as_map();
+        Value cls = ctx.args[0].class_of();
+        while (cls.is_class() && !found) {
+            found = cls.as_map() == wanted;
+            cls = cls.map_get(Value(std::string("__parent__")));
+        }
+    }
+    return ctx.ret(Value::make_bool(found));
+}
+
 Value make_core_module() {
     return MapBuilder()
         .fn("print", core_print)
         .fn("printf", core_printf)
         .fn("__fmt", core_fmt)   // internal: the desugaring of {expr:spec}
         .fn("typeof", core_typeof)
+        .fn("classOf", core_class_of)
+        .fn("instanceOf", core_instance_of)
         .set("Color", make_color_class())
         .done();
 }
