@@ -51,3 +51,16 @@ func modernFrame(s, ox, oy)
         gridY: oy + NEXT_GRID.y * s
     }
 end
+
+## Where the title and the number of a card go, as the original puts them: the title at the top, the number under it at
+## the right, never on the same row. `c` is the size of a cell. The sizes are those the text may not exceed; the number
+## is also kept inside the width of the card by the drawing.
+func modernCardText(r, c)
+    var titleSize = c * 0.75
+    var valueSize = math.min(c * 1.5, r.h - c * 1.65)
+    return {
+        pad: c * 0.5,
+        titleY: r.y + c * 0.4, titleSize: titleSize,
+        valueY: r.y + r.h - c * 0.35, valueSize: valueSize
+    }
+end

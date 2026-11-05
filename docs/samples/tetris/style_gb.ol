@@ -123,7 +123,7 @@ end
 func drawPiece(kind, turn, px, py)
     var cells = shapes[kind][turn]
     for c in cells do
-        drawBlock(px + c[1] * 8, py + c[2] * 8, kind, kind == Piece.I and cellSides(cells, c) or 0)
+        drawBlock(px + c[1] * CELL, py + c[2] * CELL, kind, kind == Piece.I and cellSides(cells, c) or 0)
     end
 end
 
@@ -141,9 +141,9 @@ func drawWell()
             var v = game.well[wellIdx(c, r)]
             if v <> 0 then
                 if game.clearing.contains(r) then
-                    block(wx + c * 8, r * 8, 8, 8, flash and 1 or 4)
+                    block(wx + c * CELL, r * CELL, CELL, CELL, flash and 1 or 4)
                 else
-                    drawBlock(wx + c * 8, r * 8, v, v == Piece.I and wellSides(c, r) or 0)
+                    drawBlock(wx + c * CELL, r * CELL, v, v == Piece.I and wellSides(c, r) or 0)
                 end
             end
         end
@@ -152,7 +152,7 @@ func drawWell()
         var cells = shapes[game.kind][game.turn]
         for c in cells do
             if game.y + c[2] >= 0 then
-                drawBlock(wx + (game.x + c[1]) * 8, (game.y + c[2]) * 8, game.kind,
+                drawBlock(wx + (game.x + c[1]) * CELL, (game.y + c[2]) * CELL, game.kind,
                     game.kind == Piece.I and cellSides(cells, c) or 0)
             end
         end
@@ -164,7 +164,7 @@ func drawCurtain()
     for i = 0, curtainRows() - 1 do
         var r = ROWS - 1 - i
         for c = 0, COLS - 1 do
-            block(WELL.x + c * 8, r * 8, 8, 8, (c + r) % 2 == 0 and 3 or 4)
+            block(WELL.x + c * CELL, r * CELL, CELL, CELL, (c + r) % 2 == 0 and 3 or 4)
         end
     end
 end

@@ -13,7 +13,7 @@
 ## second whatever the speed of the screen, so that the counts of frames of the rules mean what they say; this file
 ## is what the player touches: the keyboard and the pads, where the picture goes, and the style it is seen in. There
 ## are two, the same game in both: the ORIGINAL (style_gb.ol), the screen of the handheld in 160 by 144 points scaled to
-## fit the area (graphics.fitArea), and the MODERN (style_modern.ol), which fills the area. A style only reads the
+## fit the area (graphics.fitArea), and the MODERN (style_modern.ol), in the very same places. A style only reads the
 ## state of the game; V or the STYLE pad changes it, and the one chosen is kept for the next run.
 
 import "rules.ol"

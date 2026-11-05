@@ -12,7 +12,7 @@ func apart(a, b)
 end
 
 var cards = [SCORE_CARD, LEVEL_CARD, LINES_CARD, NEXT_CARD]
-assert(SCREEN.w == 160 and SCREEN.h == 144)
+assert(SCREEN.w == 160 and SCREEN.h == 144 and SCREEN.h % 6 == 0, "the wall of bricks repeats every 6 rows")
 assert(WELL.w == COLS * CELL and WELL.h == ROWS * CELL and WELL.h == SCREEN.h, "the well is 10 by 18 cells and the height of the screen")
 assert(inside(WELL))
 for r in cards do

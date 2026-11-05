@@ -50,4 +50,16 @@ for scale in [0.5, 1, 2, 3.75, 6] do
     end
 end
 
+## The title and the number of a card are on separate rows in all the cards, at any scale, and the number stays below the
+## title with a gap (the cards of the level and of the lines are only 22 points high, which is what asks for it).
+for scale in [0.5, 1, 2, 3.75] do
+    var f = modernFrame(scale, 0, 0)
+    for card in [f.score, f.level, f.lines] do
+        var t = modernCardText(card, f.c)
+        assert(t.valueSize > 0 and t.titleSize > 0)
+        assert(t.valueY - t.valueSize >= t.titleY + t.titleSize + f.c * 0.1 - 0.0001, "scale {scale}: the number touches the title")
+        assert(t.valueY <= card.y + card.h and t.titleY >= card.y and t.pad > 0)
+    end
+end
+
 print("tetris modern pure ok")

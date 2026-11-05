@@ -124,14 +124,14 @@ func modernWell(f)
 end
 
 ## A card of the panel: its title, and under it a number that is kept inside the card whatever its width. `c` is the
-## size of a cell, which the sizes of the card follow.
+## size of a cell, which the sizes of the card follow (modernCardText).
 func modernCard(r, c, title, value)
-    var pad = c * 0.5
+    var t = modernCardText(r, c)
     modernPanel(r.x, r.y, r.w, r.h, c * 0.6, modernLook.card)
-    drawText(title, r.x + pad, r.y + pad, fitSize(title, c * 0.85, r.w - 2 * pad), "left", "top", modernLook.dim)
+    drawText(title, r.x + t.pad, t.titleY, t.titleSize, "left", "top", modernLook.dim)
     if value then
-        var size = fitSize(value, c * 1.5, r.w - 2 * pad)
-        drawText(value, r.x + r.w - pad, r.y + r.h - pad, size, "right", "bottom", modernLook.ink)
+        var size = fitSize(value, t.valueSize, r.w - 2 * t.pad)
+        drawText(value, r.x + r.w - t.pad, t.valueY, size, "right", "bottom", modernLook.ink)
     end
 end
 
