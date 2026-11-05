@@ -3,8 +3,8 @@
 #
 #  1. The exposed Ollin API: every function or method name a module exposes (the first argument
 #     of map_set(..., make(_static)_builtin)) must be camelCase (functions) or PascalCase
-#     (constructors: Color, Quat…) — NEVER snake_case. The meta names (__str, __class__,
-#     __name__) are excluded.
+#     (constructors: Color, Quat…) — NEVER snake_case. The meta names (__str, __name__,
+#     __parent__) are excluded.
 #
 #  2. The internal C++: the engine's code is snake_case. No camelCase identifier may appear in
 #     the CODE (outside strings and comments), with the exception of EXTERNAL identifiers: the

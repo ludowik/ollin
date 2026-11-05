@@ -216,5 +216,5 @@ https.update()
 
 ## ── A request handle is a Request ──────────────────────────────────────────
 var r = https.get("https://example.org/t", ignore)
-assert(r.__class__.__name__ == "Request")
+assert("{r}" == "\{Request}", "it prints as a Request")
 https.update()

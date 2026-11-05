@@ -48,12 +48,11 @@ struct Map {
     enum : uint8_t { PLAIN = 0, ENUM = 1, MODULE = 2 };
     uint8_t kind = PLAIN;
     void* userdata = nullptr;
-    // The CLASS of an instance, or the map used as one (a plain map works as a class: that is how prototype
-    // chains of maps exist). It is a SLOT of the map and not an entry of `data`, on purpose: an entry could be
+    // The CLASS of an instance. It is a SLOT of the map and not an entry of `data`, on purpose: an entry could be
     // written with any value by any script or JSON text, and the engine, which follows it as a pointer to a
-    // map, would crash on a number. Only the engine fills it (Value::set_class, and the guarded write of the
-    // key `__class__` in op_SET_INDEX), so it is nil, a class or a map BY CONSTRUCTION and no reader checks.
-    // `obj.__class__` reads it back. nil for anything that is not an instance.
+    // map, would crash on a number. Only the engine fills it (Value::set_class: instantiating a class, a native
+    // module building its objects), so it is nil or a class BY CONSTRUCTION and no reader checks. A script cannot
+    // read or write it: `__class__` is a key like any other, held in `data`. nil for anything that is not an instance.
     Value proto;
     uint64_t version = 0;   // = ++g_map_epoch on every mutation; 0 means never mutated
     // = ++g_map_epoch when an entry appears or disappears (and on recycling), NOT when a value is overwritten in

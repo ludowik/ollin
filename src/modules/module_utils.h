@@ -143,7 +143,7 @@ struct MapBuilder {
         map.map_set(Value(std::string(key)), v);
         return *this;
     }
-    // The class of an instance being built (cf. Map::proto): not a field, so not `set("__class__", …)`.
+    // The class of an instance being built (cf. Map::proto): not a field, so so `set("__class__", …)` would only make a field nobody reads.
     MapBuilder& klass(const Value& cls) {
         map.set_class(cls);
         return *this;

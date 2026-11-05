@@ -737,7 +737,7 @@ void visit(const WhileStmt& s) override {
 | **Interne C++** (statiques de fichier) | préfixe `s_` + snake | `s_target`, `s_run_active` |
 | **Interne C++** (types / classes) | **PascalCase** | `Value`, `Chunk`, `Frame` |
 
-- **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `map_set(..., make_builtin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`, clés `__class__`/`__name__`) sont exemptées.
+- **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `map_set(..., make_builtin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`, clés `__name__`/`__parent__`) sont exemptées.
 - **Règle stricte, côté C++ interne : `snake_case` partout.** Une seule convention pour tout le code du moteur (choix de cohérence interne, indépendant de l'API langage). Le C++ « parle la même langue » que la STL qu'il appelle. **Exceptions** (axes orthogonaux, pas des choix de casse) : types/classes en `PascalCase`, statiques préfixés `s_`, méta-noms `__…` du langage, et **identifiants externes conservés tels quels** — API raylib/rlgl (`rl*`/`gl*`), méthodes `emscripten::val` (`isNumber`, `isNull`…), champs de structs raylib (`vaoId`, `texId`, `meshMaterial`…). Les noms d'API exposés et les identifiants GLSL des shaders vivent dans des **littéraux de chaîne** → hors casse C++. **Les blocs `EM_ASM({…})` sont du JavaScript stringifié par la macro (PAS un littéral de chaîne)** : leurs identifiants JS (`getElementById`, `srcObject`, `createElement`…) restent en camelCase et sont neutralisés par span équilibré (comme dans `check_naming.sh`) — un renommage naïf par mot les casserait.
 - **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) vérifie les **deux sens** — (1) aucun builtin exposé ne contient de `_` ; (2) aucun identifiant camelCase dans le **code** C++ (chaînes/commentaires ignorés), hors liste blanche externe (`rl*`/`gl*`, méthodes `emscripten::val`, champs raylib). Un nouvel identifiant camelCase interne fait échouer le test.
 - **Code utilisateur** (`.ol`) : aucune contrainte imposée par le langage (le nommage des variables/fonctions de l'utilisateur est libre).
@@ -2291,7 +2291,7 @@ Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin i
 Implémentation : `Map { robin_hood::unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — hashmap **`robin_hood`** (mono-header vendorisé `libs/robin_hood.h`, même lib que le `StringTable` ; variante *node* car `Value` n'est pas trivialement copiable), ref-counted, recyclé via `MapPool`.  
 Clés de tout type Value (ValueHash/ValueEqual : INTEGER(1)==FLOAT(1.0), strings par pointeur).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
-`isFalsy(map)` → `mapSize() == 0` (« le vide est faux » ; une instance a ≥1 clé `__class__` → truthy). Idem `isFalsy(array)` → `arraySize() == 0`.  
+`isFalsy(map)` → `mapSize() == 0` (« le vide est faux » ; une instance sans champ reste truthy : cf. « La classe d'un objet est un EMPLACEMENT »). Idem `isFalsy(array)` → `arraySize() == 0`.  
 Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
@@ -2370,7 +2370,7 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 ## Accès membre : `GET_INDEX`, pseudo-méthodes et inline cache
 
 **Résolution.** `GET_INDEX` traite quatre familles de receveurs :
-- **map / classe** : data PROPRE d'abord, puis la chaîne (`__class__` d'une map, `__parent__` d'une classe) via `proto_chain_rest()` — séparé de `proto_chain_get()` pour ne consulter la data propre qu'**une** fois.
+- **map / classe** : data PROPRE d'abord, puis la chaîne (la classe d'une instance, `__parent__` d'une classe) via `proto_chain_rest()` — séparé de `proto_chain_get()` pour ne consulter la data propre qu'**une** fois.
 - **chaîne** : membre du module `string` (`string_module_`).
 - **tableau** : membre de `array_module_` (`len`, `push`/`enqueue`, `pop`, `dequeue`, `insert`, `delete`, `map`, `filter`, `reduce`, `sort`). Un champ absent est une **erreur** (`array has no field '…'`), pas `nil`. Ces maps sont construites **une fois** au démarrage — plus de chaîne de `strcmp` reconstruisant une closure par accès.
 - **pseudo-méthodes des maps** (`len`, `keys`, `values`, `has`, `delete`, module `map`, `map_module.cpp`) : un **repli tout-froid** (rien trouvé dans la data propre ni la chaîne, et jamais tenté sur une **instance** — `!is_instance(obj)`, même restriction que `len` a toujours eue) — cherché dans `map_module_` via `module_member()`, comme `array_module_`/`string_module_`. Ça ne peut pas être une simple entrée de map servie par lookup, puisqu'une entrée définie par la map elle-même doit toujours gagner (`{len: 42}.len == 42`).
@@ -2394,12 +2394,12 @@ Mesuré (`bash bench/icount.sh`, avant/après ce changement) : `fib` −2,9 %, b
   si bien qu'une entrée indexée sur l'instance ne peut jamais être touchée — on ne paie que le
   remplissage. (2) Entrée indexée sur la CLASSE, l'absence dans la data propre étant déjà établie
   par la recherche qui précède : **+0,26 %** sur `bench_classes`, +0,27 % sur `bench_objects`,
-  +0,00 % sur `invaders`. La descente coûte une recherche de `__class__` puis une du nom dans la
+  +0,00 % sur `invaders`. La descente coûte une recherche de la classe puis une du nom dans la
   classe ; la validation d'une entrée coûte autant. Ne pas refaire sans une idée qui change ce
-  bilan — par exemple supprimer la recherche de `__class__` elle-même.
+  bilan — par exemple supprimer la recherche de la classe elle-même.
 - Deux compteurs, tous deux tirés de `++g_map_epoch` (époque globale monotone, donc insensibles à la réutilisation d'adresse) : `Map::layout` bouge quand une entrée APPARAÎT ou DISPARAÎT (et au recyclage dans `MapPool::release`) — c'est lui que lit le cache, puisque seul cela déplace un emplacement ; `Map::version` bouge à CHAQUE `Map::set`, écrasement en place compris — c'est lui que lisent les consommateurs du CONTENU (le cache de caméra de `graphics3d.cpp`). Écraser une valeur en place laisse donc le cache de `GET_INDEX` valide, et le prochain accès lit la nouvelle valeur.
 - `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.
-- **La classe d'un objet est un EMPLACEMENT de la map (`Map::proto`), pas une entrée de ses données.** Elle était une clé `"__class__"` ordinaire, que n'importe quel script (`m["__class__"] = 5`) ou texte JSON pouvait remplir : le moteur lisait alors l'entier comme un pointeur de map (SIGSEGV, constaté). Désormais seul le moteur remplit l'emplacement (`Value::set_class`, `MapBuilder::klass`, `instantiate_class`) et l'écriture de la clé `__class__` par un script est détournée vers lui (`op_SET_INDEX`, `set_class_checked`), qui REFUSE tout ce qui n'est ni classe ni map (et un cycle) : l'emplacement est donc nil, une classe ou une map PAR CONSTRUCTION, et aucun lecteur ne vérifie. Une MAP reste acceptée comme classe (chaînes de prototypes de maps, testées). `obj.__class__` se lit par le repli froid de `GET_INDEX` (`map_member_miss`), sans coût sur le chemin chaud. Conséquences voulues : une instance n'a plus de clé `__class__` (`len`, itération, `json.stringify` ne la voient plus), une instance sans champ reste VRAIE (`is_falsy_cold`), et un texte JSON qui porte cette clé obtient un champ ordinaire. Un module natif qui crée une instance pose sa classe par `set_class`/`klass`, jamais par `map_set("__class__", …)` — qui créerait un champ mort. `sizeof(Map)` passe de 88 à 104 octets.
+- **La classe d'un objet est un EMPLACEMENT de la map (`Map::proto`), pas une entrée de ses données, et AUCUN script ne peut la lire ni l'écrire.** Elle était une clé `"__class__"` ordinaire, que n'importe quel script (`m["__class__"] = 5`) ou texte JSON pouvait remplir : le moteur lisait alors l'entier comme un pointeur de map (SIGSEGV, constaté). L'emplacement a d'abord été protégé par une écriture gardée de cette clé (`set_class_checked`) et une lecture de repli, puis le mécanisme a été **supprimé du langage** (décision de l'utilisateur : la mécanique ne doit pas être visible du langage) : `__class__` est aujourd'hui une clé comme une autre, rangée dans `data`, et ne change rien à la classe (`obj.__class__ = Autre` écrit un champ). Seul le moteur remplit l'emplacement (`Value::set_class`, `MapBuilder::klass`, `instantiate_class`), donc il est nil ou une classe PAR CONSTRUCTION et aucun lecteur ne vérifie. Il n'existe plus de chaîne de prototypes de maps (`{__class__: base}`), et plus de moyen de demander la classe d'un objet depuis un script : les tests reconnaissent un objet à son affichage ou à ses méthodes. Une instance n'a pas de clé pour sa classe (`len`, itération, `json.stringify` ne la voient pas), une instance sans champ reste VRAIE (`is_falsy_cold`), et un texte JSON qui porte la clé `__class__` obtient un champ ordinaire. Un module natif qui crée une instance pose sa classe par `set_class`/`klass`, jamais par `map_set("__class__", …)` — qui créerait un champ que personne ne lit. `sizeof(Map)` passe de 88 à 104 octets.
   **Mesuré** : −11,8 % d'instructions sur un programme d'objets (instanciation, héritage, méthodes, `__add` ; 270,1 M → 238,3 M) — le test d'instance n'est plus une recherche de hachage. ⚠ Et un piège de GCC : avec un corps aussi petit, `has_class_link` (la moitié hors ligne de `is_instance`) faisait réallouer les registres de `run_goto` (**+0,61 % sur `fib`**, deux instructions par appel, pour un chemin que `fib` ne prend jamais) ; ni `noinline`, ni déplacer le code de `GET_INDEX`/`SET_INDEX`, ni le champ `class_key_` n'y changeaient rien — c'est l'inférence interprocédurale de registres, et `[[gnu::noipa]]` sur la fonction la supprime (fib +0,03 %). Trouvé en bissectant les fonctions de `vm.cpp` une à une. **Fusionner `is_instance` et `has_class_link` en UNE fonction hors ligne a été essayé puis RETIRÉ, mesure à l'appui** : le test de type doit rester en ligne, sinon une comparaison de deux flottants paie un appel pour s'entendre répondre « non » (mandelbrot **+4,4 %** d'instructions, classes **+0,9 %** ; en ligne et fusionnée, `fib` +0,58 %). Cacher la moitié hors ligne dans une lambda `noipa` DANS `is_instance`, pour n'avoir qu'un nom, a aussi été essayé : `fib` +0,29 %, classes +0,45 %. Le découpage en deux fonctions est voulu.
 - **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
 
@@ -2609,8 +2609,8 @@ retour.
 ### Représentation
 
 - Une classe est une `T_CLASS` (= `T_MAP` à tag distinct) contenant : `__name__` (string), `__parent__` (T_CLASS, optionnel), et une entrée par méthode.
-- Une instance est un `T_MAP` normal avec une clé `__class__` pointant vers sa classe.
-- La recherche de propriété/méthode (`GET_INDEX`, `CALL_METHOD`) remonte la chaîne `instance → __class__ → __parent__` via `protoChainGet`.
+- Une instance est un `T_MAP` normal dont l'emplacement `Map::proto` pointe vers sa classe (pas une clé : cf. « La classe d'un objet est un EMPLACEMENT »).
+- La recherche de propriété/méthode (`GET_INDEX`, `CALL_METHOD`) remonte la chaîne `instance → classe → __parent__` via `protoChainGet`.
 
 ### Compilation
 
@@ -2666,14 +2666,14 @@ l'expression servait d'ARGUMENT d'appel, et `false` quand elle était rangée da
 
 ### CALL_DYN sur T_CLASS (instanciation)
 
-1. Crée une instance T_MAP, pose `__class__` = la classe.
+1. Crée une instance T_MAP, pose son emplacement de classe.
 2. Cherche `init` via `protoChainGet`.
 3. Si trouvé : décale les args d'un cran pour insérer `self` en R[0], pousse un frame avec `ctor_result = instance`.
 4. À RETURN : si `ctor_result` non-nil, écrase R[0] avec l'instance (résultat = l'objet créé).
 
 ### CALL_METHOD (appel de méthode)
 
-- Si R[cb] a `__class__` (instance) : garde `self` en R[cb], décale args → total = argc+1.
+- Si R[cb] a une classe (instance) : garde `self` en R[cb], décale args → total = argc+1.
 - Sinon (map simple/module) : décale les args depuis R[cb+2], pas de self → total = argc.
 
 ### Méta-méthodes (dispatch dans les opcodes arithmétiques)

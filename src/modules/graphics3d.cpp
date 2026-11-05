@@ -131,7 +131,7 @@ static Camera3D camera_from_map(const Value& v, const char* fn) {
 }
 
 // Camera class (native, like Color).
-// A camera is a class INSTANCE (a map with __class__) carrying px,py,pz (position),
+// A camera is a class INSTANCE (a map with a class) carrying px,py,pz (position),
 // tx,ty,tz (target) and fovy. Since an instance is still a T_MAP, camera_from_map reads
 // it unchanged. The methods MUTATE self in place (a camera is mutable between frames)
 // and return self, so calls chain.

@@ -156,7 +156,7 @@ class VM {
 
     static Value proto_chain_get(const Value& obj, const Value& key);
 
-    // Rest of the prototype chain (a map's __class__, a class's __parent__). The caller has
+    // Rest of the prototype chain (an instance's class, a class's __parent__). The caller has
     // already searched obj's OWN data, so this avoids looking the same key up twice
     // (see op_GET_INDEX).
     static Value proto_chain_rest(const Value& obj, const Value& key);
@@ -173,7 +173,6 @@ class VM {
             return false;
         return has_class_link(v);
     }
-    [[gnu::noinline]] void set_class_checked(Value& obj, const Value& cls); // out of line: run_goto hosts every hot path
     Value map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr);
 
     uint32_t try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
@@ -326,9 +325,6 @@ class VM {
             throw std::runtime_error("runtime: expected number, got boolean");
         throw std::runtime_error("runtime: expected number, got string");
     }
-
-    // The interned key `__class__`, compared by pointer in the write and the read of that key (set in execute).
-    const InternedStr* class_key_ = nullptr;
 };
 
 // The result slots are addressed through VM::regs and the index CallCtx carries, never through the

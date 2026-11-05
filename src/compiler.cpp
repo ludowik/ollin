@@ -2506,7 +2506,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (self_it == nullptr)
             throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super' can only be used inside a method");
         // The parent class is fixed LEXICALLY — the class where the method is defined — rather
-        // than through self.__class__.__parent__: otherwise B.m() running on a C instance would
+        // than through the class of self and its parent: otherwise B.m() running on a C instance would
         // always land back on B, an infinite recursion in a hierarchy of three levels or more.
         if (current_class_parent_.empty())
             throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super': the current class has no parent");

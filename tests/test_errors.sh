@@ -941,8 +941,8 @@ h.delay(-1)' \
     "tween.delay: delay must be >= 0"
 
 check_error "a tween method on something that is not a tween" \
-    'var T = tween.to({x: 0}, {x: 1}, 1).__class__
-T.cancel({})' \
+    'var cancel = tween.to({x: 0}, {x: 1}, 1).cancel
+cancel({})' \
     "tween.cancel: expected a tween"
 
 check_error "sound.sample without a time" \
@@ -961,13 +961,13 @@ s.loop(3)' \
     "sound.loop: expected true, false, or no argument"
 
 check_error "a sound method on something that is not a sound" \
-    'var S = sound.tone(100, 0.01).__class__
-S.duration({})' \
+    'var duration = sound.tone(100, 0.01).duration
+duration({})' \
     "sound.duration: expected a sound"
 
 check_error "an oscillator method on something that is not an oscillator" \
-    'var O = sound.sine(100).__class__
-O.freq({})' \
+    'var freq = sound.sine(100).freq
+freq({})' \
     "sound.freq: expected an oscillator"
 
 check_error "a sound used after its slot was taken back" \

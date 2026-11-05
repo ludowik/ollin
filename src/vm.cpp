@@ -41,10 +41,10 @@ static void validate_numeric_range(double start, double end, double step) {
 
 // Interned meta-key constants, initialized once and reused across all calls.
 struct MetaKeys {
-    Value class_, parent_, str_, name_, init_;
+    Value parent_, str_, name_, init_;
     Value add_, sub_, mul_, div_, mod_, neg_, eq_, lt_, le_;
     MetaKeys()
-        : class_(std::string("__class__")), parent_(std::string("__parent__")), str_(std::string("__str")),
+        : parent_(std::string("__parent__")), str_(std::string("__str")),
           name_(std::string("__name__")), init_(std::string("init")),
           add_(std::string("__add")), sub_(std::string("__sub")), mul_(std::string("__mul")),
           div_(std::string("__div")), mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")),
@@ -56,16 +56,13 @@ static MetaKeys& MK() {
     return mk;
 }
 
-// What `obj.key` gives when `obj`'s own data has no such entry: the prototype chain, then `obj.__class__` itself
-// (the class link is a slot of the map, not an entry of its data), then the map module's pseudo-methods
+// What `obj.key` gives when `obj`'s own data has no such entry: the prototype chain, then the map module's pseudo-methods
 // (len, keys, values, has, delete) — an all-cold fallback, never tried for an INSTANCE: an instance is expected to
 // define or inherit its own fields. Out of line, so that none of it sits in run_goto.
 [[gnu::noinline]] Value VM::map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr) {
     Value chained = proto_chain_rest(obj, key);
     if (!chained.is_nil())
         return chained;
-    if (key_sptr == class_key_)
-        return obj.class_of();
     if (key_sptr && !is_instance(obj)) {
         const Value* meth = module_member(map_module_, key, key_sptr);
         return meth ? *meth : Value{};
@@ -115,23 +112,6 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
             return proto_chain_get(par, key);
     }
     return Value{};
-}
-
-// `obj.__class__ = cls`, the only way a script sets the class link: a class, a map used as one, or nil to
-// take the link away. Refusing anything else is what lets every reader of the link trust it.
-void VM::set_class_checked(Value& obj, const Value& cls) {
-    if (cls.is_nil()) {
-        obj.set_class(Value{});
-        return;
-    }
-    if (!cls.is_map() && !cls.is_class())
-        throw std::runtime_error("runtime: '__class__' must be a class or a map, got " + std::string(cls.type_name()));
-    // A chain that came back to obj would send every lookup round it for ever.
-    for (const Value* p = &cls; !p->is_nil(); p = &p->class_of()) {
-        if (p->mptr == obj.mptr)
-            throw std::runtime_error("runtime: '__class__' would make the object its own class");
-    }
-    obj.set_class(cls);
 }
 
 // Grows the register file to exactly `needed`, up to k_max_regs: the capacity was reserved by execute, so nothing moves.
@@ -1624,7 +1604,7 @@ dispatch_loop:
                 Value hit = *slot; // read before writing the register (see the cache hit)
                 R[A] = std::move(hit);
             } else {
-                // Absent from the own data: walk the prototype chain (__class__ / __parent__).
+                // Absent from the own data: walk the prototype chain (the class, then __parent__).
                 // NOT cached, because mutating the CLASS does not bump the instance's layout.
                 // The map module's pseudo-methods (len, keys, values, has, delete) are only an
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
@@ -1675,10 +1655,7 @@ dispatch_loop:
             if (obj.mptr->kind == Map::ENUM)
                 throw std::runtime_error("cannot modify an enum" +
                                          (key.is_string() ? " (field '" + key.as_string() + "')" : ""));
-            if (key.is_string() && key.sptr == class_key_)
-                set_class_checked(obj, R[C]); // `__class__` is the class link, a slot of the map
-            else
-                obj.map_set(key, R[C]);
+            obj.map_set(key, R[C]);
         } else if (obj.is_array()) {
             if (!key.is_integer())
                 throw std::runtime_error("runtime: array index must be integer");
@@ -2230,7 +2207,6 @@ void VM::execute(Chunk chunk) {
     // The whole register file is allocated here, once: run_goto keeps a pointer into it, which a
     // growth must therefore never move. grow_regs refuses to go past this size.
     regs.reserve(k_max_regs);
-    class_key_ = MK().class_.sptr;
     owned_chunk = std::move(chunk);
     ch = &owned_chunk;
     ip = 0;

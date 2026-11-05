@@ -8,7 +8,7 @@
 Value make_color_class(); // defined below; used by color_random as a fallback
 
 // Every colour built by this module — a palette constant as much as the result of pastel(),
-// grayscale() or gray() — is a real Color instance, with __class__ set, so the methods and __str
+// grayscale() or gray() — is a real Color instance, with its class set, so the methods and __str
 // work on it exactly as on Color(...). Defined at the bottom, next to the palette.
 static Value make_color_instance(const Value& cls, double r, double g, double b, double a = 1.0);
 
@@ -25,7 +25,7 @@ static double color_component(const Value& v, const char* name) {
 }
 
 // The Color class used by the static factories (random, gray): the global one, reused rather than
-// allocated anew so that __class__ is Color, falling back to a fresh class when the global is not
+// allocated anew so that the class is Color, falling back to a fresh class when the global is not
 // materialized yet.
 static Value color_class() {
     Value c = VM::current()->get_global("Color");

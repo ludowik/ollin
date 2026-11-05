@@ -254,8 +254,7 @@ struct Value {
     // The class link of a map (cf. Map::proto): nil for an object that has none. The caller has checked
     // that this is a map or a class.
     const Value& class_of() const;
-    // Makes this map an instance of `cls` (a class, or a map used as one). For the engine and the native
-    // modules; a script goes through the guarded write of `__class__`.
+    // Makes this map an instance of `cls`. For the engine and the native modules only: no script can set it.
     void set_class(const Value& cls);
 
     static Value make_array();

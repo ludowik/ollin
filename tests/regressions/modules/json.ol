@@ -57,8 +57,8 @@ assert(len(deep) == 1)
 var twice = json.parse(q("\{'a':1,'a':null,'b':1,'b':2}"))
 assert(not twice.has("a") and twice.b == 2, "a repeated key takes its last value")
 
-## A key that the engine reads as the class of an instance can come from a text: it lands as an ordinary field,
-## and the class link, a slot of the map, is not touched: the map stays a map.
+## The key `__class__` can come from a text: it lands as an ordinary field. The class of an object is a slot of the map
+## that no text or script reaches, so the map stays a map.
 var spoof = json.parse(q("\{'__class__':5,'a':1}"))
 assert(spoof.a == 1 and spoof.__class__ == 5)
 assert("{spoof}" == "{map}", "it prints as a map, whatever its __class__ holds")
