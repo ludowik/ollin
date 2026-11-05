@@ -31,17 +31,7 @@ static std::unique_ptr<VM> s_vm;
 
 static std::string ollin_run(const std::string& source, const std::string& filename) {
     // Release stale GL texture handles before GL context may be reset.
-    image_reset();
-    camera_reset();
-    ui_reset();   // the previous program's widgets: the statics outlive the VM
-    tween_reset();   // likewise: a surviving tween would retain the previous program's objects
-    https_reset();   // and an answer still on its way would reach the wrong program
-    audio_reset();   // the master volume, which a previous program may have turned down
-    sound_reset();   // otherwise an oscillator of the previous program would keep sounding
-    touch_reset();   // a finger left "down" would look like a gesture under way
-    gfx_program_reset();   // fitArea off and the previous program's orientation lock released
-    motion_reset();   // a program asks for the sensors itself, never inherits the last one's request
-    mouse_reset();   // nor a button left pressed
+    modules_reset();   // each module forgets what it kept for the previous program (k_modules, modules.cpp)
     engine_font_reset();   // the atlases belonged to the previous GL context
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();

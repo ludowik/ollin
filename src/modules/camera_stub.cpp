@@ -14,3 +14,5 @@ Value make_camera_module() {
         .fn("isOpen", [](CallCtx& ctx) -> int { return ctx.ret(Value::make_bool(false)); })
         .done();
 }
+
+void camera_reset() {}

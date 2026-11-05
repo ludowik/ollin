@@ -1,5 +1,15 @@
 #include "modules.h"
+#include "audio_module.h"
+#include "camera_module.h"
+#include "https_module.h"
+#include "image_module.h"
 #include "map_module.h"
+#include "motion_module.h"
+#include "mouse_module.h"
+#include "sound_module.h"
+#include "touch_module.h"
+#include "tween_module.h"
+#include "ui_module.h"
 #include "value.h"
 #include <stdexcept>
 
@@ -28,30 +38,46 @@ Value make_date_module();
 Value make_json_module();
 Value make_https_module();
 
-static const struct { const char* name; Value(*make)(); } k_modules[] = {
-    { "core",     make_core_module     },
-    { "math",     make_math_module     },
-    { "graphics", make_graphics_module },
-    { "string",   make_string_module   },
-    { "map",      make_map_module      },
-    { "colors",   make_colors_module   },
-    { "blend",    make_blend_module    },
-    { "window",   make_window_module   },
-    { "image",    make_image_module    },
-    { "keyboard", make_keyboard_module },
-    { "mouse",    make_mouse_module    },
-    { "data",     make_data_module     },
-    { "camera",   make_camera_module   },
-    { "ui",       make_ui_module       },
-    { "tween",    make_tween_module    },
-    { "audio",    make_audio_module    },
-    { "sound",    make_sound_module    },
-    { "touch",    make_touch_module    },
-    { "motion",   make_motion_module   },
-    { "date",     make_date_module     },
-    { "json",     make_json_module     },
-    { "https",    make_https_module    },
+// graphics_internal.h pulls in raylib, which this file compiles without: the one function it needs is declared here
+// (graphics_module.cpp, or graphics_stub.cpp without a window).
+void gfx_program_reset();
+
+// A module that keeps state from one frame to the next says here how to forget it: `reset` runs when a new program
+// starts (modules_reset), because the statics outlive the VM and the next program must not inherit the last one's
+// animations, widgets, requests, fingers or sounds. Every build has one, a stub's included, so that a module is
+// declared in one place and a new one cannot be forgotten in the engine's entry point. What runs every frame stays
+// written out in the render loop, where the ORDER of the calls is documented.
+static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modules[] = {
+    { "core",     make_core_module,     nullptr          },
+    { "math",     make_math_module,     nullptr          },
+    { "graphics", make_graphics_module, gfx_program_reset },   // fitArea off, the orientation lock released
+    { "string",   make_string_module,   nullptr          },
+    { "map",      make_map_module,      nullptr          },
+    { "colors",   make_colors_module,   nullptr          },
+    { "blend",    make_blend_module,    nullptr          },
+    { "window",   make_window_module,   nullptr          },
+    { "image",    make_image_module,    image_reset      },   // stale GL texture handles, before the context may be reset
+    { "keyboard", make_keyboard_module, nullptr          },
+    { "mouse",    make_mouse_module,    mouse_reset      },   // no button left pressed
+    { "data",     make_data_module,     nullptr          },
+    { "camera",   make_camera_module,   camera_reset     },
+    { "ui",       make_ui_module,       ui_reset         },
+    { "tween",    make_tween_module,    tween_reset      },
+    { "audio",    make_audio_module,    audio_reset      },   // the master volume a program may have turned down
+    { "sound",    make_sound_module,    sound_reset      },
+    { "touch",    make_touch_module,    touch_reset      },   // a finger left "down" would look like a gesture
+    { "motion",   make_motion_module,   motion_reset     },   // a program asks for the sensors itself
+    { "date",     make_date_module,     nullptr          },
+    { "json",     make_json_module,     nullptr          },
+    { "https",    make_https_module,    https_reset      },   // an answer still on its way would reach the wrong program
 };
+
+void modules_reset() {
+    for (auto& m : k_modules) {
+        if (m.reset)
+            m.reset();
+    }
+}
 
 const std::vector<std::string>& builtin_module_names() {
     static const std::vector<std::string> names = [] {
