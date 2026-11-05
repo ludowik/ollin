@@ -28,12 +28,13 @@ import "style_modern.ol"
 ## The styles, the first being the one the game starts in, and the key that keeps the choice between two runs.
 global styles = [styleGb, styleModern]
 const STYLE_KEY = "tetris.style"
+const TOUCH_KEY = "tetris.touch"
 
 ## What belongs to the screen and the fingers, not to the game.
 global view = {
     pads: {},                   ## the pad buttons down at the last frame
     pointer: false,             ## a finger or the mouse was down at the last frame
-    touchSeen: false,           ## a finger has touched the screen, so the pads are shown
+    touchSeen: false,           ## a finger has touched the screen (in this run or an earlier one), so the pads are shown
     hint: "",                   ## what the title screens say of the key V
     style: 1,                   ## the index in `styles` of the style the game is seen in
     layout: {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: 0, h: 0, padsShown: false}
@@ -120,8 +121,9 @@ end
 func readInput()
     var held = game.held
     var pts = pointers()
-    if touch.count() > 0 then
+    if touch.count() > 0 and not view.touchSeen then
         view.touchSeen = true
+        data.set(TOUCH_KEY, true)
     end
     var pads = {}
     var tap = len(pts) > 0 and not view.pointer
@@ -236,6 +238,7 @@ func setup()
     gameInit()
     loadGame()
     loadStyle()
+    view.touchSeen = data.get(TOUCH_KEY, false)
     layoutCompute()
 end
 
