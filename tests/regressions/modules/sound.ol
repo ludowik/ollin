@@ -221,3 +221,31 @@ for p in playingS do
     p.stop()
 end
 assert(sound.tone(100, 0.01).duration() == 0.01, "once they stop, the table accepts new sounds")
+
+## ── A method taken off its sound is refused, and so is a handle of another module ────────────────────────────
+## `var f = o.stop` then `f()` calls the method with no receiver; a tween handle has the same {slot, gen} fields and must
+## not be taken for an oscillator or a sound.
+func soundFailure(f)
+    var message = nil
+    try
+        f()
+    catch e
+        message = e
+    end
+    return message
+end
+var soundOsc = sound.osc(220)
+var soundOther = tween.to({x: 0}, {x: 1}, 1.0)
+for name in ["stop", "freq", "volume", "release"] do
+    var detached = soundOsc[name]
+    assert(soundFailure(func() detached() end) == "sound.{name}: expected an oscillator", "{name} with no receiver")
+    assert(soundFailure(func() detached(soundOther) end) == "sound.{name}: expected an oscillator", "{name} on a tween")
+    assert(soundFailure(func() detached({slot: 1, gen: 1}) end) == "sound.{name}: expected an oscillator", "{name} on a look-alike")
+end
+var soundBuffer = sound.generate(0.01, func(t) return 0 end)
+for name in ["stop", "volume", "duration"] do
+    var detached = soundBuffer[name]
+    assert(soundFailure(func() detached() end) == "sound.{name}: expected a sound", "{name} of a sound with no receiver")
+    assert(soundFailure(func() detached(soundOther) end) == "sound.{name}: expected a sound", "{name} of a sound on a tween")
+end
+soundOsc.free()

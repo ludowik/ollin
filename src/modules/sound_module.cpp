@@ -23,20 +23,15 @@ Voice* voices() {
 Value osc_class();
 
 Value make_handle(int slot) {
-    Value h = Value::make_map();
-    h.set_class(osc_class());
-    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
-    h.map_set(Value(std::string("gen")), Value((int64_t)voices()[slot].gen));
-    return h;
+    return make_slot_handle(osc_class(), slot, voices()[slot].gen);
 }
 
 int handle_slot(const Value& self, const char* fn) {
-    Value slot = self.map_get(Value(std::string("slot")));
-    Value gen = self.map_get(Value(std::string("gen")));
-    if (!slot.is_integer() || !gen.is_integer())
+    int i;
+    uint32_t gen;
+    if (!read_slot_handle(self, osc_class(), i, gen))
         throw std::runtime_error(std::string(fn) + ": expected an oscillator");
-    int i = (int)slot.as_int();
-    if (i < 0 || i >= k_max_voices || voices()[i].gen != (uint32_t)gen.as_int())
+    if (i < 0 || i >= k_max_voices || voices()[i].gen != gen)
         throw std::runtime_error(std::string(fn) + ": this oscillator no longer exists");
     return i;
 }
@@ -258,20 +253,15 @@ Buf* bufs() {
 Value buffer_class();
 
 Value make_buffer_handle(int slot) {
-    Value h = Value::make_map();
-    h.set_class(buffer_class());
-    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
-    h.map_set(Value(std::string("gen")), Value((int64_t)bufs()[slot].gen));
-    return h;
+    return make_slot_handle(buffer_class(), slot, bufs()[slot].gen);
 }
 
 int buffer_slot(const Value& self, const char* fn) {
-    Value slot = self.map_get(Value(std::string("slot")));
-    Value gen = self.map_get(Value(std::string("gen")));
-    if (!slot.is_integer() || !gen.is_integer())
+    int i;
+    uint32_t gen;
+    if (!read_slot_handle(self, buffer_class(), i, gen))
         throw std::runtime_error(std::string(fn) + ": expected a sound");
-    int i = (int)slot.as_int();
-    if (i < 0 || i >= k_max_buffers || bufs()[i].gen != (uint32_t)gen.as_int())
+    if (i < 0 || i >= k_max_buffers || bufs()[i].gen != gen)
         throw std::runtime_error(std::string(fn) + ": this sound no longer exists");
     return i;
 }

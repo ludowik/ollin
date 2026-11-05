@@ -157,14 +157,16 @@ int current_menu() {
 
 // Script-side handles: a native class instance carrying {slot, gen}.
 
+Value element_class();
+
 int handle_slot(const Value& self, const char* fn) {
-    Value slot = self.map_get(Value(std::string("slot")));
-    Value gen = self.map_get(Value(std::string("gen")));
-    if (!slot.is_integer() || !gen.is_integer())
+    int slot;
+    uint32_t gen;
+    if (!read_slot_handle(self, element_class(), slot, gen))
         throw std::runtime_error(std::string(fn) + ": expected a ui element");
-    if (!node_alive((int)slot.as_int(), (uint32_t)gen.as_int()))
+    if (!node_alive(slot, gen))
         throw std::runtime_error(std::string(fn) + ": this ui element has been removed");
-    return (int)slot.as_int();
+    return slot;
 }
 
 int menu_slot(const Value& self, const char* fn) {
@@ -174,14 +176,8 @@ int menu_slot(const Value& self, const char* fn) {
     return slot;
 }
 
-Value element_class();
-
 Value make_handle(int slot) {
-    return MapBuilder()
-        .klass(element_class())
-        .int_num("slot", slot)
-        .int_num("gen", (int64_t)s_nodes[slot].gen)
-        .done();
+    return make_slot_handle(element_class(), slot, s_nodes[slot].gen);
 }
 
 // The appearance lives here: colours, thicknesses and proportions. The font is a FRACTION of the drawing

@@ -317,11 +317,7 @@ void advance(double dt) {
 Value tween_class();
 
 Value make_handle(int slot) {
-    Value h = Value::make_map();
-    h.set_class(tween_class());
-    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
-    h.map_set(Value(std::string("gen")), Value((int64_t)s_tweens[slot].gen));
-    return h;
+    return make_slot_handle(tween_class(), slot, s_tweens[slot].gen);
 }
 
 // A handle's slot, or -1 when the tween is finished or cancelled. A stale handle is NOT a mistake:
@@ -329,28 +325,18 @@ Value make_handle(int slot) {
 bool is_tween_handle(const Value& v);
 
 int handle_slot(const CallCtx& ctx, const char* fn) {
-    // A method taken off its tween (`var f = t.cancel`) is called with no receiver at all, and the register that
-    // should hold it is then whatever the call left there: the receiver is checked before anything is read from it.
-    if (ctx.argc < 1 || !is_tween_handle(ctx.args[0]))
+    int slot;
+    uint32_t gen;
+    if (ctx.argc < 1 || !read_slot_handle(ctx.args[0], tween_class(), slot, gen))
         throw std::runtime_error(std::string(fn) + ": expected a tween");
-    const Value& self = ctx.args[0];
-    Value slot = self.map_get(Value(std::string("slot")));
-    Value gen = self.map_get(Value(std::string("gen")));
-    if (!slot.is_integer() || !gen.is_integer())
-        throw std::runtime_error(std::string(fn) + ": expected a tween");
-    if (!tween_alive((int)slot.as_int(), (uint32_t)gen.as_int()))
-        return -1;
-    return (int)slot.as_int();
+    return tween_alive(slot, gen) ? slot : -1;
 }
 
 // A tween handle is a map like any other: without this test it would be taken for the object to
 // animate, and the refusal would complain about a missing field instead of naming the
 // real cause, which is that nesting is not supported.
 bool is_tween_handle(const Value& v) {
-    if (!v.is_map())
-        return false;
-    Value cls = v.class_of();
-    return cls.is_class() && cls.as_map() == tween_class().as_map();
+    return is_instance_of(v, tween_class());
 }
 
 

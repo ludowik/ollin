@@ -7,6 +7,39 @@
 #include <utility>
 #include <vector>
 
+// A script-side handle is an instance of a native class carrying {slot, gen}: `slot` is where the thing lives in the
+// module's table, `gen` is bumped when the slot is freed, so a handle kept too long is told from the thing that took
+// its place. Never a pointer: a callback may grow the table. The check of the receiver comes first, because a method
+// taken off its object (`var f = t.cancel`) is called with no receiver, and the register that should hold it is
+// whatever the call left there.
+static inline bool is_instance_of(const Value& v, const Value& cls) {
+    if (!v.is_map())
+        return false;
+    Value c = v.class_of();
+    return c.is_class() && c.as_map() == cls.as_map();
+}
+
+static inline Value make_slot_handle(const Value& cls, int slot, uint32_t gen) {
+    Value h = Value::make_map();
+    h.set_class(cls);
+    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
+    h.map_set(Value(std::string("gen")), Value((int64_t)gen));
+    return h;
+}
+
+// False when `v` is not a handle of the class; the caller words the refusal, which names what it expected.
+static inline bool read_slot_handle(const Value& v, const Value& cls, int& slot, uint32_t& gen) {
+    if (!is_instance_of(v, cls))
+        return false;
+    Value s = v.map_get(Value(std::string("slot")));
+    Value g = v.map_get(Value(std::string("gen")));
+    if (!s.is_integer() || !g.is_integer())
+        return false;
+    slot = (int)s.as_int();
+    gen = (uint32_t)g.as_int();
+    return true;
+}
+
 // The entries of a map whose keys are all strings, sorted by key: a map has no order, and the modules that write one out
 // (json, https) need the same text for the same value. A key that is not a string throws "<what> must be a string".
 // `say_type` appends the type found, for the callers whose message always did.

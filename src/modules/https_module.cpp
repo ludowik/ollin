@@ -164,27 +164,17 @@ void read_options(const Value& options, HttpsRequest& rq, const char* fn) {
 Value https_class();
 
 Value make_handle(int slot) {
-    Value h = Value::make_map();
-    h.set_class(https_class());
-    h.map_set(Value(std::string("slot")), Value((int64_t)slot));
-    h.map_set(Value(std::string("gen")), Value((int64_t)s_reqs[slot].gen));
-    return h;
+    return make_slot_handle(https_class(), slot, s_reqs[slot].gen);
 }
 
 // The handle's slot, or -1 once the request is answered or cancelled. Holding on to the handle of a
 // request that has finished is normal, not a mistake.
 int handle_slot(const Value& self, const char* fn) {
-    // A method taken off its request (`var f = req.cancel`) is called with no receiver at all, and the
-    // register that should hold it is then whatever the call left there.
-    Value cls = self.is_map() ? self.class_of() : Value{};
-    if (!cls.is_class() || cls.as_map() != https_class().as_map())
+    int i;
+    uint32_t gen;
+    if (!read_slot_handle(self, https_class(), i, gen))
         throw std::runtime_error(std::string(fn) + ": expected a request");
-    Value slot = self.map_get(Value(std::string("slot")));
-    Value gen = self.map_get(Value(std::string("gen")));
-    if (!slot.is_integer() || !gen.is_integer())
-        throw std::runtime_error(std::string(fn) + ": expected a request");
-    int i = (int)slot.as_int();
-    if (i < 0 || i >= (int)s_reqs.size() || !s_reqs[i].alive || s_reqs[i].gen != (uint32_t)gen.as_int())
+    if (i < 0 || i >= (int)s_reqs.size() || !s_reqs[i].alive || s_reqs[i].gen != gen)
         return -1;
     return i;
 }
