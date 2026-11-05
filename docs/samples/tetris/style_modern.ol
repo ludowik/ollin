@@ -25,6 +25,9 @@ global modernLook = {
     frame: nil                      ## the last frame worked out, see modernNow
 }
 
+const MODERN_WHITE = [1, 1, 1, 1]
+const MODERN_CURTAIN = [0.17, 0.19, 0.36, 1]   ## the rows that come down on a lost game
+
 ## The frame for the screen as the layout has put it: worked out again only when that changes.
 func modernNow()
     var L = view.layout
@@ -38,16 +41,7 @@ end
 
 ## The gradient over the whole canvas: bands of one colour, from the top colour to the bottom one.
 func modernBackground()
-    var bands = 24
-    for i = 0, bands - 1 do
-        var t = i / (bands - 1)
-        var top = modernLook.skyTop
-        var bottom = modernLook.skyBottom
-        graphics.fill(top[1] + (bottom[1] - top[1]) * t, top[2] + (bottom[2] - top[2]) * t,
-            top[3] + (bottom[3] - top[3]) * t, 1)
-        var y0 = math.floor(H * i / bands)
-        graphics.rect(0, y0, W, math.floor(H * (i + 1) / bands) - y0 + 1)
-    end
+    drawGradient(modernLook.skyTop, modernLook.skyBottom, 24)
 end
 
 ## A rounded rectangle with a faint edge round it.
@@ -63,11 +57,11 @@ func modernBlock(x, y, c, kind)
     var col = MODERN_COLORS[kind]
     var g = math.max(1, math.floor(c * 0.07))
     var radius = c * 0.18
-    fillC(modernTone(col, -0.45))
+    fillC(MODERN_SHADOW[kind])
     graphics.rect(x, y, c, c, radius)
     fillC(col)
     graphics.rect(x + g, y + g, c - 2 * g, c - 2 * g, radius * 0.8)
-    fillC(modernTone(col, 0.5), 0.45)
+    fillC(MODERN_LIGHT[kind], 0.45)
     graphics.rect(x + 2 * g, y + 2 * g, c - 4 * g, math.max(1, c * 0.2), radius * 0.5)
 end
 
@@ -83,7 +77,7 @@ func modernWell(f)
     var x = f.well.x
     var y = f.well.y
     modernPanel(x, y, f.well.w, f.well.h, c * 0.3, modernLook.well)
-    fillC([1, 1, 1, 1], 0.045)
+    fillC(MODERN_WHITE, 0.045)
     for i = 1, COLS - 1 do
         graphics.rect(x + i * c, y, 1, ROWS * c)
     end
@@ -93,14 +87,14 @@ func modernWell(f)
     if game.state == "paused" then
         return
     end
-    var flash = game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
+    var flash = clearFlashOn()
     for row = 0, ROWS - 1 do
         for col = 0, COLS - 1 do
             var v = game.well[wellIdx(col, row)]
             if v <> 0 then
                 modernBlock(x + col * c, y + row * c, c, v)
                 if flash and game.clearing.contains(row) then
-                    fillC([1, 1, 1, 1], 0.85)
+                    fillC(MODERN_WHITE, 0.85)
                     graphics.rect(x + col * c, y + row * c, c, c, c * 0.18)
                 end
             end
@@ -116,7 +110,7 @@ func modernWell(f)
     if game.state == "over" and not game.won then
         for i = 0, curtainRows() - 1 do
             for col = 0, COLS - 1 do
-                fillC([0.17, 0.19, 0.36, 1])
+                fillC(MODERN_CURTAIN)
                 graphics.rect(x + col * c + 1, y + (ROWS - 1 - i) * c + 1, c - 2, c - 2, c * 0.18)
             end
         end
@@ -161,7 +155,7 @@ func modernWellText(f)
         else
             drawText("BEST  {game.best}", cx, cy - c * 0.5, c * 0.8, "center", "center", modernLook.dim)
         end
-        if game.frame % 60 < 40 then
+        if blinkOn() then
             drawText("PUSH START", cx, cy + c * 2.3, c * 0.8, "center", "center", modernLook.ink)
         end
     end
@@ -177,61 +171,43 @@ end
 
 ## ── The screens before the game ────────────────────────────────────────────────────────────────────
 
-## The points of the screen of 160 by 144 that places.ol and screens.ol speak in, in pixels: the scale and the top left.
-func modernUnit()
-    var L = view.layout
-    return {s: L.s, x: L.ox, y: L.oy}
-end
-
 ## TETRIS, each letter in the colour of a piece.
 func modernLogo(it, m)
     var size = it.size * m.s * 1.05
     var pitch = size * 0.86
     for i = 1, len(it.text) do
         var col = MODERN_COLORS[modernLook.logo[i]]
-        drawText(it.text.char(i), m.x + it.x * m.s + (i - 3.5) * pitch, m.y + it.y * m.s, size, "center", "center", col)
+        drawText(it.text.char(i), m.ox + it.x * m.s + (i - 3.5) * pitch, m.oy + it.y * m.s, size, "center", "center", col)
     end
 end
 
 func modernItem(it, m)
     if it.piece then
-        modernPiece(it.piece, 1, m.x + it.x * m.s, m.y + it.y * m.s, 8 * m.s)
+        modernPiece(it.piece, 1, m.ox + it.x * m.s, m.oy + it.y * m.s, 8 * m.s)
     elseif it.w then
         if it.lit then
             fillC(modernLook.accent)
-            graphics.rect(m.x + it.x * m.s, m.y + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22)
+            graphics.rect(m.ox + it.x * m.s, m.oy + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22)
         else
-            modernPanel(m.x + it.x * m.s, m.y + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22, modernLook.card)
+            modernPanel(m.ox + it.x * m.s, m.oy + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22, modernLook.card)
         end
-        drawText(it.text, m.x + (it.x + it.w / 2) * m.s, m.y + (it.y + it.h / 2) * m.s, it.size * m.s * 1.2,
+        drawText(it.text, m.ox + (it.x + it.w / 2) * m.s, m.oy + (it.y + it.h / 2) * m.s, it.size * m.s * 1.2,
             "center", "center", it.lit and modernLook.accentInk or modernLook.ink)
     elseif it.logo then
         modernLogo(it, m)
     else
-        drawText(it.text, m.x + it.x * m.s, m.y + it.y * m.s, it.size * m.s * 1.2, "center", "center",
+        drawText(it.text, m.ox + it.x * m.s, m.oy + it.y * m.s, it.size * m.s * 1.2, "center", "center",
             it.dim and modernLook.dim or modernLook.ink)
     end
 end
 
 func modernItems(items)
     modernBackground()
-    var m = modernUnit()
-    modernPanel(m.x + 4 * m.s, m.y + 4 * m.s, 152 * m.s, 136 * m.s, 6 * m.s, modernLook.well)
+    var m = modernNow()   ## its scale and top left: the points of the screen of 160 by 144 that places.ol speaks in, in pixels
+    modernPanel(m.ox + 4 * m.s, m.oy + 4 * m.s, 152 * m.s, 136 * m.s, 6 * m.s, modernLook.well)
     for it in items do
         modernItem(it, m)
     end
-end
-
-func modernTitle()
-    modernItems(titleItems(view.hint))
-end
-
-func modernMenu()
-    modernItems(menuItems(view.hint))
-end
-
-func modernLevel()
-    modernItems(levelItems())
 end
 
 ## The pads, from the very buttons that answer a touch: dark keys, lit while a finger is on them.
@@ -270,8 +246,6 @@ global styleModern = {
     smooth: true,
     ground: [0.028, 0.032, 0.078, 1],
     game: modernGame,
-    title: modernTitle,
-    menu: modernMenu,
-    level: modernLevel,
+    items: modernItems,
     pads: modernPads
 }

@@ -409,5 +409,25 @@ f0 = game.frame
 advance(2)
 assert(game.frame == f0 + config.maxSteps and game.clock == 0, "a stall is not made up for")
 
+## The flash of the rows being cleared, and the blink of PUSH START, each on its own frames.
+game.state = "clearing"
+game.wait = config.clearFrames
+assert(clearFlashOn() == false)
+game.wait = config.clearFrames - config.clearFlash
+assert(clearFlashOn() == true)
+game.wait = config.clearFrames - 2 * config.clearFlash
+assert(clearFlashOn() == false)
+game.state = "play"
+game.wait = config.clearFrames - config.clearFlash
+assert(clearFlashOn() == false, "only the rows of a clearing game flash")
+game.frame = 0
+assert(blinkOn() == true)
+game.frame = 39
+assert(blinkOn() == true)
+game.frame = 40
+assert(blinkOn() == false)
+game.frame = 60
+assert(blinkOn() == true)
+
 data.clear()
 print("tetris play ok")

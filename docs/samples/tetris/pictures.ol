@@ -8,17 +8,10 @@
 
 import "places.ol"
 
+const INKS = {[" "]: 1, ["."]: 2, ["+"]: 3, ["#"]: 4}
+
 func inkOf(ch)
-    if ch == " " then
-        return 1
-    elseif ch == "." then
-        return 2
-    elseif ch == "+" then
-        return 3
-    elseif ch == "#" then
-        return 4
-    end
-    return 0
+    return INKS[ch] or 0
 end
 
 ## The rectangles that paint a picture: a run of one green is one rectangle, and the same run in the rows below makes
@@ -179,10 +172,6 @@ func textRects(font, str)
     return out
 end
 
-## What the screen of a game shows whatever happens, in the order it is painted: the wall of bricks, the well, and
-## the panel with its frames and its three words. The panel is a dark ground with a light line at its edge, boxes
-## framed in a light and a mid-dark line, a ribbon of the same behind the score, and the box of the next piece,
-## framed in four greens.
 func addWall(art, wall, x)
     art.push([x, 0, 8, SCREEN.h, 2])
     for t = 0, SCREEN.h // 6 - 1 do
@@ -190,6 +179,10 @@ func addWall(art, wall, x)
     end
 end
 
+## What the screen of a game shows whatever happens, in the order it is painted: the wall of bricks, the well, and
+## the panel with its frames and its three words. The panel is a dark ground with a light line at its edge, boxes
+## framed in a light and a mid-dark line, a ribbon of the same behind the score, and the box of the next piece,
+## framed in four greens.
 func screenArt(font)
     var art = []
     var wall = pictureRects(WALL_ROWS)

@@ -25,6 +25,15 @@ func pushStart()
     return screenLabel("PUSH START", 80, 124, 8)
 end
 
+## The end of a list the screens before the game share: the blinking "PUSH START", then the hint of the style.
+func withFooter(items, hint)
+    if blinkOn() then
+        items.push(pushStart())
+    end
+    items.push(screenHint(hint))
+    return items
+end
+
 ## The first screen: the name, and the pieces, until START.
 func titleItems(hint)
     var logo = screenLabel("TETRIS", 80, 30, 24)
@@ -36,11 +45,7 @@ func titleItems(hint)
     ] do
         items.push({piece: item[1], x: item[2], y: item[3] + 4})
     end
-    if game.frame % 60 < 40 then
-        items.push(pushStart())
-    end
-    items.push(screenHint(hint))
-    return items
+    return withFooter(items, hint)
 end
 
 ## The second screen: the type of game, and the music.
@@ -55,11 +60,7 @@ func menuItems(hint)
         screenChoice("MUSIC-A", 18, 88, 60, 20, 8, music.on, onMusic),
         screenChoice("OFF", 82, 88, 60, 20, 8, not music.on, onMusic)
     ]
-    if game.frame % 60 < 40 then
-        items.push(pushStart())
-    end
-    items.push(screenHint(hint))
-    return items
+    return withFooter(items, hint)
 end
 
 ## The third screen: the level the game begins at, and for a B game the height of its rubble.
@@ -77,4 +78,16 @@ func levelItems()
     end
     items.push(screenLabel("HIGH {game.best:06d}", 80, 124, 8, true))
     return items
+end
+
+## The items of a screen before the game, or nil for the game itself, which a style draws its own way.
+func screenItems(hint)
+    if game.state == "title" then
+        return titleItems(hint)
+    elseif game.state == "menu" then
+        return menuItems(hint)
+    elseif game.state == "level" then
+        return levelItems()
+    end
+    return nil
 end

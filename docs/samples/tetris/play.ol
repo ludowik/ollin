@@ -345,6 +345,16 @@ func curtainRows()
     return math.min(game.wait // config.curtainFrames, ROWS)
 end
 
+## Whether the rows being cleared are lit on this frame: they flash, one flash of config.clearFlash frames after another.
+func clearFlashOn()
+    return game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
+end
+
+## Whether the "PUSH START" that blinks is shown on this frame.
+func blinkOn()
+    return game.frame % 60 < 40
+end
+
 func stepOver()
     if not overDone() then
         game.wait += 1

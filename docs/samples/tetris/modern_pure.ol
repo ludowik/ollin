@@ -31,6 +31,14 @@ func modernTone(col, k)
     return out
 end
 
+## The shadow and the light of each piece's colour, worked out once: a block asks for both every time it is drawn.
+const MODERN_SHADOW = MODERN_COLORS.map(func(col)
+    return modernTone(col, -0.45)
+end)
+const MODERN_LIGHT = MODERN_COLORS.map(func(col)
+    return modernTone(col, 0.5)
+end)
+
 ## A place of places.ol, in points of the screen, turned into pixels: the screen scaled by s with its top left at
 ## (ox, oy).
 func scaled(r, s, ox, oy)

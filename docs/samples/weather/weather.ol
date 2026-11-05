@@ -188,16 +188,8 @@ func wrap(text, width)
     return lines
 end
 
-func lerpColor(a, b, t)
-    return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t, 1]
-end
-
 func drawSky(palette)
-    const strips = 32
-    for i = 0, strips - 1 do
-        fillC(lerpColor(palette[1], palette[2], i / (strips - 1)))
-        graphics.rect(0, math.floor(H * i / strips), W, math.ceil(H / strips) + 1)
-    end
+    drawGradient(palette[1], palette[2], 32)
 end
 
 func drawCloud(x, y, r, shade)
@@ -259,9 +251,7 @@ func drawIcon(kind, x, y, r)
     end
 end
 
-func shade(a)
-    return [1, 1, 1, a]
-end
+const WHITE = [1, 1, 1, 1]
 
 func drawForecast(x, y, w, h)
     var days = app.weather.days
@@ -271,10 +261,10 @@ func drawForecast(x, y, w, h)
         var day = days[i]
         var cx = x + (i - 0.5) * cell
         var label = i == 1 and "Today" or weekday(day.date)
-        drawText(label, cx, y + h * 0.1, fitSize(label, h * 0.17, cell * 0.9), "center", "center", shade(1))
+        drawText(label, cx, y + h * 0.1, fitSize(label, h * 0.17, cell * 0.9), "center", "center", WHITE)
         drawIcon(skyOf(day.code).kind, cx, y + h * 0.48, math.min(cell * 0.28, h * 0.2))
-        drawText("{day.high:.0f}°", cx, y + h * 0.78, h * 0.17, "center", "center", shade(1))
-        drawText("{day.low:.0f}°", cx, y + h * 0.95, h * 0.14, "center", "center", shade(0.65))
+        drawText("{day.high:.0f}°", cx, y + h * 0.78, h * 0.17, "center", "center", WHITE)
+        drawText("{day.low:.0f}°", cx, y + h * 0.95, h * 0.14, "center", "center", WHITE, 0.65)
     end
 end
 
@@ -289,26 +279,26 @@ func draw()
     if app.place.country <> "" then
         name = "{name}, {app.place.country}"
     end
-    drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, column * 0.95), "center", "center", shade(1))
+    drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, column * 0.95), "center", "center", WHITE)
     if ready then
         drawIcon(sky.kind, CX, H * 0.22, column * 0.14)
-        drawText("{app.weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", shade(1))
-        drawText(sky.text, CX, H * 0.52, fitSize(sky.text, column * 0.065, column * 0.95), "center", "center", shade(1))
-        drawText("Wind {app.weather.wind:.0f} km/h", CX, H * 0.585, column * 0.045, "center", "center", shade(0.8))
+        drawText("{app.weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", WHITE)
+        drawText(sky.text, CX, H * 0.52, fitSize(sky.text, column * 0.065, column * 0.95), "center", "center", WHITE)
+        drawText("Wind {app.weather.wind:.0f} km/h", CX, H * 0.585, column * 0.045, "center", "center", WHITE, 0.8)
         drawForecast(CX - column * 0.5, H * 0.65, column, H * 0.25)
     elseif app.status == "failed" then
         var lines = wrap(app.message, 26)
         for i = 1, len(lines) do
-            drawText(lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", shade(1))
+            drawText(lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", WHITE)
         end
     else
-        drawText("Loading…", CX, H * 0.4, column * 0.08, "center", "center", shade(0.8))
+        drawText("Loading…", CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
     end
     var hint = "< >  another city      type a name, then Enter"
     if app.typing <> "" then
         hint = "Search: {app.typing}_"
     end
-    drawText(hint, CX, H * 0.95, fitSize(hint, column * 0.04, column * 0.95), "center", "center", shade(0.7))
+    drawText(hint, CX, H * 0.95, fitSize(hint, column * 0.04, column * 0.95), "center", "center", WHITE, 0.7)
 end
 
 func update(dt)

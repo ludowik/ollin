@@ -91,13 +91,11 @@ end
 
 ## The value of a JSON text, or nil when the text is not one (a null reads as nil too, which no answer of the service is).
 func parseJson(body)
-    var data = nil
     try
-        data = json.parse(body)
+        return json.parse(body)
     catch e
         return nil
     end
-    return data
 end
 
 ## The words the service gives when it refuses a request ("reason"), or nil when the text says nothing of the kind.

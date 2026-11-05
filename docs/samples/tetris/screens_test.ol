@@ -122,4 +122,14 @@ for it in level do
 end
 assert(choices == config.maxStartLevel + 1 + config.maxHeight + 1)
 fits(level)
+
+## Which screens are lists: the three before the game, and nil for the game itself, which a style draws its own way.
+for st in ["title", "menu", "level"] do
+    game.state = st
+    assert(len(screenItems("")) > 0, "{st} has no items")
+end
+for st in ["play", "paused", "clearing", "entry", "over"] do
+    game.state = st
+    assert(screenItems("") == nil, "{st} is a list of items")
+end
 print("tetris screens ok")

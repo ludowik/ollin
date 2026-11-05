@@ -8,10 +8,10 @@ import "../docs/samples/tetris/tetris.ol"
 ## The contract of a style: what tetris.ol asks of it.
 assert(len(styles) == 2 and styles[1].name <> styles[2].name)
 for st in styles do
-    for key in ["name", "font", "smooth", "ground", "game", "title", "menu", "level", "pads"] do
+    for key in ["name", "font", "smooth", "ground", "game", "items", "pads"] do
         assert(st[key] <> nil, "the style {st.name} has no {key}")
     end
-    assert(typeof(st.game) == "function" and typeof(st.title) == "function")
+    assert(typeof(st.game) == "function" and typeof(st.items) == "function")
 end
 
 ## A well half full of pieces, with long pieces side by side and stacked, and one falling.

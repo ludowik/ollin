@@ -17,18 +17,22 @@ const SAVE_KEY = "tetris.save"
 const SAVE_VERSION = 1
 
 ## What is saved of `game`, by sort. The frame counter that blinks the texts, the clock of the steps, the keys held and
-## pressed are not: they mean nothing a second run could use.
-const SAVE_INTS = [
-    "height", "kind", "turn", "x", "y", "next", "score", "lines", "level", "startLevel", "best",
-    "fall", "softFrames", "dasDir", "dasFrames", "wait"
-]
+## pressed are not: they mean nothing a second run could use. The whole numbers, each with the range it can be in (the
+## last four count frames).
+const SAVE_RANGES = {
+    height: [0, config.maxHeight], kind: [0, KINDS], turn: [1, 4], next: [1, KINDS],
+    score: [0, config.maxScore], best: [0, config.maxScore], lines: [0, 99999], level: [0, 99],
+    startLevel: [0, config.maxStartLevel], x: [-4, COLS + 4], y: [-4, ROWS + 4], dasDir: [-1, 1],
+    fall: [0, 1000000000], softFrames: [0, 1000000000], dasFrames: [0, 1000000000], wait: [0, 1000000000]
+}
 const SAVE_BOOLS = ["won", "newBest", "downLock", "levelUp"]
 const SAVE_STATES = ["title", "menu", "level", "play", "clearing", "entry", "paused", "over"]
 const SAVE_RESUMES = ["play", "clearing", "entry"]
 const SAVE_FOCUSES = ["type", "music", "level", "height"]
 
-## The screen the game was last kept on: a change of screen is kept at once.
-global saved = {state: ""}
+## The screen the game was last kept on (a change of screen is kept at once) and the step it was kept at (an update that
+## makes no step, on a screen that refreshes faster than the game, is not a second chance to keep the same one).
+global saved = {state: "", frame: -1}
 
 ## The state of the game as a map.
 func saveState()
@@ -36,7 +40,7 @@ func saveState()
         v: SAVE_VERSION, state: game.state, focus: game.focus, type: game.type, resume: game.resume,
         well: game.well, clearing: game.clearing, beat: music.beat, beatNext: music.next
     }
-    for name in SAVE_INTS do
+    for name, range in SAVE_RANGES do
         t[name] = game[name]
     end
     for name in SAVE_BOOLS do
@@ -53,34 +57,6 @@ func isOneOf(v, list)
     return typeof(v) == "string" and list.contains(v)
 end
 
-## The ranges of the whole numbers of a save.
-func saveRange(name)
-    if name == "height" then
-        return 0, config.maxHeight
-    elseif name == "kind" then
-        return 0, KINDS
-    elseif name == "turn" then
-        return 1, 4
-    elseif name == "next" then
-        return 1, KINDS
-    elseif name == "score" or name == "best" then
-        return 0, config.maxScore
-    elseif name == "lines" then
-        return 0, 99999
-    elseif name == "level" then
-        return 0, 99
-    elseif name == "startLevel" then
-        return 0, config.maxStartLevel
-    elseif name == "x" then
-        return -4, COLS + 4
-    elseif name == "y" then
-        return -4, ROWS + 4
-    elseif name == "dasDir" then
-        return -1, 1
-    end
-    return 0, 1000000000   ## fall, softFrames, dasFrames and wait count frames
-end
-
 ## Whether a save read back can be trusted: every field there and of its sort, in its range, and a falling piece that fits.
 func saveValid(t)
     if typeof(t) <> "map" or t.v <> SAVE_VERSION then
@@ -92,9 +68,8 @@ func saveValid(t)
     if t.type <> "A" and t.type <> "B" then
         return false
     end
-    for name in SAVE_INTS do
-        var low, high = saveRange(name)
-        if not isWhole(t[name], low, high) then
+    for name, range in SAVE_RANGES do
+        if not isWhole(t[name], range[1], range[2]) then
             return false
         end
     end
@@ -139,7 +114,7 @@ end
 
 ## Puts a state read by readSave in the game. A game that was running comes back in pause.
 func restoreSave(t)
-    for name in SAVE_INTS do
+    for name, range in SAVE_RANGES do
         game[name] = t[name]
     end
     for name in SAVE_BOOLS do
@@ -166,6 +141,7 @@ end
 func saveGame()
     data.set(SAVE_KEY, saveState())
     saved.state = game.state
+    saved.frame = game.frame
 end
 
 ## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
@@ -181,7 +157,7 @@ end
 
 ## Called once a step: keeps the game when it changed screen, and twice a second while it goes on.
 func autosave()
-    if game.state <> saved.state or game.frame % 30 == 0 then
+    if game.state <> saved.state or (game.frame % 30 == 0 and game.frame <> saved.frame) then
         saveGame()
     end
 end

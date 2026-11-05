@@ -135,7 +135,7 @@ end
 
 func drawWell()
     var wx = WELL.x
-    var flash = game.state == "clearing" and (config.clearFrames - game.wait) // config.clearFlash % 2 == 1
+    var flash = clearFlashOn()
     for r = 0, ROWS - 1 do
         for c = 0, COLS - 1 do
             var v = game.well[wellIdx(c, r)]
@@ -206,7 +206,7 @@ func drawWellText()
             label("BEST", cx, 77, 8, 3)
             label("{game.best:06d}", cx, 87, 8, 3)
         end
-        if game.frame % 60 < 40 then
+        if blinkOn() then
             label("PUSH START", cx, 91, 8, 4)
         end
     end
@@ -253,18 +253,6 @@ func drawItems(items)
     end
 end
 
-func gbTitle()
-    drawItems(titleItems(view.hint))
-end
-
-func gbMenu()
-    drawItems(menuItems(view.hint))
-end
-
-func gbLevel()
-    drawItems(levelItems())
-end
-
 ## The ink of a pad button: lit while a finger is on it.
 func padFill(name)
     return view.pads[name] == true and look.padLit or look.padFill
@@ -297,8 +285,6 @@ global styleGb = {
     smooth: false,                               ## crisp points: no smoothing of the picture
     ground: look.frameInk,
     game: gbGame,
-    title: gbTitle,
-    menu: gbMenu,
-    level: gbLevel,
+    items: drawItems,
     pads: gbPads
 }

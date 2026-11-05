@@ -15,6 +15,18 @@ func drawText(str, x, y, size, h, v, col, alpha = 1)
     graphics.noStroke()
 end
 
+## The whole canvas in `bands` strips of one colour each, from the colour `top` to the colour `bottom` (arrays
+## [r, g, b, a]). The strips overlap by a row, so that no seam shows between two of them.
+func drawGradient(top, bottom, bands)
+    for i = 0, bands - 1 do
+        var t = i / (bands - 1)
+        graphics.fill(top[1] + (bottom[1] - top[1]) * t, top[2] + (bottom[2] - top[2]) * t,
+            top[3] + (bottom[3] - top[3]) * t, 1)
+        var y0 = math.floor(H * i / bands)
+        graphics.rect(0, y0, W, math.floor(H * (i + 1) / bands) - y0 + 1)
+    end
+end
+
 ## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
 func fitSize(str, size, maxW)
     graphics.fontSize(size)

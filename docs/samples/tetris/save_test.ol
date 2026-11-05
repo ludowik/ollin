@@ -223,11 +223,14 @@ assert(data.get(SAVE_KEY).score == 6629, "written at a step that is neither a ch
 game.frame = 30
 autosave()
 assert(data.get(SAVE_KEY).score == 6669, "not written at the 30th step")
+game.score += 40
+autosave()
+assert(data.get(SAVE_KEY).score == 6669, "written twice at the 30th step")
 game.frame = 31
 game.score += 40
 game.state = "paused"
 autosave()
-assert(data.get(SAVE_KEY).score == 6709 and data.get(SAVE_KEY).state == "paused", "not written at a change of screen")
+assert(data.get(SAVE_KEY).score == 6749 and data.get(SAVE_KEY).state == "paused", "not written at a change of screen")
 data.delete(SAVE_KEY)
 
 print("tetris save ok")

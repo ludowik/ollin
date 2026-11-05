@@ -251,12 +251,9 @@ func draw()
     graphics.font(st.font)
     graphics.noStroke()
     graphics.clear(st.ground[1], st.ground[2], st.ground[3])
-    if game.state == "title" then
-        st.title()
-    elseif game.state == "menu" then
-        st.menu()
-    elseif game.state == "level" then
-        st.level()
+    var items = screenItems(view.hint)
+    if items <> nil then
+        st.items(items)
     else
         st.game()
     end
