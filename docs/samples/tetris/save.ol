@@ -17,11 +17,13 @@ const SAVE_KEY = "tetris.save"
 const SAVE_VERSION = 1
 
 ## What is saved of `game`, by sort. The frame counter that blinks the texts, the clock of the steps, the keys held and
-## pressed are not: they mean nothing a second run could use. The whole numbers, each with the range it can be in (the
+## pressed are not: they mean nothing a second run could use. Nor is the best score: it has its own key (play.ol), written
+## the moment a game ends and read back by restoreSave, so that an older save can never lower it — a game of 4000 would
+## then have written 4000 over the 9000 the key still held. A save that carries a `best` (an earlier version) has it ignored. The whole numbers, each with the range it can be in (the
 ## last four count frames).
 const SAVE_RANGES = {
     height: [0, config.maxHeight], kind: [0, KINDS], turn: [1, 4], next: [1, KINDS],
-    score: [0, config.maxScore], best: [0, config.maxScore], lines: [0, 99999], level: [0, 99],
+    score: [0, config.maxScore], lines: [0, 99999], level: [0, 99],
     startLevel: [0, config.maxStartLevel], x: [-4, COLS + 4], y: [-4, ROWS + 4], dasDir: [-1, 1],
     fall: [0, 1000000000], softFrames: [0, 1000000000], dasFrames: [0, 1000000000], wait: [0, 1000000000]
 }
@@ -123,6 +125,7 @@ func restoreSave(t)
     game.state = t.state
     game.focus = t.focus
     game.type = t.type
+    loadBest()
     game.resume = t.resume
     game.well = t.well
     game.clearing = t.clearing

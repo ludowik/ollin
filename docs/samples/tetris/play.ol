@@ -110,6 +110,10 @@ func bestKey()
     return game.type == "A" and config.bestKey or config.bestKeyB
 end
 
+## The choices of the player (type, level, height) and the best scores are kept under keys of their own (`config`), apart
+## from the save of a game under way (save.ol), on purpose: the save is refused whole when it cannot be trusted, and a
+## best score or a choice must survive that. The save keeps the choices too, for it also holds the choice being made on
+## the screen the player left; the best score it does not keep, so that there is one place that says it.
 func loadBest()
     game.best = data.get(bestKey(), 0)
 end

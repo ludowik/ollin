@@ -31,7 +31,8 @@ func arrange()
     game.lines = 12
     game.level = 3
     game.startLevel = 2
-    game.best = 40000
+    data.set(bestKey(), 40000)
+    loadBest()
     game.newBest = true
     game.fall = 17
     game.softFrames = 1
@@ -231,6 +232,29 @@ game.score += 40
 game.state = "paused"
 autosave()
 assert(data.get(SAVE_KEY).score == 6749 and data.get(SAVE_KEY).state == "paused", "not written at a change of screen")
+data.delete(SAVE_KEY)
+
+## The best score is not the save's: an older save, one that even carries a `best`, never lowers it, and a game that does
+## not beat it does not write over it.
+data.delete(SAVE_KEY)
+arrange()
+game.type = "A"
+data.set(config.bestKey, 9000)
+loadBest()
+var older = saveState()
+older.best = 3000
+data.set(SAVE_KEY, older)
+scramble()
+game.best = 1
+assert(loadGame() == true, "a save with a best of its own was refused")
+assert(game.type == "A" and game.best == 9000, "the save lowered the best score to {game.best}")
+game.score = 4000
+endGame()
+assert(data.get(config.bestKey) == 9000 and game.best == 9000, "a game under the best wrote over it")
+game.score = 9500
+endGame()
+assert(data.get(config.bestKey) == 9500, "a better game did not write the best")
+data.delete(config.bestKey)
 data.delete(SAVE_KEY)
 
 print("tetris save ok")
