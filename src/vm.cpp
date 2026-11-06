@@ -83,7 +83,7 @@ OLLIN_NOIPA bool VM::has_class_link(const Value& v) {
 }
 
 // The chain is one link everywhere: an instance leads to its class, a class to the class it extends (Map::proto).
-Value VM::proto_chain_get(const Value& obj, const Value& key) {
+[[gnu::noinline]] Value VM::proto_chain_get(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
         Value v = obj.map_get(key);
         if (!v.is_nil())
@@ -93,7 +93,7 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
     return Value{};
 }
 
-Value VM::proto_chain_rest(const Value& obj, const Value& key) {
+[[gnu::noinline]] Value VM::proto_chain_rest(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
         const Value& next = obj.mptr->proto;
         if (!next.is_nil())
@@ -172,12 +172,10 @@ static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-
 static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
                                 const char* not_callable);
 
-// A declared class: its name and, for `extends`, the class it extends. Out of line, like everything that is not the
-// hot path of run_goto; refusing a parent that is no class is what lets every reader of the chain trust it.
-[[gnu::noinline]] static Value make_declared_class(const Value& name, const Value* parent) {
-    if (parent && !parent->is_class())
-        throw std::runtime_error(std::string("runtime: a class can only extend a class, got ") + parent->type_name());
-    return Value::make_class(name.as_string(), parent ? *parent : Value{});
+// Refusing a parent that is no class is what lets every reader of the chain trust it. Out of line and never returning, so
+// that the check in NEW_CLASS costs run_goto a compare and a call it never makes.
+[[noreturn, gnu::noinline]] static void refuse_parent(const Value& parent) {
+    throw std::runtime_error(std::string("runtime: a class can only extend a class, got ") + parent.type_name());
 }
 
 // invoke_str: a mini-loop that calls __str without recursing.
@@ -1939,14 +1937,12 @@ dispatch_loop:
         NEXT();
     }
 
-    op_NEW_CLASS: {
-        {
-            // Bx: the constant of the name, shifted by one, and the low bit says the parent class is in R[A].
-            Value cls = make_declared_class(ch->constants[Bx >> 1], (Bx & 1) ? &R[A] : nullptr);
-            R[A] = std::move(cls);
-        }
+    op_NEW_CLASS:
+        // Bx: the constant of the name, shifted by one, and the low bit says the parent class is in R[A].
+        if ((Bx & 1) && !R[A].is_class())
+            refuse_parent(R[A]);
+        R[A] = Value::make_class(ch->constants[Bx >> 1].as_string(), (Bx & 1) ? R[A] : Value{});
         NEXT();
-    }
 
     op_CALL_METHOD: {
         uint32_t fp_addr = 0;
