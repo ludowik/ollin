@@ -1,5 +1,8 @@
-## What the three screens before the game say, with no drawing: the lists of items both styles paint, so that the
-## original and the modern one show the same thing in the same places. The places are in points of a screen of 160 by
+## What the screens say, with no drawing, so that the original and the modern style show the same thing: the lists of
+## items of the three screens before the game, and what the screen of the game says besides the well (the panel, the
+## message in the well, the curtain) — the end of the file.
+##
+## The lists of the screens before the game are both styles paint, in the same places. The places are in points of a screen of 160 by
 ## 144, a style scales them; an item is a label {text, x, y, size, dim} (the name of the game also has `logo`), a choice {text, x, y, w, h, size, lit} or a
 ## piece {piece, x, y}. A label is centred on its place, a choice is the box that holds its text, and a piece is its
 ## 4 by 4 cells with the top left at its place. `lit` is the choice that is on, and the chosen one of the line the arrows
@@ -90,4 +93,32 @@ func screenItems(hint)
         return levelItems()
     end
     return nil
+end
+
+## ── The screen of the game ─────────────────────────────────────────────────────────────────────────
+
+## What the panel shows: the numbers of the three cards and the piece to come.
+func panelInfo()
+    return {score: game.score, level: game.level, lines: linesShown(), next: game.next}
+end
+
+## The message in the well, or nil when there is none: {kind: "pause"} while the game waits, and once a game is over
+## (for a lost one, when the curtain is down) {kind: "over", won, newBest, best, blink}, `blink` telling whether PUSH
+## START is lit on this frame. A style words it and places it its own way.
+func wellMessage()
+    if game.state == "paused" then
+        return {kind: "pause"}
+    end
+    if game.state == "over" and overDone() then
+        return {kind: "over", won: game.won, newBest: game.newBest, best: game.best, blink: blinkOn()}
+    end
+    return nil
+end
+
+## The rows of the curtain that have come down on a lost game, from the bottom: none for another state, or a won game.
+func curtainShown()
+    if game.state == "over" and not game.won then
+        return curtainRows()
+    end
+    return 0
 end

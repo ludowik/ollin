@@ -161,7 +161,7 @@ end
 
 ## The curtain that falls over a lost game, row by row from the bottom.
 func drawCurtain()
-    for i = 0, curtainRows() - 1 do
+    for i = 0, curtainShown() - 1 do
         var r = ROWS - 1 - i
         for c = 0, COLS - 1 do
             block(WELL.x + c * CELL, r * CELL, CELL, CELL, (c + r) % 2 == 0 and 3 or 4)
@@ -182,29 +182,34 @@ end
 
 ## What changes on the panel: the numbers, with no zeros in front as on the handheld, and the next piece in its box.
 func drawPanel()
-    drawNumber(game.score, 4, SCORE_CARD.y + 20)
-    drawNumber(game.level, 3, LEVEL_CARD.y + 12)
-    drawNumber(linesShown(), 3, LINES_CARD.y + 12)
-    drawPiece(game.next, 1, NEXT_GRID.x, NEXT_GRID.y)
+    var info = panelInfo()
+    drawNumber(info.score, 4, SCORE_CARD.y + 20)
+    drawNumber(info.level, 3, LEVEL_CARD.y + 12)
+    drawNumber(info.lines, 3, LINES_CARD.y + 12)
+    drawPiece(info.next, 1, NEXT_GRID.x, NEXT_GRID.y)
 end
 
 ## The words in the well: PAUSE, and GAME OVER once the curtain is down.
 func drawWellText()
     var cx = WELL.x + WELL.w / 2
-    if game.state == "paused" then
+    var m = wellMessage()
+    if m == nil then
+        return
+    end
+    if m.kind == "pause" then
         box(cx - 28, 60, 56, 24)
         label("PAUSE", cx, 72, 10, 4)
-    elseif game.state == "over" and overDone() then
+    else
         box(cx - 32, 44, 64, 56)
-        label(game.won and "WELL" or "GAME", cx, 50, 10, 4)
-        label(game.won and "DONE" or "OVER", cx, 62, 10, 4)
-        if game.newBest then
+        label(m.won and "WELL" or "GAME", cx, 50, 10, 4)
+        label(m.won and "DONE" or "OVER", cx, 62, 10, 4)
+        if m.newBest then
             label("NEW BEST", cx, 77, 8, 3)
         else
             label("BEST", cx, 77, 8, 3)
-            label("{game.best:06d}", cx, 87, 8, 3)
+            label("{m.best:06d}", cx, 87, 8, 3)
         end
-        if blinkOn() then
+        if m.blink then
             label("PUSH START", cx, 91, 8, 4)
         end
     end
@@ -213,9 +218,7 @@ end
 func gbGame()
     drawRects(look.art, 0, 0)
     drawWell()
-    if game.state == "over" and not game.won then
-        drawCurtain()
-    end
+    drawCurtain()
     drawPanel()
     drawWellText()
 end

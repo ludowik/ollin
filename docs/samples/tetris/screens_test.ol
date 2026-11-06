@@ -132,4 +132,46 @@ for st in ["play", "paused", "clearing", "entry", "over"] do
     game.state = st
     assert(screenItems("") == nil, "{st} is a list of items")
 end
+## The screen of the game: what the panel shows, the message in the well, and the curtain.
+game.score = 6629
+game.level = 3
+game.lines = 33
+game.next = Piece.S
+game.type = "A"
+var info = panelInfo()
+assert(info.score == 6629 and info.level == 3 and info.lines == 33 and info.next == Piece.S, "an A game shows the lines made")
+game.type = "B"
+assert(panelInfo().lines == math.max(config.goalLines - 33, 0), "a B game shows the lines still to make")
+
+game.best = 12345
+game.newBest = false
+game.won = false
+game.frame = 1
+for st in ["title", "menu", "level", "play", "clearing", "entry"] do
+    game.state = st
+    assert(wellMessage() == nil and curtainShown() == 0, "{st} says something in the well")
+end
+game.state = "paused"
+assert(wellMessage().kind == "pause" and curtainShown() == 0, "the pause")
+game.state = "over"
+game.wait = 0
+assert(wellMessage() == nil, "nothing is said while the curtain comes down")
+assert(curtainShown() == 0, "no row of the curtain at the first step")
+game.wait = config.curtainFrames * 5
+assert(wellMessage() == nil and curtainShown() == 5, "five rows are down, and the message waits for the rest")
+game.wait = overFrames()
+var m = wellMessage()
+assert(m.kind == "over" and m.won == false and m.newBest == false and m.best == 12345, "a lost game is over")
+assert(curtainShown() == ROWS, "the whole curtain")
+assert(m.blink == true, "PUSH START is lit at the start of a second")
+game.frame = 45
+assert(wellMessage().blink == false, "and out at the 46th frame of 60")
+game.newBest = true
+assert(wellMessage().newBest == true)
+game.won = true
+game.wait = overFrames()
+assert(wellMessage().won == true and curtainShown() == 0, "a won game has a message and no curtain")
+game.won = false
+game.newBest = false
+game.frame = 0
 print("tetris screens ok")

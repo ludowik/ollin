@@ -104,12 +104,10 @@ func modernWell(f)
             end
         end
     end
-    if game.state == "over" and not game.won then
-        for i = 0, curtainRows() - 1 do
-            for col = 0, COLS - 1 do
-                fillC(MODERN_CURTAIN)
-                graphics.rect(x + col * c + 1, y + (ROWS - 1 - i) * c + 1, c - 2, c - 2, c * 0.18)
-            end
+    for i = 0, curtainShown() - 1 do
+        for col = 0, COLS - 1 do
+            fillC(MODERN_CURTAIN)
+            graphics.rect(x + col * c + 1, y + (ROWS - 1 - i) * c + 1, c - 2, c - 2, c * 0.18)
         end
     end
 end
@@ -127,11 +125,12 @@ func modernCard(r, c, title, value)
 end
 
 func modernCards(f)
-    modernCard(f.score, f.c, "SCORE", "{game.score}")
-    modernCard(f.level, f.c, "LEVEL", "{game.level}")
-    modernCard(f.lines, f.c, "LINES", "{linesShown()}")
+    var info = panelInfo()
+    modernCard(f.score, f.c, "SCORE", "{info.score}")
+    modernCard(f.level, f.c, "LEVEL", "{info.level}")
+    modernCard(f.lines, f.c, "LINES", "{info.lines}")
     modernCard(f.next, f.c, "NEXT", nil)
-    modernPiece(game.next, 1, f.gridX, f.gridY, f.c)
+    modernPiece(info.next, 1, f.gridX, f.gridY, f.c)
 end
 
 ## The words in the well: PAUSE, and the end of a game once the curtain is down.
@@ -139,18 +138,22 @@ func modernWellText(f)
     var c = f.c
     var cx = f.well.x + f.well.w / 2
     var cy = f.well.y + f.well.h / 2
-    if game.state == "paused" then
+    var m = wellMessage()
+    if m == nil then
+        return
+    end
+    if m.kind == "pause" then
         modernPanel(cx - COLS * c * 0.4, cy - c * 1.5, COLS * c * 0.8, c * 3, c * 0.4, modernLook.card)
         drawText("PAUSE", cx, cy, c * 1.3, "center", "center", modernLook.ink)
-    elseif game.state == "over" and overDone() then
+    else
         modernPanel(cx - COLS * c * 0.43, cy - c * 3.6, COLS * c * 0.86, c * 7.2, c * 0.5, modernLook.card)
-        drawText(game.won and "WELL DONE" or "GAME OVER", cx, cy - c * 2.3, c * 1.1, "center", "center", modernLook.ink)
-        if game.newBest then
+        drawText(m.won and "WELL DONE" or "GAME OVER", cx, cy - c * 2.3, c * 1.1, "center", "center", modernLook.ink)
+        if m.newBest then
             drawText("NEW BEST", cx, cy - c * 0.5, c * 0.9, "center", "center", modernLook.accent)
         else
-            drawText("BEST  {game.best}", cx, cy - c * 0.5, c * 0.8, "center", "center", modernLook.dim)
+            drawText("BEST  {m.best}", cx, cy - c * 0.5, c * 0.8, "center", "center", modernLook.dim)
         end
-        if blinkOn() then
+        if m.blink then
             drawText("PUSH START", cx, cy + c * 2.3, c * 0.8, "center", "center", modernLook.ink)
         end
     end
