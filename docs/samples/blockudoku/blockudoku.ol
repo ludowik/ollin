@@ -207,29 +207,9 @@ func helpParagraphs()
     return tr("help")({box: BOX, cell: config.pointsPerCell, zone: GRID * config.pointsPerClearedCell, streak: config.streakBonus})
 end
 
-## The help cut into lines no wider than areaW, with the font size already set: a blank line ends each paragraph.
+## The help cut into lines no wider than areaW: a blank line ends each paragraph.
 func wrapHelp(size, areaW)
-    graphics.fontSize(size)
-    var lines = []
-    for text in helpParagraphs() do
-        var line = ""
-        for word in text.split(" ") do
-            var tryLine = word
-            if line <> "" then
-                tryLine = line + " " + word
-            end
-            var tw = graphics.textSize(tryLine)
-            if tw > areaW and line <> "" then
-                lines.push(line)
-                line = word
-            else
-                line = tryLine
-            end
-        end
-        lines.push(line)
-        lines.push("")
-    end
-    return lines
+    return wrapParagraphs(helpParagraphs(), size, areaW)
 end
 
 ## The help at the largest size that fits under the title.

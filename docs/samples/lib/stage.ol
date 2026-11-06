@@ -35,6 +35,8 @@
 ## them, a class cannot. A const of the program that imports this file is not visible from here, which
 ## is why the example's own words come through `stage`.
 
+import "draw.ol"
+
 const BG = Color(0.07, 0.08, 0.12)
 const PANEL = Color(0.11, 0.12, 0.17)
 const EDGE = Color(0.26, 0.28, 0.37)
@@ -593,28 +595,6 @@ end
 
 ## ── the explanation ──────────────────────────────────────────────────────────
 
-## Cuts a text into lines no wider than `width`, at the current font and size.
-func wrap(text, width)
-    var lines = []
-    var current = ""
-    for word in text.split(" ") do
-        var trial = word
-        if current <> "" then
-            trial = current + " " + word
-        end
-        if current <> "" and graphics.textSize(trial) > width then
-            lines.push(current)
-            current = word
-        else
-            current = trial
-        end
-    end
-    if current <> "" then
-        lines.push(current)
-    end
-    return lines
-end
-
 func drawNote(r, s)
     panel(r, "WHAT HAPPENS")
     var pad = SIZE * 0.02
@@ -630,10 +610,9 @@ func drawNote(r, s)
         graphics.font("sans")
         var lines = []
         while true do
-            graphics.fontSize(fs)
             lines = []
             for part in parts do
-                for l in wrap(part.text, width) do
+                for l in wrapText(part.text, fs, width) do
                     lines.push({text: l, ink: part.ink})
                 end
             end

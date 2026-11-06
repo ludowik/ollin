@@ -1,4 +1,4 @@
-## The drawing helpers the samples that paint their own screens share (sudoku, blockudoku, calculator, tetris, weather): a colour held as
+## The drawing helpers the samples that paint their own screens share (sudoku, blockudoku, calculator, tetris, weather, and the lexer and parser through stage.ol): a colour held as
 ## an array [r, g, b, a], and text that is placed, sized and coloured by one call. Imported with a path relative to the
 ## importing file, "../lib/draw.ol".
 
@@ -25,6 +25,39 @@ func drawGradient(top, bottom, bands)
         var y0 = math.floor(H * i / bands)
         graphics.rect(0, y0, W, math.floor(H * (i + 1) / bands) - y0 + 1)
     end
+end
+
+## A text cut into the lines that fit `width` at the font size `size`, breaking between words. An empty text has no line.
+func wrapText(str, size, width)
+    graphics.fontSize(size)
+    var lines = []
+    var line = ""
+    for word in str.split(" ") do
+        if line == "" then
+            line = word
+        elseif graphics.textSize(line + " " + word) > width then
+            lines.push(line)
+            line = word
+        else
+            line = line + " " + word
+        end
+    end
+    if line <> "" then
+        lines.push(line)
+    end
+    return lines
+end
+
+## Paragraphs cut into lines by wrapText, with a blank line after each.
+func wrapParagraphs(paragraphs, size, width)
+    var lines = []
+    for text in paragraphs do
+        for line in wrapText(text, size, width) do
+            lines.push(line)
+        end
+        lines.push("")
+    end
+    return lines
 end
 
 ## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.

@@ -703,27 +703,6 @@ func drawTools()
     drawButton("{tr("hint")} {game.hints}", L.tools[4], hintFill, c * 0.4)
 end
 
-## A text cut into the lines that fit the width at the size, breaking between words.
-func wrapText(str, size, width)
-    var lines = []
-    var line = ""
-    graphics.fontSize(size)
-    for word in str.split(" ") do
-        var tryLine = word
-        if line <> "" then
-            tryLine = line + " " + word
-        end
-        if graphics.textSize(tryLine) > width and line <> "" then
-            lines.push(line)
-            line = word
-        else
-            line = tryLine
-        end
-    end
-    lines.push(line)
-    return lines
-end
-
 ## The line under the grid.
 func drawMessage()
     var L = game.layout
@@ -881,14 +860,7 @@ func menuScreen(titleKey, entries)
 end
 
 func helpLines(size, width)
-    var lines = []
-    for paragraph in tr("help")({box: BOX, size: N, hints: HINTS}) do
-        for line in wrapText(paragraph, size, width) do
-            lines.push(line)
-        end
-        lines.push("")
-    end
-    return lines
+    return wrapParagraphs(tr("help")({box: BOX, size: N, hints: HINTS}), size, width)
 end
 
 ## The size and the lines of the help, wrapped again only when the area or the language changes.
