@@ -1511,6 +1511,7 @@ static double s_frame_dt = 0.0;          // the last frame's duration, in second
 static bool s_clock_break = false;       // the next gap covers an interruption: it counts zero
 static double s_last_frame_time = -1.0;  // the previous frame's timestamp
 static double s_fps_ema = 0.0;           // the smoothed FPS, an exponential average
+static MemoryWatch s_memory_watch;      // has the memory grown a lot (frame_rate.h)
 static RateWatch s_rate_watch;           // the best of it over the last seconds: what the screen gives (frame_rate.h)
 
 // Declares that the loop stopped: the next frame's gap covers the interruption, not running time.
@@ -1590,6 +1591,8 @@ static void draw_fps_overlay() {
         double inst = 1.0 / s_frame_dt;
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
         s_rate_watch.feed(s_frame_dt);
+        if (s_memory_watch.sample_due(s_frame_dt))
+            s_memory_watch.sample((double)ollin_heap_bytes());
     }
     if (!s_stats_program || !s_stats_host)
         return;
@@ -1607,10 +1610,13 @@ static void draw_fps_overlay() {
 #endif
         slow = fps_below_target(s_fps_ema, target);
     }
-    // Memory used, KB below 1 MB and MB above, and the rate when it is slow.
+    // The memory when it has grown a lot, KB below 1 MB and MB above, and the rate when it is slow; nothing otherwise.
+    bool surging = s_memory_watch.surging();
+    if (!slow && !surging)
+        return;
     double kb = ollin_heap_bytes() / 1024.0;
     const char* memory = kb >= 1024.0 ? TextFormat("%.1f Mo", kb / 1024.0) : TextFormat("%.0f Ko", kb);
-    const char* buf = slow ? TextFormat("%s  %d fps", memory, fps) : memory;
+    const char* buf = !surging ? TextFormat("%d fps", fps) : slow ? TextFormat("%s  %d fps", memory, fps) : memory;
     const int size = OVERLAY_SIZE, margin = OVERLAY_MARGIN;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
@@ -1844,6 +1850,7 @@ static int gfx_run(CallCtx& ctx) {
     s_last_frame_time = -1.0;   // first frame: dt = 0, so there is no initial jump
     s_fps_ema = 0.0;
     s_rate_watch.reset();
+    s_memory_watch.reset();
     keyboard_reset();            // a fresh keyboard state: the static s_down survives between WASM runs
     s_update_callback = VM::current()->get_global("update");
 #ifdef __EMSCRIPTEN__

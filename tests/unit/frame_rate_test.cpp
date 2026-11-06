@@ -1,5 +1,5 @@
-// UNIT test of the rules of the frame-rate readout (src/frame_rate.h): which rate the screen gives, when the program
-// falls short of it, and the best rate over the last seconds. Called by the main of paths_test.cpp, which sums the failures.
+// UNIT test of the rules of the readout (src/frame_rate.h): which rate the screen gives, when the program falls short
+// of it, the best rate over the last seconds, and when the memory has grown a lot. Called by the main of paths_test.cpp, which sums the failures.
 #include "frame_rate.h"
 
 #include <cstdio>
@@ -56,9 +56,70 @@ static void test_watch() {
     expect(w.best() == 0.0 && !w.warm(), "a reset forgets everything");
 }
 
+// Runs `seconds` of frames at 60 a second, the memory being `bytes` all along, and reads it as the engine does.
+static void run_memory(MemoryWatch& w, double seconds, double bytes) {
+    for (int i = 0; i < (int)(seconds * 60.0); i++) {
+        if (w.sample_due(1.0 / 60.0))
+            w.sample(bytes);
+    }
+}
+
+static void test_memory() {
+    const double mb = 1024.0 * 1024.0;
+    MemoryWatch steady;
+    run_memory(steady, 1.9, 10 * mb);
+    expect(steady.samples.empty() && !steady.surging(), "nothing is measured before the warm-up");
+    run_memory(steady, 30.0, 10 * mb);
+    expect(!steady.surging(), "a memory that stays where it is shows nothing");
+
+    // What a program loads when it starts is not a growth: it comes before the first measure.
+    MemoryWatch loading;
+    run_memory(loading, 1.9, 40 * mb);
+    run_memory(loading, 20.0, 40 * mb);
+    expect(!loading.surging(), "a load in the first two seconds is not seen");
+
+    // 2 % a second is 22 % in ten seconds: slow growth shows nothing.
+    MemoryWatch slow;
+    double bytes = 10 * mb;
+    run_memory(slow, 2.5, bytes);
+    for (int i = 0; i < 30; i++) {
+        bytes *= 1.02;
+        run_memory(slow, 1.0, bytes);
+    }
+    expect(!slow.surging(), "22 % in ten seconds is not a lot");
+
+    // A jump to twice the memory is seen, and stays seen while the memory stays high, long after the window moved on.
+    MemoryWatch jump;
+    run_memory(jump, 5.0, 10 * mb);
+    expect(!jump.surging(), "before the jump");
+    run_memory(jump, 1.5, 20 * mb);
+    expect(jump.surging(), "twice the memory is a lot");
+    run_memory(jump, 25.0, 20 * mb);
+    expect(jump.surging(), "and it is still seen 25 seconds later, the memory having stayed high");
+    run_memory(jump, 3.0, 10 * mb);
+    expect(!jump.surging(), "the memory falls back: it ends");
+    run_memory(jump, 20.0, 10 * mb);
+    expect(!jump.surging(), "and stays ended");
+
+    // A growth by steps of 6 % a second adds up to 79 % in ten seconds: seen before the end.
+    MemoryWatch leak;
+    bytes = 10 * mb;
+    run_memory(leak, 2.5, bytes);
+    bool seen = false;
+    for (int i = 0; i < 12; i++) {
+        bytes *= 1.06;
+        run_memory(leak, 1.0, bytes);
+        seen = seen || leak.surging();
+    }
+    expect(seen, "a leak of 6 % a second is seen within twelve seconds");
+    leak.reset();
+    expect(leak.samples.empty() && !leak.surging(), "a reset forgets everything");
+}
+
 int frame_rate_failures() {
     test_display_rate();
     test_below_target();
     test_watch();
+    test_memory();
     return s_failures;
 }

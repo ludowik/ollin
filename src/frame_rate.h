@@ -1,6 +1,10 @@
 #pragma once
-// The frame-rate readout of the engine (graphics.stats) shows the rate only when the program falls short of what the
-// screen can give. Both rules live here, with no window and no clock, so that a unit test can run them.
+
+#include <vector>
+
+// The readout of the engine (graphics.stats) shows the frame rate only when the program falls short of what the screen
+// can give, and the memory only when it has grown a lot. The rules live here, with no window and no clock, so that a
+// unit test can run them.
 
 // The refresh rates of the screens there are. The display rate is a standard one: a rate measured at 118 on a 120 Hz screen
 // is 120, so that the target does not follow a program that is a little slow.
@@ -64,5 +68,51 @@ struct RateWatch {
     }
     bool warm() const {
         return total_time >= k_warm_up;
+    }
+};
+
+// Whether the memory has GROWN A LOT: more than half again what it was ten seconds before. It is measured once a second
+// (reading the allocator is not free), and not before `k_warm_up` seconds, so that what a program loads when it starts
+// is not a growth. Once seen, the growth is held against the level it started from, and stays seen as long as the memory
+// stays above that level by half: a memory that falls back, a collection or the end of a load, ends it, and a memory that
+// stays high does not hide it behind the window that moves on.
+struct MemoryWatch {
+    static constexpr double k_window = 10.0;
+    static constexpr double k_growth = 1.5;
+    static constexpr double k_warm_up = 2.0;
+    std::vector<double> samples;   // one a second, the oldest first: at most k_window + 1 of them
+    double total_time = 0.0;
+    double second_time = 0.0;
+    bool surging_ = false;
+    double baseline = 0.0;
+
+    void reset() {
+        *this = MemoryWatch{};
+    }
+    // `dt` is the duration of this frame, in seconds. True once a second after the warm-up: time to read the memory
+    // and give it to sample().
+    bool sample_due(double dt) {
+        total_time += dt;
+        if (total_time < k_warm_up)
+            return false;
+        second_time += dt;
+        if (!samples.empty() && second_time < 1.0)
+            return false;
+        second_time = 0.0;
+        return true;
+    }
+    void sample(double bytes) {
+        samples.push_back(bytes);
+        if (samples.size() > (size_t)k_window + 1)
+            samples.erase(samples.begin());
+        if (surging_) {
+            surging_ = bytes > baseline * k_growth;
+        } else if (bytes > samples.front() * k_growth) {
+            surging_ = true;
+            baseline = samples.front();
+        }
+    }
+    bool surging() const {
+        return surging_;
     }
 };
