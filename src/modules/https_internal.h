@@ -11,7 +11,6 @@ using HttpsHeaders = std::vector<std::pair<std::string, std::string>>;
 
 struct HttpsRequest {
     std::string url;
-    std::string method;
     HttpsHeaders headers;
     int timeout_ms = 30000;
 };

@@ -188,7 +188,6 @@ int https_get(CallCtx& ctx) {
         throw std::runtime_error("https.get: expected (url [, options], callback)");
     HttpsRequest rq;
     rq.url = url;
-    rq.method = "GET";
     rq.timeout_ms = (int)(k_default_timeout * 1000.0);
     check_url(url, fn);
     if (ctx.argc == 3) {

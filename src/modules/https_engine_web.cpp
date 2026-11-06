@@ -76,9 +76,8 @@ void https_engine_start(int id, const HttpsRequest& request) {
             }
             var id = $0;
             var url = UTF8ToString($1);
-            var method = UTF8ToString($2);
-            var flat = UTF8ToString($3);
-            var timeout = $4;
+            var flat = UTF8ToString($2);
+            var timeout = $3;
             var entry = {};
             entry.ctl = new AbortController();
             entry.timedOut = false;
@@ -113,7 +112,7 @@ void https_engine_start(int id, const HttpsRequest& request) {
                 var headers = new Headers();
                 for (var i = 0; i + 1 < parts.length; i += 2)
                     headers.append(parts[i], parts[i + 1]);
-                fetch(url, {method: method, headers: headers, signal: entry.ctl.signal, credentials: 'omit', redirect: 'follow'})
+                fetch(url, {method: 'GET', headers: headers, signal: entry.ctl.signal, credentials: 'omit', redirect: 'follow'})
                     .then(function(r) {
                         var flatHeaders = [];
                         r.headers.forEach(function(v, k) {
@@ -141,7 +140,7 @@ void https_engine_start(int id, const HttpsRequest& request) {
                 fail(e);
             }
         },
-        id, request.url.c_str(), request.method.c_str(), headers.c_str(), request.timeout_ms);
+        id, request.url.c_str(), headers.c_str(), request.timeout_ms);
 }
 
 void https_engine_cancel(int id) {
