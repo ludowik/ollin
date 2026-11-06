@@ -160,10 +160,8 @@ int current_menu() {
 Value element_class();
 
 int handle_slot(const Value& self, const char* fn) {
-    int slot;
     uint32_t gen;
-    if (!read_slot_handle(self, element_class(), slot, gen))
-        throw std::runtime_error(std::string(fn) + ": expected a ui element");
+    int slot = read_slot_handle(self, element_class(), fn, "a ui element", gen);
     if (!node_alive(slot, gen))
         throw std::runtime_error(std::string(fn) + ": this ui element has been removed");
     return slot;

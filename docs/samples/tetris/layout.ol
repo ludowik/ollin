@@ -28,7 +28,6 @@ end
 func computeLayout(w, h, pads)
     var L = {s: 1, ox: 0, oy: 0, buttons: [], cross: nil, w: w, h: h, padsShown: pads}
     var portrait = h > w * 1.1
-    var s
     var lx
     var ly
     var rx
@@ -39,10 +38,10 @@ func computeLayout(w, h, pads)
     var ky
     var u
     if pads and portrait then
-        s = math.min(w / SCREEN.w, h * 0.66 / SCREEN.h)
-        L.ox = math.floor((w - SCREEN.w * s) / 2)
-        L.oy = math.floor(math.max((h * 0.68 - SCREEN.h * s) / 2, 0))
-        var top = L.oy + SCREEN.h * s
+        L.s = math.min(w / SCREEN.w, h * 0.66 / SCREEN.h)
+        L.ox = math.floor((w - SCREEN.w * L.s) / 2)
+        L.oy = math.floor(math.max((h * 0.68 - SCREEN.h * L.s) / 2, 0))
+        var top = L.oy + SCREEN.h * L.s
         var rest = h - top
         u = math.min(w * 0.065, rest * 0.11)   ## below 0.119 of the room left, where B, the cross and START would overlap
         lx, ly = w * 0.27, top + rest * 0.45
@@ -50,22 +49,19 @@ func computeLayout(w, h, pads)
         px, py = w * 0.5, top + rest * 0.88
         kx, ky = w * 0.86, top + rest * 0.88
     elseif pads then
-        s = math.min(h / SCREEN.h, w / (SCREEN.w * 1.7))
-        L.ox = math.floor((w - SCREEN.w * s) / 2)
-        L.oy = math.floor((h - SCREEN.h * s) / 2)
+        L.s = math.min(h / SCREEN.h, w / (SCREEN.w * 1.7))
+        L.ox = math.floor((w - SCREEN.w * L.s) / 2)
+        L.oy = math.floor((h - SCREEN.h * L.s) / 2)
         u = math.min(L.ox * 0.11, h * 0.1)
         lx, ly = L.ox / 2, h * 0.58
         rx, ry = w - L.ox / 2, h * 0.58
         px, py = w - L.ox / 2, h * 0.16
         kx, ky = L.ox / 2, h * 0.16
     else
-        s = math.min(w / SCREEN.w, h / SCREEN.h)
-        L.ox = math.floor((w - SCREEN.w * s) / 2)
-        L.oy = math.floor((h - SCREEN.h * s) / 2)
+        L.s = math.min(w / SCREEN.w, h / SCREEN.h)
+        L.ox = math.floor((w - SCREEN.w * L.s) / 2)
+        L.oy = math.floor((h - SCREEN.h * L.s) / 2)
     end
-    L.s = s
-    L.buttons = []
-    L.cross = nil
     if pads then
         L.cross = {x: lx, y: ly, u: u}
         L.buttons = [

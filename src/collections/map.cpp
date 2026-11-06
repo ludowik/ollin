@@ -1,4 +1,5 @@
 #include "value.h"
+#include <deque>
 
 std::size_t ValueHash::other(const Value& v) noexcept {
     switch (v.tag) {
@@ -116,7 +117,8 @@ void Map::drop_proto() {
     proto = Value();
 }
 
-static std::vector<std::string> s_class_names(1);   // ids start at 1: 0 is "no name"
+// A deque, never a vector: class_name_text hands out references, which a vector would leave dangling when it grows.
+static std::deque<std::string> s_class_names(1);   // ids start at 1: 0 is "no name"
 static robin_hood::unordered_map<std::string, uint16_t> s_class_ids;
 
 uint16_t class_name_id(const std::string& name) {

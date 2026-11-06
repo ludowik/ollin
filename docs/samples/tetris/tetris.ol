@@ -47,14 +47,10 @@ func applyStyle()
     view.hint = "V  " + styles[view.style % len(styles) + 1].name + " STYLE"
 end
 
-func toggleStyle()
+func commandStyle()
     view.style = view.style % len(styles) + 1
     data.set(STYLE_KEY, styles[view.style].name)
     applyStyle()
-end
-
-func commandStyle()
-    toggleStyle()
 end
 
 ## Which command each pad button gives when it goes down, and which each key gives. No rule here: what a command means

@@ -46,7 +46,8 @@ void gfx_program_reset();
 // starts (modules_reset), because the statics outlive the VM and the next program must not inherit the last one's
 // animations, widgets, requests, fingers or sounds. Every build has one, a stub's included, so that a module is
 // declared in one place and a new one cannot be forgotten in the engine's entry point. What runs every frame stays
-// written out in the render loop, where the ORDER of the calls is documented.
+// written out in the render loop, where the ORDER of the calls is documented. Two resets are not here: the keyboard's
+// (gfx_run, when the frame loop starts) and the fonts' (ollin_run, engine_font_reset: they are no module).
 static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modules[] = {
     { "core",     make_core_module,     nullptr          },
     { "math",     make_math_module,     nullptr          },

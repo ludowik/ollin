@@ -1,15 +1,6 @@
 #include "compiler.h"
 #include "lexer.h"
-#include "modules/audio_module.h"
-#include "modules/sound_module.h"
-#include "modules/touch_module.h"
-#include "modules/motion_module.h"
-#include "modules/mouse_module.h"
-#include "modules/camera_module.h"
 #include "modules/engine_font.h"
-#include "modules/ui_module.h"
-#include "modules/tween_module.h"
-#include "modules/https_module.h"
 #include "modules/data_module.h"
 #include "modules/graphics_internal.h"
 #include "modules/image_module.h"
@@ -30,7 +21,6 @@
 static std::unique_ptr<VM> s_vm;
 
 static std::string ollin_run(const std::string& source, const std::string& filename) {
-    // Release stale GL texture handles before GL context may be reset.
     modules_reset();   // each module forgets what it kept for the previous program (k_modules, modules.cpp)
     engine_font_reset();   // the atlases belonged to the previous GL context
     // Stop any running graphics loop before destroying the old VM.

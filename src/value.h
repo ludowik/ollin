@@ -257,8 +257,6 @@ struct Value {
     const Value& class_of() const;
     // Makes this map an instance of `cls`. For the engine and the native modules only: no script can set it.
     void set_class(const Value& cls);
-    // The class a class extends, nil for none. The caller has checked that this is a class.
-    const Value& parent_of() const;
     const std::string& class_name() const;
     // Whether this is an instance of `cls` or of a class that extends it, all along the chain; false for anything that
     // is not a map. `cls` is a class.
@@ -322,9 +320,6 @@ inline const Value& Value::class_of() const {
 }
 inline void Value::set_class(const Value& cls) {
     mptr->proto = cls;
-}
-inline const Value& Value::parent_of() const {
-    return mptr->proto;
 }
 inline const std::string& Value::class_name() const {
     return class_name_text(mptr->class_name);

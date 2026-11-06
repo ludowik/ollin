@@ -20,17 +20,18 @@ static inline Value make_slot_handle(const Value& cls, int slot, uint32_t gen) {
     return h;
 }
 
-// False when `v` is not a handle of the class; the caller words the refusal, which names what it expected.
-static inline bool read_slot_handle(const Value& v, const Value& cls, int& slot, uint32_t& gen) {
-    if (!v.is_instance_of(cls))
-        return false;
-    Value s = v.map_get(Value(std::string("slot")));
-    Value g = v.map_get(Value(std::string("gen")));
-    if (!s.is_integer() || !g.is_integer())
-        return false;
-    slot = (int)s.as_int();
-    gen = (uint32_t)g.as_int();
-    return true;
+// The slot of a handle of the class, and its generation in `gen`; the caller then tests them against its table. Throws
+// "<fn>: expected <what>" ("a request") for anything else.
+static inline int read_slot_handle(const Value& v, const Value& cls, const char* fn, const char* what, uint32_t& gen) {
+    if (v.is_instance_of(cls)) {
+        Value s = v.map_get(Value(std::string("slot")));
+        Value g = v.map_get(Value(std::string("gen")));
+        if (s.is_integer() && g.is_integer()) {
+            gen = (uint32_t)g.as_int();
+            return (int)s.as_int();
+        }
+    }
+    throw std::runtime_error(std::string(fn) + ": expected " + what);
 }
 
 // The entries of a map whose keys are all strings, sorted by key: a map has no order, and the modules that write one out

@@ -33,13 +33,14 @@ func wrapText(str, size, width)
     var lines = []
     var line = ""
     for word in str.split(" ") do
+        var trial = line + " " + word
         if line == "" then
             line = word
-        elseif graphics.textSize(line + " " + word) > width then
+        elseif graphics.textSize(trial) > width then
             lines.push(line)
             line = word
         else
-            line = line + " " + word
+            line = trial
         end
     end
     if line <> "" then

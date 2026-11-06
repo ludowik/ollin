@@ -170,10 +170,8 @@ Value make_handle(int slot) {
 // The handle's slot, or -1 once the request is answered or cancelled. Holding on to the handle of a
 // request that has finished is normal, not a mistake.
 int handle_slot(const Value& self, const char* fn) {
-    int i;
     uint32_t gen;
-    if (!read_slot_handle(self, https_class(), i, gen))
-        throw std::runtime_error(std::string(fn) + ": expected a request");
+    int i = read_slot_handle(self, https_class(), fn, "a request", gen);
     if (i < 0 || i >= (int)s_reqs.size() || !s_reqs[i].alive || s_reqs[i].gen != gen)
         return -1;
     return i;

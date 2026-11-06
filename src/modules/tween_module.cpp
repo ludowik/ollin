@@ -322,13 +322,9 @@ Value make_handle(int slot) {
 
 // A handle's slot, or -1 when the tween is finished or cancelled. A stale handle is NOT a mistake:
 // keeping the handle of a finished animation is perfectly normal.
-bool is_tween_handle(const Value& v);
-
 int handle_slot(const CallCtx& ctx, const char* fn) {
-    int slot;
     uint32_t gen;
-    if (ctx.argc < 1 || !read_slot_handle(ctx.args[0], tween_class(), slot, gen))
-        throw std::runtime_error(std::string(fn) + ": expected a tween");
+    int slot = read_slot_handle(ctx.argc < 1 ? Value() : ctx.args[0], tween_class(), fn, "a tween", gen);
     return tween_alive(slot, gen) ? slot : -1;
 }
 

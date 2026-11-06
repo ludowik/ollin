@@ -27,10 +27,8 @@ Value make_handle(int slot) {
 }
 
 int handle_slot(const Value& self, const char* fn) {
-    int i;
     uint32_t gen;
-    if (!read_slot_handle(self, osc_class(), i, gen))
-        throw std::runtime_error(std::string(fn) + ": expected an oscillator");
+    int i = read_slot_handle(self, osc_class(), fn, "an oscillator", gen);
     if (i < 0 || i >= k_max_voices || voices()[i].gen != gen)
         throw std::runtime_error(std::string(fn) + ": this oscillator no longer exists");
     return i;
@@ -257,10 +255,8 @@ Value make_buffer_handle(int slot) {
 }
 
 int buffer_slot(const Value& self, const char* fn) {
-    int i;
     uint32_t gen;
-    if (!read_slot_handle(self, buffer_class(), i, gen))
-        throw std::runtime_error(std::string(fn) + ": expected a sound");
+    int i = read_slot_handle(self, buffer_class(), fn, "a sound", gen);
     if (i < 0 || i >= k_max_buffers || bufs()[i].gen != gen)
         throw std::runtime_error(std::string(fn) + ": this sound no longer exists");
     return i;

@@ -1597,20 +1597,20 @@ static void draw_fps_overlay() {
     // The rate is shown only when it falls more than 5 % under what the screen gives. The browser's loop waits for
     // the screen, so the screen's rate is the best the program reached; natively the loop is held at 60 and the
     // monitor may give less.
+    bool slow = false;
+    if (s_rate_watch.warm()) {
 #ifdef __EMSCRIPTEN__
-    double target = display_rate_from_best(s_rate_watch.best());
+        double target = display_rate_from_best(s_rate_watch.best());
 #else
-    int monitor_rate = GetMonitorRefreshRate(GetCurrentMonitor());
-    double target = (monitor_rate > 0 && monitor_rate < 60) ? monitor_rate : 60.0;
+        int monitor_rate = GetMonitorRefreshRate(GetCurrentMonitor());
+        double target = (monitor_rate > 0 && monitor_rate < 60) ? monitor_rate : 60.0;
 #endif
-    bool slow = s_rate_watch.warm() && fps_below_target(s_fps_ema, target);
+        slow = fps_below_target(s_fps_ema, target);
+    }
     // Memory used, KB below 1 MB and MB above, and the rate when it is slow.
     double kb = ollin_heap_bytes() / 1024.0;
-    const char* buf;
-    if (kb >= 1024.0)
-        buf = slow ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps) : TextFormat("%.1f Mo", kb / 1024.0);
-    else
-        buf = slow ? TextFormat("%.0f Ko  %d fps", kb, fps) : TextFormat("%.0f Ko", kb);
+    const char* memory = kb >= 1024.0 ? TextFormat("%.1f Mo", kb / 1024.0) : TextFormat("%.0f Ko", kb);
+    const char* buf = slow ? TextFormat("%s  %d fps", memory, fps) : memory;
     const int size = OVERLAY_SIZE, margin = OVERLAY_MARGIN;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
