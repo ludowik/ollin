@@ -1704,8 +1704,16 @@ superflu, au prix de bords un peu moins lissés sur un écran à faible densité
 
 ## Compteur mémoire / images par seconde (`graphics.stats`)
 
-Le moteur dessine en bas à droite un relevé de la mémoire et du débit d'images (`draw_fps_overlay`). Il
-s'affiche seulement quand **deux interrupteurs indépendants** sont allumés : celui du PROGRAMME
+Le moteur dessine en bas à droite un relevé de la mémoire, et du débit d'images **seulement quand celui-ci tombe
+à plus de 5 % sous la cible** (`draw_fps_overlay`, règles dans `src/frame_rate.h`, testées par `tests/unit/frame_rate_test.cpp`).
+**Décision de l'utilisateur** : la cible est le rythme de l'ÉCRAN, pas un 60 fixe. Au navigateur, la boucle attend
+l'écran (`requestAnimationFrame`) : le moteur en prend la mesure, `RateWatch`, comme le meilleur débit d'une SECONDE
+ENTIÈRE sur les dix dernières secondes, ramené au rythme standard le plus proche (`display_rate_from_best`). ⚠ Une
+moyenne lissée image par image (maximum d'un EMA) a été essayée puis RETIRÉE : les à-coups de la boucle du navigateur
+la poussaient au-dessus de 63, la cible passait à 75 et un programme à 60 s'affichait lent, mesuré. Rien n'est décidé
+avant deux secondes (un chargement n'est pas un programme lent). Natif : la boucle est tenue à 60 par `SetTargetFPS`, la
+cible est donc 60, ou le rythme du moniteur s'il est plus bas. La mémoire reste affichée en permanence. Le relevé n'est
+dessiné que quand **deux interrupteurs indépendants** sont allumés : celui du PROGRAMME
 (`graphics.stats([enabled])`, sans argument il l'allume, comme `graphics.antialias`) et celui de l'HÔTE
 (`Module.setStatsVisible(bool)`, lié dans `wasm_main.cpp`). Deux, parce qu'ils ne se remettent pas à zéro au
 même moment : celui du programme revient à « allumé » à chaque démarrage de programme

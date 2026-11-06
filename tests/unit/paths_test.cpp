@@ -1,4 +1,4 @@
-// UNIT test of the two engine units no script can reach on its own: the path rules (the entry points and
+// UNIT test of the engine units no script can reach on its own: the path rules (the entry points and
 // the resource loaders call them with the program's directory, which a headless test never sets) and the
 // in-memory source registry (filled by the playground, empty on a native run). Plain asserts, no framework:
 // the build target is `unit_tests`, run by tests/check_unit.sh.
@@ -84,12 +84,15 @@ static void test_sources() {
     expect(!source_get("lib/x.ol", out), "a reset forgets everything");
 }
 
+int frame_rate_failures();   // frame_rate_test.cpp
+
 int main() {
     test_dir();
     test_normalise();
     test_absolute_and_resolve();
     test_assets();
     test_sources();
+    s_failures += frame_rate_failures();
     if (s_failures) {
         std::printf("%d unit check(s) failed\n", s_failures);
         return 1;

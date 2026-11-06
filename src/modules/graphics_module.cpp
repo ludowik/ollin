@@ -7,6 +7,7 @@
 #include "tween_module.h"
 #include "https_module.h"
 #include "engine_font.h"
+#include "../frame_rate.h"
 #include "image_module.h"
 #include "module_utils.h"
 #include "value.h"
@@ -1510,6 +1511,7 @@ static double s_frame_dt = 0.0;          // the last frame's duration, in second
 static bool s_clock_break = false;       // the next gap covers an interruption: it counts zero
 static double s_last_frame_time = -1.0;  // the previous frame's timestamp
 static double s_fps_ema = 0.0;           // the smoothed FPS, an exponential average
+static RateWatch s_rate_watch;           // the best of it over the last seconds: what the screen gives (frame_rate.h)
 
 // Declares that the loop stopped: the next frame's gap covers the interruption, not running time.
 // Called by the host (the playground's pause and its capture, which resumes the loop for one frame)
@@ -1587,14 +1589,28 @@ static void draw_fps_overlay() {
     if (s_frame_dt > 0.0) {
         double inst = 1.0 / s_frame_dt;
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
+        s_rate_watch.feed(s_frame_dt);
     }
     if (!s_stats_program || !s_stats_host)
         return;
     int fps = (int)(s_fps_ema + 0.5);
-    // Memory used, next to the FPS: KB below 1 MB, MB above.
+    // The rate is shown only when it falls more than 5 % under what the screen gives. The browser's loop waits for
+    // the screen, so the screen's rate is the best the program reached; natively the loop is held at 60 and the
+    // monitor may give less.
+#ifdef __EMSCRIPTEN__
+    double target = display_rate_from_best(s_rate_watch.best());
+#else
+    int monitor_rate = GetMonitorRefreshRate(GetCurrentMonitor());
+    double target = (monitor_rate > 0 && monitor_rate < 60) ? monitor_rate : 60.0;
+#endif
+    bool slow = s_rate_watch.warm() && fps_below_target(s_fps_ema, target);
+    // Memory used, KB below 1 MB and MB above, and the rate when it is slow.
     double kb = ollin_heap_bytes() / 1024.0;
-    const char* buf = (kb >= 1024.0) ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps)
-                                     : TextFormat("%.0f Ko  %d fps", kb, fps);
+    const char* buf;
+    if (kb >= 1024.0)
+        buf = slow ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps) : TextFormat("%.1f Mo", kb / 1024.0);
+    else
+        buf = slow ? TextFormat("%.0f Ko  %d fps", kb, fps) : TextFormat("%.0f Ko", kb);
     const int size = OVERLAY_SIZE, margin = OVERLAY_MARGIN;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
@@ -1827,6 +1843,7 @@ static int gfx_run(CallCtx& ctx) {
     s_elapsed_time = 0.0;
     s_last_frame_time = -1.0;   // first frame: dt = 0, so there is no initial jump
     s_fps_ema = 0.0;
+    s_rate_watch.reset();
     keyboard_reset();            // a fresh keyboard state: the static s_down survives between WASM runs
     s_update_callback = VM::current()->get_global("update");
 #ifdef __EMSCRIPTEN__
