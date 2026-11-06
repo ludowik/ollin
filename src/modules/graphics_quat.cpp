@@ -14,19 +14,16 @@ static double quat_field(const Value& v, const char* k) {
     return f.is_number() ? f.as_num() : 0.0;
 }
 
+static Value quat_class();   // defined below
+
 Quaternion quat_from_instance(const Value& v, const char* fn) {
-    // Checks this really is a Quat instance and not some other map or other
-    // a Camera or Light object…) — otherwise a quaternion would be built silently
-    // wrong (a missing w reads as 0), so we check that its class is named "Quat".
-    Value cls = v.is_map() ? v.class_of() : Value{};
-    Value name = cls.is_class() ? cls.map_get(Value(std::string("__name__"))) : Value{};
-    if (!(name.is_string() && name.as_string() == "Quat"))
+    // Checks this really is a Quat instance and not some other map (a Camera or a Light object…): a quaternion
+    // would be built silently wrong (a missing w reads as 0).
+    if (!v.is_instance_of(quat_class()))
         throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quatAxis / quatEuler)");
     return Quaternion{(float)quat_field(v, "x"), (float)quat_field(v, "y"), (float)quat_field(v, "z"),
                       (float)quat_field(v, "w")};
 }
-
-static Value quat_class();   // defined below
 
 Value make_quat_instance(Quaternion q) {
     Value inst = Value::make_map();
@@ -90,8 +87,7 @@ static int quat_rotate_vec(CallCtx& ctx) {
 }
 
 static Value make_quat_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Quat")
+    return MapBuilder(Value::make_class("Quat"))
         .fn("mul", quat_mul)
         .fn("slerp", quat_slerp)
         .fn("normalize", quat_normalize)

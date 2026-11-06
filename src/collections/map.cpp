@@ -115,3 +115,22 @@ void Map::set(const Value& k, const Value& v) {
 void Map::drop_proto() {
     proto = Value();
 }
+
+static std::vector<std::string> s_class_names(1);   // ids start at 1: 0 is "no name"
+static robin_hood::unordered_map<std::string, uint16_t> s_class_ids;
+
+uint16_t class_name_id(const std::string& name) {
+    auto it = s_class_ids.find(name);
+    if (it != s_class_ids.end())
+        return it->second;
+    if (s_class_names.size() > std::numeric_limits<uint16_t>::max())
+        throw std::runtime_error("too many different class names (max 65535)");
+    uint16_t id = (uint16_t)s_class_names.size();
+    s_class_names.push_back(name);
+    s_class_ids.emplace(name, id);
+    return id;
+}
+
+const std::string& class_name_text(uint16_t id) {
+    return s_class_names[id];
+}

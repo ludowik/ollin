@@ -2385,27 +2385,18 @@ void Compiler::visit(const ClassDeclStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
 
-    // Create the class value (T_CLASS, an empty map).
+    // Create the class value (T_CLASS, an empty map) with its name and, for `extends`, its parent, which is loaded into
+    // the destination first. The name and the parent are not entries of the class: no script reads or writes them
+    // (cf. Map::proto). Bx is the constant of the name shifted by one, its low bit telling that a parent is there.
     int dest = alloc_reg();
-    chunk.emit(make_abc(Op::NEW_CLASS, dest, 0, 0));
-
-    // Store the class name as __name__, which print and debugging use.
-    {
-        int key_r = alloc_reg(), val_r = alloc_reg();
-        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string("__name__")))));
-        chunk.emit(make_abx(Op::LOAD_K, val_r, chunk.add_constant(Value(s.name))));
-        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, val_r));
-        reg_top_ = dest + 1;
-    }
-
-    // Inheritance: store the parent class as __parent__.
-    if (!s.parent.empty()) {
-        int par_r = alloc_reg(), key_r = alloc_reg();
-        chunk.emit(make_abx(Op::LOAD_GLOBAL, par_r, chunk.add_identifier(s.parent)));
-        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string("__parent__")))));
-        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, par_r));
-        reg_top_ = dest + 1;
-    }
+    bool has_parent = !s.parent.empty();
+    if (has_parent)
+        chunk.emit(make_abx(Op::LOAD_GLOBAL, dest, chunk.add_identifier(s.parent)));
+    uint32_t name_k = chunk.add_constant(Value(s.name));
+    if (name_k > (k_max_pool >> 1))
+        throw std::runtime_error("compile: too many constants (max " + std::to_string(k_max_pool >> 1) + ")");
+    chunk.emit(make_abx(Op::NEW_CLASS, dest, ((uint64_t)name_k << 1) | (has_parent ? 1 : 0)));
+    reg_top_ = dest + 1;
 
     // 'super' inside those methods resolves through the LEXICAL parent class.
     std::string saved_parent = current_class_parent_;

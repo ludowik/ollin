@@ -230,7 +230,9 @@ struct Value {
     bool is_static_builtin() const {
         return tag == T_BUILTIN && str_hash != 0;
     }
-    static Value make_class();
+    // A class with its name and, for `extends`, its parent (a class, or nil). Both are set here for good: no script can
+    // reach either (cf. Map::proto).
+    static Value make_class(const std::string& name, const Value& parent = Value());
     static Value make_range(Range* r) {
         return Value(r);
     }
@@ -251,11 +253,16 @@ struct Value {
     static Value make_map();
     Value map_get(const Value& key) const;
     void map_set(const Value& key, const Value& val);
-    // The class link of a map (cf. Map::proto): nil for an object that has none. The caller has checked
-    // that this is a map or a class.
+    // The class of an instance (cf. Map::proto): nil for a map that has none. The caller has checked that this is a map.
     const Value& class_of() const;
     // Makes this map an instance of `cls`. For the engine and the native modules only: no script can set it.
     void set_class(const Value& cls);
+    // The class a class extends, nil for none. The caller has checked that this is a class.
+    const Value& parent_of() const;
+    const std::string& class_name() const;
+    // Whether this is an instance of `cls` or of a class that extends it, all along the chain; false for anything that
+    // is not a map. `cls` is a class.
+    bool is_instance_of(const Value& cls) const;
 
     static Value make_array();
     Value array_get(int64_t idx) const;            // 1-based
@@ -295,10 +302,12 @@ inline Value Value::make_map() {
 inline Value Value::make_array() {
     return Value(array_pool().acquire());
 }
-inline Value Value::make_class() {
+inline Value Value::make_class(const std::string& name, const Value& parent) {
     Value v;
     v.tag = T_CLASS;
     v.mptr = map_pool().acquire();
+    v.mptr->class_name = class_name_id(name);
+    v.mptr->proto = parent;
     return v;
 }
 
@@ -313,6 +322,21 @@ inline const Value& Value::class_of() const {
 }
 inline void Value::set_class(const Value& cls) {
     mptr->proto = cls;
+}
+inline const Value& Value::parent_of() const {
+    return mptr->proto;
+}
+inline const std::string& Value::class_name() const {
+    return class_name_text(mptr->class_name);
+}
+inline bool Value::is_instance_of(const Value& cls) const {
+    if (!is_map())
+        return false;
+    for (const Value* c = &mptr->proto; c->is_class(); c = &c->mptr->proto) {
+        if (c->mptr == cls.mptr)
+            return true;
+    }
+    return false;
 }
 
 inline Value Value::array_get(int64_t idx) const {

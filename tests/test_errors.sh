@@ -1029,6 +1029,12 @@ check_error "len without argument" \
     'print(len())' \
     "len() requires 1 argument"
 
+check_error "extends something that is no class" \
+    'global G = 5
+class B extends G
+end' \
+    "a class can only extend a class, got int"
+
 check_error "instanceOf without a class" \
     'class A
 end

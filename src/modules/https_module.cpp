@@ -341,8 +341,7 @@ int method_done(CallCtx& ctx) {
 }
 
 Value make_https_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Request")
+    return MapBuilder(Value::make_class("Request"))
         .fn("cancel", method_cancel)
         .fn("done", method_done)
         .done();

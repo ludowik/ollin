@@ -41,11 +41,10 @@ static void validate_numeric_range(double start, double end, double step) {
 
 // Interned meta-key constants, initialized once and reused across all calls.
 struct MetaKeys {
-    Value parent_, str_, name_, init_;
+    Value str_, init_;
     Value add_, sub_, mul_, div_, mod_, neg_, eq_, lt_, le_;
     MetaKeys()
-        : parent_(std::string("__parent__")), str_(std::string("__str")),
-          name_(std::string("__name__")), init_(std::string("init")),
+        : str_(std::string("__str")), init_(std::string("init")),
           add_(std::string("__add")), sub_(std::string("__sub")), mul_(std::string("__mul")),
           div_(std::string("__div")), mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")),
           lt_(std::string("__lt")), le_(std::string("__le")) {
@@ -79,37 +78,26 @@ static MetaKeys& MK() {
 #define OLLIN_NOIPA [[gnu::noipa]]
 #endif
 OLLIN_NOIPA bool VM::has_class_link(const Value& v) {
-    assert(v.is_map() || v.is_class());
+    assert(v.is_map());
     return !v.mptr->proto.is_nil();
 }
 
+// The chain is one link everywhere: an instance leads to its class, a class to the class it extends (Map::proto).
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
         Value v = obj.map_get(key);
         if (!v.is_nil())
             return v;
-        if (obj.is_map()) {
-            const Value& cls = obj.class_of();
-            if (!cls.is_nil())
-                return proto_chain_get(cls, key);
-        } else {
-            Value par = obj.map_get(MK().parent_);
-            if (!par.is_nil())
-                return proto_chain_get(par, key);
-        }
+        return proto_chain_rest(obj, key);
     }
     return Value{};
 }
 
 Value VM::proto_chain_rest(const Value& obj, const Value& key) {
-    if (obj.is_map()) {
-        const Value& cls = obj.class_of();
-        if (!cls.is_nil())
-            return proto_chain_get(cls, key);
-    } else if (obj.is_class()) {
-        Value par = obj.map_get(MK().parent_);
-        if (!par.is_nil())
-            return proto_chain_get(par, key);
+    if (obj.is_map() || obj.is_class()) {
+        const Value& next = obj.mptr->proto;
+        if (!next.is_nil())
+            return proto_chain_get(next, key);
     }
     return Value{};
 }
@@ -184,6 +172,14 @@ static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-
 static FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
                                 const char* not_callable);
 
+// A declared class: its name and, for `extends`, the class it extends. Out of line, like everything that is not the
+// hot path of run_goto; refusing a parent that is no class is what lets every reader of the chain trust it.
+[[gnu::noinline]] static Value make_declared_class(const Value& name, const Value* parent) {
+    if (parent && !parent->is_class())
+        throw std::runtime_error(std::string("runtime: a class can only extend a class, got ") + parent->type_name());
+    return Value::make_class(name.as_string(), parent ? *parent : Value{});
+}
+
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the register obj came from
     Value cls = obj.class_of();
@@ -193,8 +189,7 @@ std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the 
     // A CLASS is callable, so it passes is_callable, but it is not a __str: naming the class is
     // all that can be said of it.
     if (!str_fn.is_callable() || str_fn.is_class()) {
-        Value nm = cls.map_get(MK().name_);
-        return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
+        return "{" + cls.class_name() + "}";
     }
     if (str_fn.is_builtin()) {
         Value self = obj; // one slot is available (self); the builtin writes its result there, and it is read back
@@ -235,8 +230,7 @@ std::string value_to_string_plain(const Value& v) {
         // on to call its __str.
         const Value& cls = v.class_of();
         if (!cls.is_nil()) {
-            Value nm = cls.map_get(MK().name_);
-            return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
+            return "{" + cls.class_name() + "}";
         }
         return "{map}";
     }
@@ -1604,7 +1598,7 @@ dispatch_loop:
                 Value hit = *slot; // read before writing the register (see the cache hit)
                 R[A] = std::move(hit);
             } else {
-                // Absent from the own data: walk the prototype chain (the class, then __parent__).
+                // Absent from the own data: walk the prototype chain (the class, then the classes it extends).
                 // NOT cached, because mutating the CLASS does not bump the instance's layout.
                 // The map module's pseudo-methods (len, keys, values, has, delete) are only an
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
@@ -1945,9 +1939,14 @@ dispatch_loop:
         NEXT();
     }
 
-    op_NEW_CLASS:
-        R[A] = Value::make_class();
+    op_NEW_CLASS: {
+        {
+            // Bx: the constant of the name, shifted by one, and the low bit says the parent class is in R[A].
+            Value cls = make_declared_class(ch->constants[Bx >> 1], (Bx & 1) ? &R[A] : nullptr);
+            R[A] = std::move(cls);
+        }
         NEXT();
+    }
 
     op_CALL_METHOD: {
         uint32_t fp_addr = 0;

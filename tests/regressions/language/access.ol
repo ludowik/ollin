@@ -17,7 +17,7 @@ end
 assert(ic_s == 15)
 
 ## GET_INDEX inline cache: it only ever covers the object's OWN data. A resolution through the
-## chain (__class__, __parent__) is NOT cached, so a mutation of the class stays visible from an
+## chain (the class, then the classes it extends) is NOT cached, so a mutation of the class stays visible from an
 ## instance already created.
 class ICA
     func init(v)
@@ -45,7 +45,7 @@ assert(ica.tag == "own")   ## the own data shadows the class
 var icb = ICB(5)
 assert(icb.kind() == "ICB")
 assert(icb.get_v_ok == nil)
-assert(ICB.tag == "c2")    ## inherited through __parent__
+assert(ICB.tag == "c2")    ## inherited from the parent class
 
 ## inline cache: the cached value is a NON-owning reference to the slot inside the map. The
 ## destination register may alias the object's own (`m = m.inner`), and the write would then

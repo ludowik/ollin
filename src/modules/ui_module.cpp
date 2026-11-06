@@ -633,8 +633,7 @@ static int ui_clear(CallCtx& ctx) {
 namespace {
 
 Value make_element_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "UiElement")
+    return MapBuilder(Value::make_class("UiElement"))
         .fn("button", menu_button)
         .fn("checkbox", menu_checkbox)
         .fn("slider", menu_slider)

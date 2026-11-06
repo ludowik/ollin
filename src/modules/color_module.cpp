@@ -123,8 +123,7 @@ static int color_gray(CallCtx& ctx) {
 
 
 Value make_color_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Color")
+    return MapBuilder(Value::make_class("Color"))
         .fn("init", color_init)
         .fn("__str", color_str)
         .static_fn("random", color_random)   // STATIC factories, which receive no self

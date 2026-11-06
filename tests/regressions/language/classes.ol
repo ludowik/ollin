@@ -2,7 +2,7 @@
 ## Each block locks down one precise bug. Run: ./build/ollin tests/regressions/language/classes.ol — it must finish without error.
 
 ## ── Compiler: super ─────────────────────────────────────────────────────────
-## #2 super across three levels (infinite recursion before: self.__class__.__parent__)
+## #2 super across three levels (infinite recursion before, when the parent was looked up through the class of self)
 class SA
     func tag() return "A" end
 end
@@ -262,6 +262,43 @@ assert(not instanceOf({}, CxAnimal) and not instanceOf(5, CxAnimal) and not inst
 assert(not instanceOf(CxPuppy, CxAnimal), "a class is not an instance of its parent")
 assert(instanceOf(Color(1), Color) and classOf(Color(1)) == Color, "a native class too")
 assert(instanceOf(cxPup, CxDog) == true and typeof(instanceOf(cxPup, CxCat)) == "bool")
+
+## The same goes for the name of a class and the class it extends: slots of the engine, no entries. A script can neither
+## read them nor write them, so there is no cycle to follow for ever.
+assert(CxDog.__parent__ == nil and CxDog.__name__ == nil and len(CxDog) == 0, "a class holds its methods and nothing more")
+class CxNamed
+    func hello()
+        return "hello"
+    end
+end
+class CxChild extends CxNamed
+    func other()
+        return "other"
+    end
+end
+assert(len(CxChild) == 1 and map.keys(CxChild)[1] == "other", "the entries of a class are its methods")
+CxChild.__parent__ = CxChild
+CxChild.__name__ = "Nope"
+assert(CxChild().hello() == "hello" and instanceOf(CxChild(), CxNamed), "writing them changes nothing of the chain")
+assert(CxChild().missing == nil and not instanceOf(CxChild(), CxDog), "a missing field ends the walk")
+assert("{CxChild()}" == "\{CxChild}", "nor the name an instance wears")
+
+## A class that extends another has a link to it (Map::proto) and is still no instance: as an operand it is not an object
+## whose meta-method could run, so it never reaches the __add of its parent.
+class CxOp
+    func __add(o)
+        return 42
+    end
+end
+class CxOpChild extends CxOp
+end
+var cxOpSum = nil
+try
+    cxOpSum = CxOpChild + 1
+catch e
+end
+assert(cxOpSum == nil, "a class is no operand of its parent's meta-methods")
+assert(CxOp() + 1 == 42 and CxOpChild() + 1 == 42, "the instances of both are")
 
 ## The class slot is not a field: an instance has no key of its own for it, and an empty one is still true.
 class CxEmpty

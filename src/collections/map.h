@@ -47,12 +47,18 @@ struct Map {
     // a class object itself is T_CLASS (a different tag, unaffected by kind at all).
     enum : uint8_t { PLAIN = 0, ENUM = 1, MODULE = 2 };
     uint8_t kind = PLAIN;
+    // The NAME of a class, as an id of the registry below (0 for a map that is no class). It sits in the alignment
+    // hole after `kind`, so sizeof(Map) is unchanged, and it is not reset on recycling: only a class reads it, and
+    // Value::make_class always sets it.
+    uint16_t class_name = 0;
     void* userdata = nullptr;
-    // The CLASS of an instance. It is a SLOT of the map and not an entry of `data`, on purpose: an entry could be
-    // written with any value by any script or JSON text, and the engine, which follows it as a pointer to a
-    // map, would crash on a number. Only the engine fills it (Value::set_class: instantiating a class, a native
-    // module building its objects), so it is nil or a class BY CONSTRUCTION and no reader checks. A script cannot
-    // read or write it: `__class__` is a key like any other, held in `data`. nil for anything that is not an instance.
+    // The next map of the lookup chain, which is a SLOT of the map and not an entry of `data`, on purpose: an entry
+    // could be written with any value by any script or JSON text, and the engine, which follows it as a pointer to a
+    // map, would crash on a number — or loop for ever on a cycle. For an INSTANCE it is its class; for a CLASS, the
+    // class it extends. Only the engine fills it (Value::set_class: instantiating a class, a native module building
+    // its objects; Value::make_class: `extends`), so it is nil or a class BY CONSTRUCTION, with no cycle (a parent
+    // exists before its child), and no reader checks. A script can neither read nor write it: `__class__` and
+    // `__parent__` are keys like any others, held in `data`. nil for a map that is neither.
     Value proto;
     uint64_t version = 0;   // = ++g_map_epoch on every mutation; 0 means never mutated
     // = ++g_map_epoch when an entry appears or disappears (and on recycling), NOT when a value is overwritten in
@@ -70,6 +76,11 @@ struct Map {
     // Out of line: release() is inlined wherever a Value lets go of a map, which is everywhere in run_goto.
     [[gnu::noinline]] void drop_proto();
 };
+
+// The names of the classes. A class is named when it is made (the declaration, or the native module that builds it),
+// and the name is what a printed instance wears: `{Dog}`. The registry holds each distinct name once.
+uint16_t class_name_id(const std::string& name);
+const std::string& class_name_text(uint16_t id);
 
 struct MapPool {
     static constexpr int CAP = 64;

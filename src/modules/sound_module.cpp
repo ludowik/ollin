@@ -496,8 +496,7 @@ int buf_envelope(CallCtx& ctx) {
 }
 
 Value make_buffer_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Sound")
+    return MapBuilder(Value::make_class("Sound"))
         .fn("play", buf_play)
         .fn("stop", buf_stop)
         .fn("isPlaying", buf_is_playing)
@@ -518,8 +517,7 @@ Value buffer_class() {
 }
 
 Value make_osc_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Osc")
+    return MapBuilder(Value::make_class("Osc"))
         .fn("start", method_start)
         .fn("stop", method_stop)
         .fn("isPlaying", method_is_playing)

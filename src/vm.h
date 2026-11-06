@@ -156,20 +156,21 @@ class VM {
 
     static Value proto_chain_get(const Value& obj, const Value& key);
 
-    // Rest of the prototype chain (an instance's class, a class's __parent__). The caller has
+    // Rest of the prototype chain (an instance's class, a class's parent). The caller has
     // already searched obj's OWN data, so this avoids looking the same key up twice
     // (see op_GET_INDEX).
     static Value proto_chain_rest(const Value& obj, const Value& key);
 
-    // A map or a class is an INSTANCE when it has a class link (Map::proto). Split in two ON PURPOSE: the tag
-    // test answers "no" for every number, string and boolean, that is for almost every operand of an arithmetic or
-    // comparison opcode, so it is inlined at the sites that ask; only the read of the link stays out of line
+    // A map is an INSTANCE when it has a class link (Map::proto; a class has one too, to its parent, and is no
+    // instance). Split in two ON PURPOSE: the tag test answers "no" for every number, string and boolean, that is for
+    // almost every operand of an arithmetic or comparison opcode, so it is inlined at the sites that ask; only the
+    // read of the link stays out of line
     // (cf. vm.cpp). Bundled together they were one out-of-line call, and a comparison of two floats paid it just
     // to be told no (mandelbrot +4.4 % of instructions, measured).
-    // has_class_link reads mptr, which shares its union with an int64 and a double: ONLY on a map or a class.
+    // has_class_link reads mptr, which shares its union with an int64 and a double: ONLY on a map.
     static bool has_class_link(const Value& v);
     static bool is_instance(const Value& v) {
-        if (!v.is_map() && !v.is_class())
+        if (!v.is_map())
             return false;
         return has_class_link(v);
     }

@@ -336,7 +336,7 @@ int handle_slot(const CallCtx& ctx, const char* fn) {
 // animate, and the refusal would complain about a missing field instead of naming the
 // real cause, which is that nesting is not supported.
 bool is_tween_handle(const Value& v) {
-    return is_instance_of(v, tween_class());
+    return v.is_instance_of(tween_class());
 }
 
 
@@ -797,8 +797,7 @@ int method_delay(CallCtx& ctx) {
 }
 
 Value make_tween_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Tween")
+    return MapBuilder(Value::make_class("Tween"))
         .fn("pause", method_pause)
         .fn("resume", method_resume)
         .fn("cancel", method_cancel)

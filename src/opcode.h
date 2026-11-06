@@ -101,7 +101,7 @@ enum class Op : OpByte {
     MAKE_CLOSURE,   // ABx: A=dest, Bx=func_idx → create closure, capture upvals from current frame
     GET_UPVAL,      // AB:  A=dest, B=upval_idx → R[A] = upval[B]
     SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
-    NEW_CLASS,      // A:   R[A] = T_CLASS (a fresh, empty prototype map)
+    NEW_CLASS,      // ABx: R[A] = a fresh, empty T_CLASS; Bx = (constant of its name << 1) | 1 when its parent is in R[A]
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
                     // B = the tail's MODE: 0 none, 1 `...` (frame varargs), 2 a call (last_results_)
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags

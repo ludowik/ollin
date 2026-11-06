@@ -7,14 +7,6 @@
 #include <utility>
 #include <vector>
 
-// Whether `v` is an instance of the native class `cls` itself (no walk up the chain: a handle has no subclass).
-static inline bool is_instance_of(const Value& v, const Value& cls) {
-    if (!v.is_map())
-        return false;
-    Value c = v.class_of();
-    return c.is_class() && c.as_map() == cls.as_map();
-}
-
 // A script-side handle is an instance of a native class carrying {slot, gen}: `slot` is where the thing lives in the
 // module's table, `gen` is bumped when the slot is freed, so a handle kept too long is told from the thing that took
 // its place. Never a pointer: a callback may grow the table. read_slot_handle checks the receiver first, because a method
@@ -30,7 +22,7 @@ static inline Value make_slot_handle(const Value& cls, int slot, uint32_t gen) {
 
 // False when `v` is not a handle of the class; the caller words the refusal, which names what it expected.
 static inline bool read_slot_handle(const Value& v, const Value& cls, int& slot, uint32_t& gen) {
-    if (!is_instance_of(v, cls))
+    if (!v.is_instance_of(cls))
         return false;
     Value s = v.map_get(Value(std::string("slot")));
     Value g = v.map_get(Value(std::string("gen")));

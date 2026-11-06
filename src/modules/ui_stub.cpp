@@ -56,8 +56,7 @@ int nothing(CallCtx& ctx) {
 }
 
 Value make_inert_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "UiElement")
+    return MapBuilder(Value::make_class("UiElement"))
         .fn("button", stub_button)
         .fn("checkbox", stub_checkbox)
         .fn("slider", stub_slider)

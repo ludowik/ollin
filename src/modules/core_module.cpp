@@ -159,15 +159,7 @@ static int core_instance_of(CallCtx& ctx) {
     if (!ctx.args[1].is_class())
         throw std::runtime_error(std::string("instanceOf: the second argument must be a class, got ") +
                                  ctx.args[1].type_name());
-    bool found = false;
-    if (ctx.args[0].is_map()) {
-        const Map* wanted = ctx.args[1].as_map();
-        Value cls = ctx.args[0].class_of();
-        while (cls.is_class() && !found) {
-            found = cls.as_map() == wanted;
-            cls = cls.map_get(Value(std::string("__parent__")));
-        }
-    }
+    bool found = ctx.args[0].is_instance_of(ctx.args[1]);
     return ctx.ret(Value::make_bool(found));
 }
 

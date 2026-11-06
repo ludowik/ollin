@@ -63,6 +63,11 @@ assert(near(unit.w, 1) and scaled.w == 2)
 var notQuat = "Quat.mul: expected a Quat (graphics.quat / quatAxis / quatEuler)"
 assert(refusal(func() quarterZ.mul({}) end) == notQuat)
 assert(refusal(func() quarterZ.mul() end) == "Quat.mul: expected another Quat")
+## It is the CLASS that makes a Quat, not what the object looks like or is called: a map with the four fields is refused,
+## and so is an instance of another class.
+assert(refusal(func() quarterZ.mul({x: 0, y: 0, z: 0, w: 1}) end) == notQuat)
+assert(refusal(func() quarterZ.mul(graphics.camera(0, 0, 5, 0, 0, 0, 60)) end) == notQuat)
+assert(instanceOf(quarterZ, classOf(quarterZ.mul(quarterY))) and not instanceOf(quarterZ, classOf(graphics.camera(0, 0, 5, 0, 0, 0, 60))))
 assert(refusal(func() quarterZ.slerp(quarterY) end) == "Quat.slerp: expected a Quat and t")
 assert(refusal(func() quarterZ.slerp(5, 0.5) end) == "Quat.slerp: expected a Quat (graphics.quat / quatAxis / quatEuler)")
 assert(refusal(func() quarterZ.slerp(quarterY, "x") end) == "Quat.slerp: argument 3 expected number, got string")

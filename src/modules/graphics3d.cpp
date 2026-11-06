@@ -262,8 +262,7 @@ static int cam_get_up(CallCtx& ctx) {
 }
 
 static Value make_camera_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Camera")
+    return MapBuilder(Value::make_class("Camera"))
         .fn("setPos", cam_set_pos)
         .fn("lookAt", cam_look_at)
         .fn("move", cam_move)
@@ -1019,8 +1018,7 @@ static int light_enable(CallCtx& ctx) {
 }
 
 static Value make_light_class() {
-    return MapBuilder(Value::make_class())
-        .str("__name__", "Light")
+    return MapBuilder(Value::make_class("Light"))
         .fn("setDir", light_set_dir)
         .fn("setPos", light_set_pos)
         .fn("setColor", light_set_color)
