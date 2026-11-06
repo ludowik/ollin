@@ -7,11 +7,7 @@
 #include <utility>
 #include <vector>
 
-// A script-side handle is an instance of a native class carrying {slot, gen}: `slot` is where the thing lives in the
-// module's table, `gen` is bumped when the slot is freed, so a handle kept too long is told from the thing that took
-// its place. Never a pointer: a callback may grow the table. The check of the receiver comes first, because a method
-// taken off its object (`var f = t.cancel`) is called with no receiver, and the register that should hold it is
-// whatever the call left there.
+// Whether `v` is an instance of the native class `cls` itself (no walk up the chain: a handle has no subclass).
 static inline bool is_instance_of(const Value& v, const Value& cls) {
     if (!v.is_map())
         return false;
@@ -19,6 +15,11 @@ static inline bool is_instance_of(const Value& v, const Value& cls) {
     return c.is_class() && c.as_map() == cls.as_map();
 }
 
+// A script-side handle is an instance of a native class carrying {slot, gen}: `slot` is where the thing lives in the
+// module's table, `gen` is bumped when the slot is freed, so a handle kept too long is told from the thing that took
+// its place. Never a pointer: a callback may grow the table. read_slot_handle checks the receiver first, because a method
+// taken off its object (`var f = t.cancel`) is called with no receiver, and the register that should hold it is
+// whatever the call left there.
 static inline Value make_slot_handle(const Value& cls, int slot, uint32_t gen) {
     Value h = Value::make_map();
     h.set_class(cls);
@@ -143,7 +144,7 @@ struct MapBuilder {
         map.map_set(Value(std::string(key)), v);
         return *this;
     }
-    // The class of an instance being built (cf. Map::proto): not a field, so so `set("__class__", …)` would only make a field nobody reads.
+    // The class of an instance being built (cf. Map::proto): not a field: `set("__class__", …)` would only make a field nobody reads.
     MapBuilder& klass(const Value& cls) {
         map.set_class(cls);
         return *this;

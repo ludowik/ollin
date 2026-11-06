@@ -2,7 +2,7 @@
 ## items of the three screens before the game, and what the screen of the game says besides the well (the panel, the
 ## message in the well, the curtain) — the end of the file.
 ##
-## The lists of the screens before the game are both styles paint, in the same places. The places are in points of a screen of 160 by
+## Both styles paint the lists of the screens before the game in the same places. The places are in points of a screen of 160 by
 ## 144, a style scales them; an item is a label {text, x, y, size, dim} (the name of the game also has `logo`), a choice {text, x, y, w, h, size, lit} or a
 ## piece {piece, x, y}. A label is centred on its place, a choice is the box that holds its text, and a piece is its
 ## 4 by 4 cells with the top left at its place. `lit` is the choice that is on, and the chosen one of the line the arrows

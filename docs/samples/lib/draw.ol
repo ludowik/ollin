@@ -1,4 +1,4 @@
-## The drawing helpers the samples that paint their own screens share (sudoku, blockudoku, calculator): a colour held as
+## The drawing helpers the samples that paint their own screens share (sudoku, blockudoku, calculator, tetris, weather): a colour held as
 ## an array [r, g, b, a], and text that is placed, sized and coloured by one call. Imported with a path relative to the
 ## importing file, "../lib/draw.ol".
 
