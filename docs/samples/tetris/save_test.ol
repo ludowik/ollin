@@ -6,7 +6,7 @@ import "save.ol"
 
 gameInit()
 
-## A game under way, with everything a save has to keep: rubble, a falling piece, a score, the tune half played.
+## A game under way, with everything a save has to keep: rubble, a falling piece, a score, the level and the lines.
 func arrange()
     game.state = "play"
     game.focus = "level"
@@ -46,8 +46,6 @@ func arrange()
     game.clock = 0.012
     game.held = {left: true, right: false, down: true}
     game.pressed = {start: true}
-    music.beat = 5.25
-    music.next = 4
 end
 
 ## Everything a save keeps, as one text, to compare two games (a map has no order, json.stringify sorts its keys).
@@ -74,8 +72,6 @@ func scramble()
     game.frame = 5
     game.held = {left: false, right: false, down: false}
     game.pressed = {}
-    music.beat = 0
-    music.next = 1
 end
 
 ## A game written, then read back in a scrambled one: the same, but in pause because it was running.
@@ -92,7 +88,6 @@ game.state = "play"                              ## as START would put it
 assert(snapshot() == before, "the game is not the one that was saved")
 assert(game.well[wellIdx(2, 17)] == 1 + (2 + 17) % KINDS or game.well[wellIdx(2, 17)] == 0)
 assert(game.frame == 0 and game.clock == 0 and game.held.left == false and len(game.pressed) == 0)
-assert(music.beat == 5.25 and music.next == 4)
 
 ## Every screen and every running state comes back as it was; the running ones in pause, with where they return to.
 for st in ["title", "menu", "level", "play", "clearing", "entry", "paused", "over"] do
@@ -166,12 +161,9 @@ refuse("a missing counter", func(m) m.wait = nil end)
 refuse("rows that flash outside the well", func(m) m.clearing = [18] end)
 refuse("five rows that flash", func(m) m.clearing = [1, 2, 3, 4, 5] end)
 refuse("rows that are not an array", func(m) m.clearing = "16" end)
-refuse("a tune before its start", func(m) m.beat = -1 end)
-refuse("a tune past its end", func(m) m.beat = musicLength() + 1 end)
-refuse("a note that does not exist", func(m) m.beatNext = len(music.events) + 2 end)
 refuse("a falling piece in the rubble", func(m) m.well[wellIdx(4, 2) + 2 * COLS] = 1 m.well[wellIdx(5, 2)] = 1 end)
 refuse("a falling piece out of the well", func(m) m.x = 9 end)
-assert(rejected == 38)
+assert(rejected == 35)
 
 ## A paused game that was falling is held to the same rule; one that was not falling is not asked for a piece.
 refuse("a paused falling game with its piece in the rubble", func(m)
@@ -194,7 +186,7 @@ arrange()
 saveGame()
 assert(json.stringify(data.get(SAVE_KEY)) == good, "what data keeps is not the state")
 var back = readSave(data.get(SAVE_KEY))
-assert(back <> nil and back.well[wellIdx(2, 17)] == game.well[wellIdx(2, 17)] and back.beat == 5.25)
+assert(back <> nil and back.well[wellIdx(2, 17)] == game.well[wellIdx(2, 17)])
 game.score = 7000
 saveGame()
 assert(data.get(SAVE_KEY).score == 7000, "a changed game is not written")

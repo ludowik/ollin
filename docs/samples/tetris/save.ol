@@ -1,7 +1,7 @@
 ## The save of Tetris, with no drawing: the whole state of the game as one map, written as the game goes and read back at
 ## the start, so that a run begins where the last one stopped — the screen it was on (title, menu, level, game), the
-## well and the falling piece, the score, the level, the lines, the tune. The best scores are kept apart, as they always
-## were (play.ol).
+## well and the falling piece, the score, the level, the lines. The best scores are kept apart, as they always were
+## (play.ol), and so is the music: a game comes back in pause, and its tune starts again from the beginning.
 ##
 ## `data` keeps the map as it is, arrays included, and does not write again a value that did not change. A save that
 ## cannot be trusted — another version, a field of the wrong sort or out of its range, a
@@ -10,7 +10,6 @@
 ## there: a piece that began to fall the moment a page opened would be a trap.
 
 import "rules.ol"
-import "sounds.ol"
 import "play.ol"
 
 const SAVE_KEY = "tetris.save"
@@ -40,7 +39,7 @@ global saved = {state: "", frame: -1}
 func saveState()
     var t = {
         v: SAVE_VERSION, state: game.state, focus: game.focus, type: game.type, resume: game.resume,
-        well: game.well, clearing: game.clearing, beat: music.beat, beatNext: music.next
+        well: game.well, clearing: game.clearing
     }
     for name, range in SAVE_RANGES do
         t[name] = game[name]
@@ -93,12 +92,6 @@ func saveValid(t)
             return false
         end
     end
-    if (typeof(t.beat) <> "int" and typeof(t.beat) <> "float") or t.beat < 0 or t.beat >= musicLength() then
-        return false
-    end
-    if not isWhole(t.beatNext, 1, len(music.events) + 1) then
-        return false
-    end
     if t.kind >= 1 and t.turn > len(shapes[t.kind]) then
         return false
     end
@@ -133,8 +126,6 @@ func restoreSave(t)
     game.clock = 0
     game.held = {left: false, right: false, down: false}
     game.pressed = {}
-    music.beat = t.beat
-    music.next = t.beatNext
     if running() then
         pauseGame()
     end
