@@ -108,8 +108,9 @@ func reasonOf(body)
 end
 
 ## The weather now and over the next days, from the text of an answer of the forecast service:
-##   {temp, wind, code, days: [{date, code, high, low}]}
-## or nil and the reason it cannot be read.
+##   {temp, wind, code, days: [{date, dayName, code, high, low}]}
+## or nil and the reason it cannot be read. `dayName` is the day of the week of the date, worked out here once rather
+## than at every frame.
 func readForecast(body)
     var data = parseJson(body)
     if data == nil then
@@ -130,7 +131,8 @@ func readForecast(body)
     end
     var days = []
     for i = 1, count do
-        days.push({date: daily.time[i], code: daily.weather_code[i], high: daily.temperature_2m_max[i], low: daily.temperature_2m_min[i]})
+        days.push({date: daily.time[i], dayName: weekday(daily.time[i]), code: daily.weather_code[i],
+            high: daily.temperature_2m_max[i], low: daily.temperature_2m_min[i]})
     end
     return {temp: now.temperature_2m, wind: now.wind_speed_10m, code: now.weather_code, days: days}
 end

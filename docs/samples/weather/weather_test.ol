@@ -34,6 +34,7 @@ const FORECAST = q("\{'latitude':48.86,'longitude':2.36,'current':\{'time':'2026
 var weather, why = readForecast(FORECAST)
 assert(why == nil and weather.temp == 12.3 and weather.wind == 14.4 and weather.code == 61)
 assert(len(weather.days) == 3 and weather.days[1].date == "2026-11-01" and weather.days[2].code == 3)
+assert(weather.days[1].dayName == "Sun" and weather.days[2].dayName == "Mon" and weather.days[3].dayName == "Tue")
 assert(weather.days[3].high == 9.5 and weather.days[3].low == 4 and weather.days[2].high == 11)
 
 var nothing, reason = readForecast("not json")

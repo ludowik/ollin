@@ -260,7 +260,7 @@ func drawForecast(x, y, w, h)
     for i = 1, n do
         var day = days[i]
         var cx = x + (i - 0.5) * cell
-        var label = i == 1 and "Today" or weekday(day.date)
+        var label = i == 1 and "Today" or day.dayName
         drawText(label, cx, y + h * 0.1, fitSize(label, h * 0.17, cell * 0.9), "center", "center", WHITE)
         drawIcon(skyOf(day.code).kind, cx, y + h * 0.48, math.min(cell * 0.28, h * 0.2))
         drawText("{day.high:.0f}°", cx, y + h * 0.78, h * 0.17, "center", "center", WHITE)
