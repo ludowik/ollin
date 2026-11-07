@@ -181,6 +181,8 @@ ollin/
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      test-https-browser.js (essaie le moteur WASM du module https contre un vrai serveur HTTPS local, dans
 │                      Chromium — à la MAIN, cf. « Modules `https` et `json` »),
+│                      test-keyboard-browser.js (essaie `keyboard.typed` dans Chromium — à la MAIN : texte produit
+│                      par les touches, aucun caractère de contrôle, rien quand l'hôte bloque le clavier),
 │                      gen_cpp_source.py (engendre docs/samples/{lexer,parser}/cpp_source.ol — le texte des fonctions de
 │                      lexer.cpp et de parser.cpp que les deux animations suivent ligne à ligne ; ne pas l'éditer à la
 │                      main, cf. check_trace_source.sh),

@@ -30,10 +30,14 @@ static bool query_blocked() {
 // activation needed:
 //   keyboard.keypressed = func(key) ... end   key pressed (an event)
 //   keyboard.keyrelease = func(key) ... end   key released (an event)
+//   keyboard.typed = func(text) ... end       text typed (an event): what the keys PRODUCE, which a key name cannot say
 // plus a HELD-state builtin, for continuous movement:
 //   keyboard.isDown(key) -> whether the key is down right now.
 // `key` is a key NAME: "a".."z", "0".."9", "space", "return", "escape", "backspace", "tab",
 // "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", "f1".."f12", and so on.
+// `text` is the characters the keyboard layout and the system made of the presses of the frame, in UTF-8: an accent,
+// a hyphen, an apostrophe, a capital, a dead key's result. A fast typist or a paste gives several characters in one
+// call. Control characters (return, tab, backspace) are never part of it: they are key names, for keypressed.
 //
 // Detection happens in keyboard_poll(), called once per frame by the render loop
 // (graphics_module.cpp), so the keyboard only works during a graphics.run(...) — or through the
@@ -128,6 +132,20 @@ static bool s_down[512];
 // see audio_wake.
 static bool s_pressed_any = false;
 
+// The text the frame's character queue holds, in UTF-8, without the control characters: raylib reports the characters
+// the system produced, and some platforms include the ones that keys such as return or backspace make.
+static std::string take_typed() {
+    std::string text;
+    int codepoint;
+    while ((codepoint = GetCharPressed()) != 0) {
+        if (codepoint < 32 || codepoint == 127)
+            continue;
+        int size = 0;
+        text.append(CodepointToUTF8(codepoint, &size), size);
+    }
+    return text;
+}
+
 // Clears the held state. Called at the start of every gfx_run: on the shared WASM instance
 // s_down is static and would otherwise survive from one run to the next, so a key held across a
 // reset would produce a keyrelease with no keypressed.
@@ -150,6 +168,9 @@ void keyboard_poll() {
         pressed = kbd.map_get(Value(std::string("keypressed")));
         released = kbd.map_get(Value(std::string("keyrelease")));
     }
+    Value typed;
+    if (kbd.is_map())
+        typed = kbd.map_get(Value(std::string("typed")));
     bool want_press = pressed.is_callable();
     bool want_release = released.is_callable();
 
@@ -169,6 +190,7 @@ void keyboard_poll() {
         }
         while (GetKeyPressed() != 0) {
         }
+        take_typed();
         return;
     }
 
@@ -185,6 +207,12 @@ void keyboard_poll() {
         if (want_press)
             vm->call_value(pressed, Value(name));
     }
+
+    // The text of the frame, after the presses it came from. The queue is drained even without a callback, so that it
+    // does not hold what was typed before the script asked.
+    std::string text = take_typed();
+    if (!text.empty() && typed.is_callable())
+        vm->call_value(typed, Value(text));
 
     // Releases: walk the keys tracked as held.
     for (int k = 0; k < 512; k++) {

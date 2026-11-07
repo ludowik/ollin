@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-07 20:56</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-07 23:13</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-07 20:56</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-07 23:13</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2284,9 +2284,21 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>keyboard.isDown(key)</code></td><td>Returns <code>true</code>/<code>false</code> according to whether the key is <strong>down right now</strong>; ask inside <code>draw</code>/<code>update</code></td></tr>
     <tr><td><code>func keyboard.keypressed(key)</code></td><td>Called on every key <strong>press</strong>, as an event</td></tr>
     <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
+    <tr><td><code>func keyboard.typed(text)</code></td><td>Called with the <strong>text</strong> the keys produced, as an event — see below</td></tr>
   </tbody>
 </table>
 <p><code>key</code> is a <strong>key name</strong>: <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>, <code>"f1"</code>…<code>"f12"</code>.</p>
+<p><strong>Writing a text</strong> is what <code>keyboard.typed(text)</code> is for. A key name says which key was pressed, not what it wrote: <code>"a"</code> is the same key for <code>a</code> and <code>A</code>, and the hyphen, the apostrophe or an accented letter have no name at all. <code>text</code> is what the keyboard layout and the system made of the presses — <code>"A"</code>, <code>"-"</code>, <code>"é"</code> — as UTF-8. A fast typist or a paste can give several characters in one call. The control keys (<code>"return"</code>, <code>"tab"</code>, <code>"backspace"</code>) never come in it: they stay key names, for <code>keypressed</code>. A key pressed that writes something calls both, <code>keypressed</code> first.</p>
+<pre><code><span class="kw">global</span> name = <span class="str">""</span>
+<span class="kw">func</span> keyboard.typed(text)
+    name += text
+<span class="kw">end</span>
+<span class="kw">func</span> keyboard.keypressed(key)
+    <span class="kw">if</span> key == <span class="str">"backspace"</span> <span class="kw">then</span>
+        name = <span class="bi">string</span>.substr(name, <span class="num">1</span>, <span class="bi">len</span>(name) - <span class="num">1</span>)
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+<p>This is a physical keyboard's text. A phone has no keyboard to type on until one is shown, and the canvas is not something the system opens one for.</p>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
 <span class="kw">func</span> keyboard.keypressed(key)
