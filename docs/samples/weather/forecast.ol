@@ -61,16 +61,47 @@ func skyOf(code)
     return SKIES[code] or {kind: "cloud", text: "Weather code {code}"}
 end
 
-## The day of the week of a date written "2026-11-01" (Sakamoto's method): "Sun", "Mon"…, or nil for a text whose
-## year, month or day is not a number or is out of range.
+## Whether a text is made of digits and nothing else: string.number would also take "1.", "0x1F" or " 1".
+func isDigits(text)
+    if text == "" then
+        return false
+    end
+    for c in text do
+        if string.find("0123456789", c) == nil then
+            return false
+        end
+    end
+    return true
+end
+
+## The days a month has, February's depending on the year (Gregorian rule).
+func monthLength(y, m)
+    const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if m == 2 and ((y % 4 == 0 and y % 100 <> 0) or y % 400 == 0) then
+        return 29
+    end
+    return days[m]
+end
+
+## The day of the week of a date written "2026-11-01" (Sakamoto's method): "Sun", "Mon"…, or nil for a text that is
+## not exactly such a date: four digits, two, two, and a day the month has.
 func weekday(date)
-    if typeof(date) <> "string" or len(date) <> 10 then
+    if typeof(date) <> "string" then
         return nil
     end
-    var y = string.number(string.substr(date, 1, 4))
-    var m = string.number(string.substr(date, 6, 2))
-    var d = string.number(string.substr(date, 9, 2))
-    if y == nil or m == nil or d == nil or m < 1 or m > 12 or d < 1 or d > 31 then
+    var parts = date.split("-")
+    if #parts <> 3 or len(parts[1]) <> 4 or len(parts[2]) <> 2 or len(parts[3]) <> 2 then
+        return nil
+    end
+    for part in parts do
+        if not isDigits(part) then
+            return nil
+        end
+    end
+    var y = string.number(parts[1])
+    var m = string.number(parts[2])
+    var d = string.number(parts[3])
+    if y < 1 or m < 1 or m > 12 or d < 1 or d > monthLength(y, m) then
         return nil
     end
     const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
