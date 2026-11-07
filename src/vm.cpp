@@ -1204,6 +1204,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_RETURN_SPREAD,
         &&op_SEAL_ENUM,
         &&op_CLOSE_UPVALS,
+        &&op_CLEAR_REGS,
         &&op_LEN,
         &&op_SWITCH,
         &&op_ADDK,
@@ -2137,6 +2138,14 @@ dispatch_loop:
     // fresh one, giving one variable per iteration.
     op_CLOSE_UPVALS: {
         close_upvals_above(A);
+        NEXT();
+    }
+
+    // Emitted by Compiler::compile_stmt_seq, which says why.
+    op_CLEAR_REGS: {
+        const uint32_t n = B;
+        for (uint32_t i = 0; i < n; ++i)
+            R[A + i] = Value{};
         NEXT();
     }
 

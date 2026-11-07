@@ -559,8 +559,7 @@ Chunk Compiler::compile(const Program& prog) {
     locals_top_ = reg_top_;
     bump_reg_count();
 
-    for (auto& s : prog.stmts)
-        s->accept(*this);
+    compile_stmt_seq(prog.stmts);
     // Same guard as for functions: a register is named in one instruction field, and without it a
     // top-level script needing more than k_max_reg of them was silently truncated.
     check_reg_count("top-level code");
@@ -685,12 +684,33 @@ void Compiler::visit(const VarDeclStmt& s) {
 
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body); // defined below
 
+static bool body_has_loop(const std::vector<std::unique_ptr<Stmt>>& body); // defined below
+static bool stmt_own_func(const Stmt& s);                                   // defined below
+
 // The temporaries of a statement are freed once it is compiled, so the next one reuses them.
+// They are also EMPTIED when the frame can outlive the statement for long. A register is not
+// cleared by the statement that used it, so a value stored somewhere else — `global keep = []`
+// builds the array in a temporary, then copies it — stays held by that temporary until another
+// statement happens to write it. In a frame that lives as long as the program (the top level, under
+// a graphics loop) that never comes, and the value outlives every way the script has to drop it.
+// A statement that runs ONCE per call pays one instruction to empty them; one inside a loop does
+// not, since the next turn rewrites its temporaries.
 void Compiler::compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body) {
     for (auto& stmt : body) {
         int saved = reg_top_;
+        // reg_count_ is lowered for the statement, so that it says how high THIS one went.
+        int outer_count = reg_count_;
+        reg_count_ = saved;
         stmt->accept(*this);
+        int hi = reg_count_;
+        reg_count_ = std::max(outer_count, hi);
         reg_top_ = saved;
+        bool runs_once = fn().continue_patches.empty(); // the loops open in this function
+        // Nothing runs after a return, and a statement carrying a function leaves its captured
+        // registers to the closing of their upvalues.
+        if (hi > saved && fn().clear_temps && runs_once && !dynamic_cast<const ReturnStmt*>(stmt.get()) &&
+            !stmt_carries_func(*stmt))
+            chunk.emit(make_abc(Op::CLEAR_REGS, saved, hi - saved, 0));
     }
 }
 
@@ -726,6 +746,17 @@ bool Compiler::body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body)
     bool r = body_has_func(body);
     has_func_cache_.emplace(&body, r);
     return r;
+}
+
+bool Compiler::stmt_carries_func(const Stmt& s) {
+    if (stmt_own_func(s))
+        return true;
+    bool found = false;
+    s.for_each_body([&](const std::vector<std::unique_ptr<Stmt>>& sub) {
+        if (!found)
+            found = body_carries_func(sub);
+    });
+    return found;
 }
 
 int Compiler::keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
@@ -1184,6 +1215,7 @@ FuncIdx Compiler::compile_func_body(const std::string& name, const std::vector<s
     // already arguments here. A caller with with_self = false — a plain function, a lambda —
     // cannot be one.
     fn().in_ctor = with_self && is_ctor_name(name);
+    fn().clear_temps = body_has_loop(body);
 
     // Instance method: self in R[0], parameters from R[1]. Otherwise parameters from R[0].
     int n_params = (int)params.size();
@@ -2027,7 +2059,7 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
 // in which case the register stays reserved so nothing overwrites it after the loop.
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);
 // Does this node CARRY a function directly — a declaration, or a lambda in one of its own
-// expressions? DESCENDING into the sub-bodies is stmt_has_func's job, through
+// expressions? DESCENDING into the sub-bodies is stmt_any's job, through
 // Stmt::for_each_body, so no list of composite kinds is maintained here. Such a list is exactly
 // what had left `do ... end` out, with a closure reading a recycled register.
 struct HasFuncQuery : StmtQuery {
@@ -2054,9 +2086,10 @@ struct HasFuncQuery : StmtQuery {
         result = true;
     }
 };
-static bool stmt_has_func(const Stmt* s) {
+// Does this node CARRY a function by itself: a declaration, or a lambda in one of its own expressions?
+static bool stmt_own_func(const Stmt& s) {
     HasFuncQuery q;
-    s->accept(q);
+    s.accept(q);
     if (q.result)
         return true;
     bool found = false;
@@ -2065,23 +2098,47 @@ static bool stmt_has_func(const Stmt* s) {
     // s.value, s.values, s.key, s.targets… by hand — a list where a new node, or a new expression
     // field on an existing one, was missed in SILENCE, and a false "no function here" recycles a
     // register still held by an open upvalue.
-    s->for_each_expr([&found](const Expr& e) {
+    s.for_each_expr([&found](const Expr& e) {
         if (!found)
             found = expr_has_lambda(e);
     });
-    if (found)
+    return found;
+}
+
+// Is `hit` true of this statement or of one nested in its bodies? The body of a function or class
+// declaration belongs to ANOTHER function, so a declaration is a boundary and is never entered.
+template <typename Pred>
+static bool stmt_any(const Stmt& s, Pred hit);
+
+template <typename Pred>
+static bool body_any(const std::vector<std::unique_ptr<Stmt>>& body, Pred hit) {
+    for (auto& s : body)
+        if (stmt_any(*s, hit))
+            return true;
+    return false;
+}
+
+template <typename Pred>
+static bool stmt_any(const Stmt& s, Pred hit) {
+    if (hit(s))
         return true;
-    s->for_each_body([&found](const std::vector<std::unique_ptr<Stmt>>& sub) {
+    if (dynamic_cast<const FuncDeclStmt*>(&s) || dynamic_cast<const ClassDeclStmt*>(&s))
+        return false;
+    bool found = false;
+    s.for_each_body([&](const std::vector<std::unique_ptr<Stmt>>& sub) {
         if (!found)
-            found = body_has_func(sub);
+            found = body_any(sub, hit);
     });
     return found;
 }
+
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body) {
-    for (auto& s : body)
-        if (stmt_has_func(s.get()))
-            return true;
-    return false;
+    return body_any(body, stmt_own_func);
+}
+static bool body_has_loop(const std::vector<std::unique_ptr<Stmt>>& body) {
+    return body_any(body, [](const Stmt& s) {
+        return dynamic_cast<const WhileStmt*>(&s) || dynamic_cast<const ForIterStmt*>(&s);
+    });
 }
 
 void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,

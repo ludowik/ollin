@@ -56,6 +56,10 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         // values are still evaluated for their side effects, then RETURN 0,1 hands back self.
         // Per FRAME, so a lambda written INSIDE a constructor returns its own value.
         bool in_ctor = false;
+        // Whether the statements of this body that run once empty their temporaries after
+        // themselves (CLEAR_REGS): the top level and any function holding a loop, the frames that
+        // can stay alive long enough for a dead temporary to matter.
+        bool clear_temps = true;
     };
     // A DEQUE, not a vector: a reference to a frame — the scope guard of every block holds one —
     // must survive the push of an inner function's frame, and a vector reallocates.
@@ -245,6 +249,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // member and not a static.
     void close_upvals_from(int base);
     bool body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body);
+    // The same question about ONE statement: its own function or lambda, then its sub-bodies through
+    // the memoized body_carries_func (compile_block has already asked it of most of them).
+    bool stmt_carries_func(const Stmt& s);
     int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
                            int reg_top_after_body);
     std::unordered_map<const void*, bool> has_func_cache_;

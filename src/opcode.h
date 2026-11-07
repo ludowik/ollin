@@ -122,6 +122,7 @@ enum class Op : OpByte {
     RETURN_SPREAD, // AB: returns B explicit values plus last_results_ (the last being a call), contiguous at R[A..]
     SEAL_ENUM,     // A: the map in R[A] becomes an enum, and every indexed write is refused
     CLOSE_UPVALS,  // A: closes the open upvalues whose register is >= A, at the end of a scope
+    CLEAR_REGS,    // AB: R[A..A+B-1] = nil — the dead temporaries of an ended statement
     LEN,           // AB: R[A] = length of R[B] — the '#' operator
     SWITCH,        // ABx: jumps through switch_tables[Bx], indexed by the integer in R[A]
     // The right operand is a constant of the pool, C its index: a literal no longer costs a LOAD_K.

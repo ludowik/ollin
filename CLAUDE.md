@@ -906,6 +906,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | SWITCH        | ABx    | A=sujet, Bx=table          | saut indexé par l'entier de `R[A]` dans `chunk.switch_tables[Bx]` (cf. « Table de sauts du `switch` ») |
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
+| CLEAR_REGS    | AB     | A=premier registre, B=nombre | `R[A..A+B-1] = nil` : les temporaires d'une instruction terminée (cf. « Un temporaire mort ne retient rien ») |
 | ADDK/SUBK/MULK/EQK/NEQK/GTK/LTK/GEK/LEK | ABC | A=dst, B=lhs, C=index de constante | comme `ADD`… mais l'opérande DROIT est `constants[C]` : un littéral n'a plus de `LOAD_K` (cf. « Opérande constant à droite ») |
 | GET_INDEXK / SET_INDEXK | ABC | `R[A] = R[B][constants[C]]` / `R[A][constants[B]] = R[C]` | la CLÉ est une constante du pool (nom de champ, indice littéral) : plus de `LOAD_K` avant l'accès ; repli sur `LOAD_K` + `GET_INDEX`/`SET_INDEX` au-delà de 65 535 constantes. Même corps que la forme à registre (`goto get_index` / `set_index` : seule la source de la clé change) |
 | CONCAT        | ABC    | A=dst, B=première pièce, C=nombre | `R[A]` = le texte de `R[B..B+C-1]` mis bout à bout, en UNE chaîne : une interpolation, ou une chaîne de `+` dont l'opérande le plus à GAUCHE est un littéral chaîne (alors chaque `+` est une concaténation : `ADD` teste la chaîne avant tout). Une chaîne de `+` qui commence par un nombre ne s'aplatit pas (`1 + 2 + "x"` additionne d'abord). Au-delà de 64 pièces, l'accumulateur passe d'une fenêtre à l'autre. Mesuré : `strings` −46 % d'instructions (un internement par chaîne au lieu d'un par résultat partiel) |
@@ -2119,7 +2120,7 @@ ligne et énonce le fait. Le corps d'une `FuncExpr` n'est pas un enfant (ce sont
 instructions) : seules ses valeurs par défaut le sont.
 
 Deux visiteurs l'utilisent, `CollectGlobalsVisitor` et `HasFuncQuery` :
-- `HasFuncQuery` : `stmt_has_func` demande d'abord au nœud s'il PORTE une fonction
+- `HasFuncQuery` : `stmt_any` (la descente unique, aussi employée par `body_has_loop`) demande d'abord au nœud s'il PORTE une fonction
   (déclaration, ou lambda dans une de ses propres expressions), puis descend via
   `for_each_body`. Sa descente était tenue à la main et `do … end` y manquait : le
   compilateur croyait qu'aucune closure ne capturait la variable de boucle, recyclait
@@ -2250,6 +2251,21 @@ avaient ces deux points depuis toujours ; le `while` n'en avait aucun. **Réserv
 fermer a été essayé et retiré** : la réserve s'accumulait sur tout un fichier et faisait dépasser
 le plafond de registres (255 à l'époque, cf. `k_max_reg`). Fermer ne dé-partage rien : deux closures d'un même registre continuent de
 voir les écritures l'une de l'autre (figé dans `tests/regressions/`).
+
+**Un temporaire mort ne retient rien** (`CLEAR_REGS`, émis par `compile_stmt_seq`). Un registre n'est pas vidé
+quand l'instruction qui l'a utilisé se termine : `global keep = []` construit le tableau dans un temporaire, puis
+le recopie dans la globale, si bien que `keep = []` plus tard laissait l'ANCIEN tableau (140 Mo dans le cas
+mesuré) tenu par ce temporaire, tant qu'aucune instruction n'en réécrivait la case. Un cadre qui dure autant que
+le programme — le premier niveau sous une boucle graphique — ne la réécrit jamais ; un programme sans fenêtre,
+lui, finit par le faire, et ne montrait rien. Le compilateur émet donc un `CLEAR_REGS` sur les temporaires de
+chaque instruction **qui s'exécute une fois par appel** : le premier niveau et les fonctions qui portent une
+boucle, hors du corps d'une boucle (le tour suivant réécrit ses temporaires) et hors des instructions qui portent
+une fonction. Les fonctions sans boucle (`fib`) n'en paient rien. ⚠ Le premier niveau ne passait PAS par
+`compile_stmt_seq` : sa boucle ne libérait même pas les temporaires entre deux instructions. Mesuré
+(`icount.sh` et les huit autres scripts de `bench/`, avant → après) : de −1,15 % à +0,40 %, sans tendance, donc
+neutre. Mutation vérifiée : sans l'émission du `CLEAR_REGS`, `tests/regressions/language/temporaries.ol` échoue.
+Reste hors de portée : une fonction longue sans boucle propre (elle appelle directement `graphics.run`), et un
+temporaire d'une instruction DANS une boucle, borné à la dernière valeur du dernier tour.
 
 **« Ce corps porte-t-il une fonction ? » est MÉMOÏSÉ** par l'adresse du corps
 (`body_carries_func`). Le parcours est récursif et la même question est posée trois à quatre
