@@ -51,7 +51,7 @@ static Value parts_of(const std::tm& tm, int millis) {
 // The instant to decode, in SECONDS since the epoch — the unit time() returns — as a whole second
 // plus the milliseconds left over. The split uses a FLOOR and not a truncation, so a date before
 // 1970 keeps its milliseconds in 0..999 instead of going negative.
-static void instant(CallCtx& ctx, const char* fn, std::time_t* secs, int* millis) {
+static void instant(CallCtx& ctx, const char* fn, long long* secs, int* millis) {
     double t;
     if (ctx.argc >= 1) {
         t = num_arg(ctx.args, ctx.argc, 0, fn);
@@ -63,22 +63,27 @@ static void instant(CallCtx& ctx, const char* fn, std::time_t* secs, int* millis
     if (!(std::fabs(t) <= 1e15))
         throw std::runtime_error(std::string(fn) + ": the instant is out of range");
     double whole = std::floor(t);
-    *secs = (std::time_t)whole;
+    *secs = (long long)whole;
     *millis = (int)((t - whole) * 1000.0);
     if (*millis > 999)      // a fraction of 0.9999 rounds to 1000 in double: keep the field valid
         *millis = 999;
 }
 
 static int date_now(CallCtx& ctx) {
-    std::time_t t;
+    long long secs;
     int millis;
-    instant(ctx, "date.now", &t, &millis);
+    instant(ctx, "date.now", &secs, &millis);
+    // The C library takes a time_t, which may be narrower than the instant (32 bits on some Android ABIs) and has
+    // a range of its own: an instant it cannot decode is refused, where a failed call left a zeroed tm to be read.
+    std::time_t t = (std::time_t)secs;
     std::tm tm{};
 #ifdef _WIN32
-    localtime_s(&tm, &t);
+    bool decoded = localtime_s(&tm, &t) == 0;
 #else
-    localtime_r(&t, &tm);
+    bool decoded = localtime_r(&t, &tm) != nullptr;
 #endif
+    if (!decoded || (long long)t != secs)
+        throw std::runtime_error("date.now: the instant is out of range for this platform");
     return ctx.ret(parts_of(tm, millis));
 }
 
@@ -127,11 +132,11 @@ static Value parts_of_day(long long days, int second_of_day, int millis) {
 }
 
 static int date_utc(CallCtx& ctx) {
-    std::time_t t;
+    long long secs;
     int millis;
-    instant(ctx, "date.utc", &t, &millis);
-    long long days = t / 86400;
-    long long second_of_day = t % 86400;
+    instant(ctx, "date.utc", &secs, &millis);
+    long long days = secs / 86400;
+    long long second_of_day = secs % 86400;
     if (second_of_day < 0) { // a floor and not a truncation, as the milliseconds are split
         second_of_day += 86400;
         --days;
