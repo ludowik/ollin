@@ -61,18 +61,19 @@ func skyOf(code)
     return SKIES[code] or {kind: "cloud", text: "Weather code {code}"}
 end
 
-## The day of the week of a date written "2026-11-01" (Sakamoto's method): "Sun", "Mon"…, or nil for a text that is no date.
+## The day of the week of a date written "2026-11-01" (Sakamoto's method): "Sun", "Mon"…, or nil for a text whose
+## year, month or day is not a number or is out of range.
 func weekday(date)
-    const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
     if typeof(date) <> "string" or len(date) <> 10 then
         return nil
     end
     var y = string.number(string.substr(date, 1, 4))
     var m = string.number(string.substr(date, 6, 2))
     var d = string.number(string.substr(date, 9, 2))
-    if y == nil or m == nil or d == nil or m < 1 or m > 12 then
+    if y == nil or m == nil or d == nil or m < 1 or m > 12 or d < 1 or d > 31 then
         return nil
     end
+    const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
     if m < 3 then
         y -= 1
     end

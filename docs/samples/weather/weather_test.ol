@@ -51,7 +51,7 @@ nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1,'weather_code
 assert(nothing == nil and reason == "the forecast of the days is missing", "no day at all")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1,'weather_code':0,'wind_speed_10m':2},'daily':\{'time':['x'],'weather_code':[0],'temperature_2m_max':[1],'temperature_2m_min':[0]}}"))
 assert(nothing == nil and reason == "a date of the forecast is not a date", "a day that is not a date is a refusal, not an error")
-assert(weekday("2026-13-01") == nil and weekday(5) == nil and weekday("2026-11-01") == "Sun")
+assert(weekday("2026-13-01") == nil and weekday("2026-11-32") == nil and weekday("2026-11-00") == nil and weekday(5) == nil and weekday("2026-11-01") == "Sun")
 
 ## ── The reason a request is refused ──
 assert(reasonOf(q("\{'error':true,'reason':'Latitude must be in range of -90 to 90°.'}")) == "Latitude must be in range of -90 to 90°.")
