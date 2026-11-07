@@ -37,39 +37,30 @@
 ## the noises in sounds.ol. What stays here is the GAME — its rules, its state and its frame.
 import "sprites.ol"
 import "sounds.ol"
+import "field.ol"
+import "save.ol"
 
-const FIELD_W    = 224          ## the field, in its own pixels — graphics.viewport does the rest
-const FIELD_H    = 256
 const TICK       = 1.0 / 60.0   ## the logical tick: one alien advances per tick
-const COLS       = 11
-const ROWS       = 5
 const CELL_W     = 16           ## the column pitch; a sprite is 8 wide, centred in it
 const CELL_H     = 16
 const FLEET_X    = 24
 const FLEET_Y    = 40
 const WAVE_DROP  = 8            ## how much lower each wave starts, and each descent falls
 const STEP_X     = 2            ## how far one alien advances
-const MARGIN     = 8            ## the walls the fleet turns at
 const SHIELD_Y     = 200        ## the four shields, just above the cannon as in the arcade
-const SHIELDS      = 4
-const SHIELD_W     = 22
-const SHIELD_H     = 16
 ## The row is CENTRED by calculation: five equal gaps between the walls and the four arches. Written
 ## as a first position and a pitch, it sat 26 px from the left wall and 8 from the right — a shift
 ## the eye catches at once, and one that no rewriting of two numbers can be trusted to keep. Whole
 ## pixels, a shield being read pixel by pixel through its own coordinates.
 const SHIELD_GAP   = (FIELD_W - SHIELDS * SHIELD_W) // (SHIELDS + 1)
-const GUN_W      = 13
 const GUN_H      = 5
 const GUN_Y      = 224          ## the cannon stands close under the shields, not far below them
 const GUN_SPEED  = 60           ## field pixels per second
 const SHOT_SPEED = 240
 const BOMB_SPEED = 90           ## slower than the cannon's shot: a bomb can be outrun
-const BOMB_MAX   = 3            ## how many bombs the fleet keeps in the air
 const BOMB_ODDS  = 90           ## one tick in this many drops a bomb, while there is room for one
 const LIVES      = 3
 const UFO_Y        = 24         ## the mystery ship's lane, above the fleet
-const UFO_W        = 16
 const UFO_H        = 7
 const UFO_SPEED    = 30         ## field pixels per second
 const UFO_PERIOD   = 22.0       ## seconds between two crossings
@@ -111,6 +102,7 @@ global ufoDir = 1        ## it comes from the other side each time
 global shots = 0         ## shots fired, which is what prices the mystery ship
 global popup = nil       ## {text, x, y, left}: what a kill was worth, written where it happened
 const BEST_KEY = "best"
+const SAVE_EVERY = 0.5   ## seconds between two keepings of a game that goes on
 global best = 0          ## the best score, kept from one run to the next
 
 global state = "title"   ## "title", "play" or "over": every input asks this first
@@ -124,6 +116,9 @@ global touchPlay = false ## a finger has been seen: aiming is by hand, firing by
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
 global grabGun = 0.0     ## RELATIVE, so touching the screen never teleports the cannon
 global acc = 0.0
+
+global saveWait = 0.0    ## the time left before the game is kept again
+global savedState = ""   ## the screen it was last kept on: a change of screen is kept at once
 
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
 ## arches — and the erosion of the previous one is genuinely gone, the textures being new.
@@ -501,6 +496,124 @@ func dragTo(x)
     gunX = stopped
 end
 
+## One shield as save.ol writes it: a `#` for a pixel still whole and a `.` for one that was eaten.
+func shieldRows(sh)
+    var rows = []
+    for y = 0, SHIELD_H - 1 do
+        var row = ""
+        for x = 0, SHIELD_W - 1 do
+            var r, g, b, a = image.getPixel(sh.img, x, y)
+            row += a > 0.5 and "#" or "."
+        end
+        rows.push(row)
+    end
+    return rows
+end
+
+## The game under way as a map. What is not kept means nothing a second run could use: the kills coming apart, the
+## value written where the ship died, the fingers and the clock that spends the ticks. The best score has its own key.
+func saveState()
+    var t = {
+        v: SAVE_VERSION, state: state, wave: wave, score: score, lives: lives, nextLife: nextLife, shots: shots,
+        ticks: ticks, marchStep: marchStep, cursor: cursor, heading: heading, turning: turning, frame: frame,
+        fx: [], fy: [], fa: [], shields: [], gunX: gunX, shotLive: shotLive, shotX: shotX, shotY: shotY,
+        bombs: bombs, respawn: respawn, ufoWait: ufoWait, ufoDir: ufoDir, ufo: ufo
+    }
+    for a in fleet do
+        t.fx.push(a.x)
+        t.fy.push(a.y)
+        t.fa.push(a.alive)
+    end
+    for sh in shields do
+        t.shields.push(shieldRows(sh))
+    end
+    return t
+end
+
+## Eats from a shield what the save says was eaten: it starts whole, as a wave builds it, and erosion only removes.
+func carveShield(sh, rows)
+    image.beginPixels(sh.img)
+    for y = 1, SHIELD_H do
+        for x = 1, SHIELD_W do
+            if string.char(rows[y], x) == "." then
+                image.setPixel(sh.img, x - 1, y - 1, 0, 0, 0, 0)
+            end
+        end
+    end
+    image.endPixels(sh.img)
+end
+
+## Puts a state read by readSave in the game. The wave is built first, so that the fleet and the shields exist as a wave
+## makes them, and the save then moves them to where they were. A game that was running comes back in pause.
+func restoreSave(t)
+    wave = t.wave
+    newWave()
+    alive = 0
+    for i = 1, #fleet do
+        fleet[i].x = t.fx[i]
+        fleet[i].y = t.fy[i]
+        fleet[i].alive = t.fa[i]
+        if t.fa[i] then
+            alive += 1
+        end
+    end
+    for i = 1, SHIELDS do
+        carveShield(shields[i], t.shields[i])
+    end
+    state = t.state
+    score = t.score
+    lives = t.lives
+    nextLife = t.nextLife
+    shots = t.shots
+    ticks = t.ticks
+    marchStep = t.marchStep
+    cursor = t.cursor
+    heading = t.heading
+    turning = t.turning
+    frame = t.frame
+    gunX = t.gunX
+    shotLive = t.shotLive
+    shotX = t.shotX
+    shotY = t.shotY
+    bombs = t.bombs
+    respawn = t.respawn
+    ufoWait = t.ufoWait
+    ufoDir = t.ufoDir
+    ufo = t.ufo
+    paused = state == "play"
+end
+
+## Keeps the game; `data` leaves the file alone when it is what was kept last.
+func saveGame()
+    data.set(SAVE_KEY, saveState())
+    saveWait = SAVE_EVERY
+    savedState = state
+end
+
+## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
+func loadGame()
+    var t = readSave(data.get(SAVE_KEY))
+    if t == nil then
+        return false
+    end
+    restoreSave(t)
+    savedState = state
+    saveWait = SAVE_EVERY
+    return true
+end
+
+## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
+## nothing worth keeping.
+func autosave(dt)
+    if state == "title" then
+        return
+    end
+    saveWait -= dt
+    if state <> savedState or saveWait <= 0.0 then
+        saveGame()
+    end
+end
+
 ## Everything the program owns is built here, in the order it depends on: the window first, since a
 ## sprite is a texture and a texture needs a graphics context.
 func setup()
@@ -514,6 +627,7 @@ func setup()
     ## The field is laid out but not started: the title screen holds it, and its fleet is the one the
     ## first wave will march — nothing is built twice.
     newWave()
+    loadGame()
 end
 
 ## Any press means "go" on the title screen and on the end screen, and only fires while playing.
@@ -524,6 +638,16 @@ func begin()
     end
     startGame()
     return true
+end
+
+## A press ends the pause. A game kept by a run comes back in pause, and the way on from there must not be a key a
+## player of the mouse or the screen does not have. Whether there was a pause to end.
+func unpause()
+    if state == "play" and paused then
+        paused = false
+        return true
+    end
+    return false
 end
 
 ## A tap in the top band pauses instead of aiming. It answers the same on both input paths — a single
@@ -538,7 +662,7 @@ end
 
 func keyboard.keypressed(key)
     if key == "space" then
-        if not begin() then
+        if not unpause() and not begin() then
             fire()
         end
     elseif key == "p" and state == "play" then
@@ -551,7 +675,7 @@ end
 ## one being allowed in the air.
 func touch.began(id, x, y)
     touchPlay = true
-    if begin() or bandTap(y) then    ## the band pauses, and neither takes hold of the cannon
+    if unpause() or begin() or bandTap(y) then    ## the band pauses, and none of them takes hold of the cannon
         return
     end
     aimId = id
@@ -579,6 +703,9 @@ func mouse.pressed(x, y)
     if touchPlay then
         return
     end
+    if unpause() then
+        return
+    end
     grab(x)
     fire()                                   ## a real click, on a desktop: it fires as space does
 end
@@ -600,6 +727,7 @@ end
 
 func update(dt)
     burstsFade(dt)
+    autosave(dt)
     if state == "title" then
         demo += dt
         return
