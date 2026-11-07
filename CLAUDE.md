@@ -44,6 +44,12 @@ Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et le
 étant la langue par défaut de ces jeux et l'anglais la seconde. Ne pas les traduire ni les signaler à la
 passe de dictionnaire. Les identifiants et les commentaires de ces fichiers restent en anglais.
 
+**Les noms localisés du calendrier sont de la DONNÉE, pas de la prose** : les noms français des jours et des mois de
+`date.weekdayName` et `date.monthName` (tables de `src/modules/date_module.cpp` et leurs tests dans
+`tests/regressions/modules/date.ol`, accents compris) sont en français parce qu'ils SONT la langue demandée. Ne pas les
+traduire, ni les signaler à la passe de dictionnaire. Une langue de plus est une ligne de chaque table, avec ses noms dans
+cette langue. Les identifiants et les commentaires de ces fichiers restent en anglais.
+
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans
 verbe (« Vérifié : … », « Corrigé et poussé. »), pas de listes de mots-clés en
