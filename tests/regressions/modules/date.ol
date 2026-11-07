@@ -95,3 +95,23 @@ assert(date.monthLength(2024, 1) == 31 and date.monthLength(2024, 12) == 31, "on
 assert(date.monthLength(-4, 2) == 29 and date.monthLength(0, 2) == 29, "the rule goes on before year 1")
 assert(date.monthLength(2026.0, 2.0) == 28, "a whole number written with a point is whole")
 
+## date.weekdayName: the 7 days in each language and each form, numbered as the `weekday` field is (Monday = 1).
+var dt_names = {
+    en: {long: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+         short: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]},
+    fr: {long: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
+         short: ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"]}
+}
+for dt_lang in ["en", "fr"] do
+    for dt_form in ["long", "short"] do
+        for dt_n = 1, 7 do
+            assert(date.weekdayName(dt_n, dt_lang, dt_form) == dt_names[dt_lang][dt_form][dt_n], "{dt_lang} {dt_form} {dt_n}")
+        end
+    end
+end
+assert(date.weekdayName(1) == "Monday" and date.weekdayName(7) == "Sunday", "English and long by default")
+assert(date.weekdayName(3, "fr") == "mercredi" and date.weekdayName(3, "en", "short") == "Wed", "a language alone, a form after it")
+assert(date.weekdayName(date.parse("2026-11-01").weekday, "fr") == "dimanche", "the number a date gives is the one the names take")
+assert(date.weekdayName(date.utc(0).weekday, "en") == "Thursday", "1970-01-01 was a Thursday")
+assert(date.weekdayName(2.0) == "Tuesday", "a whole number written with a point is whole")
+

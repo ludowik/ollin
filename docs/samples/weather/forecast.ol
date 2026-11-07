@@ -61,16 +61,13 @@ func skyOf(code)
     return SKIES[code] or {kind: "cloud", text: "Weather code {code}"}
 end
 
-## The names of the days of the week, in the numbering of date.parse: Monday is 1.
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-## The name of the day of a date written "2026-11-01", or nil for anything that is not such a date.
+## The short English name of the day of a date written "2026-11-01", or nil for anything that is not such a date.
 func weekday(text)
     if typeof(text) <> "string" then
         return nil
     end
     var parts = date.parse(text)
-    return parts and DAY_NAMES[parts.weekday]
+    return parts and date.weekdayName(parts.weekday, "en", "short")
 end
 
 ## ── Reading an answer ──────────────────────────────────────────────────────────────────────────────

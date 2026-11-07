@@ -771,6 +771,30 @@ check_error "date.monthLength with a year out of range" \
     'var d = date.monthLength(1e300, 2)' \
     "date.monthLength: the year is out of range"
 
+check_error "date.weekdayName with a day out of range" \
+    'var d = date.weekdayName(8)' \
+    "date.weekdayName: the day must be a whole number from 1 to 7"
+
+check_error "date.weekdayName with a day that is not whole" \
+    'var d = date.weekdayName(1.5)' \
+    "date.weekdayName: the day must be a whole number from 1 to 7"
+
+check_error "date.weekdayName with a text for a day" \
+    'var d = date.weekdayName("1")' \
+    "date.weekdayName: argument 1 expected number"
+
+check_error "date.weekdayName with an unknown language" \
+    'var d = date.weekdayName(1, "de")' \
+    "date.weekdayName: unknown mode 'de' (expected \"en\" or \"fr\")"
+
+check_error "date.weekdayName with an unknown form" \
+    'var d = date.weekdayName(1, "en", "tiny")' \
+    "date.weekdayName: unknown mode 'tiny' (expected \"long\" or \"short\")"
+
+check_error "date.weekdayName with a language that is no text" \
+    'var d = date.weekdayName(1, 2)' \
+    "date.weekdayName: expected \"en\" or \"fr\""
+
 check_error "data.get with a non-string key" \
     'data.get(1)' \
     "data.get: expected a string key"

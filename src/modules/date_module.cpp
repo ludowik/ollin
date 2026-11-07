@@ -17,6 +17,10 @@
 //                here and not through the C library, whose range is the platform's (Windows stops
 //                in 3000), so that the same text gives the same answer everywhere.
 // date.monthLength(year, month)  the days a month has, February's depending on the year.
+// date.weekdayName(day[, language[, form]])  the name of a weekday (1 = Monday to 7 = Sunday, as the
+//                `weekday` field numbers it), in "en" or "fr", "long" ("Monday") or "short" ("Mon"). The
+//                names are data of the calendar, not a formatting: a script that shows them in another
+//                language asks for it here, and a language is one more row of the table below.
 //
 // The first three return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
@@ -139,11 +143,41 @@ static int date_month_length(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)month_length((long long)year, (int)month)));
 }
 
+// The languages the names exist in, and the forms they come in. Both lists are what mode_arg accepts and
+// what its error message spells out; the names below follow the same order (language, form, day).
+static const char* const k_languages[] = {"en", "fr"};
+static const char* const k_forms[] = {"long", "short"};
+static const char* const k_weekday_names[2][2][7] = {
+    {
+        {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
+        {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+    },
+    {
+        {"lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"},
+        {"lun", "mar", "mer", "jeu", "ven", "sam", "dim"},
+    },
+};
+static_assert(sizeof(k_weekday_names) / sizeof(k_weekday_names[0]) == sizeof(k_languages) / sizeof(k_languages[0]),
+              "every language needs its names");
+static_assert(sizeof(k_weekday_names[0]) / sizeof(k_weekday_names[0][0]) == sizeof(k_forms) / sizeof(k_forms[0]),
+              "every form needs its names");
+
+static int date_weekday_name(CallCtx& ctx) {
+    const char* fn = "date.weekdayName";
+    double day = num_arg(ctx.args, ctx.argc, 0, fn);
+    if (day != std::floor(day) || day < 1 || day > 7)
+        throw std::runtime_error(std::string(fn) + ": the day must be a whole number from 1 to 7");
+    int language = mode_arg(ctx, 1, fn, k_languages, 0);
+    int form = mode_arg(ctx, 2, fn, k_forms, 0);
+    return ctx.ret(Value(std::string(k_weekday_names[language][form][(int)day - 1])));
+}
+
 Value make_date_module() {
     return MapBuilder()
         .fn("now", date_now)
         .fn("utc", date_utc)
         .fn("parse", date_parse)
         .fn("monthLength", date_month_length)
+        .fn("weekdayName", date_weekday_name)
         .done();
 }
