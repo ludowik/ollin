@@ -1,7 +1,7 @@
 ## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the
 ## https and json modules. Left and right (the keys, or a tap on either side of the screen) change the city; typing
 ## a name and pressing Enter looks it up; a tap in the middle asks again. The weather is asked again every ten
-## minutes on its own.
+## minutes on its own. The place is kept from one run to the next.
 ##
 ## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
 ## so the screen says "loading" until then. forecast.ol holds the addresses and the reading of the answers, and
@@ -33,6 +33,7 @@ const SKY = {                   ## the top and the bottom of the sky behind each
     storm: [[0.1, 0.1, 0.22], [0.32, 0.3, 0.45]]
 }
 const WAITING = [[0.12, 0.2, 0.38], [0.3, 0.42, 0.6]]
+const PLACE_KEY = "place"
 
 global app = {
     place: CITIES[1],
@@ -99,6 +100,7 @@ end
 func goTo(place, index)
     app.place = place
     app.index = index
+    data.set(PLACE_KEY, {place: place, index: index})
     app.weather = nil
     app.age = 0
     ask()
@@ -309,8 +311,26 @@ func update(dt)
     end
 end
 
+## The place the last run left, or nil. A store is read and not trusted: it gets the checks an answer of the
+## service gets, so that a damaged one gives the first city instead of a request that cannot be made.
+func savedPlace()
+    var saved = data.get(PLACE_KEY)
+    if typeof(saved) <> "map" or typeof(saved.place) <> "map" or typeof(saved.index) <> "int" then
+        return nil
+    end
+    if typeof(saved.place.name) <> "string" or not numbersOf([saved.place.lat, saved.place.lon], 2) then
+        return nil
+    end
+    return saved.place, saved.index
+end
+
 func setup()
     graphics.canvas(W, H, "Weather")
     graphics.fitArea()
+    var place, index = savedPlace()
+    if place then
+        app.place = place
+        app.index = index
+    end
     ask()
 end
