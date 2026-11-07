@@ -38,17 +38,19 @@ tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de carac
 `tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
 `docs/vendor/`, `docs/wasm/`, `libs/robin_hood.h`).
 
-**Seule exception à l'anglais, voulue par l'utilisateur** : les textes localisés de Blockudoku et de
-Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et leurs tests
-`docs/samples/blockudoku/texts_test.ol`, `docs/samples/sudoku/texts_test.ol`) sont en français À DESSEIN, le français
-étant la langue par défaut de ces jeux et l'anglais la seconde. Ne pas les traduire ni les signaler à la
-passe de dictionnaire. Les identifiants et les commentaires de ces fichiers restent en anglais.
-
-**Les noms localisés du calendrier sont de la DONNÉE, pas de la prose** : les noms français des jours et des mois de
-`date.weekdayName` et `date.monthName` (tables de `src/modules/date_module.cpp` et leurs tests dans
-`tests/regressions/modules/date.ol`, accents compris) sont en français parce qu'ils SONT la langue demandée. Ne pas les
-traduire, ni les signaler à la passe de dictionnaire. Une langue de plus est une ligne de chaque table, avec ses noms dans
-cette langue. Les identifiants et les commentaires de ces fichiers restent en anglais.
+**Exception à l'anglais, voulue par l'utilisateur : le MULTILINGUE** (règle permanente). Le moteur et les applications
+(exemples compris) peuvent gérer plusieurs langues, et ce que cela exige est du texte DANS ces langues. Un texte écrit
+dans une autre langue que l'anglais est donc légitime à une seule condition : c'est de la DONNÉE d'une fonctionnalité
+multilingue, rangée dans une table ou un fichier que la fonctionnalité choisit selon la langue demandée (un nom de jour,
+un libellé d'interface, un texte d'aide), et non de la prose que le code s'adresse à lui-même. Ne pas la traduire, ne pas
+la signaler à la passe de dictionnaire, accents compris. Ce qui ne change JAMAIS : les identifiants, les commentaires, les
+messages d'erreur du moteur et la documentation restent en anglais, y compris dans les fichiers de données localisées ; et
+une langue de plus s'ajoute dans la table, avec ses textes dans cette langue, sans toucher au code qui la lit. Les cas
+actuels, qui ne limitent pas la règle :
+- les textes de Blockudoku et de Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et leurs tests
+  `texts_test.ol`), le français étant la langue par défaut de ces jeux et l'anglais la seconde ;
+- les noms des jours et des mois de `date.weekdayName` et `date.monthName` (tables de `src/modules/date_module.cpp` et
+  tests de `tests/regressions/modules/date.ol`), l'anglais étant la langue par défaut du moteur.
 
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans
