@@ -39,10 +39,10 @@
 ## sounds.ol. The joystick is not ours to keep here — it is shared with the voxel example.
 import "shapes.ol"
 import "sounds.ol"
+import "field.ol"
+import "save.ol"
 import "../lib/joystick.ol"
 
-const FIELD_W = 512            ## the field, in its own pixels — graphics.viewport does the rest
-const FIELD_H = 384
 
 const SHIP_R      = 11.0       ## the ship's collision radius; the outline is drawn at this scale
 const TURN_SPEED  = 5.2        ## radians per second, on the keyboard — turning is free and instant
@@ -57,7 +57,6 @@ const CLEAR_R     = 70.0       ## the centre must be this clear before a ship is
 
 const SHOT_SPEED  = 420.0
 const SHOT_LIFE   = 0.9        ## a shot's RANGE, as the time it lives: it does not cross the field
-const SHOTS_MAX   = 4          ## how many of the player's shots may be in the air
 
 ## The three rock sizes, as radii, and what each is worth. Index 3 is the large rock, 1 the small:
 ## a split lands on `size - 1`, so the table is read by the size itself and no mapping is needed.
@@ -72,8 +71,6 @@ const WAVE_WAIT   = 1.8        ## the breath between a cleared wave and the next
 
 const SAUCER_PERIOD = 16.0     ## seconds between two crossings
 const SAUCER_SPEED  = 95.0
-const SAUCER_BIG_R  = 16.0
-const SAUCER_SMALL_R = 9.0
 const SAUCER_SHOT   = 1.1      ## seconds between the saucer's shots
 const SAUCER_SMALL_AT = 4000   ## above this score the small saucer starts to appear
 const SAUCER_BIG_SCORE   = 200
@@ -90,6 +87,7 @@ global state = "title"
 global paused = false
 global score = 0
 const BEST_KEY = "best"
+const SAVE_EVERY = 0.5         ## seconds between two keepings of a game that goes on
 global best = 0                ## the best score, kept from one run to the next
 global lives = LIVES
 global wave = 1
@@ -105,6 +103,8 @@ global saucer = nil
 global saucerShots = []
 global saucerTimer = SAUCER_PERIOD
 global debris = []             ## the fading sparks of anything that came apart
+global saveWait = 0.0          ## the time left before the game is kept again
+global savedState = ""         ## the screen it was last kept on: a change of screen is kept at once
 
 ## The outlines at the sizes the game draws them, sized ONCE by buildArt (see shapes.ol).
 global rockArt = []           ## [shape][size]
@@ -544,6 +544,7 @@ func update(dt)
         d.left -= dt
         return d.left > 0.0
     end)
+    autosave(dt)
 
     if state == "title" then
         demo += dt
@@ -635,11 +636,94 @@ func startGame()
     newShip()
 end
 
+## The game under way as a map. What is not kept means nothing a second run could use: the sparks, the fingers, the
+## cadence of a held trigger, the heartbeat. The best score has its own key. A rock keeps its `dead` mark and the
+## saucer its radius, which restoreSave puts right.
+func saveState()
+    return {
+        v: SAVE_VERSION, state: state, score: score, lives: lives, wave: wave, nextExtra: nextExtra, spawn: spawn,
+        waveWait: waveWait, saucerTimer: saucerTimer, ship: ship, rocks: rocks, shots: shots,
+        saucer: saucer, saucerShots: saucerShots
+    }
+end
+
+## Puts a state read by readSave in the game. A game that was running comes back in pause.
+func restoreSave(t)
+    state = t.state
+    score = t.score
+    lives = t.lives
+    wave = t.wave
+    nextExtra = t.nextExtra
+    spawn = t.spawn
+    waveWait = t.waveWait
+    saucerTimer = t.saucerTimer
+    ship = t.ship
+    rocks = t.rocks
+    for r in rocks do
+        r.dead = false
+    end
+    shots = t.shots
+    saucerShots = t.saucerShots
+    saucer = t.saucer
+    if saucer <> nil then
+        saucer.r = saucer.small and SAUCER_SMALL_R or SAUCER_BIG_R
+    end
+    debris = []
+    fireId = nil
+    padId = nil
+    pad.release()
+    fireTimer = 0.0
+    paused = state == "play"
+end
+
+## Keeps the game; `data` leaves the file alone when it is what was kept last.
+func saveGame()
+    data.set(SAVE_KEY, saveState())
+    saveWait = SAVE_EVERY
+    savedState = state
+end
+
+## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
+func loadGame()
+    var t = readSave(data.get(SAVE_KEY))
+    if t == nil then
+        return false
+    end
+    restoreSave(t)
+    savedState = state
+    saveWait = SAVE_EVERY
+    return true
+end
+
+## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
+## nothing worth keeping.
+func autosave(dt)
+    if state == "title" then
+        return
+    end
+    saveWait -= dt
+    if state <> savedState or saveWait <= 0.0 then
+        saveGame()
+    end
+end
+
+## A press ends the pause. A game kept by a run comes back in pause, and the way on from there must not be a key a
+## player of the mouse or the screen does not have. Whether there was a pause to end.
+func unpause()
+    if state == "play" and paused then
+        paused = false
+        return true
+    end
+    return false
+end
+
 ## Space does not fire from here: it is HELD, and the cadence in update reads it. Firing here too
 ## spent two of the four shots on a single press.
 func keyboard.keypressed(key)
     if key == "space" then
-        begin()
+        if not unpause() then
+            begin()
+        end
     elseif key == "p" and state == "play" then
         paused = not paused
     end
@@ -655,7 +739,7 @@ end
 ## trigger twice is holding it once.
 func touch.began(id, x, y)
     touchPlay = true
-    if begin() then
+    if unpause() or begin() then
         return
     end
     if x < W / 2 then
@@ -686,6 +770,9 @@ end
 
 func mouse.pressed(x, y)
     if begin() or touchPlay then    ## a finger was already answered by touch.began
+        return
+    end
+    if unpause() then
         return
     end
     fire()                          ## a real click, on a desktop: it fires as space does
@@ -867,4 +954,5 @@ func setup()
     ## The field is laid out but not started: the title screen holds it, and its rocks are the ones
     ## the first wave will drift — nothing is built twice.
     newWave()
+    loadGame()
 end
