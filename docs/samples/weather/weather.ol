@@ -1,7 +1,8 @@
 ## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the
-## https and json modules. Left and right (the keys, or a tap on either side of the screen) change the city; typing
-## a name and pressing Enter looks it up; a tap in the middle asks again. The weather is asked again every ten
-## minutes on its own. The place is kept from one run to the next.
+## https and json modules. Left and right (the keys, or a tap on either side of the screen) change the city; a tap in
+## the middle asks again. A name is looked up from the magnifier, or by typing: the panel that opens holds the letters,
+## the digits, the accents of French, the apostrophe and the hyphen, so that a finger writes a name as well as a
+## keyboard does. The weather is asked again every ten minutes on its own. The place is kept from one run to the next.
 ##
 ## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
 ## so the screen says "loading" until then. forecast.ol holds the addresses and the reading of the answers, and
@@ -9,6 +10,7 @@
 ## browser, and only from it: elsewhere every request fails with "unsupported", which the screen reports.
 
 import "forecast.ol"
+import "keypad.ol"
 import "../lib/draw.ol"
 
 const CITIES = [
@@ -43,6 +45,7 @@ global app = {
     message: "",                ## what went wrong, when it failed
     age: 0,                     ## seconds since the weather was asked
     typing: "",                 ## the name being typed
+    searching: false,           ## the panel of the search is open
     request: nil
 }
 
@@ -135,33 +138,113 @@ func step(by)
     goTo(CITIES[i], i)
 end
 
+func openSearch()
+    app.searching = true
+    app.typing = ""
+end
+
+func closeSearch()
+    app.searching = false
+    app.typing = ""
+end
+
+func typeChar(ch)
+    app.typing = appendChar(app.typing, ch)
+end
+
+func eraseChar()
+    app.typing = eraseLast(app.typing)
+end
+
+## Looks the name up and closes the panel. An empty name only closes it.
+func submitSearch()
+    var name = string.trim(app.typing)
+    closeSearch()
+    if name <> "" then
+        search(name)
+    end
+end
+
+## The panel of the current area, built again only when the area changes.
+global panel = nil
+global panelSize = ""
+
+func searchPanel()
+    var size = "{W}x{H}"
+    if size <> panelSize then
+        panel = panelLayout(W, H)
+        panelSize = size
+    end
+    return panel
+end
+
+## The search button, in the corner of the title row.
+func searchButton()
+    var r = math.max(math.min(W, H) * 0.045, 16)
+    return {x: W - r * 1.7, y: H * 0.07, r: r}
+end
+
+func onSearchButton(x, y)
+    var b = searchButton()
+    var reach = b.r * 1.4
+    return (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) <= reach * reach
+end
+
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 func keyboard.keypressed(key)
-    if key == "left" and app.typing == "" then
-        step(-1)
-    elseif key == "right" and app.typing == "" then
-        step(1)
-    elseif key == "return" then
-        if app.typing <> "" then
-            search(app.typing)
-            app.typing = ""
+    if key == "return" then
+        if app.searching then
+            submitSearch()
         else
             goTo(app.place, app.index)
         end
     elseif key == "escape" then
-        app.typing = ""
-    elseif key == "backspace" and app.typing <> "" then
-        app.typing = string.substr(app.typing, 1, len(app.typing) - 1)
-    elseif key == "space" and app.typing <> "" and len(app.typing) < 30 then
-        app.typing += " "
-    elseif len(key) == 1 and key >= "a" and key <= "z" and len(app.typing) < 30 then
-        app.typing += key
+        closeSearch()
+    elseif app.searching then
+        if key == "backspace" then
+            eraseChar()
+        elseif key == "space" then
+            typeChar(" ")
+        elseif isNameKey(key) then
+            typeChar(key)
+        end
+    elseif key == "left" then
+        step(-1)
+    elseif key == "right" then
+        step(1)
+    elseif isNameKey(key) then
+        openSearch()
+        typeChar(key)
+    end
+end
+
+## A press on the open panel: a key, or anywhere above it, which gives the search up.
+func pressPanel(x, y)
+    var p = searchPanel()
+    if y < p.top then
+        closeSearch()
+        return
+    end
+    var k = keyAt(p, x, y)
+    if k == nil then
+        return
+    end
+    if k.kind == "back" then
+        eraseChar()
+    elseif k.kind == "go" then
+        submitSearch()
+    else
+        typeChar(k.text)
     end
 end
 
 func mouse.pressed(x, y)
-    if x < W * 0.3 then
+    if app.searching then
+        pressPanel(x, y)
+    elseif onSearchButton(x, y) then
+        openSearch()
+    elseif x < W * 0.3 then
         step(-1)
     elseif x > W * 0.7 then
         step(1)
@@ -254,6 +337,50 @@ func drawIcon(kind, x, y, r)
 end
 
 const WHITE = [1, 1, 1, 1]
+const PANEL_GO = [0.45, 0.78, 1, 1]
+const PANEL_INK = [0.05, 0.1, 0.22, 1]
+
+## The magnifier that opens the search.
+func drawSearchButton()
+    var b = searchButton()
+    fillC(WHITE, 0.18)
+    graphics.circle(b.x, b.y, b.r)
+    graphics.noFill()
+    graphics.stroke(1, 1, 1, 0.95)
+    graphics.strokeSize(b.r * 0.13)
+    graphics.circle(b.x - b.r * 0.1, b.y - b.r * 0.1, b.r * 0.38)
+    graphics.line(b.x + b.r * 0.18, b.y + b.r * 0.18, b.x + b.r * 0.5, b.y + b.r * 0.5)
+    graphics.noStroke()
+end
+
+## The open search: the weather dimmed above, the name being typed and the keys below.
+func drawSearch()
+    var p = searchPanel()
+    fillC([0, 0, 0, 1], 0.5)
+    graphics.rect(0, 0, W, p.top)
+    fillC([0.07, 0.12, 0.24, 1])
+    graphics.rect(0, p.top, W, H - p.top)
+    fillC(WHITE, 0.14)
+    graphics.rect(p.fieldX, p.fieldY, p.fieldW, p.kh, p.radius)
+    var inset = p.kh * 0.3
+    if app.typing == "" then
+        drawText("Type or touch a name", p.fieldX + inset, p.fieldY + p.kh / 2, p.kh * 0.42, "left", "center", WHITE, 0.5)
+    else
+        var shown = app.typing + (math.frac(elapsedTime) < 0.5 and "_" or " ")
+        drawText(shown, p.fieldX + inset, p.fieldY + p.kh / 2, fitSize(shown, p.kh * 0.55, p.fieldW - 2 * inset),
+                 "left", "center", WHITE)
+    end
+    for k in p.keys do
+        if k.kind == "go" then
+            fillC(PANEL_GO)
+        else
+            fillC(WHITE, k.kind == "char" and 0.16 or 0.28)
+        end
+        graphics.rect(k.x, k.y, k.w, k.h, p.radius)
+        drawText(k.label, k.x + k.w / 2, k.y + k.h / 2, fitSize(k.label, p.kh * 0.5, k.w * 0.9), "center", "center",
+                 k.kind == "go" and PANEL_INK or WHITE)
+    end
+end
 
 func drawForecast(x, y, w, h)
     var days = app.weather.days
@@ -281,7 +408,8 @@ func draw()
     if app.place.country <> "" then
         name = "{name}, {app.place.country}"
     end
-    drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, column * 0.95), "center", "center", WHITE)
+    var room = math.min(column * 0.95, W - 5 * searchButton().r)       ## the magnifier takes a corner, and the title is centred
+    drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
     if ready then
         drawIcon(sky.kind, CX, H * 0.22, column * 0.14)
         drawText("{app.weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", WHITE)
@@ -296,11 +424,13 @@ func draw()
     else
         drawText("Loading…", CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
     end
-    var hint = "< >  another city      type a name, then Enter"
-    if app.typing <> "" then
-        hint = "Search: {app.typing}_"
-    end
+    var hint = "< >  another city      type a name, or touch the magnifier"
     drawText(hint, CX, H * 0.95, fitSize(hint, column * 0.04, column * 0.95), "center", "center", WHITE, 0.7)
+    if app.searching then
+        drawSearch()
+    else
+        drawSearchButton()
+    end
 end
 
 func update(dt)
