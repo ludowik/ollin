@@ -290,8 +290,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `home`, `tutorial`, `playground`, `run`, `perf`.
 - **Écran principal (vue `home`)** : une grille de tuiles — « My projects » d'abord (le magasin
   IndexedDB du playground, du plus récent au plus ancien), puis un thème par groupe du catalogue des
-  exemples, dans l'ordre de leur première apparition. Un projet s'ouvre dans le playground
-  (`setActiveId` puis `#/playground`), un exemple en lecture directe (`#/playground/sample/<fichier>`).
+  exemples, dans l'ordre de leur première apparition. Une tuile LANCE le programme dans la vue
+  plein écran `run` (**décision de l'utilisateur**) : un projet par `setActiveId` puis `#/run`, un exemple en lecture
+  directe par `#/run/sample/<fichier>`. L'éditeur est à un clic de là, par le lien « Back to the editor » de la barre.
   **Décision de l'utilisateur : un lancement rouvre la DERNIÈRE vue visitée**, l'écran principal n'étant la
   vue par défaut que pour un premier lancement ou une adresse inconnue — le logo « Ollin » de chaque vue y ramène
   (le tutoriel n'a plus de bouton « Home » : l'utilisateur l'a fait retirer). Le catalogue se lit par `lib/pg-samples.js`, partagé avec

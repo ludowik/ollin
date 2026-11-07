@@ -1,8 +1,9 @@
 // HOME view — the initialisation logic, called by app.js once the views/home.html fragment is mounted.
 //   init(ctx) → cleanup()
 // The main screen: the user's projects, then every group of the examples catalogue, each entry a tile
-// (an icon and a name). A project opens in the playground; an example opens there too, read straight
-// from the repository (the #/playground/sample/<file> route).
+// (an icon and a name). A tile RUNS the program in the full-screen view: a project through the active
+// project, an example read straight from the repository (the #/run/sample/<file> route). The editor is one
+// click away from there, in the run bar.
 
 // The colours of a generated tile, all of them light: the ink on top is the page's own dark, so one ratio
 // serves twice — the initials on the tile, and the tile against the page behind it. Measured with the
@@ -103,7 +104,7 @@ export async function init(ctx) {
     label(tile, p.name)
     tile.addEventListener('click', () => {
       Store.setActiveId(p.id)
-      ctx.navigate('playground')
+      ctx.navigate('run')
     })
     mine.tiles.appendChild(tile)
   }
@@ -121,7 +122,7 @@ export async function init(ctx) {
     for (const entry of entries) {
       const tile = document.createElement('a')
       tile.className = 'tile'
-      tile.href = '#/playground/sample/' + entry.file
+      tile.href = '#/run/sample/' + entry.file
       tile.append(entry.icon ? imageIcon('samples/' + entry.icon, entry.name) : generatedIcon(entry.name))
       label(tile, entry.name)
       group.tiles.appendChild(tile)
