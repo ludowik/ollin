@@ -2278,7 +2278,7 @@ temporaire d'une instruction DANS une boucle, borné à la dernière valeur du d
 `RETURN` dépile le cadre mais ne vide PAS ses registres : la fenêtre de l'appelé reste peuplée jusqu'à ce qu'un
 autre appel la réécrive. Supprimer ce `CLEAR_REGS` a été essayé puis RETIRÉ : `temporaires.ol` échoue (le tableau
 reçu comme receveur de `push` au dernier tour reste tenu, 13,8 Mo). Vider la fenêtre au retour réglerait le cas
-mais touche `op_RETURN`, le chemin de `fib` : non mesuré, ne pas le faire sans `icount.sh`.
+mais touche `op_RETURN`, le chemin de `fib`.
 
 **« Ce corps porte-t-il une fonction ? » est MÉMOÏSÉ** par l'adresse du corps
 (`body_carries_func`). Le parcours est récursif et la même question est posée trois à quatre
