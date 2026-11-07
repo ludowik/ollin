@@ -2261,7 +2261,7 @@ lui, finit par le faire, et ne montrait rien. Le compilateur émet donc un `CLEA
 chaque instruction **qui s'exécute une fois par appel** : le premier niveau et les fonctions qui portent une
 boucle, hors du corps d'une boucle (le tour suivant réécrit ses temporaires) et hors des instructions qui portent
 une fonction. Les fonctions sans boucle (`fib`) n'en paient rien. ⚠ Le premier niveau ne passait PAS par
-`compile_stmt_seq` : sa boucle ne libérait même pas les temporaires entre deux instructions. Mesuré
+`compile_stmt_seq`, l'endroit où se pose le nettoyage : il y passe désormais. Mesuré
 (`icount.sh` et les huit autres scripts de `bench/`, avant → après) : de −1,15 % à +0,40 %, sans tendance, donc
 neutre. Mutation vérifiée : sans l'émission du `CLEAR_REGS`, `tests/regressions/language/temporaries.ol` échoue.
 Reste hors de portée : une fonction longue sans boucle propre (elle appelle directement `graphics.run`), et un
