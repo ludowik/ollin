@@ -117,15 +117,23 @@ static void civil_from_days(long long days, long long* year, int* month, int* da
     *year = year_of_era + era * 400 + (*month <= 2 ? 1 : 0);
 }
 
-// The parts of a day counted from 1970-01-01, and of a second within it. The one place the UTC calendar is worked
-// out, for date.utc and date.parse alike: the same instant gives the same answer on every platform, which the C
-// library's gmtime cannot promise (its range is the platform's, and Windows stops in 3000).
-static Value parts_of_day(long long days, int second_of_day, int millis) {
+// a / b rounded DOWN, for a positive b: the quotient of the division the C++ operator truncates toward zero.
+static long long floor_div(long long a, long long b) {
+    long long q = a / b;
+    return a % b < 0 ? q - 1 : q;
+}
+
+// The parts of an instant, in seconds since 1970-01-01 UTC: the one place the UTC calendar is worked out (cf. the
+// header), for date.utc and date.parse alike.
+static Value parts_of_instant(long long secs, int millis) {
+    long long days = floor_div(secs, 86400);
+    int second_of_day = (int)(secs - days * 86400);
     long long year;
     int month;
     int day;
     civil_from_days(days, &year, &month, &day);
-    int weekday = (int)(((days + 3) % 7 + 7) % 7) + 1; // 1970-01-01 was a Thursday, the 4th day of an ISO week
+    // 1970-01-01 was a Thursday, the 4th day of an ISO week
+    int weekday = (int)(days + 3 - floor_div(days + 3, 7) * 7) + 1;
     int year_day = (int)(days - days_from_civil(year, 1, 1)) + 1;
     return make_parts(year, month, day, second_of_day / 3600, second_of_day / 60 % 60, second_of_day % 60, millis,
                       weekday, year_day);
@@ -135,13 +143,7 @@ static int date_utc(CallCtx& ctx) {
     long long secs;
     int millis;
     instant(ctx, "date.utc", &secs, &millis);
-    long long days = secs / 86400;
-    long long second_of_day = secs % 86400;
-    if (second_of_day < 0) { // a floor and not a truncation, as the milliseconds are split
-        second_of_day += 86400;
-        --days;
-    }
-    return ctx.ret(parts_of_day(days, (int)second_of_day, millis));
+    return ctx.ret(parts_of_instant(secs, millis));
 }
 
 static int date_parse(CallCtx& ctx) {
@@ -168,7 +170,7 @@ static int date_parse(CallCtx& ctx) {
     }
     if (year < 1 || month < 1 || month > 12 || day < 1 || day > month_length(year, month))
         return ctx.ret(Value());
-    return ctx.ret(parts_of_day(days_from_civil(year, month, day), 0, 0));
+    return ctx.ret(parts_of_instant(days_from_civil(year, month, day) * 86400, 0));
 }
 
 // A year this far from 0 is no date anyone means, and the cast to int stays far from its limit.

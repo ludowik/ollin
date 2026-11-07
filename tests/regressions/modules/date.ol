@@ -76,11 +76,12 @@ var dt_known = [
     [4107542399, 2100, 2, 28, 23, 59, 59, 7, 59], [4107542400, 2100, 3, 1, 0, 0, 0, 1, 60],
     [253402300799, 9999, 12, 31, 23, 59, 59, 5, 365],
     [253402300800, 10000, 1, 1, 0, 0, 0, 6, 1]]
+var dt_fields = ["year", "month", "day", "hour", "minute", "second", "weekday", "yearDay"]
 for dt_row in dt_known do
     var dt_got = date.utc(dt_row[1])
-    var dt_mine = [dt_got.year, dt_got.month, dt_got.day, dt_got.hour, dt_got.minute, dt_got.second, dt_got.weekday, dt_got.yearDay]
     for dt_i = 1, 8 do
-        assert(dt_mine[dt_i] == dt_row[dt_i + 1], "date.utc({dt_row[1]}), field {dt_i}: {dt_mine[dt_i]} instead of {dt_row[dt_i + 1]}")
+        var dt_name = dt_fields[dt_i]
+        assert(dt_got[dt_name] == dt_row[dt_i + 1], "date.utc({dt_row[1]}), {dt_name}: {dt_got[dt_name]} instead of {dt_row[dt_i + 1]}")
     end
 end
 
