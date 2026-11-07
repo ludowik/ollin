@@ -755,6 +755,14 @@ check_error "date.parse with no argument" \
     'var d = date.parse()' \
     "date.parse: missing argument"
 
+check_error "date.utc with an instant out of range" \
+    'var d = date.utc(1e300)' \
+    "date.utc: the instant is out of range"
+
+check_error "date.now with an instant out of range" \
+    'var d = date.now(-1e300)' \
+    "date.now: the instant is out of range"
+
 check_error "date.monthLength with a month out of range" \
     'var d = date.monthLength(2026, 13)' \
     "date.monthLength: the month must be a whole number from 1 to 12"

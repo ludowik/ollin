@@ -13,9 +13,10 @@
 // date.utc([t])  the same in UTC, which is what makes the decoding testable: an epoch second maps
 //                to one and only one answer, whatever the machine's zone.
 // date.parse(s)  the parts of a date written "2026-11-01", or nil for a text that is not exactly
-//                one: four digits, two and two, and a day its month has. The calendar is worked out
-//                here and not through the C library, whose range is the platform's (Windows stops
-//                in 3000), so that the same text gives the same answer everywhere.
+//                one: four digits, two and two, and a day its month has.
+// utc and parse share one calendar, worked out here and not through the C library, whose range is the
+// platform's (Windows stops in 3000): the same instant or text gives the same answer everywhere. Only now
+// goes through the C library, since the time zone and its summer time are the platform's to tell.
 // date.monthLength(year, month)  the days a month has, February's depending on the year.
 // date.weekdayName(day[, language[, form]])  the name of a weekday (1 = Monday to 7 = Sunday, as the
 //                `weekday` field numbers it), in "en" or "fr", "long" ("Monday") or "short" ("Mon").
@@ -58,6 +59,9 @@ static void instant(CallCtx& ctx, const char* fn, std::time_t* secs, int* millis
         auto now = std::chrono::system_clock::now().time_since_epoch();
         t = std::chrono::duration<double>(now).count();
     }
+    // About 30 million years either way: far past any date a program means, and the cast below stays defined.
+    if (!(std::fabs(t) <= 1e15))
+        throw std::runtime_error(std::string(fn) + ": the instant is out of range");
     double whole = std::floor(t);
     *secs = (std::time_t)whole;
     *millis = (int)((t - whole) * 1000.0);
@@ -78,19 +82,6 @@ static int date_now(CallCtx& ctx) {
     return ctx.ret(parts_of(tm, millis));
 }
 
-static int date_utc(CallCtx& ctx) {
-    std::time_t t;
-    int millis;
-    instant(ctx, "date.utc", &t, &millis);
-    std::tm tm{};
-#ifdef _WIN32
-    gmtime_s(&tm, &t);
-#else
-    gmtime_r(&t, &tm);
-#endif
-    return ctx.ret(parts_of(tm, millis));
-}
-
 // February has 29 days by the Gregorian rule: every fourth year, except the centuries that 400 does not divide.
 static int month_length(long long year, int month) {
     static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -106,6 +97,46 @@ static long long days_from_civil(long long year, int month, int day) {
     long long day_of_year = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
     long long day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     return era * 146097 + day_of_era - 719468;
+}
+
+// The inverse of days_from_civil (Hinnant's civil_from_days).
+static void civil_from_days(long long days, long long* year, int* month, int* day) {
+    days += 719468;
+    long long era = (days >= 0 ? days : days - 146096) / 146097;
+    long long day_of_era = days - era * 146097;
+    long long year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
+    long long day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    long long march_month = (5 * day_of_year + 2) / 153; // 0 = March
+    *day = (int)(day_of_year - (153 * march_month + 2) / 5 + 1);
+    *month = (int)(march_month < 10 ? march_month + 3 : march_month - 9);
+    *year = year_of_era + era * 400 + (*month <= 2 ? 1 : 0);
+}
+
+// The parts of a day counted from 1970-01-01, and of a second within it. The one place the UTC calendar is worked
+// out, for date.utc and date.parse alike: the same instant gives the same answer on every platform, which the C
+// library's gmtime cannot promise (its range is the platform's, and Windows stops in 3000).
+static Value parts_of_day(long long days, int second_of_day, int millis) {
+    long long year;
+    int month;
+    int day;
+    civil_from_days(days, &year, &month, &day);
+    int weekday = (int)(((days + 3) % 7 + 7) % 7) + 1; // 1970-01-01 was a Thursday, the 4th day of an ISO week
+    int year_day = (int)(days - days_from_civil(year, 1, 1)) + 1;
+    return make_parts(year, month, day, second_of_day / 3600, second_of_day / 60 % 60, second_of_day % 60, millis,
+                      weekday, year_day);
+}
+
+static int date_utc(CallCtx& ctx) {
+    std::time_t t;
+    int millis;
+    instant(ctx, "date.utc", &t, &millis);
+    long long days = t / 86400;
+    long long second_of_day = t % 86400;
+    if (second_of_day < 0) { // a floor and not a truncation, as the milliseconds are split
+        second_of_day += 86400;
+        --days;
+    }
+    return ctx.ret(parts_of_day(days, (int)second_of_day, millis));
 }
 
 static int date_parse(CallCtx& ctx) {
@@ -132,10 +163,7 @@ static int date_parse(CallCtx& ctx) {
     }
     if (year < 1 || month < 1 || month > 12 || day < 1 || day > month_length(year, month))
         return ctx.ret(Value());
-    long long days = days_from_civil(year, month, day);
-    int weekday = (int)(((days + 3) % 7 + 7) % 7) + 1; // 1970-01-01 was a Thursday, the 4th day of an ISO week
-    int year_day = (int)(days - days_from_civil(year, 1, 1)) + 1;
-    return ctx.ret(make_parts(year, month, day, 0, 0, 0, 0, weekday, year_day));
+    return ctx.ret(parts_of_day(days_from_civil(year, month, day), 0, 0));
 }
 
 // A year this far from 0 is no date anyone means, and the cast to int stays far from its limit.

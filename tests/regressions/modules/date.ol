@@ -63,17 +63,42 @@ assert(date.parse("2024-02-29").weekday == 4 and date.parse("2024-02-29").yearDa
 assert(date.parse("0001-01-01").weekday == 1 and date.parse("9999-12-31").weekday == 5, "the ends of the range")
 assert(date.parse("9999-12-31").yearDay == 365)
 
-## Every day from 1970 to 2105: the text of a decoded instant reads back as the same date. This is what ties
-## parse to the C library's calendar (decoding), where a month length or a leap rule gone wrong would split them.
-var dt_day = 0
-while dt_day < 49310 do
-    var dt_from = date.utc(dt_day * 86400)
-    var dt_text = "{dt_from.year:04d}-{dt_from.month:02d}-{dt_from.day:02d}"
-    var dt_back = date.parse(dt_text)
-    assert(dt_back <> nil, "a real date was refused: " + dt_text)
-    assert(dt_back.year == dt_from.year and dt_back.month == dt_from.month and dt_back.day == dt_from.day, dt_text)
-    assert(dt_back.weekday == dt_from.weekday and dt_back.yearDay == dt_from.yearDay, "weekday or year day of " + dt_text)
-    dt_day += 1
+## date.utc and date.parse share one calendar, so the checks that matter are against dates known independently of
+## it: instants worked out with another implementation (Python's datetime), at the edges where a calendar goes
+## wrong — the ends of the range, a century that is not a leap year and one that is, the day before and after.
+## [instant, year, month, day, hour, minute, second, ISO weekday, year day]
+var dt_known = [
+    [-62135596800, 1, 1, 1, 0, 0, 0, 1, 1], [-11644473600, 1601, 1, 1, 0, 0, 0, 1, 1],
+    [-2208988800, 1900, 1, 1, 0, 0, 0, 1, 1], [-2203891201, 1900, 2, 28, 23, 59, 59, 3, 59],
+    [-2203891200, 1900, 3, 1, 0, 0, 0, 4, 60], [-1, 1969, 12, 31, 23, 59, 59, 3, 365],
+    [951782400, 2000, 2, 29, 0, 0, 0, 2, 60], [951827696, 2000, 2, 29, 12, 34, 56, 2, 60],
+    [1709251199, 2024, 2, 29, 23, 59, 59, 4, 60], [1767225599, 2025, 12, 31, 23, 59, 59, 3, 365],
+    [4107542399, 2100, 2, 28, 23, 59, 59, 7, 59], [4107542400, 2100, 3, 1, 0, 0, 0, 1, 60],
+    [253402300799, 9999, 12, 31, 23, 59, 59, 5, 365],
+    [253402300800, 10000, 1, 1, 0, 0, 0, 6, 1]]
+for dt_row in dt_known do
+    var dt_got = date.utc(dt_row[1])
+    var dt_mine = [dt_got.year, dt_got.month, dt_got.day, dt_got.hour, dt_got.minute, dt_got.second, dt_got.weekday, dt_got.yearDay]
+    for dt_i = 1, 8 do
+        assert(dt_mine[dt_i] == dt_row[dt_i + 1], "date.utc({dt_row[1]}), field {dt_i}: {dt_mine[dt_i]} instead of {dt_row[dt_i + 1]}")
+    end
+end
+
+## Reading a decoded day back gives the same day: parse and utc are inverse of each other, whatever the calendar
+## rules they share. Every day from 1900 to 2200, then one in 37 across the whole range of years 1 to 9999.
+func dtRoundTrip(day)
+    var from = date.utc(day * 86400)
+    var text = "{from.year:04d}-{from.month:02d}-{from.day:02d}"
+    var back = date.parse(text)
+    assert(back <> nil, "a real date was refused: " + text)
+    assert(back.year == from.year and back.month == from.month and back.day == from.day, text)
+    assert(back.weekday == from.weekday and back.yearDay == from.yearDay, "weekday or year day of " + text)
+end
+for dt_day = -25567, 83984 do
+    dtRoundTrip(dt_day)
+end
+for dt_day = -719162, 2932896, 37 do
+    dtRoundTrip(dt_day)
 end
 
 ## What is no date gives nil: the shape, the characters, and a day the month does not have.
