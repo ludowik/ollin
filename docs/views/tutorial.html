@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-07 15:51</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-07 16:40</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-07 15:51</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-07 16:40</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2780,12 +2780,14 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 
 <section id="date">
 <h2>The <code>date</code> module</h2>
-<p>The calendar, which <code>time()</code> alone cannot give: it returns the seconds since the Unix epoch, and turning those into a day and an hour means leap years, month lengths and above all a <strong>time zone</strong> with its summer time. Available without any <code>import</code>. Both functions return a plain <strong>map</strong>.</p>
+<p>The calendar, which <code>time()</code> alone cannot give: it returns the seconds since the Unix epoch, and turning those into a day and an hour means leap years, month lengths and above all a <strong>time zone</strong> with its summer time. Available without any <code>import</code>. <code>now</code>, <code>utc</code> and <code>parse</code> return a plain <strong>map</strong>.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>date.now([t])</code></td><td>The parts of the <strong>local</strong> time; with no argument, of this instant. <code>t</code> is a number of seconds since the epoch, as <code>time()</code> returns it — its decimals become the milliseconds</td></tr>
     <tr><td><code>date.utc([t])</code></td><td>The same in <strong>UTC</strong>, the same answer on every machine</td></tr>
+    <tr><td><code>date.parse(text)</code></td><td>The same parts for a date written <code>"2026-11-01"</code>, the time being 0, or <code>nil</code> for a text that is not exactly one: four digits, two and two, and a day its month has. Anything but a text is an error</td></tr>
+    <tr><td><code>date.monthLength(year, month)</code></td><td>The days a month has, February's depending on the year (every fourth year, except the centuries that 400 does not divide). The month is 1 to 12</td></tr>
   </tbody>
 </table>
 <table>
@@ -2807,6 +2809,12 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <span class="kw">if</span> d.weekday &gt;= <span class="num">6</span> <span class="kw">then</span>
     <span class="bi">print</span>(<span class="str">"day off"</span>)
 <span class="kw">end</span>
+
+<span class="cmt">## a date written as text: nil when it is no date, so a day that does not exist is told</span>
+<span class="kw">var</span> due = <span class="bi">date</span>.parse(<span class="str">"2026-11-01"</span>)
+<span class="bi">print</span>(due.weekday)                    <span class="cmt">## 7: a Sunday</span>
+<span class="bi">print</span>(<span class="bi">date</span>.parse(<span class="str">"2026-02-29"</span>))       <span class="cmt">## nil: 2026 is not a leap year</span>
+<span class="bi">print</span>(<span class="bi">date</span>.monthLength(<span class="num">2024</span>, <span class="num">2</span>))      <span class="cmt">## 29</span>
 
 <span class="cmt">## an instant of one's own: the parts of a stored date</span>
 <span class="kw">var</span> then_ = <span class="bi">date</span>.utc(<span class="num">1_700_000_000</span>)   <span class="cmt">## 2023-11-14 22:13:20 UTC</span></code></pre>

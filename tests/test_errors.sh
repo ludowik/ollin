@@ -747,6 +747,30 @@ check_error "date.utc with a non-number instant" \
     'var d = date.utc([])' \
     "date.utc: argument 1 expected number"
 
+check_error "date.parse with a non-text" \
+    'var d = date.parse(20261101)' \
+    "date.parse: expected string"
+
+check_error "date.parse with no argument" \
+    'var d = date.parse()' \
+    "date.parse: missing argument"
+
+check_error "date.monthLength with a month out of range" \
+    'var d = date.monthLength(2026, 13)' \
+    "date.monthLength: the month must be 1 to 12, got 13"
+
+check_error "date.monthLength with a month that is not whole" \
+    'var d = date.monthLength(2026, 1.5)' \
+    "date.monthLength: expected a whole year and a whole month"
+
+check_error "date.monthLength with a text" \
+    'var d = date.monthLength("2026", 2)' \
+    "date.monthLength: argument 1 expected number"
+
+check_error "date.monthLength with a year out of range" \
+    'var d = date.monthLength(1e300, 2)' \
+    "date.monthLength: the year is out of range"
+
 check_error "data.get with a non-string key" \
     'data.get(1)' \
     "data.get: expected a string key"

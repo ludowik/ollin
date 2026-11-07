@@ -12,8 +12,13 @@
 // date.now([t])  the parts of the LOCAL time; with no argument, of this instant
 // date.utc([t])  the same in UTC, which is what makes the decoding testable: an epoch second maps
 //                to one and only one answer, whatever the machine's zone.
+// date.parse(s)  the parts of a date written "2026-11-01", or nil for a text that is not exactly
+//                one: four digits, two and two, and a day its month has. The calendar is worked out
+//                here and not through the C library, whose range is the platform's (Windows stops
+//                in 3000), so that the same text gives the same answer everywhere.
+// date.monthLength(year, month)  the days a month has, February's depending on the year.
 //
-// Both return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
+// The first three return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
 static Value parts_of(const std::tm& tm, int millis) {
     // ISO numbering for the weekday, Monday = 1 to Sunday = 7. The C library counts Sunday as 0,
@@ -75,6 +80,70 @@ static int date_utc(CallCtx& ctx) {
     return ctx.ret(parts_of(tm, millis));
 }
 
+// The Gregorian rule: every fourth year, except the centuries that 400 does not divide.
+static bool is_leap_year(long long year) {
+    return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+}
+
+static int month_length(long long year, int month) {
+    static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    return month == 2 && is_leap_year(year) ? 29 : days[month - 1];
+}
+
+// Days since 1970-01-01 of a date of the proleptic Gregorian calendar (Hinnant's days_from_civil).
+static long long days_from_civil(long long year, int month, int day) {
+    year -= month <= 2 ? 1 : 0;
+    long long era = (year >= 0 ? year : year - 399) / 400;
+    long long year_of_era = year - era * 400;
+    long long day_of_year = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    long long day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    return era * 146097 + day_of_era - 719468;
+}
+
+static int date_parse(CallCtx& ctx) {
+    const std::string& text = str_arg(ctx.args, ctx.argc, 0, "date.parse");
+    if (text.size() != 10 || text[4] != '-' || text[7] != '-')
+        return ctx.ret(Value());
+    int digits[8];
+    const int positions[8] = {0, 1, 2, 3, 5, 6, 8, 9};
+    for (int i = 0; i < 8; ++i) {
+        char c = text[positions[i]];
+        if (c < '0' || c > '9')
+            return ctx.ret(Value());
+        digits[i] = c - '0';
+    }
+    int year = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3];
+    int month = digits[4] * 10 + digits[5];
+    int day = digits[6] * 10 + digits[7];
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > month_length(year, month))
+        return ctx.ret(Value());
+    long long days = days_from_civil(year, month, day);
+    std::tm tm{};
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;
+    tm.tm_mday = day;
+    tm.tm_wday = (int)(((days + 4) % 7 + 7) % 7);   // 1970-01-01 was a Thursday; 0 is Sunday, as in the C library
+    tm.tm_yday = (int)(days - days_from_civil(year, 1, 1));
+    return ctx.ret(parts_of(tm, 0));
+}
+
+static int date_month_length(CallCtx& ctx) {
+    double year = num_arg(ctx.args, ctx.argc, 0, "date.monthLength");
+    double month = num_arg(ctx.args, ctx.argc, 1, "date.monthLength");
+    if (year != std::floor(year) || month != std::floor(month))
+        throw std::runtime_error("date.monthLength: expected a whole year and a whole month");
+    if (!(std::fabs(year) <= 1e15))
+        throw std::runtime_error("date.monthLength: the year is out of range");
+    if (month < 1 || month > 12)
+        throw std::runtime_error("date.monthLength: the month must be 1 to 12, got " + std::to_string((long long)month));
+    return ctx.ret(Value((int64_t)month_length((long long)year, (int)month)));
+}
+
 Value make_date_module() {
-    return MapBuilder().fn("now", date_now).fn("utc", date_utc).done();
+    return MapBuilder()
+        .fn("now", date_now)
+        .fn("utc", date_utc)
+        .fn("parse", date_parse)
+        .fn("monthLength", date_month_length)
+        .done();
 }
