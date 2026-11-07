@@ -110,7 +110,8 @@ global ufoWait = UFO_PERIOD
 global ufoDir = 1        ## it comes from the other side each time
 global shots = 0         ## shots fired, which is what prices the mystery ship
 global popup = nil       ## {text, x, y, left}: what a kill was worth, written where it happened
-global best = 0          ## the best score of the session
+const BEST_KEY = "best"
+global best = 0          ## the best score, kept from one run to the next
 
 global state = "title"   ## "title", "play" or "over": every input asks this first
 global paused = false
@@ -255,6 +256,7 @@ func addScore(points)
     score += points
     if score > best then
         best = score
+        data.set(BEST_KEY, best)
     end
     if score >= nextLife then
         lives += 1
@@ -503,6 +505,7 @@ end
 ## sprite is a texture and a texture needs a graphics context.
 func setup()
     graphics.canvas(W, H, "Ollin Invaders")
+    best = data.get(BEST_KEY, 0)
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
     graphics.viewport(FIELD_W, FIELD_H)

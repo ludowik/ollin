@@ -89,7 +89,8 @@ const WARM  = Color(1.0, 0.78, 0.35)
 global state = "title"
 global paused = false
 global score = 0
-global best = 0                ## the best score of the session
+const BEST_KEY = "best"
+global best = 0                ## the best score, kept from one run to the next
 global lives = LIVES
 global wave = 1
 global nextExtra = EXTRA_AT
@@ -217,6 +218,7 @@ func award(points)
     end
     if score > best then
         best = score
+        data.set(BEST_KEY, best)
     end
 end
 
@@ -856,6 +858,7 @@ end
 ## Everything the program owns is built here, in the order it depends on.
 func setup()
     graphics.canvas(W, H, "Ollin Asteroids")
+    best = data.get(BEST_KEY, 0)
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
     graphics.viewport(FIELD_W, FIELD_H)
