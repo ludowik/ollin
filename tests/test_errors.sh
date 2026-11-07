@@ -795,6 +795,26 @@ check_error "date.weekdayName with a language that is no text" \
     'var d = date.weekdayName(1, 2)' \
     "date.weekdayName: expected \"en\" or \"fr\""
 
+check_error "date.monthName with a month out of range" \
+    'var d = date.monthName(13)' \
+    "date.monthName: the month must be a whole number from 1 to 12"
+
+check_error "date.monthName with a month that is not whole" \
+    'var d = date.monthName(1.5)' \
+    "date.monthName: the month must be a whole number from 1 to 12"
+
+check_error "date.monthName with a text for a month" \
+    'var d = date.monthName("1")' \
+    "date.monthName: argument 1 expected number"
+
+check_error "date.monthName with an unknown language" \
+    'var d = date.monthName(1, "de")' \
+    "date.monthName: unknown mode 'de' (expected \"en\" or \"fr\")"
+
+check_error "date.monthName with an unknown form" \
+    'var d = date.monthName(1, "en", "tiny")' \
+    "date.monthName: unknown mode 'tiny' (expected \"long\" or \"short\")"
+
 check_error "data.get with a non-string key" \
     'data.get(1)' \
     "data.get: expected a string key"

@@ -18,9 +18,10 @@
 //                in 3000), so that the same text gives the same answer everywhere.
 // date.monthLength(year, month)  the days a month has, February's depending on the year.
 // date.weekdayName(day[, language[, form]])  the name of a weekday (1 = Monday to 7 = Sunday, as the
-//                `weekday` field numbers it), in "en" or "fr", "long" ("Monday") or "short" ("Mon"). The
-//                names are data of the calendar, not a formatting: a script that shows them in another
-//                language asks for it here, and a language is one more row of the table below.
+//                `weekday` field numbers it), in "en" or "fr", "long" ("Monday") or "short" ("Mon").
+// date.monthName(month[, language[, form]])  the same for a month (1 = January to 12 = December).
+//                The names are data of the calendar, not a formatting: a script that shows them in another
+//                language asks for it here, and a language is one more row of each table below.
 //
 // The first three return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
@@ -144,7 +145,7 @@ static int date_month_length(CallCtx& ctx) {
 }
 
 // The languages the names exist in, and the forms they come in. Both lists are what mode_arg accepts and
-// what its error message spells out; the names below follow the same order (language, form, day).
+// what its error message spells out; the tables below follow the same order (language, form, number).
 static const char* const k_languages[] = {"en", "fr"};
 static const char* const k_forms[] = {"long", "short"};
 static const char* const k_weekday_names[2][2][7] = {
@@ -154,22 +155,44 @@ static const char* const k_weekday_names[2][2][7] = {
     },
     {
         {"lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"},
-        {"lun", "mar", "mer", "jeu", "ven", "sam", "dim"},
+        {"lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."},
     },
 };
-static_assert(sizeof(k_weekday_names) / sizeof(k_weekday_names[0]) == sizeof(k_languages) / sizeof(k_languages[0]),
-              "every language needs its names");
-static_assert(sizeof(k_weekday_names[0]) / sizeof(k_weekday_names[0][0]) == sizeof(k_forms) / sizeof(k_forms[0]),
-              "every form needs its names");
+static const char* const k_month_names[2][2][12] = {
+    {
+        {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+         "November", "December"},
+        {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+    },
+    {
+        {"janvier", "f\u00e9vrier", "mars", "avril", "mai", "juin", "juillet", "ao\u00fbt", "septembre", "octobre",
+         "novembre", "d\u00e9cembre"},
+        {"janv.", "f\u00e9vr.", "mars", "avr.", "mai", "juin", "juil.", "ao\u00fbt", "sept.", "oct.", "nov.",
+         "d\u00e9c."},
+    },
+};
 
-static int date_weekday_name(CallCtx& ctx) {
-    const char* fn = "date.weekdayName";
-    double day = num_arg(ctx.args, ctx.argc, 0, fn);
-    if (day != std::floor(day) || day < 1 || day > 7)
-        throw std::runtime_error(std::string(fn) + ": the day must be a whole number from 1 to 7");
+// The name of the weekday or month `ctx.args[0]` numbers, in the language and the form asked for. `what` names
+// the number in the error ("day", "month"); the table's sizes are checked against the two lists above.
+template <int L, int F, int N>
+static int date_name(CallCtx& ctx, const char* fn, const char* what, const char* const (&names)[L][F][N]) {
+    static_assert(L == sizeof(k_languages) / sizeof(k_languages[0]), "every language needs its names");
+    static_assert(F == sizeof(k_forms) / sizeof(k_forms[0]), "every form needs its names");
+    double number = num_arg(ctx.args, ctx.argc, 0, fn);
+    if (number != std::floor(number) || number < 1 || number > N)
+        throw std::runtime_error(std::string(fn) + ": the " + what + " must be a whole number from 1 to " +
+                                 std::to_string(N));
     int language = mode_arg(ctx, 1, fn, k_languages, 0);
     int form = mode_arg(ctx, 2, fn, k_forms, 0);
-    return ctx.ret(Value(std::string(k_weekday_names[language][form][(int)day - 1])));
+    return ctx.ret(Value(std::string(names[language][form][(int)number - 1])));
+}
+
+static int date_weekday_name(CallCtx& ctx) {
+    return date_name(ctx, "date.weekdayName", "day", k_weekday_names);
+}
+
+static int date_month_name(CallCtx& ctx) {
+    return date_name(ctx, "date.monthName", "month", k_month_names);
 }
 
 Value make_date_module() {
@@ -179,5 +202,6 @@ Value make_date_module() {
         .fn("parse", date_parse)
         .fn("monthLength", date_month_length)
         .fn("weekdayName", date_weekday_name)
+        .fn("monthName", date_month_name)
         .done();
 }

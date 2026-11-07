@@ -100,7 +100,7 @@ var dt_names = {
     en: {long: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
          short: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]},
     fr: {long: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
-         short: ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"]}
+         short: ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]}
 }
 for dt_lang in ["en", "fr"] do
     for dt_form in ["long", "short"] do
@@ -114,4 +114,27 @@ assert(date.weekdayName(3, "fr") == "mercredi" and date.weekdayName(3, "en", "sh
 assert(date.weekdayName(date.parse("2026-11-01").weekday, "fr") == "dimanche", "the number a date gives is the one the names take")
 assert(date.weekdayName(date.utc(0).weekday, "en") == "Thursday", "1970-01-01 was a Thursday")
 assert(date.weekdayName(2.0) == "Tuesday", "a whole number written with a point is whole")
+
+## date.monthName: the 12 months in each language and each form, January being 1 as the `month` field has it.
+var dt_months = {
+    en: {long: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                "November", "December"],
+         short: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]},
+    fr: {long: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
+                "novembre", "décembre"],
+         short: ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]}
+}
+for dt_lang in ["en", "fr"] do
+    for dt_form in ["long", "short"] do
+        for dt_n = 1, 12 do
+            assert(date.monthName(dt_n, dt_lang, dt_form) == dt_months[dt_lang][dt_form][dt_n], "{dt_lang} {dt_form} {dt_n}")
+        end
+    end
+end
+assert(date.monthName(1) == "January" and date.monthName(12) == "December", "English and long by default")
+assert(date.monthName(8, "fr") == "août" and date.monthName(2, "en", "short") == "Feb", "a language alone, a form after it")
+assert(date.monthName(date.parse("2026-11-01").month, "fr") == "novembre", "the number a date gives is the one the names take")
+assert(date.monthName(date.utc(0).month) == "January", "the epoch is in January")
+assert(date.monthName(12.0) == "December", "a whole number written with a point is whole")
+assert(len(date.monthName(2, "fr")) == 7, "the accent is one character, not two bytes")
 
