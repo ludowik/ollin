@@ -569,3 +569,42 @@ for i = 1, 2 do
     cxEn += CxLoopEnum.A
 end
 assert(cxEn == 2)
+
+## ── Compiler: the variable of a `catch` captured by a closure ────────────────
+## The bug: the catch variable has a register of its own, below the registers of the catch block, and the block
+## closes the upvalues of ITS registers only. The closure kept an open upvalue on the catch register, which the
+## next statement then wrote: the closure read an array (or nil) instead of the error.
+var catchFn
+try
+    throw 42
+catch catchErr
+    catchFn = func() return catchErr end
+end
+var catchNext = [5, 6]
+assert(catchFn() == 42, "at the top level")
+func catchMake()
+    var g
+    try
+        throw 43
+    catch e
+        g = func() return e end
+    end
+    var x = [1, 2, 3]
+    var y = "other"
+    return g()
+end
+assert(catchMake() == 43, "in a function")
+func catchMakeLoop()
+    var g
+    for i = 1, 2 do
+    end
+    try
+        throw 44
+    catch e
+        g = func() return e end
+    end
+    var x = {a: 1}
+    var z = x.a + 1
+    return g()
+end
+assert(catchMakeLoop() == 44, "in a function that holds a loop")

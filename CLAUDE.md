@@ -897,7 +897,7 @@ comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure �
 | MAKE_CLOSURE  | ABx    | A=dest, Bx=func_idx        | R[A] = Closure{func_idx, capture upvals depuis frame courant} |
 | GET_UPVAL     | AB     | A=dest, B=upval_idx        | R[A] = upval[B]  (ouverte: regs[base+idx], fermée: uv.val) |
 | SET_UPVAL     | AB     | A=src, B=upval_idx         | upval[B] = R[A]                                  |
-| NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
+| NEW_CLASS     | ABx    | A=dest, Bx=(constante du nom << 1) \| parent | R[A] = nouvelle classe vide (T_CLASS) ; si le bit de poids faible est posé, la classe parente est dans R[A] |
 | CALL_METHOD   | ABC    | A=recv_base, B=mode, C=argc | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance. **B est le MODE de la queue** : 0 aucune, 1 `...` (varargs du cadre), 2 un appel (`last_results_`) — C étant alors le nombre d'arguments FIXES |
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
 
@@ -2656,10 +2656,7 @@ retour.
 
 ### Opcodes
 
-| Opcode | Format | Description |
-|--------|--------|-------------|
-| NEW_CLASS | A | R[A] = nouvelle classe vide (T_CLASS) |
-| CALL_METHOD | ABC | A=receiver_base, B=mode de la queue (0/1/2), C=argc — R[A]=receiver, R[A+1]=method_fn, R[A+2..]=args |
+`NEW_CLASS` et `CALL_METHOD` : voir le tableau « Opcodes VM ».
 
 ### Le constructeur rend l'OBJET, et c'est le COMPILATEUR qui le décide
 

@@ -796,8 +796,9 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     // the temporaries, and the next statement overwrote the captured value (a `do` block
     // returning nil instead of 42, measured). The two loop forms already close per iteration,
     // for the same reason; reserving the registers instead would grow without bound over a file.
-    if (has_func && reg_top_ > saved_top)
-        close_upvals_from(saved_top);
+    // The variable bound beforehand (the catch variable) is one of them, and its register is BELOW saved_top.
+    if (has_func && (reg_top_ > saved_top || !pre_bound.empty()))
+        close_upvals_from(pre_bound.empty() ? saved_top : pre_bound_reg);
     reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
