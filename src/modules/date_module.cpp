@@ -25,20 +25,26 @@
 //
 // The first three return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
-static Value parts_of(const std::tm& tm, int millis) {
-    // ISO numbering for the weekday, Monday = 1 to Sunday = 7. The C library counts Sunday as 0,
-    // which puts the week-end at both ends and trips up every "is it a weekday" test.
+// The weekday is numbered ISO, Monday = 1 to Sunday = 7: the C library counts Sunday as 0, which puts
+// the week-end at both ends and trips up every "is it a weekday" test.
+static Value make_parts(long long year, int month, int day, int hour, int minute, int second, int millis, int weekday,
+                        int year_day) {
     return MapBuilder()
-        .int_num("year", tm.tm_year + 1900)
-        .int_num("month", tm.tm_mon + 1)        // 1..12
-        .int_num("day", tm.tm_mday)             // 1..31
-        .int_num("hour", tm.tm_hour)            // 0..23
-        .int_num("minute", tm.tm_min)
-        .int_num("second", tm.tm_sec)
-        .int_num("millisecond", millis)         // 0..999
-        .int_num("weekday", tm.tm_wday == 0 ? 7 : tm.tm_wday)
-        .int_num("yearDay", tm.tm_yday + 1)     // 1..366
+        .int_num("year", year)
+        .int_num("month", month)        // 1..12
+        .int_num("day", day)            // 1..31
+        .int_num("hour", hour)          // 0..23
+        .int_num("minute", minute)
+        .int_num("second", second)
+        .int_num("millisecond", millis) // 0..999
+        .int_num("weekday", weekday)
+        .int_num("yearDay", year_day)   // 1..366
         .done();
+}
+
+static Value parts_of(const std::tm& tm, int millis) {
+    return make_parts(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, millis,
+                      tm.tm_wday == 0 ? 7 : tm.tm_wday, tm.tm_yday + 1);
 }
 
 // The instant to decode, in SECONDS since the epoch — the unit time() returns — as a whole second
@@ -85,14 +91,11 @@ static int date_utc(CallCtx& ctx) {
     return ctx.ret(parts_of(tm, millis));
 }
 
-// The Gregorian rule: every fourth year, except the centuries that 400 does not divide.
-static bool is_leap_year(long long year) {
-    return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-}
-
+// February has 29 days by the Gregorian rule: every fourth year, except the centuries that 400 does not divide.
 static int month_length(long long year, int month) {
     static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    return month == 2 && is_leap_year(year) ? 29 : days[month - 1];
+    bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    return month == 2 && leap ? 29 : days[month - 1];
 }
 
 // Days since 1970-01-01 of a date of the proleptic Gregorian calendar (Hinnant's days_from_civil).
@@ -107,41 +110,42 @@ static long long days_from_civil(long long year, int month, int day) {
 
 static int date_parse(CallCtx& ctx) {
     const std::string& text = str_arg(ctx.args, ctx.argc, 0, "date.parse");
-    if (text.size() != 10 || text[4] != '-' || text[7] != '-')
+    if (text.size() != 10)
         return ctx.ret(Value());
-    int digits[8];
-    const int positions[8] = {0, 1, 2, 3, 5, 6, 8, 9};
-    for (int i = 0; i < 8; ++i) {
-        char c = text[positions[i]];
-        if (c < '0' || c > '9')
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    for (int i = 0; i < 10; ++i) {
+        char c = text[i];
+        if (i == 4 || i == 7) {
+            if (c != '-')
+                return ctx.ret(Value());
+        } else if (c < '0' || c > '9') {
             return ctx.ret(Value());
-        digits[i] = c - '0';
+        } else if (i < 4) {
+            year = year * 10 + (c - '0');
+        } else if (i < 7) {
+            month = month * 10 + (c - '0');
+        } else {
+            day = day * 10 + (c - '0');
+        }
     }
-    int year = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3];
-    int month = digits[4] * 10 + digits[5];
-    int day = digits[6] * 10 + digits[7];
     if (year < 1 || month < 1 || month > 12 || day < 1 || day > month_length(year, month))
         return ctx.ret(Value());
     long long days = days_from_civil(year, month, day);
-    std::tm tm{};
-    tm.tm_year = year - 1900;
-    tm.tm_mon = month - 1;
-    tm.tm_mday = day;
-    tm.tm_wday = (int)(((days + 4) % 7 + 7) % 7);   // 1970-01-01 was a Thursday; 0 is Sunday, as in the C library
-    tm.tm_yday = (int)(days - days_from_civil(year, 1, 1));
-    return ctx.ret(parts_of(tm, 0));
+    int weekday = (int)(((days + 3) % 7 + 7) % 7) + 1; // 1970-01-01 was a Thursday, the 4th day of an ISO week
+    int year_day = (int)(days - days_from_civil(year, 1, 1)) + 1;
+    return ctx.ret(make_parts(year, month, day, 0, 0, 0, 0, weekday, year_day));
 }
 
+// A year this far from 0 is no date anyone means, and the cast to int stays far from its limit.
+static const long long k_max_year = 1000000000;
+
 static int date_month_length(CallCtx& ctx) {
-    double year = num_arg(ctx.args, ctx.argc, 0, "date.monthLength");
-    double month = num_arg(ctx.args, ctx.argc, 1, "date.monthLength");
-    if (year != std::floor(year) || month != std::floor(month))
-        throw std::runtime_error("date.monthLength: expected a whole year and a whole month");
-    if (!(std::fabs(year) <= 1e15))
-        throw std::runtime_error("date.monthLength: the year is out of range");
-    if (month < 1 || month > 12)
-        throw std::runtime_error("date.monthLength: the month must be 1 to 12, got " + std::to_string((long long)month));
-    return ctx.ret(Value((int64_t)month_length((long long)year, (int)month)));
+    const char* fn = "date.monthLength";
+    long long year = whole_arg(ctx.args, ctx.argc, 0, fn, "year", -k_max_year, k_max_year);
+    long long month = whole_arg(ctx.args, ctx.argc, 1, fn, "month", 1, 12);
+    return ctx.ret(Value((int64_t)month_length(year, (int)month)));
 }
 
 // The languages the names exist in, and the forms they come in. Both lists are what mode_arg accepts and
@@ -178,13 +182,10 @@ template <int L, int F, int N>
 static int date_name(CallCtx& ctx, const char* fn, const char* what, const char* const (&names)[L][F][N]) {
     static_assert(L == sizeof(k_languages) / sizeof(k_languages[0]), "every language needs its names");
     static_assert(F == sizeof(k_forms) / sizeof(k_forms[0]), "every form needs its names");
-    double number = num_arg(ctx.args, ctx.argc, 0, fn);
-    if (number != std::floor(number) || number < 1 || number > N)
-        throw std::runtime_error(std::string(fn) + ": the " + what + " must be a whole number from 1 to " +
-                                 std::to_string(N));
+    int number = (int)whole_arg(ctx.args, ctx.argc, 0, fn, what, 1, N);
     int language = mode_arg(ctx, 1, fn, k_languages, 0);
     int form = mode_arg(ctx, 2, fn, k_forms, 0);
-    return ctx.ret(Value(std::string(names[language][form][(int)number - 1])));
+    return ctx.ret(Value(std::string(names[language][form][number - 1])));
 }
 
 static int date_weekday_name(CallCtx& ctx) {

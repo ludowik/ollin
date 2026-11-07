@@ -2,6 +2,7 @@
 #include "value.h"
 #include "vm.h"
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -87,6 +88,17 @@ static inline double num_arg(const Value* args, int argc, int i, const char* fn)
     if (i >= argc)
         throw std::runtime_error(std::string(fn) + ": missing argument");
     return num_arg(args, i, fn);
+}
+
+// A number that must be WHOLE and within lo..hi. `what` names it in the message, which spells the range, so a call
+// refused for a fraction and one refused for a size read the same.
+static inline long long whole_arg(const Value* args, int argc, int i, const char* fn, const char* what, long long lo,
+                                  long long hi) {
+    double v = num_arg(args, argc, i, fn);
+    if (v != std::floor(v) || v < (double)lo || v > (double)hi)
+        throw std::runtime_error(std::string(fn) + ": the " + what + " must be a whole number from " +
+                                 std::to_string(lo) + " to " + std::to_string(hi));
+    return (long long)v;
 }
 
 static inline const std::string& str_arg(const Value* args, int argc, int i, const char* fn) {

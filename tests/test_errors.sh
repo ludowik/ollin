@@ -757,11 +757,15 @@ check_error "date.parse with no argument" \
 
 check_error "date.monthLength with a month out of range" \
     'var d = date.monthLength(2026, 13)' \
-    "date.monthLength: the month must be 1 to 12, got 13"
+    "date.monthLength: the month must be a whole number from 1 to 12"
 
 check_error "date.monthLength with a month that is not whole" \
     'var d = date.monthLength(2026, 1.5)' \
-    "date.monthLength: expected a whole year and a whole month"
+    "date.monthLength: the month must be a whole number from 1 to 12"
+
+check_error "date.monthLength with a year that is not whole" \
+    'var d = date.monthLength(2026.5, 2)' \
+    "date.monthLength: the year must be a whole number from -1000000000 to 1000000000"
 
 check_error "date.monthLength with a text" \
     'var d = date.monthLength("2026", 2)' \
@@ -769,7 +773,7 @@ check_error "date.monthLength with a text" \
 
 check_error "date.monthLength with a year out of range" \
     'var d = date.monthLength(1e300, 2)' \
-    "date.monthLength: the year is out of range"
+    "date.monthLength: the year must be a whole number from -1000000000 to 1000000000"
 
 check_error "date.weekdayName with a day out of range" \
     'var d = date.weekdayName(8)' \
