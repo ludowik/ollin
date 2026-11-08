@@ -224,6 +224,17 @@ void keyboard_hide() {
 #endif
 }
 
+bool keyboard_dismissed() {
+#ifdef __EMSCRIPTEN__
+    return EM_ASM_INT({
+        var t = window.__ollinTextInput;
+        return t && t.takeDismissed() ? 1 : 0;
+    }) != 0;
+#else
+    return false;
+#endif
+}
+
 static int kbd_show(CallCtx& ctx) {
     keyboard_show();
     return ctx.ret(Value());

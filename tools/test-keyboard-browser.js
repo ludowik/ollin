@@ -320,6 +320,35 @@ server.listen(0, '127.0.0.1', async () => {
     }
     if (!phoneChecks.every((c) => c[1])) console.log('  field message: ' + phoneFieldMessage)
 
+    // The "done" key of a phone's keyboard (or a swipe down) closes it without the engine being told: the edit must end,
+    // validated, and the program must hear nothing of the typed text.
+    {
+      const pg = await (await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })).newPage()
+      await pg.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${FIELD_TOUCH.replace('/samples/', '/sample/')}`)
+      await pg.waitForTimeout(5000)
+      await pg.evaluate(() => { window.__message = null; window.__ollinFrameError = (m) => { window.__message = m } })
+      const pt = await fieldPoint(pg)
+      const sess = await pg.context().newCDPSession(pg)
+      await sess.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: pt.x, y: pt.y, id: 0 }] })
+      await pg.waitForTimeout(150)
+      await sess.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await pg.waitForTimeout(400)
+      await sess.send('Input.insertText', { text: 'cd' })
+      await pg.waitForTimeout(150)
+      await pg.evaluate(() => document.activeElement.blur())   // what "done" does
+      await pg.waitForTimeout(500)
+      await sess.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'F1', code: 'F1', windowsVirtualKeyCode: 112 })
+      await sess.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'F1', code: 'F1', windowsVirtualKeyCode: 112 })
+      await pg.waitForTimeout(300)
+      const doneMessage = await pg.evaluate(() => window.__message)
+      const doneOk = typeof doneMessage === 'string' && doneMessage.endsWith('NAME=cd SEEN=<cd>')
+      console.log((doneOk ? 'OK   ' : 'FAIL ') + 'closing the keyboard validates the field')
+      if (!doneOk) {
+        failed = true
+        console.log('  message: ' + doneMessage)
+      }
+    }
+
     // ── the window shrinks while a field is edited (a keyboard that resizes the page) ────────────────
     // Once with graphics.fitArea (the area follows the pane) and once without (the engine scales the canvas to fit the pane).
     for (const [label, url] of [['fitArea', FIELD_FIT], ['scale to fit', FIELD_TOUCH]]) {

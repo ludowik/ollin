@@ -1027,6 +1027,8 @@ bool poll_drag() {
 bool ui_poll() {
     if (s_nodes.empty())
         return false;
+    if (ui_editing() && keyboard_dismissed())
+        commit_edit();   // the keyboard of a phone was closed by its user ("done"): the edit ends, validated
     if (poll_drag())
         return true;
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))

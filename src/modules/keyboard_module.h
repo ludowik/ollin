@@ -20,3 +20,7 @@ void keyboard_reset();
 // themselves. No-ops outside the browser.
 void keyboard_show();
 void keyboard_hide();
+
+// Whether the user closed the keyboard of a phone since the last call (its "done" key, a swipe). A ui text field takes it
+// for "validate". False outside the browser.
+bool keyboard_dismissed();

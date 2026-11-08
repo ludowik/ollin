@@ -50,6 +50,8 @@ export function installTextInput(canvas) {
   let queue = ''
   let shown = false
   let composing = false
+  let dismissed = false     // the user took the focus away (the "done" key of a phone, a swipe): the engine ends a field's edit
+  let closing = false       // hide() and reset() blur the sink themselves, which is no dismissal
   let askedAt = -Infinity   // when show() found no armed sink and left its request to the next touchend
   const ASK_LIFETIME = 1500 // ms: a request that old is no tap's, and the touchend of a later tap must not answer it
 
@@ -96,6 +98,13 @@ export function installTextInput(canvas) {
       return text
     },
 
+    // Whether the user closed the keyboard since the last call, which a text field takes for "done".
+    takeDismissed() {
+      const was = dismissed
+      dismissed = false
+      return was
+    },
+
     // Lets the keyboard come. An armed sink only needs its inputmode changed; otherwise the tap that is going on has not
     // reached its touchend yet, which is the only place the focus can be taken (see the head of this file).
     show() {
@@ -110,9 +119,12 @@ export function installTextInput(canvas) {
 
     hide() {
       shown = false
+      dismissed = false
       askedAt = -Infinity
       sink.inputMode = 'none'
+      closing = true
       sink.blur()
+      closing = false
     },
 
     // A new program: no keyboard left up, nothing wanted, nothing typed.
@@ -122,8 +134,11 @@ export function installTextInput(canvas) {
       shown = false
       askedAt = -Infinity
       composing = false
+      dismissed = false
       sink.inputMode = 'none'
+      closing = true
       sink.blur()
+      closing = false
       sink.textContent = ''
     },
   }
@@ -134,6 +149,7 @@ export function installTextInput(canvas) {
   // measured to accept (a focus() inside a gesture, on an element that wants a keyboard).
   function arm() {
     if (!api.wanted || blocked() || shown) return
+    dismissed = false
     const asked = performance.now() - askedAt < ASK_LIFETIME
     askedAt = -Infinity
     sink.inputMode = asked ? 'text' : 'none'
@@ -152,6 +168,7 @@ export function installTextInput(canvas) {
 
   sink.addEventListener('focus', freeze)
   sink.addEventListener('blur', () => {
+    if (!closing && shown) dismissed = true
     shown = false
     composing = false
     thaw()

@@ -1294,6 +1294,9 @@ Ce que le code ne dit pas :
   arrière tapés en moins de 16 ms laissent le « a ». `field.edit()` appelé hors d'un toucher n'ouvre pas le clavier d'un téléphone (même raison que
   `show()`). Logique d'édition pure dans `src/ui_text_edit.h` (test unitaire) ; le texte frappé se vérifie au navigateur
   (`tools/test-keyboard-browser.js`), les touches ne s'injectant pas sous Xvfb.
+- **Fermer le clavier d'un téléphone (touche ✓ de la barre iOS, balayage) VALIDE le champ** (constaté par l'utilisateur : le clavier
+  se fermait mais l'édition continuait). La page ne le sait que par le `blur` de l'élément ; elle le retient (`dismissed`) sauf quand
+  `hide()`/`reset()` l'ont provoqué eux-mêmes (`closing`), et `ui_poll` le lit une fois par image (`keyboard_dismissed`).
 - **La page FIGE le panneau du canvas tant que l'élément de saisie a le focus** (`freeze`/`thaw`, `pg-text-input.js`) : un clavier
   qui redimensionne la fenêtre faisait rétrécir tout l'écran (la zone de `graphics.fitArea`, ou le canvas remis à l'échelle). Le
   panneau garde la taille qu'il avait au focus, le clavier couvre le bas, et une vraie rotation (`screen.orientation.type`) le
