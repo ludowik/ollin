@@ -72,6 +72,12 @@ const { hardReload, isStandaloneApp } = await import('./lib/pg-run.js?v=' + V)
 const { installCrashOverlay, wireModule } = await import('./lib/pg-crashlog.js?v=' + V)
 installCrashOverlay()
 
+// The text a program types, on a phone: an invisible element of the page that takes the focus when the canvas is
+// touched (lib/pg-text-input.js). The canvas is one node for the whole app, so this is installed once.
+import('./lib/pg-text-input.js?v=' + V)
+  .then((m) => m.installTextInput(document.getElementById('canvas')))
+  .catch((e) => console.error('text input:', e))
+
 // The shared WASM runtime: one instance for the whole app.
 let ollinPromise = null
 function getOllin() {

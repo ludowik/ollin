@@ -31,6 +31,7 @@ static bool query_blocked() {
 //   keyboard.keypressed = func(key) ... end   key pressed (an event)
 //   keyboard.keyrelease = func(key) ... end   key released (an event)
 //   keyboard.typed = func(text) ... end       text typed (an event): what the keys PRODUCE, which a key name cannot say
+//   keyboard.show() / keyboard.hide()         the keyboard of a phone, which a canvas cannot raise by itself
 // plus a HELD-state builtin, for continuous movement:
 //   keyboard.isDown(key) -> whether the key is down right now.
 // `key` is a key NAME: "a".."z", "0".."9", "space", "return", "escape", "backspace", "tab",
@@ -38,6 +39,8 @@ static bool query_blocked() {
 // `text` is the characters the keyboard layout and the system made of the presses of the frame, in UTF-8: an accent,
 // a hyphen, an apostrophe, a capital, a dead key's result. A fast typist or a paste gives several characters in one
 // call. Control characters (return, tab, backspace) are never part of it: they are key names, for keypressed.
+// On a phone the text comes from an invisible element of the page that holds the focus (docs/lib/pg-text-input.js): the
+// reasons, and what a browser accepts, are written there. On a computer it comes from raylib's character queue.
 //
 // Detection happens in keyboard_poll(), called once per frame by the render loop
 // (graphics_module.cpp), so the keyboard only works during a graphics.run(...) — or through the
@@ -146,12 +149,93 @@ static std::string take_typed() {
     return text;
 }
 
+// What the page's invisible text element handed over this frame. `active` is false when the element is not the source of
+// text (no phone, no tap yet, or a build outside the browser): the engine then reads raylib's own queue.
+struct HostText {
+    bool active = false;
+    std::string text;
+};
+
+// Also tells the page whether the program wants text at all (it declared keyboard.typed), since that is what makes the
+// page take the focus when the canvas is touched.
+static HostText host_text(bool wanted) {
+    HostText host;
+#ifdef __EMSCRIPTEN__
+    int len = -1;
+    char* p = (char*)EM_ASM_INT(
+        {
+            var t = window.__ollinTextInput;
+            if (!t) {
+                HEAP32[$1 >> 2] = -1;
+                return 0;
+            }
+            var s = t.frame($0 != 0);
+            if (s === null) {
+                HEAP32[$1 >> 2] = -1;
+                return 0;
+            }
+            if (s === '') {
+                HEAP32[$1 >> 2] = 0;
+                return 0;
+            }
+            var bytes = new TextEncoder().encode(s);
+            var ptr = _malloc(bytes.length + 1);
+            if (!ptr) {
+                HEAP32[$1 >> 2] = 0;
+                return 0;
+            }
+            HEAPU8.set(bytes, ptr);
+            HEAPU8[ptr + bytes.length] = 0;
+            HEAP32[$1 >> 2] = bytes.length;
+            return ptr;
+        },
+        wanted ? 1 : 0, &len);
+    host.active = len >= 0;
+    if (p) {
+        host.text.assign(p, (size_t)len);
+        free(p);
+    }
+#else
+    (void)wanted;
+#endif
+    return host;
+}
+
+static int kbd_show(CallCtx& ctx) {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        var t = window.__ollinTextInput;
+        if (t)
+            t.show();
+    });
+#endif
+    return ctx.ret(Value());
+}
+
+static int kbd_hide(CallCtx& ctx) {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        var t = window.__ollinTextInput;
+        if (t)
+            t.hide();
+    });
+#endif
+    return ctx.ret(Value());
+}
+
 // Clears the held state. Called at the start of every gfx_run: on the shared WASM instance
 // s_down is static and would otherwise survive from one run to the next, so a key held across a
 // reset would produce a keyrelease with no keypressed.
 void keyboard_reset() {
     for (int i = 0; i < 512; i++)
         s_down[i] = false;
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        var t = window.__ollinTextInput;
+        if (t)
+            t.reset();
+    });
+#endif
 }
 
 bool keyboard_pressed_any() {
@@ -171,6 +255,7 @@ void keyboard_poll() {
     Value typed;
     if (kbd.is_map())
         typed = kbd.map_get(Value(std::string("typed")));
+    HostText host = host_text(typed.is_callable());
     bool want_press = pressed.is_callable();
     bool want_release = released.is_callable();
 
@@ -208,9 +293,12 @@ void keyboard_poll() {
             vm->call_value(pressed, Value(name));
     }
 
-    // The text of the frame, after the presses it came from. The queue is drained even without a callback, so that it
-    // does not hold what was typed before the script asked.
+    // The text of the frame, after the presses it came from. raylib's queue is drained even without a callback, so that
+    // it does not hold what was typed before the script asked, and even when the page's element is the source: both see
+    // the same keys, and reading both would give every character twice.
     std::string text = take_typed();
+    if (host.active)
+        text = host.text;
     if (!text.empty() && typed.is_callable())
         vm->call_value(typed, Value(text));
 
@@ -234,5 +322,7 @@ void keyboard_poll() {
 Value make_keyboard_module() {
     return MapBuilder()
         .fn("isDown", kbd_is_down)
+        .fn("show", kbd_show)
+        .fn("hide", kbd_hide)
         .done();
 }

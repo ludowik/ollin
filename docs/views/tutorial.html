@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 03:07</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 09:34</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 03:07</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 09:34</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2285,6 +2285,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func keyboard.keypressed(key)</code></td><td>Called on every key <strong>press</strong>, as an event</td></tr>
     <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
     <tr><td><code>func keyboard.typed(text)</code></td><td>Called with the <strong>text</strong> the keys produced, as an event — see below</td></tr>
+    <tr><td><code>keyboard.show()</code></td><td>Asks for the <strong>keyboard of a phone</strong>; does nothing on a computer. Call it from a tap handler (<code>mouse.pressed</code>)</td></tr>
+    <tr><td><code>keyboard.hide()</code></td><td>Puts the keyboard of a phone away</td></tr>
   </tbody>
 </table>
 <p><code>key</code> is a <strong>key name</strong>: <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>, <code>"f1"</code>…<code>"f12"</code>.</p>
@@ -2298,7 +2300,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
         name = <span class="bi">string</span>.substr(name, <span class="num">1</span>, <span class="bi">len</span>(name) - <span class="num">1</span>)
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
-<p>This is a physical keyboard's text. A phone has no keyboard to type on until one is shown, and the canvas is not something the system opens one for.</p>
+<p><strong>On a phone</strong> the system keyboard is not something a canvas can raise by itself, so a program asks for it: <code>keyboard.show()</code> from the handler of a tap (the box the user touches to write), <code>keyboard.hide()</code> when the writing is over. Declaring <code>keyboard.typed</code> is what tells the page that the program wants text: from then on the first touch of the canvas gets ready for the keyboard, and <code>show()</code> lets it come. The text arrives through <code>typed</code> in the same way as from a physical keyboard, with two differences to know: the straight apostrophe and the straight quote come as typed, because the phone's curly ones (<code>‘ ’ “ ”</code>) are turned back into <code>'</code> and <code>"</code>; and the control keys (<code>"return"</code>, <code>"backspace"</code>) are still key names, for <code>keypressed</code>. The <em>Text input</em> example is the smallest program that does it.</p>
+<p>Without a <code>typed</code> function the page does nothing to the touches of the canvas, so a program that does not write text is not changed.</p>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
 <span class="kw">func</span> keyboard.keypressed(key)

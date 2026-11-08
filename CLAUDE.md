@@ -181,8 +181,8 @@ ollin/
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      test-https-browser.js (essaie le moteur WASM du module https contre un vrai serveur HTTPS local, dans
 │                      Chromium — à la MAIN, cf. « Modules `https` et `json` »),
-│                      test-keyboard-browser.js (essaie `keyboard.typed` dans Chromium — à la MAIN : texte produit
-│                      par les touches, aucun caractère de contrôle, rien quand l'hôte bloque le clavier),
+│                      test-keyboard-browser.js (essaie `keyboard.typed`, `show` et `hide` dans Chromium, clavier de
+│                      bureau puis écran tactile émulé — à la MAIN, cf. « Texte saisi »),
 │                      gen_cpp_source.py (engendre docs/samples/{lexer,parser}/cpp_source.ol — le texte des fonctions de
 │                      lexer.cpp et de parser.cpp que les deux animations suivent ligne à ligne ; ne pas l'éditer à la
 │                      main, cf. check_trace_source.sh),
@@ -1266,6 +1266,24 @@ Ce que le code ne dit pas :
   qu'au premier écouteur de la page — un écouteur de test posé avant celui du module le masque. ⚠
   `print` est muet dans une frame graphique : lire une valeur par `assert(false, …)` en prenant la
   main sur `window.__ollinFrameError`.
+
+## Texte saisi (`keyboard.typed`, `show`, `hide`)
+
+> API : voir le tutoriel (section « The keyboard module »). Le mécanisme et ses raisons sont en tête de
+> `docs/lib/pg-text-input.js` ; ce qui suit est ce que ce fichier ne dit pas.
+
+- **Mesuré sur un iPhone** (Safari puis Chrome iOS, par `docs/keyboard-probe.html`, qui existe pour être retirée une fois la
+  fonction éprouvée) : `focus()` n'ouvre le clavier que DANS le geste d'un toucher, or le moteur apprend le toucher à l'image
+  suivante ; un élément pris avec `inputmode="none"` dans le toucher, puis passé à `"text"` plus tard, ouvre le clavier ET
+  garde le focus. Sans `preventDefault` sur `touchstart`/`touchend` du canvas, le clavier s'ouvrait mais l'élément avait
+  perdu le focus, donc la saisie n'allait nulle part. iOS remplace aussi `'` par `‘` dans `beforeinput` (la page le redresse).
+- ⚠ **Non vérifié sur Android**, ni l'armement ni le changement d'`inputmode` ; **Safari** n'a été essayé que sur les
+  tests simples. L'émulation de Chromium ne dit pas si un vrai clavier apparaît : elle prouve la logique, pas l'appareil.
+- **Une seule source de texte à la fois** : quand l'élément de la page a le focus, le moteur lit son texte et VIDE la file de
+  raylib (qui voit les mêmes touches) — lire les deux donnait chaque caractère deux fois (mutation vérifiée : `[xx]`).
+- ⚠ **Au harnais, `page.touchscreen.tap` est trop court** : toucher et lever dans la même image, que le moteur ne voit jamais
+  (même piège que le clic instantané, cf. « Modules `audio` et `sound` »). Tenir le toucher 150 ms par
+  `Input.dispatchTouchEvent`.
 
 ## Zone de dessin qui suit l'hôte (`graphics.fitArea`, implémentation)
 
