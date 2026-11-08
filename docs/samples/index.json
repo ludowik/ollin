@@ -37,5 +37,6 @@
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" },
   { "group": "Device and storage", "name": "Text field (ui)", "file": "text_field.ol" },
+  { "group": "Device and storage", "name": "Keyboard diagnostic", "file": "keyboard_diagnostic.ol" },
   { "group": "Device and storage", "name": "Weather (https)", "file": "weather/weather.ol" }
 ]

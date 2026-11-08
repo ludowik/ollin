@@ -1297,6 +1297,10 @@ Ce que le code ne dit pas :
 - **Fermer le clavier d'un téléphone (touche ✓ de la barre iOS, balayage) VALIDE le champ** (constaté par l'utilisateur : le clavier
   se fermait mais l'édition continuait). La page ne le sait que par le `blur` de l'élément ; elle le retient (`dismissed`) sauf quand
   `hide()`/`reset()` l'ont provoqué eux-mêmes (`closing`), et `ui_poll` le lit une fois par image (`keyboard_dismissed`).
+- **`keyboard.trace([lignes])` et l'exemple « Keyboard diagnostic »** : la page tient un journal des événements du clavier (focus, `blur` et
+  qui l'a causé, touches reçues, hauteurs de la fenêtre et de la zone visible) que l'exemple dessine à l'écran. C'est la mesure à
+  demander à l'utilisateur avant de raisonner sur ce qu'un clavier de téléphone envoie (leçon de `#/perf`) : « touchez le ✓ puis
+  envoyez une capture ».
 - **La page FIGE le panneau du canvas tant que l'élément de saisie a le focus** (`freeze`/`thaw`, `pg-text-input.js`) : un clavier
   qui redimensionne la fenêtre faisait rétrécir tout l'écran (la zone de `graphics.fitArea`, ou le canvas remis à l'échelle). Le
   panneau garde la taille qu'il avait au focus, le clavier couvre le bas, et une vraie rotation (`screen.orientation.type`) le

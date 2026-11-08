@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 11:01</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 22:01</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 11:01</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 22:01</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2286,6 +2286,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
     <tr><td><code>func keyboard.typed(text)</code></td><td>Called with the <strong>text</strong> the keys produced, as an event — see below</td></tr>
     <tr><td><code>keyboard.show()</code></td><td>Asks for the <strong>keyboard of a phone</strong>; does nothing on a computer. Call it from a tap handler (<code>mouse.pressed</code>)</td></tr>
+    <tr><td><code>keyboard.trace([lines])</code></td><td>The last <code>lines</code> (12 by default) of what the page saw of a phone's keyboard, as one text, newest last: the focus it took and lost, the keys it sent, the size of the visible area. A diagnostic — the <em>Keyboard diagnostic</em> example shows it on the screen. Empty outside the browser</td></tr>
     <tr><td><code>keyboard.hide()</code></td><td>Puts the keyboard of a phone away</td></tr>
   </tbody>
 </table>

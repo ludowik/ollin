@@ -235,6 +235,37 @@ bool keyboard_dismissed() {
 #endif
 }
 
+// keyboard.trace([lines]): the last lines of what the page saw of the phone's keyboard, newest last — the focus it took
+// and lost, the keys it sent, the size of the visible area. A diagnostic for a device out of reach; "" outside the browser.
+static int kbd_trace(CallCtx& ctx) {
+    int count = 12;
+    if (ctx.argc > 0 && ctx.args[0].is_number())
+        count = (int)ctx.args[0].as_num();
+    std::string text;
+#ifdef __EMSCRIPTEN__
+    char* p = (char*)EM_ASM_INT(
+        {
+            var t = window.__ollinTextInput;
+            var s = t ? t.trace($0) : '';
+            var bytes = new TextEncoder().encode(s);
+            var ptr = _malloc(bytes.length + 1);
+            if (!ptr)
+                return 0;
+            HEAPU8.set(bytes, ptr);
+            HEAPU8[ptr + bytes.length] = 0;
+            return ptr;
+        },
+        count);
+    if (p) {
+        text = p;
+        free(p);
+    }
+#else
+    (void)count;
+#endif
+    return ctx.ret(Value(text));
+}
+
 static int kbd_show(CallCtx& ctx) {
     keyboard_show();
     return ctx.ret(Value());
@@ -355,5 +386,6 @@ Value make_keyboard_module() {
         .fn("isDown", kbd_is_down)
         .fn("show", kbd_show)
         .fn("hide", kbd_hide)
+        .fn("trace", kbd_trace)
         .done();
 }

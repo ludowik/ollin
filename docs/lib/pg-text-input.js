@@ -47,6 +47,15 @@ export function installTextInput(canvas) {
     'font-size:16px;color:transparent;background:transparent;caret-color:transparent;outline:none;overflow:hidden'
   document.body.appendChild(sink)
 
+  // What the page saw, newest last, for keyboard.trace() and the keyboard diagnostic example: on a phone this is the only way
+  // to learn which events a keyboard really sends (the "done" key, a swipe), and in what order.
+  const log = []
+  const t0 = performance.now()
+  function note(what) {
+    log.push(((performance.now() - t0) / 1000).toFixed(2) + ' ' + what)
+    if (log.length > 60) log.shift()
+  }
+
   let queue = ''
   let shown = false
   let composing = false
@@ -81,6 +90,11 @@ export function installTextInput(canvas) {
     if (frozen && orientation() !== frozen.orientation) thaw()
   }
   window.addEventListener('resize', onResize)
+  const vv = window.visualViewport
+  const noteViewport = (what) => note(what + ' inner ' + window.innerHeight + (vv ? ' visual ' + Math.round(vv.height) : '') +
+    ' sink=' + focused())
+  window.addEventListener('resize', () => noteViewport('resize'))
+  if (vv) vv.addEventListener('resize', () => noteViewport('visual resize'))
 
   const focused = () => document.activeElement === sink
   const blocked = () => !!window.__ollinKbdBlocked   // the editor of the playground has the keyboard
@@ -102,12 +116,19 @@ export function installTextInput(canvas) {
     takeDismissed() {
       const was = dismissed
       dismissed = false
+      if (was) note('engine took the dismissal')
       return was
+    },
+
+    // The last lines of what the page saw, as one text.
+    trace(count) {
+      return log.slice(-count).join('\n')
     },
 
     // Lets the keyboard come. An armed sink only needs its inputmode changed; otherwise the tap that is going on has not
     // reached its touchend yet, which is the only place the focus can be taken (see the head of this file).
     show() {
+      note('show() ' + (focused() ? 'focused: inputmode text' : 'asked, waiting for a touchend'))
       if (blocked()) return
       if (focused()) {
         sink.inputMode = 'text'
@@ -118,6 +139,7 @@ export function installTextInput(canvas) {
     },
 
     hide() {
+      note('hide()')
       shown = false
       dismissed = false
       askedAt = -Infinity
@@ -151,6 +173,7 @@ export function installTextInput(canvas) {
     if (!api.wanted || blocked() || shown) return
     dismissed = false
     const asked = performance.now() - askedAt < ASK_LIFETIME
+    note('touchend arms the sink, asked=' + asked)
     askedAt = -Infinity
     sink.inputMode = asked ? 'text' : 'none'
     if (asked) shown = true
@@ -166,8 +189,13 @@ export function installTextInput(canvas) {
     if (e.cancelable) e.preventDefault()
   }, { passive: false })
 
-  sink.addEventListener('focus', freeze)
+  sink.addEventListener('focus', () => {
+    note('sink focus')
+    freeze()
+  })
+  sink.addEventListener('keydown', (e) => note('keydown ' + e.key))
   sink.addEventListener('blur', () => {
+    note('sink blur' + (closing ? ' (engine)' : '') + (shown ? ' while shown' : ''))
     if (!closing && shown) dismissed = true
     shown = false
     composing = false
