@@ -40,8 +40,8 @@ const PLACE_KEY = "place"
 global app = {
     place: CITIES[1],
     index: 1,                   ## the city of the list the place comes from, or 0 for a place that was searched
-    weather: nil,               ## the reading of the last answer, nil until there is one
-    status: "loading",          ## loading, ready or failed
+    weather: nil,               ## the reading being shown: nil until there is one, and again after a failure or a change of place
+    status: "loading",          ## loading, ready or failed; a reload of the same place keeps showing the weather while it is out
     message: "",                ## what went wrong, when it failed
     age: 0,                     ## seconds since the weather was asked
     typing: "",                 ## the name being typed, which the text field of the interface edits
@@ -64,6 +64,7 @@ end
 
 func fail(message)
     app.status = "failed"
+    app.weather = nil
     app.message = message
     app.request = nil
 end
@@ -92,7 +93,7 @@ func onForecast(res)
 end
 
 ## Asks the weather of the place. The previous request, if one is still out, is given up: its answer would be for
-## another place.
+## another place. The weather already shown stays on the screen until the answer replaces it, so a reload does not flash.
 func ask()
     stopAsking()
     app.status = "loading"
@@ -182,7 +183,7 @@ end
 ## The keys that WRITE nothing, by name.
 func keyboard.keypressed(key)
     if key == "return" then
-        goTo(app.place, app.index)
+        ask()
     elseif key == "left" then
         step(-1)
     elseif key == "right" then
@@ -198,7 +199,7 @@ func mouse.pressed(x, y)
     elseif x > W * 0.7 then
         step(1)
     else
-        goTo(app.place, app.index)
+        ask()
     end
 end
 
@@ -319,7 +320,7 @@ func draw()
     graphics.font("sans")
     graphics.noStroke()
     var column = math.min(W, H * 0.62)
-    var ready = app.status == "ready" and app.weather
+    var ready = app.weather
     var sky = ready and skyOf(app.weather.code) or nil
     drawSky(sky and SKY[sky.kind] or WAITING)
     var name = app.place.name
