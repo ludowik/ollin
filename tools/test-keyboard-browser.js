@@ -6,7 +6,8 @@
 //    keyboard, the script's show() then lets the keyboard come (inputmode "text"), the text of the element reaches
 //    typed() once and not twice, the iPhone's curly apostrophe arrives straight, backspace and return stay key names,
 //    the tap still reaches mouse.pressed, and hide() gives the focus back.
-// What no emulation can say is whether a real phone raises its keyboard: docs/keyboard-probe.html asked the phones.
+// What no emulation can say is whether a real phone raises its keyboard: that was measured on an iPhone with a probe page
+// (since removed), and the findings are in pg-text-input.js.
 //
 // By hand, like test-https-browser.js (no browser in tests/run.sh):  NODE_PATH=$(npm root -g) node tools/test-keyboard-browser.js
 // The program is served from memory, so nothing is added to docs/samples.

@@ -1,7 +1,7 @@
 // The text a program types, on a phone: keyboard.typed(text), keyboard.show() and keyboard.hide() (src/modules/keyboard_module.cpp).
 //
 // A <canvas> is no text field, so no browser opens its keyboard for one. The page therefore keeps an INVISIBLE
-// contenteditable element, the "sink", and takes the focus for it. Measured on an iPhone (docs/keyboard-probe.html):
+// contenteditable element, the "sink", and takes the focus for it. Measured on an iPhone, with a probe page that has since been removed:
 //  - focus() raises the keyboard only INSIDE the gesture of a tap. The engine learns of a tap one frame later, so a
 //    script's show() could never do it alone;
 //  - an element focused with inputmode="none" takes the focus WITHOUT a keyboard, and setting inputmode="text" on it

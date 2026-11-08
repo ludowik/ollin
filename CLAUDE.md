@@ -1272,8 +1272,8 @@ Ce que le code ne dit pas :
 > API : voir le tutoriel (section « The keyboard module »). Le mécanisme et ses raisons sont en tête de
 > `docs/lib/pg-text-input.js` ; ce qui suit est ce que ce fichier ne dit pas.
 
-- **Mesuré sur un iPhone** (Safari puis Chrome iOS, par `docs/keyboard-probe.html`, qui existe pour être retirée une fois la
-  fonction éprouvée) : `focus()` n'ouvre le clavier que DANS le geste d'un toucher, or le moteur apprend le toucher à l'image
+- **Mesuré sur un iPhone** (Safari puis Chrome iOS, par une page d'essai retirée depuis : elle a servi à poser la question à
+  l'appareil, et ses relevés sont ce qui suit) : `focus()` n'ouvre le clavier que DANS le geste d'un toucher, or le moteur apprend le toucher à l'image
   suivante ; un élément pris avec `inputmode="none"` dans le toucher, puis passé à `"text"` plus tard, ouvre le clavier ET
   garde le focus. Sans `preventDefault` sur `touchstart`/`touchend` du canvas, le clavier s'ouvrait mais l'élément avait
   perdu le focus, donc la saisie n'allait nulle part. iOS remplace aussi `'` par `‘` dans `beforeinput` (la page le redresse).
