@@ -79,9 +79,11 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.4 u
 <p>A game does not receive a tap inside the tap handler: it sees it in its NEXT animation frame. These two boxes ask for the keyboard the same way. On iPhone, the first round showed that this plain request is refused, so tests 8 and 9 below try a trick: take the focus inside a first tap WITHOUT a keyboard, then let the boxes ask for the keyboard later.</p>
 <button id="t8">8 · Arm: focus the contenteditable with inputmode="none"<small>No keyboard expected now. Then tap box 6 or 7: the page switches the inputmode to "text" outside the gesture.</small></button>
 <button id="t9">9 · Arm: focus the input while it is read-only<small>No keyboard expected now. Then tap box 6 or 7: the page removes read-only outside the gesture.</small></button>
+<button id="t10">10 · Touch on the boxes: preventDefault is ON<small>Tap to switch it. ON stops the browser from moving the focus away when the box is touched.</small></button>
 <div id="stage6" class="stage">6 · tap here: asked in the next animation frame</div>
 <div id="stage7" class="stage">7 · tap here: asked by setTimeout(0)</div>
 <p id="armed">Nothing armed: the boxes just call focus().</p>
+<p>After a box has raised the keyboard, <b>type a few letters</b>: the text must show up under “What the page received”. A keyboard that is up while the element has lost the focus is of no use.</p>
 
 <button id="hide">Hide the keyboard (blur everything)</button>
 <button id="copy" class="primary">Copy the report<small id="copyState">Then paste it into the chat.</small></button>
@@ -105,6 +107,7 @@ let typed = ''
 let composing = false
 let t0 = performance.now()
 let armed = null
+let blockTouch = true
 const results = []
 
 function stamp() {
@@ -212,17 +215,24 @@ function arm(kind) {
   measure('arm: ' + armed.label + ' (no keyboard expected)', start, armed.el, false)
 }
 
-// What a game's show() would be: called OUTSIDE the tap, one frame or more after it.
+// What a game's show() would be: called OUTSIDE the tap, one frame or more after it. The element is focused again right
+// after the release, because changing the attribute of a focused element may make the browser drop its focus.
 function ask(how) {
   if (!armed) {
     focusSink('contenteditable', how)
     return
   }
+  const el = armed.el
   const start = viewportHeight()
-  const label = 'release ' + armed.label + ' / ' + how
+  const label = 'release ' + armed.label + ' / ' + how + ' / preventDefault ' + (blockTouch ? 'ON' : 'OFF')
   log('TEST ' + label)
   armed.release()
-  measure(label, start, armed.el, true)
+  log('right after the release: focused=' + (document.activeElement === el ? 'yes' : 'NO'))
+  if (document.activeElement !== el) {
+    el.focus({ preventScroll: true })
+    log('focus() called again: focused=' + (document.activeElement === el ? 'yes' : 'NO'))
+  }
+  measure(label, start, el, true)
 }
 
 // ── the tests ────────────────────────────────────────────────────────────────────────────────────────
@@ -234,6 +244,11 @@ $('t4').addEventListener('click', () => {
   setArmed(null)
   log('TEST contenteditable / 400 ms after the tap: waiting')
   setTimeout(() => focusSink('contenteditable', '400 ms after the tap'), 400)
+})
+$('t10').addEventListener('click', () => {
+  blockTouch = !blockTouch
+  $('t10').firstChild.textContent = '10 · Touch on the boxes: preventDefault is ' + (blockTouch ? 'ON' : 'OFF')
+  log('preventDefault on the boxes: ' + (blockTouch ? 'ON' : 'OFF'))
 })
 $('t8').addEventListener('click', () => arm('inputmode'))
 $('t9').addEventListener('click', () => arm('readonly'))
@@ -257,8 +272,11 @@ $('stage6').addEventListener('pointerup', () => {
   log('box 6 tapped (pointerup)')
   requestAnimationFrame(() => ask('next animation frame after pointerup'))
 })
-$('stage7').addEventListener('click', () => {
-  log('box 7 tapped (click)')
+for (const id of ['stage6', 'stage7']) {
+  $(id).addEventListener('touchstart', (e) => { if (blockTouch) e.preventDefault() }, { passive: false })
+}
+$('stage7').addEventListener('pointerup', () => {
+  log('box 7 tapped (pointerup)')
   setTimeout(() => ask('setTimeout(0) after click'), 0)
 })
 
