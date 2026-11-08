@@ -1,6 +1,7 @@
 ## Typing text: keyboard.typed(text) gives what the keys WROTE (a capital, an accent, a hyphen), and keyboard.show() /
 ## keyboard.hide() raise and lower the keyboard of a phone, which a canvas cannot raise by itself. On a computer the
 ## physical keyboard needs no show(). Tap the box to type, tap elsewhere to stop; return and backspace come as key names.
+## For a ready-made field, see ui.textField (the "Text field" example): it does all of this, drawing included.
 
 global text = ""
 global editing = false

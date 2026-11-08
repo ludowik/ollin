@@ -1,9 +1,9 @@
 ## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the
 ## https and json modules. Left and right (the keys, or a tap on either side of the screen) change the city; a tap in
-## the middle asks again. A name is looked up from the magnifier, or by typing: the field that opens takes what the
-## keyboard of the system writes (keyboard.typed), the one of a phone included (keyboard.show), so the accents, the
-## hyphen and the apostrophe of a name come as the system makes them. The weather is asked again every ten minutes on its
-## own. The place is kept from one run to the next.
+## the middle asks again. A name is looked up from the magnifier, or by typing: both open the text field of the engine's
+## interface (ui.textField), which takes the keyboard of the system, the one of a phone included, so the accents, the
+## hyphen and the apostrophe of a name come as the system makes them. Return or a touch elsewhere looks the name up. The
+## weather is asked again every ten minutes on its own. The place is kept from one run to the next.
 ##
 ## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
 ## so the screen says "loading" until then. forecast.ol holds the addresses and the reading of the answers, and
@@ -11,7 +11,6 @@
 ## browser, and only from it: elsewhere every request fails with "unsupported", which the screen reports.
 
 import "forecast.ol"
-import "typing.ol"
 import "../lib/draw.ol"
 
 const CITIES = [
@@ -45,8 +44,7 @@ global app = {
     status: "loading",          ## loading, ready or failed
     message: "",                ## what went wrong, when it failed
     age: 0,                     ## seconds since the weather was asked
-    typing: "",                 ## the name being typed
-    searching: false,           ## the field of the search is open
+    typing: "",                 ## the name being typed, which the text field of the interface edits
     request: nil
 }
 
@@ -139,35 +137,28 @@ func step(by)
     goTo(CITIES[i], i)
 end
 
-func openSearch()
-    app.searching = true
+## The name is edited by the engine's text field, which owns the keyboard while it is open and calls this when the name is
+## validated. An empty name only closes the interface.
+func lookUp(name)
     app.typing = ""
-    keyboard.show()
-end
-
-func closeSearch()
-    app.searching = false
-    app.typing = ""
-    keyboard.hide()
-end
-
-func eraseChar()
-    app.typing = eraseLast(app.typing)
-end
-
-## Looks the name up and closes the field. An empty name only closes it.
-func submitSearch()
-    var name = string.trim(app.typing)
-    closeSearch()
+    ui.close()
+    name = string.trim(name)
     if name <> "" then
         search(name)
     end
 end
 
-## The search button, in the corner of the title row.
+global searchField = ui.textField("City", ref app.typing, 30, "Type a city name", lookUp)
+
+func openSearch()
+    app.typing = ""
+    searchField.edit()
+end
+
+## The search button, in the title row, left of the handle of the interface (the three bars the engine keeps in the corner).
 func searchButton()
     var r = math.max(math.min(W, H) * 0.045, 16)
-    return {x: W - r * 1.7, y: H * 0.07, r: r}
+    return {x: W - H * 0.054 - r * 1.6, y: H * 0.07, r: r}
 end
 
 func onSearchButton(x, y)
@@ -178,32 +169,20 @@ end
 
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
-## What the keys WRITE: the name, whatever the keyboard. A text typed while no search is open opens it, as typing a letter
-## always did, unless it is only spaces.
+## A text typed while the field is closed opens it with that text, as typing a letter always did, unless it is only spaces.
+## Once it is open the field takes the keys itself: neither typed nor keypressed is called.
 func keyboard.typed(chars)
-    if not app.searching then
-        if string.trim(chars) == "" then
-            return
-        end
-        openSearch()
+    if string.trim(chars) == "" then
+        return
     end
-    app.typing = appendText(app.typing, chars)
+    app.typing = string.substr(chars, 1, 30)
+    searchField.edit()
 end
 
 ## The keys that WRITE nothing, by name.
 func keyboard.keypressed(key)
     if key == "return" then
-        if app.searching then
-            submitSearch()
-        else
-            goTo(app.place, app.index)
-        end
-    elseif key == "escape" then
-        closeSearch()
-    elseif app.searching then
-        if key == "backspace" then
-            eraseChar()
-        end
+        goTo(app.place, app.index)
     elseif key == "left" then
         step(-1)
     elseif key == "right" then
@@ -211,23 +190,8 @@ func keyboard.keypressed(key)
     end
 end
 
-## A press while the search is open: the button looks the name up, the field asks for the keyboard again (the user may
-## have put it away), and anywhere else gives the search up.
-func pressSearch(x, y)
-    var layout = searchLayout(W, H)
-    if within(layout.go, x, y) then
-        submitSearch()
-    elseif within(layout.field, x, y) then
-        keyboard.show()
-    else
-        closeSearch()
-    end
-end
-
 func mouse.pressed(x, y)
-    if app.searching then
-        pressSearch(x, y)
-    elseif onSearchButton(x, y) then
+    if onSearchButton(x, y) then
         openSearch()
     elseif x < W * 0.3 then
         step(-1)
@@ -322,8 +286,6 @@ func drawIcon(kind, x, y, r)
 end
 
 const WHITE = [1, 1, 1, 1]
-const GO_FILL = [0.45, 0.78, 1, 1]
-const GO_INK = [0.05, 0.1, 0.22, 1]
 
 ## The magnifier that opens the search.
 func drawSearchButton()
@@ -336,30 +298,6 @@ func drawSearchButton()
     graphics.circle(b.x - b.r * 0.1, b.y - b.r * 0.1, b.r * 0.38)
     graphics.line(b.x + b.r * 0.18, b.y + b.r * 0.18, b.x + b.r * 0.5, b.y + b.r * 0.5)
     graphics.noStroke()
-end
-
-## The open search: the weather dimmed, the name being typed and the button that looks it up.
-func drawSearch()
-    var layout = searchLayout(W, H)
-    var field = layout.field
-    var go = layout.go
-    fillC([0, 0, 0, 1], 0.55)
-    graphics.rect(0, 0, W, H)
-    fillC(WHITE, 0.2)
-    graphics.rect(field.x, field.y, field.w, field.h, layout.radius)
-    var inset = field.h * 0.3
-    if app.typing == "" then
-        drawText("Type a city name", field.x + inset, field.y + field.h / 2, field.h * 0.42, "left", "center", WHITE, 0.55)
-    else
-        var shown = app.typing + (math.frac(elapsedTime) < 0.5 and "_" or " ")
-        drawText(shown, field.x + inset, field.y + field.h / 2, fitSize(shown, field.h * 0.55, field.w - 2 * inset),
-                 "left", "center", WHITE)
-    end
-    fillC(GO_FILL)
-    graphics.rect(go.x, go.y, go.w, go.h, layout.radius)
-    drawText("Search", go.x + go.w / 2, go.y + go.h / 2, fitSize("Search", field.h * 0.45, go.w * 0.85), "center", "center", GO_INK)
-    var hint = "Enter looks it up, touch outside to cancel"
-    drawText(hint, CX, layout.hintY, fitSize(hint, field.h * 0.32, field.w + go.w), "center", "center", WHITE, 0.75)
 end
 
 func drawForecast(x, y, w, h)
@@ -388,7 +326,8 @@ func draw()
     if app.place.country <> "" then
         name = "{name}, {app.place.country}"
     end
-    var room = math.min(column * 0.95, W - 5 * searchButton().r)       ## the magnifier takes a corner, and the title is centred
+    var button = searchButton()
+    var room = math.min(column * 0.95, 2 * (button.x - 1.4 * button.r - CX))       ## the magnifier and the handle take the right, and the title is centred
     drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
     if ready then
         drawIcon(sky.kind, CX, H * 0.22, column * 0.14)
@@ -406,11 +345,7 @@ func draw()
     end
     var hint = "< >  another city      type a name, or touch the magnifier"
     drawText(hint, CX, H * 0.95, fitSize(hint, column * 0.04, column * 0.95), "center", "center", WHITE, 0.7)
-    if app.searching then
-        drawSearch()
-    else
-        drawSearchButton()
-    end
+    drawSearchButton()
 end
 
 func update(dt)

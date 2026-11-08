@@ -2494,7 +2494,7 @@ ui.slider(<span class="str">"Speed"</span>, <span class="kw">ref</span> speed, <
 <pre><code><span class="kw">global</span> name = <span class="kw">nil</span>
 ui.textField(<span class="str">"Name"</span>, <span class="kw">ref</span> name, <span class="num">20</span>, <span class="str">"your name"</span>, <span class="kw">func</span>(text) print(<span class="str">"hello {text}"</span>) <span class="kw">end</span>)
 ui.open()</code></pre>
-<p><code>field.edit()</code> starts the edit from the script, unfolding the interface on the menu that holds the field. On a phone the keyboard only comes if a tap is going on, so call it from a tap handler, not from <code>setup()</code>.</p>
+<p>The <em>Text field (ui)</em> example is the smallest program that uses it. <code>field.edit()</code> starts the edit from the script, unfolding the interface on the menu that holds the field. On a phone the keyboard only comes if a tap is going on, so call it from a tap handler, not from <code>setup()</code>.</p>
 
 <h3>Lists</h3>
 <p>A list chooses <strong>one</strong> item among several. Its source is an <strong>array</strong>, a <strong>map</strong> or an <strong>enum</strong>, and the display rule is that of <code><span class="kw">for</span> … <span class="kw">in</span></code>: an array gives its <strong>values</strong>, a map or an enum its <strong>keys</strong>. The bound variable receives exactly what is shown — the value for an array, the key for a map or an enum.</p>
