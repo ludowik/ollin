@@ -54,7 +54,7 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.4 u
 </head>
 <body>
 <h1>Keyboard probe</h1>
-<p>Does a page of ours get the system keyboard of a phone WITHOUT any visible text field? Tap each test, say whether the keyboard came up, then type <b>é</b>, <b>-</b>, <b>'</b> and a few letters. The log at the bottom records what the page saw: send it back with “Copy the report”.</p>
+<p>Does a page of ours get the system keyboard of a phone WITHOUT any visible text field? Tap each test and say whether the keyboard came up. When it does, type <b>é</b> (hold the e key), <b>-</b>, <b>'</b>, a few letters and a Backspace. The log at the bottom records what the page saw: send it back with “Copy the report”.</p>
 
 <h2>Your device</h2>
 <div class="card"><pre id="device"></pre></div>
@@ -76,9 +76,12 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.4 u
 <button id="t5">5 · contenteditable + navigator.virtualKeyboard.show()<small>The VirtualKeyboard API, where it exists (Chrome on Android).</small></button>
 
 <h2>The way the engine would do it</h2>
-<p>A game does not receive a tap inside the tap handler: it sees it in its NEXT animation frame. These two boxes ask for the focus the same way, from the contenteditable.</p>
-<div id="stage6" class="stage">6 · tap here: focus requested in the next animation frame</div>
-<div id="stage7" class="stage">7 · tap here: focus requested by setTimeout(0)</div>
+<p>A game does not receive a tap inside the tap handler: it sees it in its NEXT animation frame. These two boxes ask for the keyboard the same way. On iPhone, the first round showed that this plain request is refused, so tests 8 and 9 below try a trick: take the focus inside a first tap WITHOUT a keyboard, then let the boxes ask for the keyboard later.</p>
+<button id="t8">8 · Arm: focus the contenteditable with inputmode="none"<small>No keyboard expected now. Then tap box 6 or 7: the page switches the inputmode to "text" outside the gesture.</small></button>
+<button id="t9">9 · Arm: focus the input while it is read-only<small>No keyboard expected now. Then tap box 6 or 7: the page removes read-only outside the gesture.</small></button>
+<div id="stage6" class="stage">6 · tap here: asked in the next animation frame</div>
+<div id="stage7" class="stage">7 · tap here: asked by setTimeout(0)</div>
+<p id="armed">Nothing armed: the boxes just call focus().</p>
 
 <button id="hide">Hide the keyboard (blur everything)</button>
 <button id="copy" class="primary">Copy the report<small id="copyState">Then paste it into the chat.</small></button>
@@ -100,9 +103,8 @@ const statusEl = $('status')
 const lines = []
 let typed = ''
 let composing = false
-let current = 'none'
 let t0 = performance.now()
-let heightAtStart = 0
+let armed = null
 const results = []
 
 function stamp() {
@@ -156,40 +158,87 @@ function blurAll() {
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur()
 }
 
-// Gives the focus to a sink, then reports after a short wait whether the page now believes it has the focus and
-// whether the viewport shrank (which is what a software keyboard does).
+// After a short wait, reports whether the page believes it has the focus and whether the viewport shrank (which is what
+// a software keyboard does). The label and the starting height are the test's own: two tests may overlap.
+function measure(label, startHeight, el, expectKeyboard) {
+  setTimeout(() => {
+    const focused = document.activeElement === el
+    const now = viewportHeight()
+    const shrunk = startHeight - now
+    const up = shrunk > 80
+    log('RESULT ' + label + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport height ' + startHeight + ' -> ' + now +
+        (up ? ' (shrank by ' + shrunk + ': a keyboard is probably up)' : ' (no real change: the keyboard is probably NOT up)'))
+    results.push(label + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport ' + startHeight + ' -> ' + now + (up ? ', KEYBOARD' : ', no keyboard'))
+    say(label + ': ' + (focused ? 'focused' : 'focus refused') + (up ? ', keyboard probably shown' : ', no keyboard seen by the viewport (check the screen yourself)'),
+        expectKeyboard === (up && focused) ? 'good' : 'bad')
+  }, 700)
+}
+
 function focusSink(name, how) {
   const el = sinks[name]
-  current = name + ' / ' + how
-  heightAtStart = viewportHeight()
-  log('TEST ' + current + ': focus() called, viewport height ' + heightAtStart)
+  const label = name + ' / ' + how
+  const start = viewportHeight()
+  log('TEST ' + label + ': focus() called, viewport height ' + start)
   try {
     el.focus({ preventScroll: true })
   } catch (e) {
     log('focus() threw: ' + e.message)
   }
-  setTimeout(() => {
-    const focused = document.activeElement === el
-    const now = viewportHeight()
-    const shrunk = heightAtStart - now
-    log('RESULT ' + current + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport height ' + heightAtStart + ' -> ' + now +
-        (shrunk > 80 ? ' (shrank by ' + shrunk + ': a keyboard is probably up)' : ' (no real change: the keyboard is probably NOT up)'))
-    results.push(current + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport ' + heightAtStart + ' -> ' + now)
-    say(current + ': ' + (focused ? 'focused' : 'focus refused') + (shrunk > 80 ? ', keyboard probably shown' : ', no keyboard seen by the viewport (check the screen yourself)'),
-        focused && shrunk > 80 ? 'good' : 'bad')
-  }, 700)
+  measure(label, start, el, true)
+}
+
+function setArmed(value) {
+  armed = value
+  $('armed').textContent = value ? 'Armed: ' + value.label + '. Tap box 6 or 7.' : 'Nothing armed: the boxes just call focus().'
+}
+
+// Takes the focus inside the tap, without a keyboard (that is the part to be checked), and remembers how to let the
+// keyboard come later.
+function arm(kind) {
+  blurAll()
+  const start = viewportHeight()
+  if (kind === 'inputmode') {
+    const el = sinks.contenteditable
+    el.inputMode = 'none'
+    el.focus({ preventScroll: true })
+    setArmed({ label: 'contenteditable with inputmode="none"', el, release: () => { el.inputMode = 'text' } })
+  } else {
+    const el = sinks.input
+    el.readOnly = true
+    el.focus({ preventScroll: true })
+    setArmed({ label: 'input while read-only', el, release: () => { el.readOnly = false } })
+  }
+  log('ARM ' + armed.label + ': focus() called inside the tap')
+  measure('arm: ' + armed.label + ' (no keyboard expected)', start, armed.el, false)
+}
+
+// What a game's show() would be: called OUTSIDE the tap, one frame or more after it.
+function ask(how) {
+  if (!armed) {
+    focusSink('contenteditable', how)
+    return
+  }
+  const start = viewportHeight()
+  const label = 'release ' + armed.label + ' / ' + how
+  log('TEST ' + label)
+  armed.release()
+  measure(label, start, armed.el, true)
 }
 
 // ── the tests ────────────────────────────────────────────────────────────────────────────────────────
 
-$('t1').addEventListener('click', () => focusSink('contenteditable', 'inside the tap'))
-$('t2').addEventListener('click', () => focusSink('input', 'inside the tap'))
-$('t3').addEventListener('click', () => focusSink('textarea', 'inside the tap'))
+$('t1').addEventListener('click', () => { setArmed(null); focusSink('contenteditable', 'inside the tap') })
+$('t2').addEventListener('click', () => { setArmed(null); focusSink('input', 'inside the tap') })
+$('t3').addEventListener('click', () => { setArmed(null); focusSink('textarea', 'inside the tap') })
 $('t4').addEventListener('click', () => {
+  setArmed(null)
   log('TEST contenteditable / 400 ms after the tap: waiting')
   setTimeout(() => focusSink('contenteditable', '400 ms after the tap'), 400)
 })
+$('t8').addEventListener('click', () => arm('inputmode'))
+$('t9').addEventListener('click', () => arm('readonly'))
 $('t5').addEventListener('click', () => {
+  setArmed(null)
   focusSink('contenteditable', 'inside the tap + VirtualKeyboard.show()')
   if ('virtualKeyboard' in navigator) {
     try {
@@ -206,14 +255,15 @@ $('t5').addEventListener('click', () => {
 // The engine's way: the tap is noticed inside the handler, but the script reacts one frame later.
 $('stage6').addEventListener('pointerup', () => {
   log('box 6 tapped (pointerup)')
-  requestAnimationFrame(() => focusSink('contenteditable', 'next animation frame after pointerup'))
+  requestAnimationFrame(() => ask('next animation frame after pointerup'))
 })
 $('stage7').addEventListener('click', () => {
   log('box 7 tapped (click)')
-  setTimeout(() => focusSink('contenteditable', 'setTimeout(0) after click'), 0)
+  setTimeout(() => ask('setTimeout(0) after click'), 0)
 })
 
 $('hide').addEventListener('click', () => {
+  setArmed(null)
   blurAll()
   log('blurAll() called')
   say('Blurred. The keyboard should close.', '')
