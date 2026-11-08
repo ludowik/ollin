@@ -81,7 +81,6 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.4 u
 <div id="stage7" class="stage">7 · tap here: focus requested by setTimeout(0)</div>
 
 <button id="hide">Hide the keyboard (blur everything)</button>
-<button id="clear">Clear the text and the log</button>
 <button id="copy" class="primary">Copy the report<small id="copyState">Then paste it into the chat.</small></button>
 
 <h2>Log</h2>
@@ -104,6 +103,7 @@ let composing = false
 let current = 'none'
 let t0 = performance.now()
 let heightAtStart = 0
+const results = []
 
 function stamp() {
   return ((performance.now() - t0) / 1000).toFixed(2).padStart(6, ' ') + 's'
@@ -174,6 +174,7 @@ function focusSink(name, how) {
     const shrunk = heightAtStart - now
     log('RESULT ' + current + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport height ' + heightAtStart + ' -> ' + now +
         (shrunk > 80 ? ' (shrank by ' + shrunk + ': a keyboard is probably up)' : ' (no real change: the keyboard is probably NOT up)'))
+    results.push(current + ': focused=' + (focused ? 'yes' : 'NO') + ', viewport ' + heightAtStart + ' -> ' + now)
     say(current + ': ' + (focused ? 'focused' : 'focus refused') + (shrunk > 80 ? ', keyboard probably shown' : ', no keyboard seen by the viewport (check the screen yourself)'),
         focused && shrunk > 80 ? 'good' : 'bad')
   }, 700)
@@ -217,16 +218,9 @@ $('hide').addEventListener('click', () => {
   log('blurAll() called')
   say('Blurred. The keyboard should close.', '')
 })
-$('clear').addEventListener('click', () => {
-  typed = ''
-  showTyped()
-  lines.length = 0
-  logEl.textContent = ''
-  t0 = performance.now()
-  say('Cleared.', '')
-})
 $('copy').addEventListener('click', async () => {
-  const report = describeDevice() + '\n\ntyped: ' + JSON.stringify(typed) + '\n\n' + lines.join('\n')
+  const summary = results.length ? results.join('\n') : '(no test run yet: no test button was tapped)'
+  const report = describeDevice() + '\n\nSUMMARY\n' + summary + '\n\ntyped: ' + JSON.stringify(typed) + '\n\nLOG\n' + lines.join('\n')
   try {
     await navigator.clipboard.writeText(report)
     $('copyState').textContent = 'Copied. Paste it into the chat.'
