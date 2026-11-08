@@ -1284,6 +1284,18 @@ Ce que le code ne dit pas :
   test enregistre l'événement en cours (`window.event`) à chaque `focus()` de l'élément, seul moyen de le voir.
 - ⚠ **Non vérifié sur Android**, ni l'armement ni le changement d'`inputmode` ; **Safari** n'a été essayé que sur les
   tests simples. L'émulation de Chromium ne dit pas si un vrai clavier apparaît : elle prouve la logique, pas l'appareil.
+- **`ui.textField` prend le clavier à son compte** (`ui_editing`, `ui_module.h`) : `keyboard_poll` passe avant `ui_poll`, lui
+  remet le texte et les noms de touche (`ui_edit_text`, `ui_edit_key`) et n'appelle NI `typed` NI `keypressed` (ni, plus tard, le
+  relâchement de ces touches : `s_down` n'est pas posé) ; `isDown` répond faux. Un champ suffit à `wanted` (`ui_wants_text`).
+  **Décisions de l'utilisateur** : la variable n'est écrite qu'à la VALIDATION (brouillon dans le module), un toucher ailleurs
+  valide ET est consommé, Échap annule ; plier l'interface, changer de menu ou retirer le champ termine l'édition SANS écrire
+  (`edit_on_display`, revérifiée à chaque image par `ui_editing`). Piège connu : l'ordre entre texte et touches d'une même image
+  est perdu ; un champ traite le TEXTE d'abord (« abc » puis Entrée ne valide pas un brouillon vide), donc « a » puis Retour
+  arrière tapés en moins de 16 ms laissent le « a ». Non couvert, faute
+  d'appareil : une zone qui rétrécit quand le clavier monte (`graphics.fitArea`) rétrécit aussi l'interface ; les mesures ne sont
+  pas figées pendant l'édition. `field.edit()` appelé hors d'un toucher n'ouvre pas le clavier d'un téléphone (même raison que
+  `show()`). Logique d'édition pure dans `src/ui_text_edit.h` (test unitaire) ; le texte frappé se vérifie au navigateur
+  (`tools/test-keyboard-browser.js`), les touches ne s'injectant pas sous Xvfb.
 - **Une seule source de texte à la fois** : quand l'élément de la page a le focus, le moteur lit son texte et VIDE la file de
   raylib (qui voit les mêmes touches) — lire les deux donnait chaque caractère deux fois (mutation vérifiée : `[xx]`).
 - ⚠ **Au harnais, `page.touchscreen.tap` est trop court** : toucher et lever dans la même image, que le moteur ne voit jamais

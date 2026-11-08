@@ -42,6 +42,12 @@ int stub_list(CallCtx& ctx) {
     return ctx.ret(make_inert());
 }
 
+int stub_text_field(CallCtx& ctx) {
+    ui_check_text_field_args(ctx.args + 1, ctx.argc - 1);
+    ui_text_init(ctx.args[2]);
+    return ctx.ret(make_inert());
+}
+
 int stub_menu(CallCtx& ctx) {
     ui_check_menu_args(ctx.args + 1, ctx.argc - 1);
     return ctx.ret(make_inert());
@@ -61,8 +67,10 @@ Value make_inert_class() {
         .fn("checkbox", stub_checkbox)
         .fn("slider", stub_slider)
         .fn("list", stub_list)
+        .fn("textField", stub_text_field)
         .fn("menu", stub_menu)
         .fn("open", stub_self)
+        .fn("edit", stub_self)
         .fn("clear", stub_self)
         .fn("remove", nothing)
         .done();
@@ -97,6 +105,12 @@ int module_list(CallCtx& ctx) {
     return ctx.ret(make_inert());
 }
 
+int module_text_field(CallCtx& ctx) {
+    ui_check_text_field_args(ctx.args, ctx.argc);
+    ui_text_init(ctx.args[1]);
+    return ctx.ret(make_inert());
+}
+
 int module_menu(CallCtx& ctx) {
     ui_check_menu_args(ctx.args, ctx.argc);
     return ctx.ret(make_inert());
@@ -114,6 +128,7 @@ Value make_ui_module() {
         .fn("checkbox", module_checkbox)
         .fn("slider", module_slider)
         .fn("list", module_list)
+        .fn("textField", module_text_field)
         .fn("menu", module_menu)
         .fn("show", nothing)
         .fn("open", nothing)

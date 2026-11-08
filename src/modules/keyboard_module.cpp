@@ -1,5 +1,6 @@
 #include "keyboard_module.h"
 #include "module_utils.h"
+#include "ui_module.h"
 #include "value.h"
 #include "vm.h"
 #include <cctype>
@@ -39,6 +40,8 @@ static bool query_blocked() {
 // `text` is the characters the keyboard layout and the system made of the presses of the frame, in UTF-8: an accent,
 // a hyphen, an apostrophe, a capital, a dead key's result. A fast typist or a paste gives several characters in one
 // call. Control characters (return, tab, backspace) are never part of it: they are key names, for keypressed.
+// While a ui text field is edited it takes the text and the control keys instead (ui_editing, ui_module.h), and neither
+// typed nor keypressed is called.
 // On a phone the text comes from an invisible element of the page that holds the focus (docs/lib/pg-text-input.js): the
 // reasons, and what a browser accepts, are written there. On a computer it comes from raylib's character queue.
 //
@@ -105,8 +108,8 @@ static int key_code(std::string name) {
 // keyboard.
 static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (s_blocked)
-        return ctx.ret(Value::make_bool(false));   // the editor has focus, so the game does not read the keyboard
+    if (s_blocked || ui_editing())
+        return ctx.ret(Value::make_bool(false));   // the editor has focus, or a ui text field does: the program does not read the keyboard
     if (argc < 1 || !args[0].is_string())
         return ctx.ret(Value::make_bool(false));
     std::string name = args[0].as_string();
@@ -201,7 +204,7 @@ static HostText host_text(bool wanted) {
     return host;
 }
 
-static int kbd_show(CallCtx& ctx) {
+void keyboard_show() {
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         var t = window.__ollinTextInput;
@@ -209,10 +212,9 @@ static int kbd_show(CallCtx& ctx) {
             t.show();
     });
 #endif
-    return ctx.ret(Value());
 }
 
-static int kbd_hide(CallCtx& ctx) {
+void keyboard_hide() {
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         var t = window.__ollinTextInput;
@@ -220,6 +222,15 @@ static int kbd_hide(CallCtx& ctx) {
             t.hide();
     });
 #endif
+}
+
+static int kbd_show(CallCtx& ctx) {
+    keyboard_show();
+    return ctx.ret(Value());
+}
+
+static int kbd_hide(CallCtx& ctx) {
+    keyboard_hide();
     return ctx.ret(Value());
 }
 
@@ -255,7 +266,7 @@ void keyboard_poll() {
     Value typed;
     if (kbd.is_map())
         typed = kbd.map_get(Value(std::string("typed")));
-    HostText host = host_text(typed.is_callable());
+    HostText host = host_text(typed.is_callable() || ui_wants_text());
     bool want_press = pressed.is_callable();
     bool want_release = released.is_callable();
 
@@ -279,6 +290,17 @@ void keyboard_poll() {
         return;
     }
 
+    // The text of the frame. raylib's queue is drained even without a callback, so that it does not hold what was typed
+    // before the script asked, and even when the page's element is the source: both see the same keys, and reading both
+    // would give every character twice.
+    std::string text = take_typed();
+    if (host.active)
+        text = host.text;
+    // A ui text field takes the text BEFORE the keys of the frame: the order between the two is lost, and "abc" then return
+    // must not validate an empty draft.
+    if (!text.empty() && ui_edit_text(text))
+        text.clear();
+
     // This frame's presses, taken from the key queue, which is robust to timing. We drain it and
     // track the held state even without a keypressed callback, for keyrelease's sake.
     int key;
@@ -287,18 +309,16 @@ void keyboard_poll() {
         std::string name = key_name(key);
         if (name.empty())
             continue;
+        // A ui text field takes the keys while it is edited: the program sees neither the press nor, later, a release.
+        if (ui_edit_key(name))
+            continue;
         if (key >= 0 && key < 512)
             s_down[key] = true;
         if (want_press)
             vm->call_value(pressed, Value(name));
     }
 
-    // The text of the frame, after the presses it came from. raylib's queue is drained even without a callback, so that
-    // it does not hold what was typed before the script asked, and even when the page's element is the source: both see
-    // the same keys, and reading both would give every character twice.
-    std::string text = take_typed();
-    if (host.active)
-        text = host.text;
+    // The script's text comes after the presses it came from.
     if (!text.empty() && typed.is_callable())
         vm->call_value(typed, Value(text));
 

@@ -1,6 +1,8 @@
 #include "ui_module.h"
 #include "graphics_internal.h"
+#include "keyboard_module.h"
 #include "module_utils.h"
+#include "ui_text_edit.h"
 #include "vm.h"
 #include <raylib.h>
 #include "engine_font.h"
@@ -15,6 +17,7 @@
 //
 //   ui.button("Replay", replay)
 //   ui.checkbox("Grid", ref grid [, onChange])
+//   ui.textField("Name", ref name [, maxLength] [, placeholder] [, onSubmit])
 //   var settings = ui.menu("Settings")   -- a container, with the same methods
 //   ui.show(settings)                    -- replaces the global menu on display
 //   ui.back()                            -- goes up one level
@@ -32,21 +35,28 @@
 // pushes, the "<" row pops. An opened list is a level of the stack too — current_menu() can designate
 // a LIST node — and choosing an item pops it.
 //
+// TEXT ENTRY: a click on a text field starts an EDIT. The text typed goes into a draft, not into the variable: return (or a
+// click anywhere else) validates and writes the variable, escape cancels. While editing, keyboard_poll hands the text and
+// the control keys to ui_edit_text / ui_edit_key instead of the script's callbacks (see ui_editing in ui_module.h).
+//
 // The click is handled BEFORE mouse_poll (see ui_poll), so clicking a widget does not also fire the
 // script's mouse.pressed.
 
 namespace {
 
 struct Node {
+    // TEXT_FIELD is the "label  text" row: its text is edited in place.
     // LIST is the "label: selection" row; LIST_ITEM is a row of the opened list, generated at opening
     // time as a child of the LIST node: an ordinary row of the stack, with a round mark of its own
     // and a click that selects it.
-    enum Kind { BUTTON, CHECKBOX, SLIDER, MENU, LIST, LIST_ITEM };
+    enum Kind { BUTTON, CHECKBOX, SLIDER, MENU, LIST, LIST_ITEM, TEXT_FIELD };
     Kind kind = BUTTON;
     std::string label;
     Value action;      // a button: the function called on a click
-    Value target;      // a checkbox, slider or list: the reference (`ref x`) to the bound variable
-    Value on_change;   // a checkbox, slider or list: an optional function called after a change
+    Value target;      // a checkbox, slider, list or text field: the reference (`ref x`) to the bound variable
+    Value on_change;   // a checkbox, slider or list: an optional function called after a change; a text field: called with the text when validated
+    size_t max_chars = 0;      // a text field: the limit in characters, 0 = none
+    std::string placeholder;   // a text field: shown while the text is empty
     double vmin = 0.0;     // slider: the range's bounds
     double vmax = 1.0;
     double vdefault = 0.0; // a slider: the value to use when the bound variable is nil
@@ -77,6 +87,12 @@ Rectangle s_head_box = {0, 0, 0, 0};   // the closed handle, or the open head ro
 // slot alone could have been recycled between two frames.
 int s_drag = -1;
 uint32_t s_drag_gen = 0;
+// The text field being edited, by identity like the slider above, and its draft. -1 = no edit.
+int s_edit = -1;
+uint32_t s_edit_gen = 0;
+std::string s_edit_text;
+int s_text_fields = 0;       // the live text fields: what ui_wants_text answers without a scan, once per frame
+double s_edit_blink = 0.0;   // when the cursor last moved: it shows solid for a moment, then blinks
 
 bool node_alive(int slot, uint32_t gen) {
     return slot >= 0 && slot < (int)s_nodes.size() && s_nodes[slot].alive && s_nodes[slot].gen == gen;
@@ -97,6 +113,8 @@ int alloc_node(Node::Kind kind, const std::string& label, int parent) {
     n.gen = gen;
     n.alive = true;
     n.kind = kind;
+    if (kind == Node::TEXT_FIELD)
+        s_text_fields++;
     n.label = label;
     n.parent = parent;
     if (parent >= 0)
@@ -108,6 +126,8 @@ int alloc_node(Node::Kind kind, const std::string& label, int parent) {
 // released (a removed list must not keep its source alive). `parent` is left alone, so a dead row that a
 // draw loop still holds can read its parent's slot, which is always within the table.
 void kill_node(Node& n) {
+    if (n.alive && n.kind == Node::TEXT_FIELD)
+        s_text_fields--;
     n.alive = false;
     n.gen++;
     n.action = Value{};
@@ -117,6 +137,7 @@ void kill_node(Node& n) {
     n.item = Value{};
     n.children.clear();
     n.label.clear();
+    n.placeholder.clear();
     // The rectangle too: a draw loop interrupted by a script that clears the interface still holds the
     // slots it was about to paint, and a dead row must paint (and hit-test) nothing.
     n.box = {0, 0, 0, 0};
@@ -207,6 +228,8 @@ struct Style {
     float bar_gap_frac;    // the gap between two bars (0.124 × 21.6 is about 2 px of separation
                            // for a 600 px tall area; see metrics)
     float bar_width_frac;  // the bars' width, as a fraction of the square
+    float field_frac;      // the width of a text field's text area, in fonts
+    float cursor_frac;     // the width of the text cursor, as a fraction of the font
 };
 
 const Style STYLE = {
@@ -232,6 +255,8 @@ const Style STYLE = {
     0.105f,                // bar_thick_frac
     0.124f,                // bar_gap_frac
     0.5f,                  // bar_width_frac
+    9.0f,                  // field_frac
+    0.09f,                 // cursor_frac
 };
 
 const char* CHEVRON = ">";
@@ -374,6 +399,8 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
             Value target = s_nodes[slot].target;
             need += m.pad + text_width(list_text(target), m.font);
         }
+        if (kind == Node::TEXT_FIELD)
+            need += m.pad + m.font * STYLE.field_frac;   // fixed, so the stack does not move while one types
         if (need > widest)
             widest = need;
     }
@@ -392,6 +419,47 @@ void toggle_checkbox(const Value& target, const Value& on_change) {
     ref_set(target, state);
     if (on_change.is_callable())
         VM::current()->call_value(on_change, state);
+}
+
+// The text a text field's variable holds. The target is taken by COPY, as everywhere a reference is read.
+std::string text_field_value(const Value& target) {
+    Value v = ref_get(target);
+    return v.is_string() ? v.as_string() : std::string();
+}
+
+void end_edit() {
+    s_edit = -1;
+    s_edit_text.clear();
+    keyboard_hide();
+}
+
+// An edit lasts only while its field is on display: removed, the interface folded or another menu shown ends it.
+bool edit_on_display() {
+    return s_edit >= 0 && node_alive(s_edit, s_edit_gen) && s_open && s_nodes[s_edit].parent == current_menu();
+}
+
+void begin_edit(int slot) {
+    Value target = s_nodes[slot].target;
+    uint32_t gen = s_nodes[slot].gen;
+    std::string text = text_field_value(target);   // runs script code, which can remove the field
+    if (!node_alive(slot, gen))
+        return;
+    s_edit = slot;
+    s_edit_gen = gen;
+    s_edit_text = text;
+    s_edit_blink = GetTime();
+    keyboard_show();
+}
+
+// Writes the draft to the variable, then notifies. The edit ends FIRST: the callback can start another one.
+void commit_edit() {
+    Value target = s_nodes[s_edit].target;
+    Value on_submit = s_nodes[s_edit].on_change;
+    Value text(s_edit_text);
+    end_edit();
+    ref_set(target, text);
+    if (on_submit.is_callable())
+        VM::current()->call_value(on_submit, text);
 }
 
 } // namespace
@@ -474,6 +542,21 @@ static int add_list(CallCtx& ctx, const Value* args, int argc, Value parent_menu
     return ctx.ret(make_handle(slot));
 }
 
+static int add_text_field(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
+    ui_check_text_field_args(args, argc);
+    std::string label = args[0].as_string();
+    Value target = args[1];
+    UiTextFieldOptions options = ui_text_field_options(args, argc);
+    ui_text_init(target);   // calls the script (getter/setter), hence BEFORE allocating the node
+    int slot = alloc_node(Node::TEXT_FIELD, label, resolve_parent(parent_menu, fn));
+    Node& n = s_nodes[slot];
+    n.target = target;
+    n.on_change = options.on_submit;
+    n.max_chars = options.max_chars;
+    n.placeholder = options.placeholder;
+    return ctx.ret(make_handle(slot));
+}
+
 static int add_menu(CallCtx& ctx, const Value* args, int argc, Value parent_menu, const char* fn) {
     ui_check_menu_args(args, argc);
     std::string label = args[0].as_string();
@@ -495,6 +578,10 @@ static int ui_slider(CallCtx& ctx) {
 
 static int ui_list(CallCtx& ctx) {
     return add_list(ctx, ctx.args, ctx.argc, Value{}, "ui.list");
+}
+
+static int ui_text_field(CallCtx& ctx) {
+    return add_text_field(ctx, ctx.args, ctx.argc, Value{}, "ui.textField");
 }
 
 static int ui_menu(CallCtx& ctx) {
@@ -523,6 +610,11 @@ static int menu_list(CallCtx& ctx) {
     return add_list(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.list");
 }
 
+static int menu_text_field(CallCtx& ctx) {
+    menu_slot(ctx.args[0], "menu.textField");
+    return add_text_field(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.textField");
+}
+
 static int menu_menu(CallCtx& ctx) {
     menu_slot(ctx.args[0], "menu.menu");
     return add_menu(ctx, ctx.args + 1, ctx.argc - 1, ctx.args[0], "menu.menu");
@@ -542,6 +634,22 @@ static int menu_open(CallCtx& ctx) {
     } else {
         throw std::runtime_error("menu.open: this ui element is neither a menu nor a list");
     }
+    return ctx.ret(self);
+}
+
+// field.edit() starts editing this field, unfolding the interface on the menu that holds it. On a phone the keyboard
+// only comes if a tap is going on (see docs/lib/pg-text-input.js): from a click callback, not from setup().
+static int field_edit(CallCtx& ctx) {
+    Value self = ctx.args[0];
+    int slot = handle_slot(self, "field.edit");
+    if (s_nodes[slot].kind != Node::TEXT_FIELD)
+        throw std::runtime_error("field.edit: this ui element is not a text field");
+    std::vector<int> chain;
+    for (int p = s_nodes[slot].parent; p >= 0; p = s_nodes[p].parent)
+        chain.push_back(p);
+    s_nav.assign(chain.rbegin(), chain.rend());
+    s_open = true;
+    begin_edit(slot);
     return ctx.ret(self);
 }
 
@@ -636,8 +744,10 @@ Value make_element_class() {
         .fn("checkbox", menu_checkbox)
         .fn("slider", menu_slider)
         .fn("list", menu_list)
+        .fn("textField", menu_text_field)
         .fn("menu", menu_menu)
         .fn("open", menu_open)
+        .fn("edit", field_edit)
         .fn("clear", menu_clear)
         .fn("remove", element_remove)
         .done();
@@ -667,6 +777,8 @@ void ui_reset() {
     s_head_box = {0, 0, 0, 0};
     s_open = false;
     s_drag = -1;
+    if (s_edit >= 0)
+        end_edit();
 }
 
 namespace {
@@ -726,6 +838,7 @@ void draw_text_at(const std::string& text, float x, const Rectangle& rect, const
 void ui_draw() {
     if (s_nodes.empty())
         return;
+    ui_editing();   // ends an edit whose field is no longer on display, so it is not drawn as edited
     std::vector<int> rows = s_nodes[current_menu()].children;
     if (rows.empty() && s_nav.size() < 2) {
         // An empty interface: not even a handle, and above all no leftover clickable area, since the
@@ -787,6 +900,27 @@ void ui_draw() {
             std::string vtext = list_text(target);
             float vw = text_width(vtext, m.font);
             draw_text_at(vtext, rect.x + rect.width - m.pad - vw, rect, m, STYLE.text_dim);
+        }
+        if (kind == Node::TEXT_FIELD) {
+            std::string placeholder = s_nodes[slot].placeholder;
+            bool editing = slot == s_edit;
+            std::string text = editing ? s_edit_text : text_field_value(target);
+            // The text sits on the right, like a slider's value; a long one shows its end, where the cursor is.
+            float cursor_w = m.font * STYLE.cursor_frac;
+            float right_edge = rect.x + rect.width - m.pad - (editing ? cursor_w + m.pad * 0.25f : 0.0f);
+            float avail = rect.width - 3.0f * m.pad - text_width(label, m.font) - (editing ? cursor_w : 0.0f);
+            bool placeheld = text.empty() && !editing;
+            std::string shown = placeheld ? placeholder : text;
+            shown = text_edit_tail(shown, [&](const std::string& t) { return text_width(t, m.font) <= avail; });
+            float vw = text_width(shown, m.font);
+            draw_text_at(shown, right_edge - vw, rect, m, placeheld ? STYLE.text_dim : STYLE.text);
+            if (editing) {
+                DrawRectangleRoundedLinesEx(rect, STYLE.round, 8, STYLE.border_thick * 2.0f, STYLE.accent);
+                if (std::fmod(GetTime() - s_edit_blink, 1.0) < 0.6) {
+                    float ch = m.font * 1.1f;
+                    DrawRectangleRec({right_edge + m.pad * 0.25f, rect.y + (rect.height - ch) * 0.5f, cursor_w, ch}, STYLE.text);
+                }
+            }
         }
         if (kind == Node::CHECKBOX) {
             // The label on the left, at the same abscissa as a button's, and the square on the
@@ -898,6 +1032,13 @@ bool ui_poll() {
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         return false;
     Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
+    if (ui_editing()) {
+        // A click on the field being edited goes on editing; anywhere else it validates. Either way it is consumed,
+        // or ending an edit would also press whatever lies under the finger.
+        if (!CheckCollisionPointRec(p, s_nodes[s_edit].box))
+            commit_edit();
+        return true;
+    }
     // The rectangles come from the last frame drawn, so what one sees is what one clicks. Before the
     // first frame no row has a box, and therefore no click lands.
     if (CheckCollisionPointRec(p, s_head_box)) {
@@ -933,6 +1074,8 @@ bool ui_poll() {
             poll_drag();
         } else if (kind == Node::LIST) {
             open_list(slot);
+        } else if (kind == Node::TEXT_FIELD) {
+            begin_edit(slot);
         } else if (kind == Node::LIST_ITEM) {
             Value item = s_nodes[slot].item;
             int list_slot = s_nodes[slot].parent;
@@ -950,12 +1093,49 @@ bool ui_poll() {
     return false;
 }
 
+bool ui_editing() {
+    if (s_edit < 0)
+        return false;
+    if (!edit_on_display()) {
+        end_edit();
+        return false;
+    }
+    return true;
+}
+
+bool ui_wants_text() {
+    return s_text_fields > 0;
+}
+
+bool ui_edit_text(const std::string& text) {
+    if (!ui_editing())
+        return false;
+    if (text_edit_append(s_edit_text, text, s_nodes[s_edit].max_chars))
+        s_edit_blink = GetTime();
+    return true;
+}
+
+bool ui_edit_key(const std::string& name) {
+    if (!ui_editing())
+        return false;
+    if (name == "return") {
+        commit_edit();
+    } else if (name == "escape") {
+        end_edit();
+    } else if (name == "backspace") {
+        if (text_edit_erase_last(s_edit_text))
+            s_edit_blink = GetTime();
+    }
+    return true;
+}
+
 Value make_ui_module() {
     return MapBuilder()
         .fn("button", ui_button)
         .fn("checkbox", ui_checkbox)
         .fn("slider", ui_slider)
         .fn("list", ui_list)
+        .fn("textField", ui_text_field)
         .fn("menu", ui_menu)
         .fn("show", ui_show)
         .fn("open", ui_open)

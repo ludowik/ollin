@@ -392,6 +392,45 @@ check_error "menu.list without a reference" \
 ui.menu("Palette").list("Colour", ["red"], v)' \
     "reference"
 
+check_error "ui.textField without a reference" \
+    'global v = ""
+ui.textField("Name", v)' \
+    "must be a reference"
+
+check_error "ui.textField without a variable" \
+    'ui.textField("Name")' \
+    "expected label, ref variable"
+
+check_error "ui.textField label not a string" \
+    'var v = ""
+ui.textField(42, ref v)' \
+    "label must be a string"
+
+check_error "ui.textField with a bad extra argument" \
+    'var v = ""
+ui.textField("Name", ref v, [1])' \
+    "extra argument must be a number"
+
+check_error "ui.textField with a maximum length of zero" \
+    'var v = ""
+ui.textField("Name", ref v, 0)' \
+    "maximum length must be a positive integer"
+
+check_error "ui.textField with a fractional maximum length" \
+    'var v = ""
+ui.textField("Name", ref v, 2.5)' \
+    "maximum length must be a positive integer"
+
+check_error "ui.textField on a variable that is not a string" \
+    'var v = 7
+ui.textField("Name", ref v)' \
+    "the variable must hold a string"
+
+check_error "menu.textField without a reference" \
+    'global v = ""
+ui.menu("Profile").textField("City", v)' \
+    "must be a reference"
+
 check_error "camera.open without a browser" \
     'camera.open()' \
     "camera: only available in the playground (WASM)"

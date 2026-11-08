@@ -37,3 +37,32 @@ var liMKept = "green"
 ui.menu("Palette").list("Colour", liTints, ref liMKept)
 assert(liMKept == "green")
 assert(ui.current() <> nil)
+
+## ── ui.textField, menu.textField, field.edit ───────────────────────────────
+## Headless, the declaration validates its arguments and initialises the variable; typing and validating need a
+## display (tools/test-keyboard-browser.js drives them in the browser). A nil variable becomes "", a string is kept, the
+## optional arguments come in any order, and the method of a menu goes through its own function in the stub.
+var tfName = nil
+var tfField = ui.textField("Name", ref tfName)
+assert(tfName == "")
+var tfKept = "Ada"
+ui.textField("Name", ref tfKept, 12, "your name", func(t) end)
+assert(tfKept == "Ada")
+var tfOrder = "x"
+ui.textField("Name", ref tfOrder, func(t) end, "placeholder", 3)
+assert(tfOrder == "x")
+var tfM = nil
+ui.menu("Profile").textField("City", ref tfM, 20)
+assert(tfM == "")
+assert(tfField.edit() == tfField)
+
+## A variable that holds something else than a string is refused, and is left as it was.
+var tfNumber = 42
+var tfRefused = false
+try
+    ui.textField("Name", ref tfNumber)
+catch e
+    tfRefused = true
+end
+assert(tfRefused)
+assert(tfNumber == 42)

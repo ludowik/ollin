@@ -23,6 +23,19 @@ bool ui_poll();
 void ui_draw();
 void ui_reset();
 
+// Text entry (ui.textField), where the ui module meets the keyboard module. Only the raylib build has them: the stub has
+// no field to edit, and keyboard_module.cpp is itself part of that build only.
+// ui_editing()    a field is being edited. keyboard_poll then hands it the text and the control keys INSTEAD of the
+//                 script's keyboard.typed / keypressed, and keyboard.isDown answers false. It also ends an edit whose
+//                 field is no longer on display (removed, interface folded, another menu shown), without writing.
+// ui_wants_text() a field exists, which is what makes a phone's page take the focus when the canvas is touched.
+// ui_edit_text()  text typed while editing; ui_edit_key() a key NAME (return validates, escape cancels, backspace erases).
+//                 Both return whether a field took it: false means nothing was being edited, and the caller keeps it.
+bool ui_editing();
+bool ui_wants_text();
+bool ui_edit_text(const std::string& text);
+bool ui_edit_key(const std::string& name);
+
 // Argument validation, SHARED by the module and the stub.
 // A misuse must be reported even without raylib, since the test binary uses the stub, so the
 // messages live in a single place and cannot diverge. `args` and `argc` are the USER arguments: on a
@@ -74,6 +87,55 @@ inline Value ui_slider_default(const Value* args, int argc) {
             return args[i];
     }
     return args[2];
+}
+
+// ui.textField(label, ref v [, maxLength] [, placeholder] [, onSubmit]) — the three optional arguments are recognized by
+// their TYPE, as a slider's are: a number is the maximum length in CHARACTERS, a string the placeholder shown while the
+// text is empty, a function the callback called with the text when it is validated.
+inline void ui_check_text_field_args(const Value* args, int argc) {
+    if (argc < 2)
+        throw std::runtime_error("ui.textField: expected label, ref variable");
+    if (!args[0].is_string())
+        throw std::runtime_error("ui.textField: label must be a string");
+    if (!is_ref(args[1]))
+        throw std::runtime_error("ui.textField: second argument must be a reference — write `ref myVariable`");
+    for (int i = 2; i < argc; ++i) {
+        if (args[i].is_nil() || args[i].is_string() || args[i].is_callable())
+            continue;
+        if (!args[i].is_number())
+            throw std::runtime_error("ui.textField: extra argument must be a number (maximum length), a string (placeholder) or a function");
+        if (!args[i].is_integer() || args[i].as_num() < 1)
+            throw std::runtime_error("ui.textField: maximum length must be a positive integer");
+    }
+}
+
+struct UiTextFieldOptions {
+    size_t max_chars = 0;   // 0 = no limit
+    std::string placeholder;
+    Value on_submit;
+};
+
+inline UiTextFieldOptions ui_text_field_options(const Value* args, int argc) {
+    UiTextFieldOptions out;
+    for (int i = 2; i < argc; ++i) {
+        if (args[i].is_number())
+            out.max_chars = (size_t)args[i].as_num();
+        else if (args[i].is_string())
+            out.placeholder = args[i].as_string();
+        else if (args[i].is_callable())
+            out.on_submit = args[i];
+    }
+    return out;
+}
+
+// A text field's variable holds a string; nil is INITIALIZED to "" so the script can read it from the first frame on, as
+// with a slider. Anything else is refused at declaration. By value, like ui_slider_init (reading runs script code).
+inline void ui_text_init(Value target) {
+    Value current = ref_get(target);
+    if (current.is_nil())
+        ref_set(target, Value(std::string()));
+    else if (!current.is_string())
+        throw std::runtime_error("ui.textField: the variable must hold a string (or nil)");
 }
 
 // A bound variable holding nil is INITIALIZED at declaration time, so the script can read it from

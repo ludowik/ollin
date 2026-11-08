@@ -15,3 +15,8 @@ bool keyboard_pressed_any();
 // Resets the held-key state. Called at the start of every gfx_run, since s_down is static and
 // persists across runs on the shared WASM instance.
 void keyboard_reset();
+
+// The keyboard of a phone, which keyboard.show() and keyboard.hide() raise and lower, and which ui text fields use for
+// themselves. No-ops outside the browser.
+void keyboard_show();
+void keyboard_hide();

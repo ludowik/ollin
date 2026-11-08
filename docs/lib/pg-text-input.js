@@ -16,7 +16,7 @@
 //  - the browser must not move the focus when the canvas is touched: preventDefault on touchstart and touchend, which
 //    also cancels the emulated mouse events that would blur the sink. Without it the keyboard still came up, but the
 //    sink had lost the focus and typed nothing.
-// Programs that never declare keyboard.typed ("wanted" stays false) are not touched at all.
+// Programs that declare neither keyboard.typed nor a ui.textField ("wanted" stays false) are not touched at all.
 //
 // The engine and this module meet in window.__ollinTextInput: the engine calls frame(wanted) once per frame, show() and
 // hide(). Only the text of the sink comes through here; the control keys (backspace, return…) bubble from the sink to

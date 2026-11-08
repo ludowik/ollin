@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 09:34</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-08 10:15</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 09:34</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-08 10:15</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2483,9 +2483,18 @@ ui.slider(<span class="str">"Speed"</span>, <span class="kw">ref</span> speed, <
     <tr><td><code>ui.checkbox(label, ref variable [, onChange])</code></td><td>Adds a checkbox bound to a variable, passed by <a href="#ref">reference</a>. The initial state is <strong>read</strong> from the variable; every click writes <code>true</code> or <code>false</code> into it, then calls <code>onChange(newState)</code> when that function is given.</td></tr>
     <tr><td><code>ui.slider(label, ref variable, min, max [, default] [, onChange])</code></td><td>Adds a numeric value adjustable with the mouse, bound to a variable passed by <a href="#ref">reference</a>. When the variable is <code>nil</code> it is initialised to the <strong>default</strong>, or to <code>min</code> when there is none. The last two arguments are recognised by their type: a number is the default, a function the callback called on every change with the new value.</td></tr>
     <tr><td><code>ui.list(label, source, <span class="kw">ref</span> variable [, onChange])</code></td><td>A <strong>single-selection</strong> list: the row shows the item chosen, and a click unfolds the choices. <code>source</code> is an array, a map or an enum</td></tr>
+    <tr><td><code>ui.textField(label, <span class="kw">ref</span> variable [, maxLength] [, placeholder] [, onSubmit])</code></td><td>A <strong>text field</strong> bound to a variable that holds a string (<code>nil</code> becomes <code>""</code>). A click starts the edit — see <em>Text fields</em> below. The three optional arguments are recognised by their type: a number is the maximum length in <strong>characters</strong>, a string the placeholder shown while the text is empty, a function the callback called with the text when it is validated.</td></tr>
     <tr><td><code>ui.clear()</code></td><td>Removes every widget — for rebuilding an interface that changes along the way.</td></tr>
   </tbody>
 </table>
+
+<h3>Text fields</h3>
+<p>A text field edits a string in place. A click on its row starts the edit: the row gets an accent outline and a blinking cursor, and on a phone the system keyboard comes up. What is typed goes into a <strong>draft</strong>; the variable is written only when the edit is <strong>validated</strong>, by <strong>return</strong> or by a <strong>click anywhere else</strong> (that click is consumed, so it does not also press whatever lies under it). <strong>Escape</strong> cancels and leaves the variable as it was. Backspace erases one character, an accented letter or an emoji included. The text is edited at its end only: there is no cursor to move, no selection and no paste in this version. A text longer than the field shows its end.</p>
+<p>While a field is being edited it <strong>owns the keyboard</strong>: <code>keyboard.typed</code> and <code>keypressed</code> are not called, and <code>keyboard.isDown</code> answers <code>false</code>. A program that declares no <code>keyboard.typed</code> still gets text, since the field alone is enough to ask for it. Folding the interface, showing another menu or removing the field ends the edit <strong>without writing</strong> and without calling anything.</p>
+<pre><code><span class="kw">global</span> name = <span class="kw">nil</span>
+ui.textField(<span class="str">"Name"</span>, <span class="kw">ref</span> name, <span class="num">20</span>, <span class="str">"your name"</span>, <span class="kw">func</span>(text) print(<span class="str">"hello {text}"</span>) <span class="kw">end</span>)
+ui.open()</code></pre>
+<p><code>field.edit()</code> starts the edit from the script, unfolding the interface on the menu that holds the field. On a phone the keyboard only comes if a tap is going on, so call it from a tap handler, not from <code>setup()</code>.</p>
 
 <h3>Lists</h3>
 <p>A list chooses <strong>one</strong> item among several. Its source is an <strong>array</strong>, a <strong>map</strong> or an <strong>enum</strong>, and the display rule is that of <code><span class="kw">for</span> … <span class="kw">in</span></code>: an array gives its <strong>values</strong>, a map or an enum its <strong>keys</strong>. The bound variable receives exactly what is shown — the value for an array, the key for a map or an enum.</p>
@@ -2540,6 +2549,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
     <tr><td><code>ui.current()</code></td><td>The handle of the menu currently on display.</td></tr>
     <tr><td><code>element.remove()</code></td><td>Removes a widget or a menu, with all its content, from its parent.</td></tr>
     <tr><td><code>menu.clear()</code></td><td>Empties a menu of its content, without removing the menu itself.</td></tr>
+    <tr><td><code>field.edit()</code></td><td>Starts editing a text field — see <em>Text fields</em>. The widgets also come as methods of a menu: <code>menu.textField(…)</code>, like <code>menu.button(…)</code>.</td></tr>
   </tbody>
 </table>
 

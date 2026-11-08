@@ -47,4 +47,20 @@ assert(bound == 5, "the slider initialised the variable with its default")
 bound = nil
 ui.list("L", [7, 8, 9], big)
 assert(bound == 7, "the list initialised the variable with its first item")
+
+
+## A text field's variable is read and written through a reference whose code can do anything: the declaration must
+## survive a getter that grows the register file, and must refuse a variable that is not a string BEFORE a node exists.
+var text = nil
+var textBig = {__ref: true, get: func() deep(3000) return text end, set: func(v) deep(3000) text = v end}
+ui.textField("T", textBig, 5, "placeholder")
+assert(text == "", "the text field initialised the variable with an empty string")
+var refusedText = false
+var notText = 3
+try
+    ui.menu("M").textField("T", ref notText)
+catch e
+    refusedText = true
+end
+assert(refusedText and notText == 3, "a variable that holds a number is refused and left alone")
 print("ui (raylib build): ok")

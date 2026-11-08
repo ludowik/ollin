@@ -2,6 +2,10 @@
 //  - On a computer: the text the keys PRODUCE reaches the script, which a key name cannot say (a capital, a hyphen, an
 //    apostrophe, an accent), no control character comes with it, and nothing is delivered while the page blocks the
 //    keyboard (the playground's editor has the focus).
+//  - A ui.textField takes the keys while it is edited: the program's typed() and keypressed() hear nothing, return
+//    writes the variable and calls the callback, escape cancels, a click elsewhere validates and is not a click for the
+//    program, and the limit counts characters. On a touch screen the same field raises the keyboard of a program that
+//    never declared typed().
 //  - On a touch screen (emulated): the first tap gives the focus to the page's invisible text element WITHOUT asking for a
 //    keyboard, the script's show() then lets the keyboard come (inputmode "text"), the text of the element reaches
 //    typed() once and not twice, the iPhone's curly apostrophe arrives straight, backspace and return stay key names,
@@ -21,6 +25,51 @@ const mime = { '.js': 'text/javascript', '.wasm': 'application/wasm', '.json': '
                '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ol': 'text/plain' }
 const PROBE = '/samples/_keyboard_probe.ol'
 const PROBE_TOUCH = '/samples/_keyboard_probe_touch.ol'
+const FIELD = '/samples/_keyboard_field.ol'
+const FIELD_TOUCH = '/samples/_keyboard_field_touch.ol'
+const programField = `
+global name = nil
+global seen = ""
+global typedLog = ""
+global keyLog = ""
+global clicks = 0
+func keyboard.typed(text)
+    typedLog += "[" + text + "]"
+end
+func keyboard.keypressed(key)
+    keyLog += key + ","
+    if key == "f1" then
+        assert(false, "NAME=" + name + " SEEN=" + seen + " TYPED=" + typedLog + " KEYS=" + keyLog + " CLICKS=" + clicks)
+    end
+end
+func mouse.pressed(x, y)
+    clicks += 1
+end
+func setup()
+    ui.textField("Name", ref name, 6, "type here", func(t) seen += "<" + t + ">" end)
+    ui.open()
+end
+func draw()
+    graphics.clear(colors.BLACK)
+end
+`
+// No keyboard.typed here: the field alone must make the page take the focus.
+const programFieldTouch = `
+global name = nil
+global seen = ""
+func keyboard.keypressed(key)
+    if key == "f1" then
+        assert(false, "NAME=" + name + " SEEN=" + seen)
+    end
+end
+func setup()
+    ui.textField("Name", ref name, 20, "type here", func(t) seen += "<" + t + ">" end)
+    ui.open()
+end
+func draw()
+    graphics.clear(colors.BLACK)
+end
+`
 const programTouch = `
 global typedLog = ""
 global keyLog = ""
@@ -63,9 +112,10 @@ end
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0])
-  if (url === PROBE || url === PROBE_TOUCH) {
+  const programs = { [PROBE]: program, [PROBE_TOUCH]: programTouch, [FIELD]: programField, [FIELD_TOUCH]: programFieldTouch }
+  if (programs[url]) {
     res.writeHead(200, { 'content-type': 'text/plain' })
-    return res.end(url === PROBE ? program : programTouch)
+    return res.end(programs[url])
   }
   const file = path.join(root, url.endsWith('/') ? url + 'index.html' : url)
   fs.readFile(file, (err, data) => {
@@ -187,6 +237,84 @@ server.listen(0, '127.0.0.1', async () => {
       if (!ok2) failed = true
     }
     if (failed) console.log('  touch message: ' + touchMessage)
+
+    // ── a ui text field ────────────────────────────────────────────────────────────────────────────────
+    // The field's row, as ui_module.cpp lays it out: the stack hangs from the top right, a header row first, then the
+    // field. A point inside the field, in CSS pixels of the canvas.
+    const fieldPoint = async (pg) => pg.evaluate(() => {
+      const r = document.getElementById('canvas').getBoundingClientRect()
+      const font = Math.max(9, r.height * 0.02)
+      const row = font * 1.8
+      return { x: r.right - font * 0.9 - font, y: r.top + font * 0.9 + row + font * 0.22 + row / 2, left: r.left + 40, mid: r.top + r.height / 2 }
+    })
+    const holdClick = async (pg, x, y) => {
+      await pg.mouse.move(x, y)
+      await pg.mouse.down()
+      await pg.waitForTimeout(150)
+      await pg.mouse.up()
+      await pg.waitForTimeout(150)
+    }
+    await page.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${FIELD.replace('/samples/', '/sample/')}`)
+    await page.waitForTimeout(5000)
+    await page.evaluate(() => { window.__message = null; window.__ollinFrameError = (m) => { window.__message = m } })
+    const fp = await fieldPoint(page)
+    await holdClick(page, fp.x, fp.y)                         // start editing
+    for (const text of ['a']) await typeText(text)
+    await press('Shift+B')
+    for (const text of ['é', '1', '2', '3', '4']) await typeText(text)   // the 6-character limit stops the last one
+    await press('Backspace')
+    await typeText('9')
+    await press('Enter')                                      // validates
+    await press('q')                                          // not editing any more: the program hears it again
+    await holdClick(page, fp.x, fp.y)
+    await press('Backspace')
+    await typeText('x')
+    await press('Escape')                                     // cancels
+    await holdClick(page, fp.x, fp.y)
+    await press('Backspace')
+    await typeText('y')
+    await holdClick(page, fp.left, fp.mid)                    // a click elsewhere validates, and is not the program's
+    await press('F1')
+    await page.waitForTimeout(300)
+    const fieldMessage = await page.evaluate(() => window.__message)
+    const fieldExpected = 'NAME=aBé12y SEEN=<aBé129><aBé12y> TYPED=[q] KEYS=q,f1, CLICKS=0'
+    const fieldOk = typeof fieldMessage === 'string' && fieldMessage.endsWith(fieldExpected)
+    console.log(fieldOk ? 'OK   ui.textField' : `FAIL ui.textField\n  got      ${fieldMessage}\n  expected ...${fieldExpected}`)
+    if (!fieldOk) failed = true
+
+    const phone2 = await (await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })).newPage()
+    await phone2.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${FIELD_TOUCH.replace('/samples/', '/sample/')}`)
+    await phone2.waitForTimeout(5000)
+    await phone2.evaluate(() => { window.__message = null; window.__ollinFrameError = (m) => { window.__message = m } })
+    const wantedByField = await phone2.evaluate(() => !!(window.__ollinTextInput && window.__ollinTextInput.wanted))
+    const fp2 = await fieldPoint(phone2)
+    const session2 = await phone2.context().newCDPSession(phone2)
+    await session2.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fp2.x, y: fp2.y, id: 0 }] })
+    await phone2.waitForTimeout(150)
+    await session2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await phone2.waitForTimeout(400)
+    const raised = await phone2.evaluate(() => { const el = document.activeElement; return !!(el && el.isContentEditable) && el.getAttribute('inputmode') === 'text' })
+    await session2.send('Input.insertText', { text: 'ab' })
+    await phone2.waitForTimeout(150)
+    await session2.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+    await session2.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+    await phone2.waitForTimeout(300)
+    const lowered = await phone2.evaluate(() => !(document.activeElement && document.activeElement.isContentEditable))
+    await session2.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'F1', code: 'F1', windowsVirtualKeyCode: 112 })
+    await session2.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'F1', code: 'F1', windowsVirtualKeyCode: 112 })
+    await phone2.waitForTimeout(300)
+    const phoneFieldMessage = await phone2.evaluate(() => window.__message)
+    const phoneChecks = [
+      ['a text field alone makes the page want text (no typed declared)', wantedByField],
+      ['tapping the field raised the keyboard', raised],
+      ['the text of the keyboard reached the field and return validated it', typeof phoneFieldMessage === 'string' && phoneFieldMessage.endsWith('NAME=ab SEEN=<ab>')],
+      ['validating lowered the keyboard', lowered],
+    ]
+    for (const [name, ok3] of phoneChecks) {
+      console.log((ok3 ? 'OK   ' : 'FAIL ') + name)
+      if (!ok3) failed = true
+    }
+    if (!phoneChecks.every((c) => c[1])) console.log('  field message: ' + phoneFieldMessage)
   } catch (e) {
     console.log('FAIL', e.message)
     failed = true
