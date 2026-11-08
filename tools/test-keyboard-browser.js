@@ -117,6 +117,17 @@ server.listen(0, '127.0.0.1', async () => {
 
     // ── a touch screen ─────────────────────────────────────────────────────────────────────────────────
     const phone = await (await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })).newPage()
+    // Which event each focus() of the invisible element happens in (window.event is empty outside an event handler). An
+    // iPhone raises its keyboard only for a focus() taken inside the gesture of a tap, and Chromium does not care: this is
+    // the only way for the test to see a focus taken a frame later, from show(), which a phone refused.
+    await phone.addInitScript(() => {
+      window.__focusLog = []
+      const focus = HTMLElement.prototype.focus
+      HTMLElement.prototype.focus = function (...args) {
+        if (this.isContentEditable) window.__focusLog.push(window.event ? window.event.type : 'outside any event')
+        return focus.apply(this, args)
+      }
+    })
     await phone.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${PROBE_TOUCH.replace('/samples/', '/sample/')}`)
     await phone.waitForTimeout(5000)
     await phone.evaluate(() => { window.__message = null; window.__ollinFrameError = (m) => { window.__message = m } })
@@ -135,6 +146,7 @@ server.listen(0, '127.0.0.1', async () => {
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await phone.waitForTimeout(400)
     const afterTap = await sinkState()
+    const focusLog = await phone.evaluate(() => window.__focusLog)
     const insert = async (text) => { await session.send('Input.insertText', { text }); await phone.waitForTimeout(120) }
     const key = async (name, code, vk) => {
       await session.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: name, code, windowsVirtualKeyCode: vk })
@@ -162,6 +174,8 @@ server.listen(0, '127.0.0.1', async () => {
       ['the program asks for text (typed declared)', before.wanted === true],
       ['no sink has the focus before any tap', before.sink === false],
       ['the first tap armed the sink, and the script\'s show() let the keyboard come', afterTap.sink === true && afterTap.mode === 'text'],
+      ['the first tap took the focus inside its touchend, never from show() a frame later (' + focusLog.join(', ') + ')',
+       focusLog.length >= 1 && focusLog.every((type) => type === 'touchend')],
       ['the tap still reached mouse.pressed', typeof touchMessage === 'string' && /TAPS=[1-9]/.test(touchMessage)],
       ['the text arrived once, the curly apostrophe straight', typeof touchMessage === 'string' && touchMessage.includes("TYPED=[é]['][ab][x] ") && !touchMessage.includes('[é][é]')],
       ['backspace and return stayed key names', typeof touchMessage === 'string' && /KEYS=x,backspace,return,/.test(touchMessage)],

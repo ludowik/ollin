@@ -7,6 +7,12 @@
 //  - an element focused with inputmode="none" takes the focus WITHOUT a keyboard, and setting inputmode="text" on it
 //    later, outside any gesture, raises the keyboard and keeps the focus. That is the whole trick: the tap ARMS the
 //    sink (focus, no keyboard), the script's show() releases it (inputmode "text");
+//  - the engine learns of a touch at its touchstart (it is what raylib reports), so a script's show() runs while the finger
+//    is STILL DOWN, before the page can arm anything: the page may take the focus only at touchend, inside the gesture.
+//    So show() never takes the focus itself: it remembers the request, and the touchend that ends the tap answers it by
+//    focusing with inputmode "text" at once. A show() that finds the sink armed already (an earlier tap did it) switches
+//    the inputmode at once. Taking the focus from show() was the first version, and a real iPhone showed it: the keyboard
+//    came only from the second tap on, once an earlier touchend had left the sink focused;
 //  - the browser must not move the focus when the canvas is touched: preventDefault on touchstart and touchend, which
 //    also cancels the emulated mouse events that would blur the sink. Without it the keyboard still came up, but the
 //    sink had lost the focus and typed nothing.
@@ -40,6 +46,8 @@ export function installTextInput(canvas) {
   let queue = ''
   let shown = false
   let composing = false
+  let askedAt = -Infinity   // when show() found no armed sink and left its request to the next touchend
+  const ASK_LIFETIME = 1500 // ms: a request that old is no tap's, and the touchend of a later tap must not answer it
 
   const focused = () => document.activeElement === sink
   const blocked = () => !!window.__ollinKbdBlocked   // the editor of the playground has the keyboard
@@ -57,20 +65,21 @@ export function installTextInput(canvas) {
       return text
     },
 
-    // The tap armed the sink; this lets the keyboard come.
+    // Lets the keyboard come. An armed sink only needs its inputmode changed; otherwise the tap that is going on has not
+    // reached its touchend yet, which is the only place the focus can be taken (see the head of this file).
     show() {
       if (blocked()) return
-      if (!focused()) {
-        // No tap armed it. Outside a gesture this may be refused, and on a computer there is no keyboard to show.
-        if (!(navigator.maxTouchPoints > 0)) return
-        sink.focus({ preventScroll: true })
+      if (focused()) {
+        sink.inputMode = 'text'
+        shown = true
+        return
       }
-      sink.inputMode = 'text'
-      shown = true
+      askedAt = performance.now()
     },
 
     hide() {
       shown = false
+      askedAt = -Infinity
       sink.inputMode = 'none'
       sink.blur()
     },
@@ -80,6 +89,7 @@ export function installTextInput(canvas) {
       api.wanted = false
       queue = ''
       shown = false
+      askedAt = -Infinity
       composing = false
       sink.inputMode = 'none'
       sink.blur()
@@ -88,10 +98,15 @@ export function installTextInput(canvas) {
   }
   window.__ollinTextInput = api
 
-  // Takes the focus for the sink without a keyboard, inside the tap.
+  // Takes the focus for the sink inside the tap, at its touchend: without a keyboard, unless show() asked for one while the
+  // finger was down. Then the focus is taken with inputmode "text" from the start, which is the case an iPhone was
+  // measured to accept (a focus() inside a gesture, on an element that wants a keyboard).
   function arm() {
     if (!api.wanted || blocked() || shown) return
-    sink.inputMode = 'none'
+    const asked = performance.now() - askedAt < ASK_LIFETIME
+    askedAt = -Infinity
+    sink.inputMode = asked ? 'text' : 'none'
+    if (asked) shown = true
     if (!focused()) sink.focus({ preventScroll: true })
   }
 

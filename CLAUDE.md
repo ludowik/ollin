@@ -1277,6 +1277,11 @@ Ce que le code ne dit pas :
   suivante ; un élément pris avec `inputmode="none"` dans le toucher, puis passé à `"text"` plus tard, ouvre le clavier ET
   garde le focus. Sans `preventDefault` sur `touchstart`/`touchend` du canvas, le clavier s'ouvrait mais l'élément avait
   perdu le focus, donc la saisie n'allait nulle part. iOS remplace aussi `'` par `‘` dans `beforeinput` (la page le redresse).
+- ⚠ **`show()` ne prend JAMAIS le focus lui-même** (constaté sur un iPhone, signalé par l'utilisateur : le clavier ne venait
+  qu'au SECOND toucher). Le moteur apprend un toucher à `touchstart`, donc `mouse.pressed` appelle `show()` le doigt encore
+  posé, avant que la page puisse armer quoi que ce soit ; un `focus()` pris là est hors du geste et iOS le refuse. La demande
+  est retenue, et le `touchend` du même toucher prend le focus avec `inputmode="text"`. Chromium ne distingue pas les deux : le
+  test enregistre l'événement en cours (`window.event`) à chaque `focus()` de l'élément, seul moyen de le voir.
 - ⚠ **Non vérifié sur Android**, ni l'armement ni le changement d'`inputmode` ; **Safari** n'a été essayé que sur les
   tests simples. L'émulation de Chromium ne dit pas si un vrai clavier apparaît : elle prouve la logique, pas l'appareil.
 - **Une seule source de texte à la fois** : quand l'élément de la page a le focus, le moteur lit son texte et VIDE la file de
