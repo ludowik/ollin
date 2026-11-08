@@ -16,6 +16,10 @@
 //  - the browser must not move the focus when the canvas is touched: preventDefault on touchstart and touchend, which
 //    also cancels the emulated mouse events that would blur the sink. Without it the keyboard still came up, but the
 //    sink had lost the focus and typed nothing.
+//  - the keyboard SHRINKS the window on some browsers, and the pane that holds the canvas follows it: the engine then
+//    resizes its area (graphics.fitArea) or scales the whole canvas down to fit, and a screen "shrinks" as the keyboard
+//    comes up. So while the sink has the focus the pane keeps the size it had when the focus was taken (freeze), and the
+//    keyboard simply covers the bottom of it. A real rotation (the orientation changes) lets it go.
 // Programs that declare neither keyboard.typed nor a ui.textField ("wanted" stays false) are not touched at all.
 //
 // The engine and this module meet in window.__ollinTextInput: the engine calls frame(wanted) once per frame, show() and
@@ -48,6 +52,33 @@ export function installTextInput(canvas) {
   let composing = false
   let askedAt = -Infinity   // when show() found no armed sink and left its request to the next touchend
   const ASK_LIFETIME = 1500 // ms: a request that old is no tap's, and the touchend of a later tap must not answer it
+
+  // The pane keeps the size it had at the focus: an explicit size, no flex. Nothing changes size, so the observers of the
+  // host (watchRenderArea) and of the engine (the scale-to-fit of the canvas) see nothing.
+  let frozen = null
+  const orientation = () => (screen.orientation ? screen.orientation.type : String(window.orientation))
+  function freeze() {
+    if (frozen) return
+    const pane = canvas.parentElement
+    if (!pane) return
+    const box = pane.getBoundingClientRect()
+    if (!(box.width > 0 && box.height > 0)) return
+    frozen = { pane, orientation: orientation(), flex: pane.style.flex, width: pane.style.width, height: pane.style.height }
+    pane.style.flex = 'none'
+    pane.style.width = box.width + 'px'
+    pane.style.height = box.height + 'px'
+  }
+  function thaw() {
+    if (!frozen) return
+    frozen.pane.style.flex = frozen.flex
+    frozen.pane.style.width = frozen.width
+    frozen.pane.style.height = frozen.height
+    frozen = null
+  }
+  const onResize = () => {
+    if (frozen && orientation() !== frozen.orientation) thaw()
+  }
+  window.addEventListener('resize', onResize)
 
   const focused = () => document.activeElement === sink
   const blocked = () => !!window.__ollinKbdBlocked   // the editor of the playground has the keyboard
@@ -119,9 +150,11 @@ export function installTextInput(canvas) {
     if (e.cancelable) e.preventDefault()
   }, { passive: false })
 
+  sink.addEventListener('focus', freeze)
   sink.addEventListener('blur', () => {
     shown = false
     composing = false
+    thaw()
   })
   sink.addEventListener('compositionstart', () => { composing = true })
   sink.addEventListener('compositionend', (e) => {
@@ -143,6 +176,8 @@ export function installTextInput(canvas) {
 
   return () => {
     if (window.__ollinTextInput === api) delete window.__ollinTextInput
+    window.removeEventListener('resize', onResize)
+    thaw()
     sink.remove()
   }
 }

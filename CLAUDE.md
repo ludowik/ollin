@@ -1291,11 +1291,15 @@ Ce que le code ne dit pas :
   valide ET est consommé, Échap annule ; plier l'interface, changer de menu ou retirer le champ termine l'édition SANS écrire
   (`edit_on_display`, revérifiée à chaque image par `ui_editing`). Piège connu : l'ordre entre texte et touches d'une même image
   est perdu ; un champ traite le TEXTE d'abord (« abc » puis Entrée ne valide pas un brouillon vide), donc « a » puis Retour
-  arrière tapés en moins de 16 ms laissent le « a ». Non couvert, faute
-  d'appareil : une zone qui rétrécit quand le clavier monte (`graphics.fitArea`) rétrécit aussi l'interface ; les mesures ne sont
-  pas figées pendant l'édition. `field.edit()` appelé hors d'un toucher n'ouvre pas le clavier d'un téléphone (même raison que
+  arrière tapés en moins de 16 ms laissent le « a ». `field.edit()` appelé hors d'un toucher n'ouvre pas le clavier d'un téléphone (même raison que
   `show()`). Logique d'édition pure dans `src/ui_text_edit.h` (test unitaire) ; le texte frappé se vérifie au navigateur
   (`tools/test-keyboard-browser.js`), les touches ne s'injectant pas sous Xvfb.
+- **La page FIGE le panneau du canvas tant que l'élément de saisie a le focus** (`freeze`/`thaw`, `pg-text-input.js`) : un clavier
+  qui redimensionne la fenêtre faisait rétrécir tout l'écran (la zone de `graphics.fitArea`, ou le canvas remis à l'échelle). Le
+  panneau garde la taille qu'il avait au focus, le clavier couvre le bas, et une vraie rotation (`screen.orientation.type`) le
+  libère. Mesuré au navigateur en réduisant la fenêtre pendant l'édition, avec et sans `fitArea` ; ⚠ **non vérifié sur un
+  appareil** : on ne sait pas si l'iPhone redimensionne la fenêtre ou ne fait que la déplacer, et ce qui rétrécit chez
+  l'utilisateur n'a pas été identifié avec certitude.
 - **Une seule source de texte à la fois** : quand l'élément de la page a le focus, le moteur lit son texte et VIDE la file de
   raylib (qui voit les mêmes touches) — lire les deux donnait chaque caractère deux fois (mutation vérifiée : `[xx]`).
 - ⚠ **Au harnais, `page.touchscreen.tap` est trop court** : toucher et lever dans la même image, que le moteur ne voit jamais

@@ -6,6 +6,8 @@
 //    writes the variable and calls the callback, escape cancels, a click elsewhere validates and is not a click for the
 //    program, and the limit counts characters. On a touch screen the same field raises the keyboard of a program that
 //    never declared typed().
+//  - The keyboard shrinks the window on some browsers: while a text field is edited the pane that holds the canvas keeps its
+//    size (the program's area and its canvas do not shrink), and follows the window again when the edit ends.
 //  - On a touch screen (emulated): the first tap gives the focus to the page's invisible text element WITHOUT asking for a
 //    keyboard, the script's show() then lets the keyboard come (inputmode "text"), the text of the element reaches
 //    typed() once and not twice, the iPhone's curly apostrophe arrives straight, backspace and return stay key names,
@@ -70,6 +72,8 @@ func draw()
     graphics.clear(colors.BLACK)
 end
 `
+const FIELD_FIT = '/samples/_keyboard_field_fit.ol'
+const programFieldFit = programFieldTouch.replace('ui.open()\n', 'ui.open()\ngraphics.fitArea()\n')
 const programTouch = `
 global typedLog = ""
 global keyLog = ""
@@ -112,7 +116,7 @@ end
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0])
-  const programs = { [PROBE]: program, [PROBE_TOUCH]: programTouch, [FIELD]: programField, [FIELD_TOUCH]: programFieldTouch }
+  const programs = { [PROBE]: program, [PROBE_TOUCH]: programTouch, [FIELD]: programField, [FIELD_TOUCH]: programFieldTouch, [FIELD_FIT]: programFieldFit }
   if (programs[url]) {
     res.writeHead(200, { 'content-type': 'text/plain' })
     return res.end(programs[url])
@@ -315,6 +319,44 @@ server.listen(0, '127.0.0.1', async () => {
       if (!ok3) failed = true
     }
     if (!phoneChecks.every((c) => c[1])) console.log('  field message: ' + phoneFieldMessage)
+
+    // ── the window shrinks while a field is edited (a keyboard that resizes the page) ────────────────
+    // Once with graphics.fitArea (the area follows the pane) and once without (the engine scales the canvas to fit the pane).
+    for (const [label, url] of [['fitArea', FIELD_FIT], ['scale to fit', FIELD_TOUCH]]) {
+      const pg = await (await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })).newPage()
+      await pg.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${url.replace('/samples/', '/sample/')}`)
+      await pg.waitForTimeout(5000)
+      const measure = () => pg.evaluate(() => {
+        const pane = document.getElementById('output-pane').getBoundingClientRect()
+        const cv = document.getElementById('canvas').getBoundingClientRect()
+        return { pane: Math.round(pane.height), canvas: Math.round(cv.height), area: window.__ollinRenderH }
+      })
+      const pt = await fieldPoint(pg)
+      const sess = await pg.context().newCDPSession(pg)
+      await sess.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: pt.x, y: pt.y, id: 0 }] })
+      await pg.waitForTimeout(150)
+      await sess.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await pg.waitForTimeout(500)
+      const before = await measure()
+      await pg.setViewportSize({ width: 390, height: 420 })     // what a keyboard that resizes the page does
+      await pg.waitForTimeout(800)
+      const during = await measure()
+      await sess.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+      await sess.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+      await pg.waitForTimeout(800)
+      const after = await measure()
+      const shrinkChecks = [
+        [`${label}: the pane keeps its size while the field is edited`, during.pane === before.pane],
+        [`${label}: the canvas keeps its size while the field is edited`, Math.abs(during.canvas - before.canvas) <= 1],
+        [`${label}: the area handed to the engine keeps its size`, during.area === before.area],
+        [`${label}: the pane follows the window again once the edit ends`, after.pane < before.pane - 50],
+      ]
+      for (const [name, ok4] of shrinkChecks) {
+        console.log((ok4 ? 'OK   ' : 'FAIL ') + name)
+        if (!ok4) failed = true
+      }
+      if (!shrinkChecks.every((c) => c[1])) console.log('  before ' + JSON.stringify(before) + ' during ' + JSON.stringify(during) + ' after ' + JSON.stringify(after))
+    }
   } catch (e) {
     console.log('FAIL', e.message)
     failed = true
