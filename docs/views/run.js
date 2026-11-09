@@ -13,7 +13,7 @@ export async function init(ctx) {
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
   const Thumb = await import('../lib/pg-thumb.js?v=' + ctx.v)   // the picture of a project's tile
-  const { loadProjectIntoRuntime, launchProgram, resumeLoop, sampleFromAnchor, fetchSample, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, launchProgram, resumeLoop, sampleFromAnchor, fetchSample, watchRenderArea, releaseProgramHolds } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -198,7 +198,7 @@ export async function init(ctx) {
   const stop = () => {
     if (cancelThumb) cancelThumb()
     unwatchArea()
-    unlockOrientation()
+    releaseProgramHolds()
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
     window.__ollinRenderW = undefined   // a size hint private to this view: it must not leak

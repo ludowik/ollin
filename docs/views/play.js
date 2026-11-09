@@ -18,7 +18,7 @@
 export async function init(ctx) {
   const { getOllin } = ctx
   const { sampleFromAnchor, fetchSample, loadProjectIntoRuntime, launchProgram, preloadProgramAssets, resumeLoop,
-          isStandaloneApp, watchRenderArea, unlockOrientation } = await import('../lib/pg-run.js?v=' + ctx.v)
+          isStandaloneApp, watchRenderArea, releaseProgramHolds } = await import('../lib/pg-run.js?v=' + ctx.v)
   const Samples = await import('../lib/pg-samples.js?v=' + ctx.v)
 
   const $ = (id) => document.getElementById(id)
@@ -293,7 +293,7 @@ export async function init(ctx) {
     unwatchArea()
     listeners.forEach((off) => off())
     releaseScreen()
-    unlockOrientation()
+    releaseProgramHolds()
     try { navigator.keyboard && navigator.keyboard.unlock && navigator.keyboard.unlock() } catch (_) {}
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     try { if (document.fullscreenElement) document.exitFullscreen() } catch (_) {}

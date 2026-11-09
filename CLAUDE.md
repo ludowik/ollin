@@ -1351,7 +1351,7 @@ chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit 
   arrive en pixels du canvas). Un remappage `gfx_screen_map` écrit pour la version qui tournait le canvas
   les faussait ici, et il a été retiré avec elle. Le module `motion` n'a rien à corriger non plus : le canvas
   est droit dans l'écran, donc l'angle d'écran est le bon repère. L'hôte relâche le tout quand le programme
-  s'arrête (`unlockOrientation`, `lib/pg-run.js`, appelé par `run.js` et par `setRunning(false)` du
+  s'arrête (`releaseProgramHolds`, `lib/pg-run.js`, appelé par `run.js` et par `setRunning(false)` du
   playground), sinon tout le site resterait verrouillé. La section « This window » de `#/perf` affiche l'angle, le type et le résultat d'un
   essai de verrou : c'est la mesure sur l'appareil, à lire avant de raisonner sur ce que Safari accepte.
   ⚠ Les propriétés CSS individuelles `scale`/`translate` ont été essayées : le style calculé et le

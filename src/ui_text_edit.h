@@ -27,15 +27,20 @@ inline bool text_edit_erase_last(std::string& text) {
 }
 
 // The end of `text` that `fits` accepts: characters leave from the FRONT until the rest fits, so the cursor stays
-// visible in a field narrower than its text. `fits` is a predicate on a string (the module measures with the font).
+// visible in a field narrower than its text. `fits` is a predicate on a string (the module measures with the font) and
+// must be monotone — a shorter tail never fits less — which is what lets a bisection find the first tail that fits in
+// log(n) measures instead of one per character.
 template <typename Fits>
 inline std::string text_edit_tail(const std::string& text, Fits fits) {
-    size_t start = 0;
-    while (start < text.size()) {
-        std::string tail = text.substr(start);
-        if (fits(tail))
-            return tail;
-        start += utf8_step(text, start);
+    size_t low = 0;
+    size_t high = utf8_count(text);
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        if (fits(text.substr(utf8_byte_offset(text, middle))))
+            high = middle;
+        else
+            low = middle + 1;
     }
-    return std::string();
+    std::string tail = text.substr(utf8_byte_offset(text, low));
+    return fits(tail) ? tail : std::string();
 }

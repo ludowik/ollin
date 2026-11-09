@@ -61,6 +61,15 @@ static void test_tail() {
     auto none = [](const std::string&) { return false; };
     expect(text_edit_tail("abc", none).empty(), "nothing fits: nothing is shown");
     expect(text_edit_tail("", five).empty(), "an empty text stays empty");
+    std::string long_text(5000, 'x');
+    long_text += "end";
+    int measures = 0;
+    auto counted = [&](const std::string& s) {
+        measures++;
+        return utf8_count(s) <= 5;
+    };
+    expect(text_edit_tail(long_text, counted) == "xxend", "a very long text shows its end");
+    expect(measures < 40, "and takes a few measures, not one per character");
 }
 
 int ui_text_edit_failures() {

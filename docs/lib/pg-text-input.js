@@ -93,8 +93,10 @@ export function installTextInput(canvas) {
   const vv = window.visualViewport
   const noteViewport = (what) => note(what + ' inner ' + window.innerHeight + (vv ? ' visual ' + Math.round(vv.height) : '') +
     ' sink=' + focused())
-  window.addEventListener('resize', () => noteViewport('resize'))
-  if (vv) vv.addEventListener('resize', () => noteViewport('visual resize'))
+  const onNoteResize = () => noteViewport('resize')
+  const onNoteVisualResize = () => noteViewport('visual resize')
+  window.addEventListener('resize', onNoteResize)
+  if (vv) vv.addEventListener('resize', onNoteVisualResize)
 
   const focused = () => document.activeElement === sink
   const blocked = () => !!window.__ollinKbdBlocked   // the editor of the playground has the keyboard
@@ -122,7 +124,7 @@ export function installTextInput(canvas) {
 
     // The last lines of what the page saw, as one text.
     trace(count) {
-      return log.slice(-count).join('\n')
+      return count > 0 ? log.slice(-count).join('\n') : ''    // slice(-0) would be the whole log
     },
 
     // Lets the keyboard come. An armed sink only needs its inputmode changed; otherwise the tap that is going on has not
@@ -205,6 +207,7 @@ export function installTextInput(canvas) {
   sink.addEventListener('compositionend', (e) => {
     composing = false
     if (e.data) queue += plain(e.data)
+    sink.textContent = ''   // the last input event of a composition came while it was still on: the sink must not keep the word
   })
   sink.addEventListener('beforeinput', (e) => {
     if (blocked()) return
@@ -222,6 +225,8 @@ export function installTextInput(canvas) {
   return () => {
     if (window.__ollinTextInput === api) delete window.__ollinTextInput
     window.removeEventListener('resize', onResize)
+    window.removeEventListener('resize', onNoteResize)
+    if (vv) vv.removeEventListener('resize', onNoteVisualResize)
     thaw()
     sink.remove()
   }

@@ -82,12 +82,14 @@ export function watchRenderArea(pane) {
   return () => observer.disconnect()
 }
 
-// A graphics program that does not follow the area makes the engine lock the screen's orientation, and keep
-// its canvas whole by scaling it down to fit where the browser refuses; the host releases both when the
-// program stops, otherwise the whole site would stay locked.
-export function unlockOrientation() {
+// What a program holds while it runs and the host must release when it stops: a graphics program that does not follow
+// the area makes the engine lock the screen's orientation, and keep its canvas whole by scaling it down to fit where the
+// browser refuses (otherwise the whole site would stay locked), and a program that writes text keeps the keyboard of a
+// phone up and the touches of the canvas to itself.
+export function releaseProgramHolds() {
   try { screen.orientation.unlock() } catch (_) {}
   if (window.__ollinHoldStop) window.__ollinHoldStop()   // and the engine's own fit of it
+  if (window.__ollinTextInput) window.__ollinTextInput.reset()   // a keyboard left up, a text still wanted
 }
 
 // Runs `code` and routes the result through hooks supplied by the caller:

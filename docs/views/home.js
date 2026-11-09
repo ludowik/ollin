@@ -111,7 +111,7 @@ export async function init(ctx) {
   if (!projects.length) {
     const empty = document.createElement('p')
     empty.className = 'empty'
-    empty.textContent = 'No project yet. Open an example and press “Create a project”, or start one from the playground’s Project menu.'
+    empty.textContent = 'No project yet. Open an example, go back to the editor from its bar and press “Create a project”, or start one from the playground’s Project menu.'
     mine.sec.replaceChild(empty, mine.tiles)
   }
   page.appendChild(mine.sec)

@@ -426,6 +426,10 @@ check_error "ui.textField on a variable that is not a string" \
 ui.textField("Name", ref v)' \
     "the variable must hold a string"
 
+check_error "field.edit on an element that is not a text field" \
+    'ui.button("Go", func() end).edit()' \
+    "field.edit: this ui element is not a text field"
+
 check_error "menu.textField without a reference" \
     'global v = ""
 ui.menu("Profile").textField("City", v)' \

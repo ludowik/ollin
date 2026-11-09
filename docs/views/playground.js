@@ -1988,7 +1988,7 @@ const outputHdr  = document.getElementById('output-header')
 // area, and app.js puts it back on unmount.
 canvasEl.style.display = 'none'
 outputPane.appendChild(canvasEl)
-disposers.push(Run.watchRenderArea(outputPane), Run.unlockOrientation)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
+disposers.push(Run.watchRenderArea(outputPane), Run.releaseProgramHolds)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
 
 // The render area (output plus canvas) only appears while running or paused; at rest the editor
 // takes up ALL the space.
@@ -2029,7 +2029,7 @@ function setRunning(running) {
       cancelThumb()
       cancelThumb = null
     }
-    Run.unlockOrientation()
+    Run.releaseProgramHolds()
     runBtn.classList.remove('running')
     runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Run</span><kbd>Alt+↵</kbd>'
     stopBtn.style.display = 'none'
