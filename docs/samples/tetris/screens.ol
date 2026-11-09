@@ -37,16 +37,36 @@ func withFooter(items, hint)
     return items
 end
 
+const TITLE_GAP = 10            ## points between two pieces of the title: more than a cell (8), so that none touches another
+
+## A row of pieces centred across the screen, each given as [piece, lift]: the blocks of neighbours are TITLE_GAP apart
+## whatever the boxes of the pieces hold, and a lift moves a piece up (negative) or down.
+func titleRow(row, y)
+    var width = TITLE_GAP * (len(row) - 1)
+    for entry in row do
+        var x0, x1 = shapeBounds(entry[1], 1)
+        width += (x1 - x0 + 1) * 8
+    end
+    var x = 80 - width / 2
+    var items = []
+    for entry in row do
+        var x0, x1 = shapeBounds(entry[1], 1)
+        items.push({piece: entry[1], x: x - x0 * 8, y: y + entry[2]})
+        x += (x1 - x0 + 1) * 8 + TITLE_GAP
+    end
+    return items
+end
+
 ## The first screen: the name, and the pieces, until START.
 func titleItems(hint)
     var logo = screenLabel("TETRIS", 80, 30, 24)
     logo.logo = true
     var items = [logo]
-    for item in [
-        [Piece.I, 14, 48], [Piece.O, 54, 48], [Piece.T, 78, 48], [Piece.Z, 110, 44],
-        [Piece.L, 22, 72], [Piece.J, 54, 76], [Piece.S, 86, 72]
-    ] do
-        items.push({piece: item[1], x: item[2], y: item[3] + 4})
+    for item in titleRow([[Piece.I, 0], [Piece.O, 0], [Piece.T, 0], [Piece.Z, -4]], 52) do
+        items.push(item)
+    end
+    for item in titleRow([[Piece.L, 0], [Piece.J, 4], [Piece.S, 0]], 76) do
+        items.push(item)
     end
     return withFooter(items, hint)
 end

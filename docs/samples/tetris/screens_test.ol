@@ -51,6 +51,27 @@ for it in title do
     end
 end
 assert(pieces == KINDS and len(seen) == KINDS)
+
+## No two pieces touch: the nearest blocks of two pieces are a whole cell apart, whatever the boxes hold.
+func blocks(it)
+    var out = []
+    for c in shapes[it.piece][1] do
+        out.push([it.x + c[1] * 8, it.y + c[2] * 8])
+    end
+    return out
+end
+for i = 1, len(title) do
+    for j = i + 1, len(title) do
+        if title[i].piece and title[j].piece then
+            for a in blocks(title[i]) do
+                for b in blocks(title[j]) do
+                    var apart = math.max(math.abs(a[1] - b[1]), math.abs(a[2] - b[2]))
+                    assert(apart >= 16, "two pieces of the title touch: {title[i].piece} and {title[j].piece}")
+                end
+            end
+        end
+    end
+end
 assert(find(title, "PUSH START") <> nil)
 assert(title[len(title)].text == "V  MODERN STYLE" and title[len(title)].dim == true and title[len(title)].size == 6)
 fits(title)
