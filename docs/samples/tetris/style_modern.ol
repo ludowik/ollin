@@ -41,7 +41,7 @@ end
 
 ## The gradient over the whole canvas: bands of one colour, from the top colour to the bottom one.
 func modernBackground()
-    drawGradient(modernLook.skyTop, modernLook.skyBottom, 24)
+    drawGradient(modernLook.skyTop, modernLook.skyBottom)
 end
 
 ## A rounded rectangle with a faint edge round it.

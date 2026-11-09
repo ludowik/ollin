@@ -15,9 +15,15 @@ func drawText(str, x, y, size, h, v, col, alpha = 1)
     graphics.noStroke()
 end
 
-## The whole canvas in `bands` strips of one colour each, from the colour `top` to the colour `bottom` (arrays
-## [r, g, b, a]). The strips overlap by a row, so that no seam shows between two of them.
-func drawGradient(top, bottom, bands)
+## The whole canvas in strips of one colour each, from the colour `top` to the colour `bottom` (arrays [r, g, b, a]).
+## The strips overlap by a row, so that no seam shows between two of them. By default there is one strip per level
+## of the display that the colour crosses (a screen has 256 per channel): fewer show as steps, more change nothing.
+## `bands` forces the number.
+func drawGradient(top, bottom, bands = 0)
+    if bands <= 0 then
+        var levels = math.max(math.abs(bottom[1] - top[1]), math.abs(bottom[2] - top[2]), math.abs(bottom[3] - top[3])) * 255
+        bands = math.clamp(math.ceil(levels) + 1, 2, H)
+    end
     for i = 0, bands - 1 do
         var t = i / (bands - 1)
         graphics.fill(top[1] + (bottom[1] - top[1]) * t, top[2] + (bottom[2] - top[2]) * t,
