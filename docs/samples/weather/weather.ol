@@ -1,16 +1,22 @@
 ## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the
-## https and json modules. Left and right (the keys, or a tap on either side of the screen) change the city; a tap in
-## the middle asks again. A name is looked up from the magnifier, or by typing: both open the text field of the engine's
+## https and json modules. The cities are pages side by side, as in the weather application of a phone: drag the screen
+## sideways (or press left and right) to pass from one to the next, and the dots at the bottom say which page it is.
+## Every page keeps its own reading and asks the service again every ten minutes on its own, so a page that comes
+## into view already shows its weather, and a page that is asked again keeps showing the old one until the answer
+## replaces it. A name is looked up from the magnifier, or by typing: both open the text field of the engine's
 ## interface (ui.textField), which takes the keyboard of the system, the one of a phone included, so the accents, the
-## hyphen and the apostrophe of a name come as the system makes them. Return or a touch elsewhere looks the name up. The
-## weather is asked again every ten minutes on its own. The place is kept from one run to the next.
+## hyphen and the apostrophe of a name come as the system makes them. Return or a touch elsewhere looks the name up,
+## and the place found becomes one more page, after the cities. Return, when no field is open, asks again. The page
+## the last run left is kept from one run to the next.
 ##
 ## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
-## so the screen says "loading" until then. forecast.ol holds the addresses and the reading of the answers, and
-## weather_test.ol tries them on texts written the way the service writes them. The service is reached from the
-## browser, and only from it: elsewhere every request fails with "unsupported", which the screen reports.
+## so a page with no weather yet says "loading". forecast.ol holds the addresses and the reading of the answers,
+## pager.ol the motion of the pages, and weather_test.ol tries both: the answers on texts written the way the service
+## writes them. The service is reached from the browser, and only from it: elsewhere every request fails with
+## "unsupported", which the screen reports.
 
 import "forecast.ol"
+import "pager.ol"
 import "../lib/draw.ol"
 
 const CITIES = [
@@ -35,17 +41,23 @@ const SKY = {                   ## the top and the bottom of the sky behind each
     storm: [[0.1, 0.1, 0.22], [0.32, 0.3, 0.45]]
 }
 const WAITING = [[0.12, 0.2, 0.38], [0.3, 0.42, 0.6]]
+const RETRY = 60                ## seconds before a page asks again after a failure
+const STALE = 60                ## seconds after which a page that comes into view asks again
+const NOTICE = 4                ## seconds a message of the search stays on the screen
 const PLACE_KEY = "place"
 
 global app = {
-    place: CITIES[1],
-    index: 1,                   ## the city of the list the place comes from, or 0 for a place that was searched
-    weather: nil,               ## the reading being shown: nil until there is one, and again after a failure or a change of place
-    status: "loading",          ## loading, ready or failed; a reload of the same place keeps showing the weather while it is out
-    message: "",                ## what went wrong, when it failed
-    age: 0,                     ## seconds since the weather was asked
+    pages: [],                  ## one per place: {place, weather, message, age, request}; the cities, then at most one place that was searched
+    index: 1,                   ## the page the screen settles on
+    pos: 1,                     ## the page shown, fractional while the pages are dragged or slide
+    dragging: false,
+    grabX: 0,
+    grabPos: 1,
+    speed: 0,                   ## pages per second, while dragging
     typing: "",                 ## the name being typed, which the text field of the interface edits
-    request: nil
+    search: nil,                ## the request for a name, while it is out
+    notice: "",                 ## what a search has to say, for a few seconds
+    noticeAge: 0
 }
 
 ## ── Asking ─────────────────────────────────────────────────────────────────────────────────────────
@@ -62,80 +74,121 @@ func describe(res)
     return reasonOf(res.body) or "The service answered {res.status}."
 end
 
-func fail(message)
-    app.status = "failed"
-    app.weather = nil
-    app.message = message
-    app.request = nil
+func newPage(place)
+    return {place: place, weather: nil, message: "", age: 0, request: nil}
 end
 
-func stopAsking()
-    if app.request then
-        app.request.cancel()
-        app.request = nil
+func onForecast(page, res)
+    page.request = nil
+    var weather = nil
+    var why = nil
+    if res.ok then
+        weather, why = readForecast(res.body)
+        why = why and "Cannot read the answer: {why}."
+    else
+        why = describe(res)
     end
-end
-
-func onForecast(res)
-    app.request = nil
-    if not res.ok then
-        fail(describe(res))
+    if weather then
+        page.weather = weather
+        page.message = ""
+        page.age = 0
         return
     end
-    var weather, why = readForecast(res.body)
-    if not weather then
-        fail("Cannot read the answer: {why}.")
-        return
+    page.age = REFRESH - RETRY
+    if not page.weather then
+        page.message = why          ## a page that has a weather keeps it: an old reading is better than a message
     end
-    app.weather = weather
-    app.status = "ready"
-    app.age = 0
 end
 
-## Asks the weather of the place. The previous request, if one is still out, is given up: its answer would be for
-## another place. The weather already shown stays on the screen until the answer replaces it, so a reload does not flash.
-func ask()
-    stopAsking()
-    app.status = "loading"
-    app.request = https.get(forecastUrl(app.place.lat, app.place.lon), {timeout: TIMEOUT}, onForecast)
+## Asks the weather of a page. The previous request, if one is still out, is given up. The weather the page already has
+## stays on it until the answer replaces it, so that asking again does not flash.
+func ask(page)
+    if page.request then
+        page.request.cancel()
+    end
+    if not page.weather then
+        page.message = ""
+    end
+    page.age = 0
+    page.request = https.get(forecastUrl(page.place.lat, page.place.lon), {timeout: TIMEOUT}, func(res)
+        onForecast(page, res)
+    end)
 end
 
-func goTo(place, index)
-    app.place = place
-    app.index = index
-    data.set(PLACE_KEY, {place: place, index: index})
-    app.weather = nil
-    app.age = 0
-    ask()
+func say(text)
+    app.notice = text
+    app.noticeAge = 0
+end
+
+## What the next run starts from: the page, and the place that was searched if there is one.
+func save()
+    var searched = nil
+    if len(app.pages) > len(CITIES) then
+        searched = app.pages[len(app.pages)].place
+    end
+    data.set(PLACE_KEY, {index: app.index, searched: searched})
+end
+
+## Settles on a page, asking it again if what it shows is old.
+func settle(index)
+    app.index = math.clamp(index, 1, len(app.pages))
+    var page = app.pages[app.index]
+    if page.age >= STALE and not page.request then
+        ask(page)
+    end
+    save()
+end
+
+func nearPlace(a, b)
+    return math.abs(a.lat - b.lat) < 0.05 and math.abs(a.lon - b.lon) < 0.05
+end
+
+## Brings the place found by a search to the screen: the page that already shows it, or a page of its own, which takes
+## the place of the page of the last search.
+func show(place)
+    for i = 1, len(app.pages) do
+        if nearPlace(app.pages[i].place, place) then
+            settle(i)
+            return
+        end
+    end
+    if len(app.pages) > len(CITIES) then
+        var old = app.pages.pop()
+        if old.request then
+            old.request.cancel()
+        end
+        app.index = math.min(app.index, len(app.pages))
+        app.pos = math.min(app.pos, len(app.pages))
+    end
+    var page = newPage(place)
+    app.pages.push(page)
+    ask(page)
+    settle(len(app.pages))
 end
 
 func onPlace(name, res)
-    app.request = nil
+    app.search = nil
     if not res.ok then
-        fail(describe(res))
+        say(describe(res))
         return
     end
     var place, why = readPlace(res.body)
     if not place then
-        fail(why == "no such place" and "No place is called {name}." or "{why}.")
+        say(why == "no such place" and "No place is called {name}." or "{why}.")
         return
     end
-    goTo(place, 0)
+    app.notice = ""
+    show(place)
 end
 
 func search(name)
-    stopAsking()
-    app.weather = nil
-    app.status = "loading"
-    app.request = https.get(searchUrl(name), {timeout: TIMEOUT}, func(res)
+    if app.search then
+        app.search.cancel()
+    end
+    say("Looking for {name}…")
+    app.search = https.get(searchUrl(name), {timeout: TIMEOUT}, func(res)
         onPlace(name, res)
     end)
-end
-
-func step(by)
-    var n = len(CITIES)
-    var i = ((app.index - 1 + by) % n + n) % n + 1    ## % keeps the sign of its left side, so a step back from the first city needs the second %
-    goTo(CITIES[i], i)
 end
 
 ## The name is edited by the engine's text field, which owns the keyboard while it is open and calls this when the name is
@@ -167,7 +220,6 @@ func onSearchButton(x, y)
     var reach = b.r * 1.4
     return (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) <= reach * reach
 end
-
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 ## A text typed while the field is closed opens it with that text, as typing a letter always did, unless it is only spaces.
@@ -183,24 +235,32 @@ end
 ## The keys that WRITE nothing, by name.
 func keyboard.keypressed(key)
     if key == "return" then
-        ask()
+        ask(app.pages[app.index])
     elseif key == "left" then
-        step(-1)
+        settle(app.index - 1)
     elseif key == "right" then
-        step(1)
+        settle(app.index + 1)
     end
 end
 
+## A touch on the screen takes the pages, which then follow the finger (update reads where it is) until it lets go.
 func mouse.pressed(x, y)
     if onSearchButton(x, y) then
         openSearch()
-    elseif x < W * 0.3 then
-        step(-1)
-    elseif x > W * 0.7 then
-        step(1)
-    else
-        ask()
+        return
     end
+    app.dragging = true
+    app.grabX = x
+    app.grabPos = app.pos
+    app.speed = 0
+end
+
+func mouse.released(x, y)
+    if not app.dragging then
+        return
+    end
+    app.dragging = false
+    settle(pageAfterDrag(app.pos, app.speed, app.index, len(app.pages)))
 end
 
 ## ── Drawing ────────────────────────────────────────────────────────────────────────────────────────
@@ -301,8 +361,7 @@ func drawSearchButton()
     graphics.noStroke()
 end
 
-func drawForecast(x, y, w, h)
-    var days = app.weather.days
+func drawForecast(days, x, y, w, h)
     var n = math.min(len(days), FORECAST_DAYS)
     var cell = w / n
     for i = 1, n do
@@ -315,68 +374,118 @@ func drawForecast(x, y, w, h)
         drawText("{day.low:.0f}°", cx, y + h * 0.95, h * 0.14, "center", "center", WHITE, 0.65)
     end
 end
-
-func draw()
-    graphics.font("sans")
-    graphics.noStroke()
+## One page, in the coordinates of the screen: the sky of its weather, the place, the reading and the days to come.
+func drawPage(page)
     var column = math.min(W, H * 0.62)
-    var ready = app.weather
-    var sky = ready and skyOf(app.weather.code) or nil
+    var weather = page.weather
+    var sky = weather and skyOf(weather.code) or nil
     drawSky(sky and SKY[sky.kind] or WAITING)
-    var name = app.place.name
-    if app.place.country <> "" then
-        name = "{name}, {app.place.country}"
+    var name = page.place.name
+    if page.place.country <> "" then
+        name = "{name}, {page.place.country}"
     end
     var button = searchButton()
     var room = math.min(column * 0.95, 2 * (button.x - 1.4 * button.r - CX))       ## the magnifier and the handle take the right, and the title is centred
     drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
-    if ready then
+    if weather then
         drawIcon(sky.kind, CX, H * 0.22, column * 0.14)
-        drawText("{app.weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", WHITE)
+        drawText("{weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", WHITE)
         drawText(sky.text, CX, H * 0.52, fitSize(sky.text, column * 0.065, column * 0.95), "center", "center", WHITE)
-        drawText("Wind {app.weather.wind:.0f} km/h", CX, H * 0.585, column * 0.045, "center", "center", WHITE, 0.8)
-        drawForecast(CX - column * 0.5, H * 0.65, column, H * 0.25)
-    elseif app.status == "failed" then
-        var lines = wrap(app.message, 26)
+        drawText("Wind {weather.wind:.0f} km/h", CX, H * 0.585, column * 0.045, "center", "center", WHITE, 0.8)
+        drawForecast(weather.days, CX - column * 0.5, H * 0.65, column, H * 0.25)
+    elseif page.message <> "" then
+        var lines = wrap(page.message, 26)
         for i = 1, len(lines) do
             drawText(lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", WHITE)
         end
     else
         drawText("Loading…", CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
     end
-    var hint = "< >  another city      type a name, or touch the magnifier"
-    drawText(hint, CX, H * 0.95, fitSize(hint, column * 0.04, column * 0.95), "center", "center", WHITE, 0.7)
+end
+
+## One dot per page, the nearer the pages are to the screen the brighter its dot.
+func drawDots(y)
+    var r = math.max(math.min(W, H) * 0.011, 3)
+    var n = len(app.pages)
+    var spacing = r * 3.4
+    for i = 1, n do
+        fillC(WHITE, 1 - 0.6 * math.min(1, math.abs(i - app.pos)))
+        graphics.circle(CX + (i - (n + 1) / 2) * spacing, y, r)
+    end
+end
+
+func draw()
+    graphics.font("sans")
+    graphics.noStroke()
+    for i = 1, len(app.pages) do
+        var offset = math.floor((i - app.pos) * W + 0.5)
+        if offset > -W and offset < W then
+            graphics.push()
+            graphics.translate(offset, 0)
+            drawPage(app.pages[i])
+            graphics.pop()
+        end
+    end
+    var column = math.min(W, H * 0.62)
+    drawDots(H * 0.93)
+    var text = app.notice
+    if text == "" then
+        text = "< >  or drag for another city      type a name, or touch the magnifier"
+    end
+    drawText(text, CX, H * 0.972, fitSize(text, column * 0.04, column * 0.95), "center", "center", WHITE, app.notice == "" and 0.7 or 1)
     drawSearchButton()
 end
 
 func update(dt)
-    app.age += dt
-    if app.age >= REFRESH and app.status <> "loading" then
-        app.age = 0
-        ask()
+    for page in app.pages do
+        page.age += dt
+        if page.age >= REFRESH and not page.request then
+            ask(page)
+        end
+    end
+    if app.dragging then
+        var x = mouse.position()
+        var pos = dragPos(app.grabPos, app.grabX, x, W, len(app.pages))
+        if dt > 0 then
+            app.speed = app.speed * 0.6 + (pos - app.pos) / dt * 0.4
+        end
+        app.pos = pos
+    else
+        app.pos = slide(app.pos, app.index, dt)
+    end
+    app.noticeAge += dt
+    if app.noticeAge >= NOTICE and not app.search then
+        app.notice = ""
     end
 end
 
-## The place the last run left, or nil. A store is read and not trusted: it gets the checks an answer of the
-## service gets, so that a damaged one gives the first city instead of a request that cannot be made.
-func savedPlace()
-    var saved = data.get(PLACE_KEY)
-    if typeof(saved) <> "map" or typeof(saved.place) <> "map" or typeof(saved.index) <> "int" then
+## A place read from the store, or nil. A store is read and not trusted: it gets the checks an answer of the service
+## gets, so that a damaged one gives the first city instead of a request that cannot be made.
+func cleanPlace(place)
+    if typeof(place) <> "map" or typeof(place.name) <> "string" or not numbersOf([place.lat, place.lon], 2) then
         return nil
     end
-    if typeof(saved.place.name) <> "string" or not numbersOf([saved.place.lat, saved.place.lon], 2) then
-        return nil
-    end
-    return saved.place, saved.index
+    return {name: place.name, country: typeof(place.country) == "string" and place.country or "", lat: place.lat, lon: place.lon}
 end
 
 func setup()
     graphics.canvas(W, H, "Weather")
     graphics.fitArea()
-    var place, index = savedPlace()
-    if place then
-        app.place = place
-        app.index = index
+    for city in CITIES do
+        app.pages.push(newPage(city))
     end
-    ask()
+    var saved = data.get(PLACE_KEY)
+    var index = 1
+    if typeof(saved) == "map" then
+        var searched = cleanPlace(saved.searched)
+        if searched then
+            app.pages.push(newPage(searched))
+        end
+        index = typeof(saved.index) == "int" and saved.index or 1
+    end
+    app.index = math.clamp(index, 1, len(app.pages))
+    app.pos = app.index
+    for page in app.pages do
+        ask(page)
+    end
 end

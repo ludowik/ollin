@@ -3,6 +3,7 @@
 ## into " by q().
 
 import "forecast.ol"
+import "pager.ol"
 
 func q(t)
     return t.replace("'", string.fromCode(34))
@@ -75,3 +76,17 @@ place, problem = readPlace(q("\{'results':[\{'name':'Lone','latitude':1,'longitu
 assert(problem == nil and place.country == "", "a place with no country has an empty one")
 
 print("weather forecast ok")
+
+## ── The pages ──
+assert(dragPos(2, 100, 100, 400, 5) == 2, "a finger that has not moved leaves the pages where they were")
+assert(dragPos(2, 300, 100, 400, 5) == 2.5, "dragging left by half a screen shows half of the next page")
+assert(dragPos(2, 100, 300, 400, 5) == 1.5)
+assert(dragPos(1, 100, 4000, 400, 5) == 1 - EDGE, "the first page gives a little, then holds")
+assert(dragPos(5, 4000, 100, 400, 5) == 5 + EDGE)
+assert(pageAfterDrag(2.2, 0, 2, 5) == 2 and pageAfterDrag(2.6, 0, 2, 5) == 3, "a slow release goes to the nearest page")
+assert(pageAfterDrag(2.2, 3, 2, 5) == 3, "a flick carries it on to the next one")
+assert(pageAfterDrag(2.8, -3, 2, 5) == 2, "and a flick back carries it back")
+assert(pageAfterDrag(2.9, 40, 2, 5) == 3 and pageAfterDrag(1.1, -40, 2, 5) == 1, "never more than a page at once")
+assert(pageAfterDrag(0.8, -5, 1, 5) == 1 and pageAfterDrag(5.3, 5, 5, 5) == 5, "the ends hold")
+assert(slide(1, 3, 0.05) > 1 and slide(1, 3, 0.05) < 3 and slide(3, 1, 0.05) < 3)
+assert(slide(2.9995, 3, 0.016) == 3 and slide(1, 3, 10) == 3, "a slide ends on the page and never overshoots it")
