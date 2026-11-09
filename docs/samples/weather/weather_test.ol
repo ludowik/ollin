@@ -4,6 +4,7 @@
 
 import "forecast.ol"
 import "pager.ol"
+import "scale.ol"
 
 func q(t)
     return t.replace("'", string.fromCode(34))
@@ -11,7 +12,7 @@ end
 
 ## ── The addresses ──
 assert(forecastUrl(48.85, 2.35) ==
-       "https://api.open-meteo.com/v1/forecast?current=temperature_2m%2Cweather_code%2Cwind_speed_10m" +
+       "https://api.open-meteo.com/v1/forecast?current=temperature_2m%2Capparent_temperature%2Cweather_code%2Cwind_speed_10m" +
        "&daily=weather_code%2Ctemperature_2m_max%2Ctemperature_2m_min&forecast_days=5&latitude=48.85" +
        "&longitude=2.35&timezone=auto")
 assert(searchUrl("New York") == "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=en&name=New%20York")
@@ -37,6 +38,12 @@ assert(why == nil and weather.temp == 12.3 and weather.wind == 14.4 and weather.
 assert(len(weather.days) == 3 and weather.days[1].date == "2026-11-01" and weather.days[2].code == 3)
 assert(weather.days[1].dayName == "Sun" and weather.days[2].dayName == "Mon" and weather.days[3].dayName == "Tue")
 assert(weather.days[3].high == 9.5 and weather.days[3].low == 4 and weather.days[2].high == 11)
+
+assert(weather.feels == nil, "an answer with no apparent temperature has no feels-like")
+const WITH_FEELS = q("\{'current':\{'temperature_2m':1,'apparent_temperature':0,'weather_code':3,'wind_speed_10m':2},'daily':\{'time':['2026-11-01']," +
+                     "'weather_code':[3],'temperature_2m_max':[2],'temperature_2m_min':[0]}}")
+weather = readForecast(WITH_FEELS)
+assert(weather.feels == 0 and weather.temp == 1, "a feels-like of 0 degrees is read, not dropped")
 
 var nothing, reason = readForecast("not json")
 assert(nothing == nil and reason == "the answer is not JSON")
@@ -134,3 +141,14 @@ for i = 3, 12 do
 end
 assert(still == 0 and len(trail) <= 8, "a finger that stopped for a tenth of a second reads as still, and old samples go")
 assert(track([[5, 2]], 5, 2) == 0, "a single sample has no speed")
+
+## ── The temperature scale ──
+func sameColour(a, b)
+    return math.abs(a[1] - b[1]) + math.abs(a[2] - b[2]) + math.abs(a[3] - b[3]) < 1e-9
+end
+assert(sameColour(tempColour(-40), TEMP_STOPS[1][2]) and sameColour(tempColour(80), TEMP_STOPS[len(TEMP_STOPS)][2]), "held beyond the ends")
+assert(sameColour(tempColour(10), TEMP_STOPS[3][2]), "exact on a step")
+var mid = tempColour(14)
+assert(mid[1] > TEMP_STOPS[3][2][1] and mid[1] < TEMP_STOPS[4][2][1], "between two steps it is between their colours")
+assert(onTrack(5, 0, 10) == 0.5 and onTrack(-3, 0, 10) == 0 and onTrack(15, 0, 10) == 1, "held on the track")
+assert(onTrack(7, 7, 7) == 0.5, "a track of no width has a middle")

@@ -12,7 +12,7 @@ func forecastUrl(lat, lon)
     return https.query("https://api.open-meteo.com/v1/forecast", {
         latitude: lat,
         longitude: lon,
-        current: "temperature_2m,weather_code,wind_speed_10m",
+        current: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
         daily: "weather_code,temperature_2m_max,temperature_2m_min",
         timezone: "auto",
         forecast_days: FORECAST_DAYS
@@ -104,8 +104,8 @@ func reasonOf(body)
 end
 
 ## The weather now and over the next days, from the text of an answer of the forecast service:
-##   {temp, wind, code, days: [{date, dayName, code, high, low}]}
-## or nil and the reason it cannot be read. `dayName` is the day of the week of the date, worked out here once rather
+##   {temp, feels, wind, code, days: [{date, dayName, code, high, low}]}
+## or nil and the reason it cannot be read. `feels`, the temperature it feels like, is nil when the answer has none. `dayName` is the day of the week of the date, worked out here once rather
 ## than at every frame.
 func readForecast(body)
     var data = parseJson(body)
@@ -134,7 +134,11 @@ func readForecast(body)
         days.push({date: daily.time[i], dayName: dayName, code: daily.weather_code[i],
             high: daily.temperature_2m_max[i], low: daily.temperature_2m_min[i]})
     end
-    return {temp: now.temperature_2m, wind: now.wind_speed_10m, code: now.weather_code, days: days}
+    var feels = nil
+    if numbersOf([now.apparent_temperature], 1) then
+        feels = now.apparent_temperature          ## not `and … or`: a feels-like of 0 is falsy
+    end
+    return {temp: now.temperature_2m, feels: feels, wind: now.wind_speed_10m, code: now.weather_code, days: days}
 end
 
 ## The first place of an answer of the search service: {name, country, lat, lon}, or nil and the reason.

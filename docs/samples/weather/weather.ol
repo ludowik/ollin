@@ -17,6 +17,7 @@
 
 import "forecast.ol"
 import "pager.ol"
+import "scale.ol"
 import "../lib/draw.ol"
 
 const CITIES = [
@@ -400,24 +401,93 @@ func drawSearchButton()
     graphics.noStroke()
 end
 
-func drawForecast(days, x, y, w, h)
-    var n = math.min(len(days), FORECAST_DAYS)
-    var cell = w / n
-    for i = 1, n do
-        var day = days[i]
-        var cx = x + (i - 0.5) * cell
-        var label = i == 1 and "Today" or day.dayName
-        drawText(label, cx, y + h * 0.1, fitSize(label, h * 0.17, cell * 0.9), "center", "center", WHITE)
-        drawIcon(skyOf(day.code).kind, cx, y + h * 0.48, math.min(cell * 0.28, h * 0.2))
-        drawText("{day.high:.0f}°", cx, y + h * 0.78, h * 0.17, "center", "center", WHITE)
-        drawText("{day.low:.0f}°", cx, y + h * 0.95, h * 0.14, "center", "center", WHITE, 0.65)
+const CARD = [0.05, 0.1, 0.2, 0.3]      ## the tint of a card, dark so that the white text keeps its contrast over a bright sky
+
+## A card over the sky: a rounded, tinted panel with a faint edge, and its title.
+func drawCard(x, y, w, h, title)
+    var r = w * 0.045
+    fillC(WHITE, 0.1)
+    graphics.rect(x - 1, y - 1, w + 2, h + 2, r + 1)
+    fillC(CARD)
+    graphics.rect(x, y, w, h, r)
+    drawText(title, x + w * 0.05, y + w * 0.065, w * 0.042, "left", "center", WHITE, 0.65)
+end
+
+## The card of what the weather feels like now: a few figures side by side, each with its label.
+func drawConditions(weather, x, y, w, h)
+    drawCard(x, y, w, h, "Conditions")
+    var cells = []
+    if weather.feels <> nil then
+        cells.push(["Feels like", "{weather.feels:.0f}°"])
+    end
+    cells.push(["Wind", "{weather.wind:.0f} km/h"])
+    for i = 1, len(cells) do
+        var cx = x + w * (i - 0.5) / len(cells)
+        drawText(cells[i][1], cx, y + h * 0.5, math.min(h * 0.14, w * 0.05), "center", "center", WHITE, 0.65)
+        drawText(cells[i][2], cx, y + h * 0.77, fitSize(cells[i][2], h * 0.25, w / len(cells) * 0.9), "center", "center", WHITE)
     end
 end
-## One page, in the coordinates of the screen, over the sky: the place, the reading and the days to come.
+
+## The bar of a day, from its low to its high on a track that shows the lowest and the highest of all the days: cold
+## blue to warm orange along it, and a white dot where the temperature now stands on the day it is for.
+func drawRange(day, lo, hi, now, x, y, w, h)
+    fillC(WHITE, 0.15)
+    graphics.rect(x, y - h / 2, w, h, h / 2)
+    var from = x + w * onTrack(day.low, lo, hi)
+    var to = math.max(x + w * onTrack(day.high, lo, hi), from + h)
+    if to > x + w then
+        to = x + w
+        from = to - h
+    end
+    var inner = to - from - h
+    fillC(tempColour(day.low))
+    graphics.circle(from + h / 2, y, h / 2)
+    fillC(tempColour(day.high))
+    graphics.circle(to - h / 2, y, h / 2)
+    var slices = 10
+    for k = 0, slices - 1 do
+        fillC(tempColour(day.low + (day.high - day.low) * (k + 0.5) / slices))
+        graphics.rect(from + h / 2 + inner * k / slices, y - h / 2, inner / slices + 1, h)
+    end
+    if now <> nil then
+        fillC(WHITE)
+        graphics.circle(x + w * onTrack(math.clamp(now, day.low, day.high), lo, hi), y, h * 0.8)
+    end
+end
+
+## The card of the days to come, a row each: the day, its sky, its low, its range and its high.
+func drawDays(weather, x, y, w, h)
+    var days = weather.days
+    var n = math.min(len(days), FORECAST_DAYS)
+    drawCard(x, y, w, h, "{n}-day forecast")
+    var lo = days[1].low
+    var hi = days[1].high
+    for i = 1, n do
+        lo = math.min(lo, days[i].low)
+        hi = math.max(hi, days[i].high)
+    end
+    var top = y + w * 0.12
+    var rowH = (y + h - top - h * 0.03) / n
+    var size = math.min(rowH * 0.46, w * 0.055)
+    for i = 1, n do
+        var day = days[i]
+        var cy = top + (i - 0.5) * rowH
+        if i > 1 then
+            fillC(WHITE, 0.12)
+            graphics.rect(x + w * 0.05, cy - rowH / 2, w * 0.9, 1)
+        end
+        drawText(i == 1 and "Today" or day.dayName, x + w * 0.05, cy, size, "left", "center", WHITE)
+        drawIcon(skyOf(day.code).kind, x + w * 0.31, cy, math.min(rowH * 0.3, w * 0.05))
+        drawText("{day.low:.0f}°", x + w * 0.5, cy, size, "right", "center", WHITE, 0.6)
+        drawRange(day, lo, hi, i == 1 and weather.temp or nil, x + w * 0.54, cy, w * 0.26, math.max(rowH * 0.17, 4))
+        drawText("{day.high:.0f}°", x + w * 0.95, cy, size, "right", "center", WHITE)
+    end
+end
+
+## One page, in the coordinates of the screen, over the sky: the place and the weather now, then two cards.
 func drawPage(page)
     var column = math.min(W, H * 0.62)
     var weather = page.weather
-    var sky = weather and skyOf(weather.code) or nil
     var name = page.place.name
     if page.place.country <> "" then
         name = "{name}, {page.place.country}"
@@ -426,11 +496,15 @@ func drawPage(page)
     var room = math.min(column * 0.95, 2 * (button.x - 1.4 * button.r - CX))       ## the magnifier and the handle take the right, and the title is centred
     drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
     if weather then
-        drawIcon(sky.kind, CX, H * 0.22, column * 0.14)
-        drawText("{weather.temp:.0f}°", CX, H * 0.4, column * 0.3, "center", "center", WHITE)
-        drawText(sky.text, CX, H * 0.52, fitSize(sky.text, column * 0.065, column * 0.95), "center", "center", WHITE)
-        drawText("Wind {weather.wind:.0f} km/h", CX, H * 0.585, column * 0.045, "center", "center", WHITE, 0.8)
-        drawForecast(weather.days, CX - column * 0.5, H * 0.65, column, H * 0.25)
+        var sky = skyOf(weather.code)
+        var temp = "{weather.temp:.0f}°"
+        var today = weather.days[1]
+        drawText(temp, CX, H * 0.245, fitSize(temp, column * 0.34, column * 0.8), "center", "center", WHITE)
+        drawText(sky.text, CX, H * 0.36, fitSize(sky.text, column * 0.065, column * 0.9), "center", "center", WHITE)
+        drawText("High {today.high:.0f}°   Low {today.low:.0f}°", CX, H * 0.41, column * 0.05, "center", "center", WHITE, 0.85)
+        var card = column * 0.94
+        drawConditions(weather, CX - card / 2, H * 0.47, card, H * 0.135)
+        drawDays(weather, CX - card / 2, H * 0.625, card, H * 0.285)
     elseif page.message <> "" then
         var lines = wrap(page.message, 26)
         for i = 1, len(lines) do
