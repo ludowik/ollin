@@ -90,6 +90,8 @@ assert(pageAfterDrag(2.9, 40, 2, 5) == 3 and pageAfterDrag(1.1, -40, 2, 5) == 1,
 assert(pageAfterDrag(0.8, -5, 1, 5) == 1 and pageAfterDrag(5.3, 5, 5, 5) == 5, "the ends hold")
 var pos, speed = slide(1, 0, 3, 0.05)
 assert(pos > 1 and pos < 3 and speed > 0, "a slide from rest sets off towards the page")
+var stiffer = slide(1, 0, 3, 0.016, FOLLOW)
+assert(stiffer > slide(1, 0, 3, 0.016) and stiffer < 3, "a stiffer spring closes more of the gap in a frame, and still does not pass it")
 pos, speed = slide(2.9996, 0, 3, 0.016)
 assert(pos == 3 and speed == 0, "and ends exactly on it")
 assert(math.abs(launch(1.4, 12, 2) - 0.6 * STIFF) < 1e-9 and launch(1.4, 0.5, 2) == 0.5, "the speed of the finger is kept, up to what lands on the page")

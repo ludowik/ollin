@@ -53,6 +53,8 @@ global app = {
     dragging: false,
     grabX: 0,
     grabPos: 1,
+    finger: 1,                  ## where the finger holds the pages, which pos follows with a spring while it is down
+    dirty: false,               ## the page changed and is not saved yet
     trail: [],                  ## the samples [time, position] of the drag, which its speed is read from
     vel: 0,                     ## pages per second, while sliding
     typing: "",                 ## the name being typed, which the text field of the interface edits
@@ -138,7 +140,7 @@ func settle(index)
     if page.age >= STALE and not page.request then
         ask(page)
     end
-    save()
+    app.dirty = true
 end
 
 func nearPlace(a, b)
@@ -255,13 +257,14 @@ func mouse.pressed(x, y)
     app.grabX = x
     app.grabPos = app.pos
     app.vel = 0
+    app.finger = app.pos
     app.trail = [[elapsedTime, app.pos]]
 end
 
 ## The pages follow the finger, now at x: where they are, and the speed of the drag.
 func follow(x)
-    app.pos = dragPos(app.grabPos, app.grabX, x, W, len(app.pages))
-    return track(app.trail, elapsedTime, app.pos)
+    app.finger = dragPos(app.grabPos, app.grabX, x, W, len(app.pages))
+    return track(app.trail, elapsedTime, app.finger)
 end
 
 ## Lets go of the pages, the finger being at x: they settle on the page the drag points to, going on at its speed.
@@ -269,7 +272,7 @@ func release(x)
     var speed = follow(x)
     app.dragging = false
     app.vel = speed
-    settle(pageAfterDrag(app.pos, speed, app.index, len(app.pages)))
+    settle(pageAfterDrag(app.finger, speed, app.index, len(app.pages)))
 end
 
 func mouse.released(x, y)
@@ -454,7 +457,7 @@ func draw()
     graphics.noStroke()
     drawSky(skyAt(app.pos))
     for i = 1, len(app.pages) do
-        var offset = math.floor((i - app.pos) * W + 0.5)
+        var offset = (i - app.pos) * W
         if offset > -W and offset < W then
             graphics.push()
             graphics.translate(offset, 0)
@@ -482,11 +485,16 @@ func update(dt)
     if app.dragging then
         if mouse.isDown() then
             follow(mouse.position())
+            app.pos, app.vel = slide(app.pos, app.vel, app.finger, dt, FOLLOW)
         else
             release(mouse.position())       ## a release that was never reported (the system takes the touch away) must not leave the pages held
         end
     else
         app.pos, app.vel = slide(app.pos, app.vel, app.index, dt)
+        if app.dirty and app.pos == app.index then
+            save()              ## once the pages have come to rest: writing the store in the middle of a slide would cost a frame
+            app.dirty = false
+        end
     end
     app.noticeAge += dt
     if app.noticeAge >= NOTICE and not app.search then
