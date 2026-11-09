@@ -7,29 +7,32 @@
 ## interface (ui.textField), which takes the keyboard of the system, the one of a phone included, so the accents, the
 ## hyphen and the apostrophe of a name come as the system makes them. Return or a touch elsewhere looks the name up,
 ## and the place found becomes one more page, after the cities. Return, when no field is open, asks again. The page
-## the last run left is kept from one run to the next.
+## and the language the last run left are kept from one run to the next. The app speaks French (the default) and
+## English, chosen from the list of the interface: the words are in texts.ol, and a language is one more table there.
 ##
 ## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
 ## so a page with no weather yet says "loading". forecast.ol holds the addresses and the reading of the answers,
-## pager.ol the motion of the pages, and weather_test.ol tries both: the answers on texts written the way the service
-## writes them. The service is reached from the browser, and only from it: elsewhere every request fails with
+## pager.ol the motion of the pages, scale.ol the colours of a temperature, and weather_test.ol tries them, and the
+## answers on texts written the way the service writes them. The service is reached from the browser, and only from it: elsewhere every request fails with
 ## "unsupported", which the screen reports.
 
 import "forecast.ol"
 import "pager.ol"
 import "scale.ol"
+import "texts.ol"
 import "../lib/draw.ol"
 
 const CITIES = [
-    {name: "Paris", country: "France", lat: 48.8534, lon: 2.3488},
-    {name: "London", country: "United Kingdom", lat: 51.5085, lon: -0.1257},
-    {name: "New York", country: "United States", lat: 40.7143, lon: -74.006},
-    {name: "Tokyo", country: "Japan", lat: 35.6895, lon: 139.6917},
-    {name: "Sydney", country: "Australia", lat: -33.8678, lon: 151.2073},
-    {name: "Reykjavik", country: "Iceland", lat: 64.1355, lon: -21.8954},
-    {name: "Cairo", country: "Egypt", lat: 30.0626, lon: 31.2497},
-    {name: "Rio de Janeiro", country: "Brazil", lat: -22.9028, lon: -43.2075}
+    {id: "paris", lat: 48.8534, lon: 2.3488},
+    {id: "london", lat: 51.5085, lon: -0.1257},
+    {id: "newYork", lat: 40.7143, lon: -74.006},
+    {id: "tokyo", lat: 35.6895, lon: 139.6917},
+    {id: "sydney", lat: -33.8678, lon: 151.2073},
+    {id: "reykjavik", lat: 64.1355, lon: -21.8954},
+    {id: "cairo", lat: 30.0626, lon: 31.2497},
+    {id: "rio", lat: -22.9028, lon: -43.2075}
 ]
+const LANG_KEY = "lang"
 const REFRESH = 600             ## seconds before the weather is asked again
 const TIMEOUT = 15              ## seconds the service has to answer
 const SKY = {                   ## the top and the bottom of the sky behind each kind of weather
@@ -66,20 +69,33 @@ global app = {
 
 ## ── Asking ─────────────────────────────────────────────────────────────────────────────────────────
 
-## What a failed request means to the person looking at the screen.
+## What a failed request means to the person looking at the screen, in the language of the moment.
 func describe(res)
     if res.error == "unsupported" then
-        return "This build has no network: the weather is asked from the browser."
+        return tr("noNetwork")
     elseif res.error == "timeout" then
-        return "The service did not answer in time."
+        return tr("timeout")
     elseif res.error then
-        return "No answer: the network is down, or the service does not allow this page to ask."
+        return tr("noAnswer")
     end
-    return reasonOf(res.body) or "The service answered {res.status}."
+    return reasonOf(res.body) or tr("answered")(res.status)
+end
+
+## The name of a place and of its country: the table of the language for a city of the list, what the search service wrote
+## for a place that was searched.
+func placeLabel(place)
+    var names = [place.name, place.country]
+    if place.id then
+        names = tr("cities")[place.id]
+    end
+    if names[2] == "" then
+        return names[1]
+    end
+    return "{names[1]}, {names[2]}"
 end
 
 func newPage(place)
-    return {place: place, weather: nil, message: "", age: 0, request: nil}
+    return {place: place, weather: nil, failure: nil, age: 0, request: nil}
 end
 
 func onForecast(page, res)
@@ -88,19 +104,20 @@ func onForecast(page, res)
     var why = nil
     if res.ok then
         weather, why = readForecast(res.body)
-        why = why and "Cannot read the answer: {why}."
-    else
-        why = describe(res)
     end
     if weather then
         page.weather = weather
-        page.message = ""
+        page.failure = nil
         page.age = 0
         return
     end
     page.age = REFRESH - RETRY
     if not page.weather then
-        page.message = why          ## a page that has a weather keeps it: an old reading is better than a message
+        ## a page that has a weather keeps it: an old reading is better than a message. The message is made when it is
+        ## shown, so that it follows a change of language.
+        page.failure = func()
+            return why and tr("cannotRead")(reasonText(why)) or describe(res)
+        end
     end
 end
 
@@ -111,7 +128,7 @@ func ask(page)
         page.request.cancel()
     end
     if not page.weather then
-        page.message = ""
+        page.failure = nil
     end
     page.age = 0
     page.request = https.get(forecastUrl(page.place.lat, page.place.lon), {timeout: TIMEOUT}, func(res)
@@ -179,7 +196,7 @@ func onPlace(name, res)
     end
     var place, why = readPlace(res.body)
     if not place then
-        say(why == "no such place" and "No place is called {name}." or "{why}.")
+        say(why == "noPlace" and tr("noPlace")(name) or tr("cannotRead")(reasonText(why)))
         return
     end
     app.notice = ""
@@ -190,8 +207,8 @@ func search(name)
     if app.search then
         app.search.cancel()
     end
-    say("Looking for {name}…")
-    app.search = https.get(searchUrl(name), {timeout: TIMEOUT}, func(res)
+    say(tr("lookingFor")(name))
+    app.search = https.get(searchUrl(name, i18n.lang), {timeout: TIMEOUT}, func(res)
         onPlace(name, res)
     end)
 end
@@ -207,7 +224,31 @@ func lookUp(name)
     end
 end
 
-global searchField = ui.textField("City", ref app.typing, 30, "Type a city name", lookUp)
+global searchField = nil
+global languageName = nil
+
+## A language chosen from the list of the interface: kept for the next run, and the interface is declared again in it.
+func chooseLanguage(name)
+    for code in LANGUAGES do
+        if TEXTS[code].name == name and setLanguage(code) then
+            data.set(LANG_KEY, code)
+            buildInterface()
+        end
+    end
+end
+
+## The widgets of the interface, in the language of the moment: the field a name is typed in, and the list of languages.
+## Declared again at every change of language, the label of a widget being fixed when it is declared.
+func buildInterface()
+    ui.clear()
+    languageName = tr("name")
+    searchField = ui.textField(tr("cityLabel"), ref app.typing, 30, tr("cityPlaceholder"), lookUp)
+    var names = []
+    for code in LANGUAGES do
+        names.push(TEXTS[code].name)
+    end
+    ui.list(tr("languageLabel"), names, ref languageName, chooseLanguage)
+end
 
 func openSearch()
     app.typing = ""
@@ -415,12 +456,12 @@ end
 
 ## The card of what the weather feels like now: a few figures side by side, each with its label.
 func drawConditions(weather, x, y, w, h)
-    drawCard(x, y, w, h, "Conditions")
+    drawCard(x, y, w, h, tr("conditions"))
     var cells = []
     if weather.feels <> nil then
-        cells.push(["Feels like", "{weather.feels:.0f}°"])
+        cells.push([tr("feelsLike"), "{weather.feels:.0f}°"])
     end
-    cells.push(["Wind", "{weather.wind:.0f} km/h"])
+    cells.push([tr("wind"), "{weather.wind:.0f} km/h"])
     for i = 1, len(cells) do
         var cx = x + w * (i - 0.5) / len(cells)
         drawText(cells[i][1], cx, y + h * 0.5, math.min(h * 0.14, w * 0.05), "center", "center", WHITE, 0.65)
@@ -459,7 +500,7 @@ end
 func drawDays(weather, x, y, w, h)
     var days = weather.days
     var n = math.min(len(days), FORECAST_DAYS)
-    drawCard(x, y, w, h, "{n}-day forecast")
+    drawCard(x, y, w, h, tr("forecastTitle")(n))
     var lo = days[1].low
     var hi = days[1].high
     for i = 1, n do
@@ -476,7 +517,7 @@ func drawDays(weather, x, y, w, h)
             fillC(WHITE, 0.12)
             graphics.rect(x + w * 0.05, cy - rowH / 2, w * 0.9, 1)
         end
-        drawText(i == 1 and "Today" or day.dayName, x + w * 0.05, cy, size, "left", "center", WHITE)
+        drawText(i == 1 and tr("today") or date.weekdayName(day.weekday, i18n.lang, "short"), x + w * 0.05, cy, size, "left", "center", WHITE)
         drawIcon(skyOf(day.code).kind, x + w * 0.31, cy, math.min(rowH * 0.3, w * 0.05))
         drawText("{day.low:.0f}°", x + w * 0.5, cy, size, "right", "center", WHITE, 0.6)
         drawRange(day, lo, hi, i == 1 and weather.temp or nil, x + w * 0.54, cy, w * 0.26, math.max(rowH * 0.17, 4))
@@ -488,10 +529,7 @@ end
 func drawPage(page)
     var column = math.min(W, H * 0.62)
     var weather = page.weather
-    var name = page.place.name
-    if page.place.country <> "" then
-        name = "{name}, {page.place.country}"
-    end
+    var name = placeLabel(page.place)
     var button = searchButton()
     var room = math.min(column * 0.95, 2 * (button.x - 1.4 * button.r - CX))       ## the magnifier and the handle take the right, and the title is centred
     drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
@@ -500,18 +538,19 @@ func drawPage(page)
         var temp = "{weather.temp:.0f}°"
         var today = weather.days[1]
         drawText(temp, CX, H * 0.245, fitSize(temp, column * 0.34, column * 0.8), "center", "center", WHITE)
-        drawText(sky.text, CX, H * 0.36, fitSize(sky.text, column * 0.065, column * 0.9), "center", "center", WHITE)
-        drawText("High {today.high:.0f}°   Low {today.low:.0f}°", CX, H * 0.41, column * 0.05, "center", "center", WHITE, 0.85)
+        var words = skyText(sky)
+        drawText(words, CX, H * 0.36, fitSize(words, column * 0.065, column * 0.9), "center", "center", WHITE)
+        drawText(tr("highLow")("{today.high:.0f}", "{today.low:.0f}"), CX, H * 0.41, column * 0.05, "center", "center", WHITE, 0.85)
         var card = column * 0.94
         drawConditions(weather, CX - card / 2, H * 0.47, card, H * 0.135)
         drawDays(weather, CX - card / 2, H * 0.625, card, H * 0.285)
-    elseif page.message <> "" then
-        var lines = wrap(page.message, 26)
+    elseif page.failure then
+        var lines = wrap(page.failure(), 26)
         for i = 1, len(lines) do
             drawText(lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", WHITE)
         end
     else
-        drawText("Loading…", CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
+        drawText(tr("loading"), CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
     end
 end
 
@@ -543,7 +582,7 @@ func draw()
     drawDots(H * 0.93)
     var text = app.notice
     if text == "" then
-        text = "< >  or drag for another city      type a name, or touch the magnifier"
+        text = tr("hint")
     end
     drawText(text, CX, H * 0.972, fitSize(text, column * 0.04, column * 0.95), "center", "center", WHITE, app.notice == "" and 0.7 or 1)
     drawSearchButton()
@@ -586,8 +625,10 @@ func cleanPlace(place)
 end
 
 func setup()
-    graphics.canvas(W, H, "Weather")
+    setLanguage(data.get(LANG_KEY, i18n.lang))
+    graphics.canvas(W, H, tr("windowTitle"))
     graphics.fitArea()
+    buildInterface()
     for city in CITIES do
         app.pages.push(newPage(city))
     end

@@ -5,6 +5,7 @@
 import "forecast.ol"
 import "pager.ol"
 import "scale.ol"
+import "texts.ol"
 
 func q(t)
     return t.replace("'", string.fromCode(34))
@@ -15,18 +16,19 @@ assert(forecastUrl(48.85, 2.35) ==
        "https://api.open-meteo.com/v1/forecast?current=temperature_2m%2Capparent_temperature%2Cweather_code%2Cwind_speed_10m" +
        "&daily=weather_code%2Ctemperature_2m_max%2Ctemperature_2m_min&forecast_days=5&latitude=48.85" +
        "&longitude=2.35&timezone=auto")
-assert(searchUrl("New York") == "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=en&name=New%20York")
+assert(searchUrl("New York", "en") == "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=en&name=New%20York")
+assert(searchUrl("Londres", "fr") == "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=fr&name=Londres")
 
 ## ── The days of the week ──
-assert(weekday("2026-11-01") == "Sun" and weekday("2026-11-02") == "Mon" and weekday("2024-02-29") == "Thu")
-assert(weekday("2000-01-01") == "Sat" and weekday("1999-12-31") == "Fri" and weekday("2026-03-01") == "Sun")
+assert(weekday("2026-11-01") == 7 and weekday("2026-11-02") == 1 and weekday("2024-02-29") == 4)
+assert(weekday("2000-01-01") == 6 and weekday("1999-12-31") == 5 and weekday("2026-03-01") == 7)
 
 ## ── The skies ──
-assert(skyOf(0).kind == "clear" and skyOf(2).kind == "partly" and skyOf(3).text == "Overcast")
+assert(skyOf(0).kind == "clear" and skyOf(2).kind == "partly" and skyOf(3).key == "overcast")
 assert(skyOf(61).kind == "rain" and skyOf(73).kind == "snow" and skyOf(95).kind == "storm" and skyOf(45).kind == "fog")
-assert(skyOf(1234).kind == "cloud" and skyOf(1234).text == "Weather code 1234", "an unknown code is not a failure")
+assert(skyOf(1234).kind == "cloud" and skyOf(1234).key == nil and skyOf(1234).code == 1234, "an unknown code is not a failure")
 for code, sky in SKIES do
-    assert(sky.text <> "" and ["clear", "partly", "cloud", "fog", "rain", "snow", "storm"].contains(sky.kind), "code {code}")
+    assert(sky.key <> nil and ["clear", "partly", "cloud", "fog", "rain", "snow", "storm"].contains(sky.kind), "code {code}")
 end
 
 ## ── A forecast ──
@@ -36,7 +38,7 @@ const FORECAST = q("\{'latitude':48.86,'longitude':2.36,'current':\{'time':'2026
 var weather, why = readForecast(FORECAST)
 assert(why == nil and weather.temp == 12.3 and weather.wind == 14.4 and weather.code == 61)
 assert(len(weather.days) == 3 and weather.days[1].date == "2026-11-01" and weather.days[2].code == 3)
-assert(weather.days[1].dayName == "Sun" and weather.days[2].dayName == "Mon" and weather.days[3].dayName == "Tue")
+assert(weather.days[1].weekday == 7 and weather.days[2].weekday == 1 and weather.days[3].weekday == 2)
 assert(weather.days[3].high == 9.5 and weather.days[3].low == 4 and weather.days[2].high == 11)
 
 assert(weather.feels == nil, "an answer with no apparent temperature has no feels-like")
@@ -46,20 +48,20 @@ weather = readForecast(WITH_FEELS)
 assert(weather.feels == 0 and weather.temp == 1, "a feels-like of 0 degrees is read, not dropped")
 
 var nothing, reason = readForecast("not json")
-assert(nothing == nil and reason == "the answer is not JSON")
+assert(nothing == nil and reason == "notJson")
 nothing, reason = readForecast("[1]")
-assert(nothing == nil and reason == "the answer holds no weather")
+assert(nothing == nil and reason == "noWeather")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1},'daily':\{}}"))
-assert(nothing == nil and reason == "the weather of now is missing")
+assert(nothing == nil and reason == "nowMissing")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1,'weather_code':0,'wind_speed_10m':2},'daily':\{'time':['2026-11-01'],'weather_code':[0]}}"))
-assert(nothing == nil and reason == "the forecast of the days is missing")
+assert(nothing == nil and reason == "daysMissing")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':'cold','weather_code':0,'wind_speed_10m':2},'daily':\{}}"))
-assert(nothing == nil and reason == "the weather of now is missing", "a number written as a text is not a number")
+assert(nothing == nil and reason == "nowMissing", "a number written as a text is not a number")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1,'weather_code':0,'wind_speed_10m':2},'daily':\{'time':[],'weather_code':[],'temperature_2m_max':[],'temperature_2m_min':[]}}"))
-assert(nothing == nil and reason == "the forecast of the days is missing", "no day at all")
+assert(nothing == nil and reason == "daysMissing", "no day at all")
 nothing, reason = readForecast(q("\{'current':\{'temperature_2m':1,'weather_code':0,'wind_speed_10m':2},'daily':\{'time':['x'],'weather_code':[0],'temperature_2m_max':[1],'temperature_2m_min':[0]}}"))
-assert(nothing == nil and reason == "a date of the forecast is not a date", "a day that is not a date is a refusal, not an error")
-assert(weekday("2026-11-01") == "Sun" and weekday("2026-12-31") == "Thu" and weekday("2024-02-29") == "Thu", "ordinary dates")
+assert(nothing == nil and reason == "badDate", "a day that is not a date is a refusal, not an error")
+assert(weekday("2026-11-01") == 7 and weekday("2026-12-31") == 4 and weekday("2024-02-29") == 4, "ordinary dates: 1 Monday to 7 Sunday")
 assert(weekday("2026-02-29") == nil and weekday("2026/11/01") == nil and weekday("") == nil, "what is no date")
 assert(weekday(5) == nil and weekday(nil) == nil and weekday([2026]) == nil, "not even a text")
 
@@ -72,15 +74,61 @@ var place, problem = readPlace(q("\{'results':[\{'id':2988507,'name':'Paris','la
                                  "'generationtime_ms':0.5}"))
 assert(problem == nil and place.name == "Paris" and place.country == "France" and place.lat == 48.85341 and place.lon == 2.3488)
 place, problem = readPlace(q("\{'generationtime_ms':0.2}"))
-assert(place == nil and problem == "no such place", "the service sends no results at all for an unknown name")
+assert(place == nil and problem == "noPlace", "the service sends no results at all for an unknown name")
 place, problem = readPlace(q("\{'results':[]}"))
-assert(place == nil and problem == "no such place")
+assert(place == nil and problem == "noPlace")
 place, problem = readPlace(q("\{'results':[\{'name':'Nowhere'}]}"))
-assert(place == nil and problem == "the place has no position")
+assert(place == nil and problem == "noPosition")
 place, problem = readPlace("\{")
-assert(place == nil and problem == "the answer is not JSON")
+assert(place == nil and problem == "notJson")
 place, problem = readPlace(q("\{'results':[\{'name':'Lone','latitude':1,'longitude':2}]}"))
 assert(problem == nil and place.country == "", "a place with no country has an empty one")
+
+## ── The texts ──
+## Both languages say everything, in texts of the same kind: a key missing from one would show on the screen as nothing.
+assert(LANGUAGES[1] == "fr" and i18n.lang == "fr", "French is the default language")
+var reference = TEXTS[LANGUAGES[1]]
+func sameKeys(a, b, where)
+    for key, value in a do
+        assert(b[key] <> nil, "{where}: {key} is missing")
+        assert(typeof(b[key]) == typeof(value), "{where}: {key} is not of the same kind")
+    end
+end
+for code in LANGUAGES do
+    var table = TEXTS[code]
+    assert(table <> nil, "{code} is listed but has no texts")
+    sameKeys(reference, table, code)
+    sameKeys(table, reference, code)
+    sameKeys(reference.sky, table.sky, "{code} sky")
+    sameKeys(table.sky, reference.sky, "{code} sky")
+    sameKeys(reference.reasons, table.reasons, "{code} reasons")
+    sameKeys(table.reasons, reference.reasons, "{code} reasons")
+    sameKeys(reference.cities, table.cities, "{code} cities")
+    sameKeys(table.cities, reference.cities, "{code} cities")
+    for key, names in table.cities do
+        assert(len(names) == 2 and names[1] <> "" and names[2] <> "", "{code}: {key} wants a name and a country")
+    end
+    ## the texts that take a figure or a name say it
+    assert(table.forecastTitle(5).find("5") <> nil and table.lookingFor("Nîmes").find("Nîmes") <> nil)
+    assert(table.noPlace("Nîmes").find("Nîmes") <> nil and table.answered(503).find("503") <> nil)
+    assert(table.highLow(18, 10).find("18") <> nil and table.highLow(18, 10).find("10") <> nil)
+    assert(table.cannotRead("x").find("x") <> nil and table.skyUnknown(1234).find("1234") <> nil)
+end
+## every sky of the table, and every reason forecast.ol gives, has its words in every language
+for code, sky in SKIES do
+    for lang in LANGUAGES do
+        assert(TEXTS[lang].sky[sky.key] <> nil, "{lang} has no words for the sky {sky.key}")
+    end
+end
+for lang in LANGUAGES do
+    for key in ["notJson", "noWeather", "nowMissing", "daysMissing", "badDate", "noPlace", "noPosition"] do
+        assert(TEXTS[lang].reasons[key] <> nil, "{lang} has no words for the reason {key}")
+    end
+end
+assert(setLanguage("en") and skyText(skyOf(3)) == "Overcast" and skyText(skyOf(1234)) == "Weather code 1234")
+assert(reasonText("notJson") == "the answer is not JSON" and reasonText("unheard of") == "unheard of")
+assert(setLanguage("fr") and skyText(skyOf(3)) == "Couvert" and skyText(skyOf(61)) == "Pluie légère")
+assert(setLanguage("de") == false and i18n.lang == "fr", "an unknown language changes nothing")
 
 print("weather forecast ok")
 

@@ -19,55 +19,58 @@ func forecastUrl(lat, lon)
     })
 end
 
-## The place of a name: its coordinates, to ask the forecast of.
-func searchUrl(name)
-    return https.query("https://geocoding-api.open-meteo.com/v1/search", {name: name, count: 1, language: "en", format: "json"})
+## The place of a name: its coordinates, to ask the forecast of. The service writes the name of the place and of its
+## country in `language`.
+func searchUrl(name, language)
+    return https.query("https://geocoding-api.open-meteo.com/v1/search", {name: name, count: 1, language: language, format: "json"})
 end
 
-## The kind of sky of each code, and its words. The kind picks the picture and the colours.
+## The kind of sky of each code, and the key of its words (texts.ol says them, in each language). The kind picks the
+## picture and the colours.
 const SKIES = {
-    [0]: {kind: "clear", text: "Clear sky"},
-    [1]: {kind: "clear", text: "Mainly clear"},
-    [2]: {kind: "partly", text: "Partly cloudy"},
-    [3]: {kind: "cloud", text: "Overcast"},
-    [45]: {kind: "fog", text: "Fog"},
-    [48]: {kind: "fog", text: "Freezing fog"},
-    [51]: {kind: "rain", text: "Light drizzle"},
-    [53]: {kind: "rain", text: "Drizzle"},
-    [55]: {kind: "rain", text: "Heavy drizzle"},
-    [56]: {kind: "rain", text: "Freezing drizzle"},
-    [57]: {kind: "rain", text: "Freezing drizzle"},
-    [61]: {kind: "rain", text: "Light rain"},
-    [63]: {kind: "rain", text: "Rain"},
-    [65]: {kind: "rain", text: "Heavy rain"},
-    [66]: {kind: "rain", text: "Freezing rain"},
-    [67]: {kind: "rain", text: "Freezing rain"},
-    [71]: {kind: "snow", text: "Light snow"},
-    [73]: {kind: "snow", text: "Snow"},
-    [75]: {kind: "snow", text: "Heavy snow"},
-    [77]: {kind: "snow", text: "Snow grains"},
-    [80]: {kind: "rain", text: "Rain showers"},
-    [81]: {kind: "rain", text: "Rain showers"},
-    [82]: {kind: "rain", text: "Violent showers"},
-    [85]: {kind: "snow", text: "Snow showers"},
-    [86]: {kind: "snow", text: "Snow showers"},
-    [95]: {kind: "storm", text: "Thunderstorm"},
-    [96]: {kind: "storm", text: "Thunderstorm, hail"},
-    [99]: {kind: "storm", text: "Thunderstorm, hail"}
+    [0]: {kind: "clear", key: "clear"},
+    [1]: {kind: "clear", key: "mainlyClear"},
+    [2]: {kind: "partly", key: "partlyCloudy"},
+    [3]: {kind: "cloud", key: "overcast"},
+    [45]: {kind: "fog", key: "fog"},
+    [48]: {kind: "fog", key: "freezingFog"},
+    [51]: {kind: "rain", key: "lightDrizzle"},
+    [53]: {kind: "rain", key: "drizzle"},
+    [55]: {kind: "rain", key: "heavyDrizzle"},
+    [56]: {kind: "rain", key: "freezingDrizzle"},
+    [57]: {kind: "rain", key: "freezingDrizzle"},
+    [61]: {kind: "rain", key: "lightRain"},
+    [63]: {kind: "rain", key: "rain"},
+    [65]: {kind: "rain", key: "heavyRain"},
+    [66]: {kind: "rain", key: "freezingRain"},
+    [67]: {kind: "rain", key: "freezingRain"},
+    [71]: {kind: "snow", key: "lightSnow"},
+    [73]: {kind: "snow", key: "snow"},
+    [75]: {kind: "snow", key: "heavySnow"},
+    [77]: {kind: "snow", key: "snowGrains"},
+    [80]: {kind: "rain", key: "rainShowers"},
+    [81]: {kind: "rain", key: "rainShowers"},
+    [82]: {kind: "rain", key: "violentShowers"},
+    [85]: {kind: "snow", key: "snowShowers"},
+    [86]: {kind: "snow", key: "snowShowers"},
+    [95]: {kind: "storm", key: "thunderstorm"},
+    [96]: {kind: "storm", key: "thunderstormHail"},
+    [99]: {kind: "storm", key: "thunderstormHail"}
 }
 
 ## A code the table does not know is shown as an overcast sky rather than as a failure.
 func skyOf(code)
-    return SKIES[code] or {kind: "cloud", text: "Weather code {code}"}
+    return SKIES[code] or {kind: "cloud", key: nil, code: code}
 end
 
-## The short English name of the day of a date written "2026-11-01", or nil for anything that is not such a date.
+## The day of the week of a date written "2026-11-01" (1 Monday to 7 Sunday, as date.weekdayName counts), or nil for
+## anything that is not such a date.
 func weekday(text)
     if typeof(text) <> "string" then
         return nil
     end
     var parts = date.parse(text)
-    return parts and date.weekdayName(parts.weekday, "en", "short")
+    return parts and parts.weekday
 end
 
 ## ── Reading an answer ──────────────────────────────────────────────────────────────────────────────
@@ -104,34 +107,35 @@ func reasonOf(body)
 end
 
 ## The weather now and over the next days, from the text of an answer of the forecast service:
-##   {temp, feels, wind, code, days: [{date, dayName, code, high, low}]}
-## or nil and the reason it cannot be read. `feels`, the temperature it feels like, is nil when the answer has none. `dayName` is the day of the week of the date, worked out here once rather
-## than at every frame.
+##   {temp, feels, wind, code, days: [{date, weekday, code, high, low}]}
+## or nil and the reason it cannot be read, a key that texts.ol says in each language (notJson, noWeather, nowMissing,
+## daysMissing, badDate). `feels`, the temperature it feels like, is nil when the answer has none. `weekday` is the day
+## of the week of the date (1 Monday to 7 Sunday), worked out here once rather than at every frame.
 func readForecast(body)
     var data = parseJson(body)
     if data == nil then
-        return nil, "the answer is not JSON"
+        return nil, "notJson"
     end
     if typeof(data) <> "map" or typeof(data.current) <> "map" or typeof(data.daily) <> "map" then
-        return nil, "the answer holds no weather"
+        return nil, "noWeather"
     end
     var now = data.current
     var daily = data.daily
     if not numbersOf([now.temperature_2m, now.weather_code, now.wind_speed_10m], 3) then
-        return nil, "the weather of now is missing"
+        return nil, "nowMissing"
     end
     var count = typeof(daily.time) == "array" and len(daily.time) or 0
     var complete = count > 0 and numbersOf(daily.weather_code, count) and numbersOf(daily.temperature_2m_max, count)
     if not complete or not numbersOf(daily.temperature_2m_min, count) then
-        return nil, "the forecast of the days is missing"
+        return nil, "daysMissing"
     end
     var days = []
     for i = 1, count do
-        var dayName = weekday(daily.time[i])
-        if dayName == nil then
-            return nil, "a date of the forecast is not a date"
+        var day = weekday(daily.time[i])
+        if day == nil then
+            return nil, "badDate"
         end
-        days.push({date: daily.time[i], dayName: dayName, code: daily.weather_code[i],
+        days.push({date: daily.time[i], weekday: day, code: daily.weather_code[i],
             high: daily.temperature_2m_max[i], low: daily.temperature_2m_min[i]})
     end
     var feels = nil
@@ -141,18 +145,19 @@ func readForecast(body)
     return {temp: now.temperature_2m, feels: feels, wind: now.wind_speed_10m, code: now.weather_code, days: days}
 end
 
-## The first place of an answer of the search service: {name, country, lat, lon}, or nil and the reason.
+## The first place of an answer of the search service: {name, country, lat, lon}, or nil and the reason (a key of
+## texts.ol: notJson, noPlace, noPosition).
 func readPlace(body)
     var data = parseJson(body)
     if data == nil then
-        return nil, "the answer is not JSON"
+        return nil, "notJson"
     end
     if typeof(data) <> "map" or typeof(data.results) <> "array" or len(data.results) == 0 then
-        return nil, "no such place"
+        return nil, "noPlace"
     end
     var found = data.results[1]
     if typeof(found) <> "map" or typeof(found.name) <> "string" or not numbersOf([found.latitude, found.longitude], 2) then
-        return nil, "the place has no position"
+        return nil, "noPosition"
     end
     return {name: found.name, country: found.country or "", lat: found.latitude, lon: found.longitude}
 end
