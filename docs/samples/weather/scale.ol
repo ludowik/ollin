@@ -11,6 +11,15 @@ const TEMP_STOPS = [
     [34, [1.0, 0.45, 0.3, 1]]
 ]
 
+## The colour `mix` of the way from `a` to `b` (arrays of the same length, one number per channel).
+func mixColours(a, b, mix)
+    var out = []
+    for k = 1, len(a) do
+        out.push(a[k] + (b[k] - a[k]) * mix)
+    end
+    return out
+end
+
 func tempColour(temp)
     var last = len(TEMP_STOPS)
     if temp <= TEMP_STOPS[1][1] then
@@ -20,12 +29,7 @@ func tempColour(temp)
         var above = TEMP_STOPS[i]
         if temp <= above[1] then
             var below = TEMP_STOPS[i - 1]
-            var mix = (temp - below[1]) / (above[1] - below[1])
-            var out = []
-            for k = 1, 4 do
-                out.push(below[2][k] + (above[2][k] - below[2][k]) * mix)
-            end
-            return out
+            return mixColours(below[2], above[2], (temp - below[1]) / (above[1] - below[1]))
         end
     end
     return TEMP_STOPS[last][2]

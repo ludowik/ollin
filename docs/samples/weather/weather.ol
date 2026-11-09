@@ -51,7 +51,7 @@ const NOTICE = 4                ## seconds a message of the search stays on the 
 const PLACE_KEY = "place"
 
 global app = {
-    pages: [],                  ## one per place: {place, weather, message, age, request}; the cities, then at most one place that was searched
+    pages: [],                  ## one per place: {place, weather, failure, age, request}; the cities, then at most one place that was searched
     index: 1,                   ## the page the screen settles on
     pos: 1,                     ## the page shown, fractional while the pages are dragged or slide
     dragging: false,
@@ -94,6 +94,13 @@ func placeLabel(place)
     return "{names[1]}, {names[2]}"
 end
 
+## Gives up a request that may be out (nil when none is): its answer will never be delivered.
+func giveUp(request)
+    if request then
+        request.cancel()
+    end
+end
+
 func newPage(place)
     return {place: place, weather: nil, failure: nil, age: 0, request: nil}
 end
@@ -124,9 +131,7 @@ end
 ## Asks the weather of a page. The previous request, if one is still out, is given up. The weather the page already has
 ## stays on it until the answer replaces it, so that asking again does not flash.
 func ask(page)
-    if page.request then
-        page.request.cancel()
-    end
+    giveUp(page.request)
     if not page.weather then
         page.failure = nil
     end
@@ -174,16 +179,13 @@ func show(place)
             return
         end
     end
-    if len(app.pages) > len(CITIES) then
-        var old = app.pages.pop()
-        if old.request then
-            old.request.cancel()
-        end
-        app.index = math.min(app.index, len(app.pages))
-        app.pos = math.min(app.pos, len(app.pages))
-    end
     var page = newPage(place)
-    app.pages.push(page)
+    if len(app.pages) > len(CITIES) then
+        giveUp(app.pages[len(app.pages)].request)
+        app.pages[len(app.pages)] = page
+    else
+        app.pages.push(page)
+    end
     ask(page)
     settle(len(app.pages))
 end
@@ -204,9 +206,7 @@ func onPlace(name, res)
 end
 
 func search(name)
-    if app.search then
-        app.search.cancel()
-    end
+    giveUp(app.search)
     say(tr("lookingFor")(name))
     app.search = https.get(searchUrl(name, i18n.lang), {timeout: TIMEOUT}, func(res)
         onPlace(name, res)
@@ -266,6 +266,7 @@ func onSearchButton(x, y)
     var reach = b.r * 1.4
     return (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) <= reach * reach
 end
+
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 ## A text typed while the field is closed opens it with that text, as typing a letter always did, unless it is only spaces.
@@ -357,15 +358,7 @@ func skyAt(pos)
     var first, second, mix = skyBetween(pos, len(app.pages))
     var a = paletteOf(app.pages[first])
     var b = paletteOf(app.pages[second])
-    var out = []
-    for i = 1, 2 do
-        var colour = []
-        for k = 1, 3 do
-            colour.push(a[i][k] + (b[i][k] - a[i][k]) * mix)
-        end
-        out.push(colour)
-    end
-    return out
+    return [mixColours(a[1], b[1], mix), mixColours(a[2], b[2], mix)]
 end
 
 func drawCloud(x, y, r, shade)
@@ -520,14 +513,23 @@ func drawDays(weather, x, y, w, h)
         drawText(i == 1 and tr("today") or date.weekdayName(day.weekday, i18n.lang, "short"), x + w * 0.05, cy, size, "left", "center", WHITE)
         drawIcon(skyOf(day.code).kind, x + w * 0.31, cy, math.min(rowH * 0.3, w * 0.05))
         drawText("{day.low:.0f}°", x + w * 0.5, cy, size, "right", "center", WHITE, 0.6)
-        drawRange(day, lo, hi, i == 1 and weather.temp or nil, x + w * 0.54, cy, w * 0.26, math.max(rowH * 0.17, 4))
+        var now = nil
+        if i == 1 then
+            now = weather.temp          ## not `i == 1 and weather.temp or nil`: a temperature of 0 is falsy
+        end
+        drawRange(day, lo, hi, now, x + w * 0.54, cy, w * 0.26, math.max(rowH * 0.17, 4))
         drawText("{day.high:.0f}°", x + w * 0.95, cy, size, "right", "center", WHITE)
     end
 end
 
+## The width the page is laid out in: the screen of a phone, but not wider than a tall column on a wide window.
+func columnWidth()
+    return math.min(W, H * 0.62)
+end
+
 ## One page, in the coordinates of the screen, over the sky: the place and the weather now, then two cards.
 func drawPage(page)
-    var column = math.min(W, H * 0.62)
+    var column = columnWidth()
     var weather = page.weather
     var name = placeLabel(page.place)
     var button = searchButton()
@@ -578,7 +580,7 @@ func draw()
             graphics.pop()
         end
     end
-    var column = math.min(W, H * 0.62)
+    var column = columnWidth()
     drawDots(H * 0.93)
     var text = app.notice
     if text == "" then

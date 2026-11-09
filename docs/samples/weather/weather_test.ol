@@ -191,6 +191,9 @@ assert(still == 0 and len(trail) <= 8, "a finger that stopped for a tenth of a s
 assert(track([[5, 2]], 5, 2) == 0, "a single sample has no speed")
 
 ## ── The temperature scale ──
+var halfway = mixColours([0, 10, 1], [10, 20, 1], 0.5)
+assert(halfway[1] == 5 and halfway[2] == 15 and halfway[3] == 1 and len(halfway) == 3, "half of the way, channel by channel")
+assert(mixColours([1, 2], [3, 4], 0)[2] == 2 and mixColours([1, 2], [3, 4], 1)[1] == 3, "the ends are the colours themselves")
 func sameColour(a, b)
     return math.abs(a[1] - b[1]) + math.abs(a[2] - b[2]) + math.abs(a[3] - b[3]) < 1e-9
 end

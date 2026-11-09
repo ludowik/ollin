@@ -1,6 +1,7 @@
 ## The TEXTS of the weather sample, in the languages it speaks: French (the default) and English. The French strings are
 ## the translation the app asks for, not a slip in the language of the repository; a language is one more table below, and
-## nothing in the code that reads them changes.
+## nothing in the code that reads them changes — except that the names of the days come from date.weekdayName, which
+## knows "en" and "fr" only, so a language of this list that it does not know must have its own table of them.
 ##
 ## Every language has the same keys, which weather_test.ol checks. A text is a string, except the ones that take a figure
 ## or a name, which are functions of it. The reasons an answer cannot be read (forecast.ol) and the kinds of sky are
