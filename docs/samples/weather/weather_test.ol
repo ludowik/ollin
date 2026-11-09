@@ -88,8 +88,30 @@ assert(pageAfterDrag(2.2, 3, 2, 5) == 3, "a flick carries it on to the next one"
 assert(pageAfterDrag(2.8, -3, 2, 5) == 2, "and a flick back carries it back")
 assert(pageAfterDrag(2.9, 40, 2, 5) == 3 and pageAfterDrag(1.1, -40, 2, 5) == 1, "never more than a page at once")
 assert(pageAfterDrag(0.8, -5, 1, 5) == 1 and pageAfterDrag(5.3, 5, 5, 5) == 5, "the ends hold")
-assert(slide(1, 3, 0.05) > 1 and slide(1, 3, 0.05) < 3 and slide(3, 1, 0.05) < 3)
-assert(slide(2.9995, 3, 0.016) == 3 and slide(1, 3, 10) == 3, "a slide ends on the page and never overshoots it")
+var pos, speed = slide(1, 0, 3, 0.05)
+assert(pos > 1 and pos < 3 and speed > 0, "a slide from rest sets off towards the page")
+pos, speed = slide(2.9996, 0, 3, 0.016)
+assert(pos == 3 and speed == 0, "and ends exactly on it")
+assert(math.abs(launch(1.4, 12, 2) - 0.6 * STIFF) < 1e-9 and launch(1.4, 0.5, 2) == 0.5, "the speed of the finger is kept, up to what lands on the page")
+assert(math.abs(launch(1.6, -12, 1) + 0.6 * STIFF) < 1e-9 and launch(1.6, 0.5, 1) == 0.5, "a finger going away from the page is not cut")
+
+## A slide launched by launch() reaches the page and never goes past it, at any speed and any length of frame, and a
+## speed that carries on keeps the pages moving the way they were (no jump at the release).
+for dt in [1 / 120, 1 / 60, 1 / 20] do
+    for start in [1.3, 1.5, 1.8] do
+        for finger in [0, 0.5, 3, 12] do
+            pos, speed = start, launch(start, finger, 2)
+            var past = 0
+            for i = 1, 400 do
+                pos, speed = slide(pos, speed, 2, dt)
+                past = math.max(past, pos - 2)
+            end
+            assert(past <= 1e-9 and pos == 2, "dt {dt} from {start} at {finger}: past by {past}, ends at {pos}")
+        end
+    end
+end
+pos, speed = slide(1.4, 2, 2, 1 / 60)
+assert(pos > 1.4 + 2 / 60 * 0.9 and speed > 1.5, "the first frame goes on at about the speed of the finger")
 
 var from, to, mix = skyBetween(2.25, 5)
 assert(from == 2 and to == 3 and mix == 0.25, "a quarter of the way from page 2 to page 3")
@@ -99,3 +121,14 @@ from, to, mix = skyBetween(0.7, 5)
 assert(from == 1 and to == 2 and mix == 0, "pulled past the first page, its sky holds")
 from, to, mix = skyBetween(5.3, 5)
 assert(from == 5 and to == 5, "pulled past the last page, its sky holds")
+
+## The speed of a drag is read from its last tenth of a second.
+var trail = [[0, 1]]
+assert(math.abs(track(trail, 0.016, 1.04) - 2.5) < 1e-9, "0.04 of a page in 16 ms is 2.5 pages a second")
+assert(math.abs(track(trail, 0.032, 1.08) - 2.5) < 1e-9, "and it goes on at that speed")
+var still = 0
+for i = 3, 12 do
+    still = track(trail, i * 0.016, 1.08)
+end
+assert(still == 0 and len(trail) <= 8, "a finger that stopped for a tenth of a second reads as still, and old samples go")
+assert(track([[5, 2]], 5, 2) == 0, "a single sample has no speed")

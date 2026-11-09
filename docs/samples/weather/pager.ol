@@ -3,8 +3,9 @@
 ## functions, so that weather_test.ol can try them without a screen.
 
 const EDGE = 0.3                ## how far past the first and the last page a finger may pull, in pages
-const FLICK = 0.2               ## seconds of the speed at release that count as more travel
-const SLIDE = 12                ## how fast a slide closes the gap: a fraction of it per second
+const FLICK = 0.3               ## seconds of the speed at release that count as more travel
+const WINDOW = 0.1              ## seconds of the finger's path that its speed is read from
+const STIFF = 14                ## the slide is a critically damped spring: this is its rate (1/s), the gap shrinking as e^(-STIFF t)
 
 ## The position while a finger that took the pages at `grabX` (when they were at `grabPos`) is now at `x`, on a screen
 ## `width` wide: the pages follow the finger, and the ends give a little.
@@ -19,13 +20,41 @@ func pageAfterDrag(pos, speed, from, last)
     return math.clamp(wanted, math.max(1, from - 1), math.min(last, from + 1))
 end
 
-## One frame of the slide towards a page.
-func slide(pos, target, dt)
-    var gap = target - pos
-    if math.abs(gap) < 0.001 then
-        return target
+## Adds the position of the pages at the time `t` to `trail`, the samples of the drag, and gives the speed of the last
+## WINDOW seconds in pages per second: a few frames of a quick flick tell its speed better than a running average, which
+## has not caught up when the finger lifts, and a finger that stopped before it lifted reads as still.
+func track(trail, t, pos)
+    trail.push([t, pos])
+    while len(trail) > 1 and t - trail[1][1] > WINDOW do
+        trail.dequeue()
     end
-    return pos + gap * math.min(1, dt * SLIDE)
+    var first = trail[1]
+    if t - first[1] < 0.001 then
+        return 0
+    end
+    return (pos - first[2]) / (t - first[1])
+end
+
+## The speed (pages per second) a slide starts with: the one the finger left, unless it would carry the pages past the
+## page they settle on, which a spring that is not allowed to overshoot cannot do.
+func launch(pos, speed, target)
+    var room = math.abs(target - pos) * STIFF
+    if target > pos then
+        return math.min(speed, room)
+    end
+    return math.max(speed, -room)
+end
+
+## One frame of the slide towards a page: the position and the speed after `dt` seconds. A critically damped spring in
+## closed form, so that it carries the speed of the finger on and stays exact whatever the length of the frame.
+func slide(pos, speed, target, dt)
+    var gap = pos - target
+    if math.abs(gap) < 0.0005 and math.abs(speed) < 0.01 then
+        return target, 0
+    end
+    var carry = speed + STIFF * gap
+    var fade = math.exp(-STIFF * dt)
+    return target + (gap + carry * dt) * fade, (carry - STIFF * (gap + carry * dt)) * fade
 end
 
 ## The two pages whose skies the screen blends at a position, and how much of the second: the sky does not slide with

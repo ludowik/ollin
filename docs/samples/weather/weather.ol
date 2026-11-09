@@ -53,7 +53,8 @@ global app = {
     dragging: false,
     grabX: 0,
     grabPos: 1,
-    speed: 0,                   ## pages per second, while dragging
+    trail: [],                  ## the samples [time, position] of the drag, which its speed is read from
+    vel: 0,                     ## pages per second, while sliding
     typing: "",                 ## the name being typed, which the text field of the interface edits
     search: nil,                ## the request for a name, while it is out
     notice: "",                 ## what a search has to say, for a few seconds
@@ -132,6 +133,7 @@ end
 ## Settles on a page, asking it again if what it shows is old.
 func settle(index)
     app.index = math.clamp(index, 1, len(app.pages))
+    app.vel = launch(app.pos, app.vel, app.index)
     var page = app.pages[app.index]
     if page.age >= STALE and not page.request then
         ask(page)
@@ -252,18 +254,27 @@ func mouse.pressed(x, y)
     app.dragging = true
     app.grabX = x
     app.grabPos = app.pos
-    app.speed = 0
+    app.vel = 0
+    app.trail = [[elapsedTime, app.pos]]
 end
 
-## Lets go of the pages: they settle on the page the drag points to.
-func release()
+## The pages follow the finger, now at x: where they are, and the speed of the drag.
+func follow(x)
+    app.pos = dragPos(app.grabPos, app.grabX, x, W, len(app.pages))
+    return track(app.trail, elapsedTime, app.pos)
+end
+
+## Lets go of the pages, the finger being at x: they settle on the page the drag points to, going on at its speed.
+func release(x)
+    var speed = follow(x)
     app.dragging = false
-    settle(pageAfterDrag(app.pos, app.speed, app.index, len(app.pages)))
+    app.vel = speed
+    settle(pageAfterDrag(app.pos, speed, app.index, len(app.pages)))
 end
 
 func mouse.released(x, y)
     if app.dragging then
-        release()
+        release(x)
     end
 end
 
@@ -468,18 +479,14 @@ func update(dt)
             ask(page)
         end
     end
-    if app.dragging and not mouse.isDown() then
-        release()               ## a release that was never reported (the system takes the touch away) must not leave the pages held
-    end
     if app.dragging then
-        var x = mouse.position()
-        var pos = dragPos(app.grabPos, app.grabX, x, W, len(app.pages))
-        if dt > 0 then
-            app.speed = app.speed * 0.6 + (pos - app.pos) / dt * 0.4
+        if mouse.isDown() then
+            follow(mouse.position())
+        else
+            release(mouse.position())       ## a release that was never reported (the system takes the touch away) must not leave the pages held
         end
-        app.pos = pos
     else
-        app.pos = slide(app.pos, app.index, dt)
+        app.pos, app.vel = slide(app.pos, app.vel, app.index, dt)
     end
     app.noticeAge += dt
     if app.noticeAge >= NOTICE and not app.search then
