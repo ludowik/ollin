@@ -40,6 +40,7 @@ const SKY = {                   ## the top and the bottom of the sky behind each
     snow: [[0.45, 0.55, 0.68], [0.82, 0.87, 0.93]],
     storm: [[0.1, 0.1, 0.22], [0.32, 0.3, 0.45]]
 }
+const SKY_BANDS = 160           ## strips of the sky: fewer show as steps, since a colour changes by about a hundred levels from top to bottom
 const WAITING = [[0.12, 0.2, 0.38], [0.3, 0.42, 0.6]]
 const RETRY = 60                ## seconds before a page asks again after a failure
 const STALE = 60                ## seconds after which a page that comes into view asks again
@@ -293,7 +294,7 @@ func paletteOf(page)
 end
 
 func drawSky(palette)
-    drawGradient(palette[1], palette[2], 32)
+    drawGradient(palette[1], palette[2], SKY_BANDS)
 end
 
 func drawCloud(x, y, r, shade)
