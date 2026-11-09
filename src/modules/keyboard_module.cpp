@@ -1,6 +1,7 @@
 #include "keyboard_module.h"
 #include "module_utils.h"
 #include "ui_module.h"
+#include "utf8.h"
 #include "value.h"
 #include "vm.h"
 #include <cctype>
@@ -146,8 +147,7 @@ static std::string take_typed() {
     while ((codepoint = GetCharPressed()) != 0) {
         if (codepoint < 32 || codepoint == 127)
             continue;
-        int size = 0;
-        text.append(CodepointToUTF8(codepoint, &size), size);
+        utf8_encode((uint32_t)codepoint, text);
     }
     return text;
 }
@@ -300,14 +300,12 @@ void keyboard_poll() {
     s_blocked = query_blocked();   // refreshed once per frame, and read by is_down without querying the DOM again
     VM* vm = VM::current();
     Value kbd = vm->get_global("keyboard");
-    Value pressed, released;
+    Value pressed, released, typed;
     if (kbd.is_map()) {
         pressed = kbd.map_get(Value(std::string("keypressed")));
         released = kbd.map_get(Value(std::string("keyrelease")));
-    }
-    Value typed;
-    if (kbd.is_map())
         typed = kbd.map_get(Value(std::string("typed")));
+    }
     HostText host = host_text(typed.is_callable() || ui_wants_text());
     bool want_press = pressed.is_callable();
     bool want_release = released.is_callable();

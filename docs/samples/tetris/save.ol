@@ -59,31 +59,18 @@ func saveValid(t)
     if not isOneOf(t.state, SAVE_STATES) or not isOneOf(t.focus, SAVE_FOCUSES) or not isOneOf(t.resume, SAVE_RESUMES) then
         return false
     end
-    if t.type <> "A" and t.type <> "B" then
+    if not isOneOf(t.type, ["A", "B"]) or not inRanges(t, SAVE_RANGES, {}) then
         return false
-    end
-    for name, range in SAVE_RANGES do
-        if not isWhole(t[name], range[1], range[2]) then
-            return false
-        end
     end
     for name in SAVE_BOOLS do
         if not isBool(t[name]) then
             return false
         end
     end
-    if typeof(t.well) <> "array" or len(t.well) <> COLS * ROWS or typeof(t.clearing) <> "array" or len(t.clearing) > 4 then
+    var cell = func(c) return isWhole(c, 0, KINDS) end
+    var row = func(r) return isWhole(r, 0, ROWS - 1) end
+    if not isArrayOf(t.well, COLS * ROWS, COLS * ROWS, cell) or not isArrayOf(t.clearing, 0, 4, row) then
         return false
-    end
-    for cell in t.well do
-        if not isWhole(cell, 0, KINDS) then
-            return false
-        end
-    end
-    for row in t.clearing do
-        if not isWhole(row, 0, ROWS - 1) then
-            return false
-        end
     end
     if t.kind >= 1 and t.turn > len(shapes[t.kind]) then
         return false

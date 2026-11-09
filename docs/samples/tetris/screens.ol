@@ -42,30 +42,38 @@ const TITLE_GAP = 10            ## points between two pieces of the title: more 
 ## A row of pieces centred across the screen, each given as [piece, lift]: the blocks of neighbours are TITLE_GAP apart
 ## whatever the boxes of the pieces hold, and a lift moves a piece up (negative) or down.
 func titleRow(row, y)
+    var bounds = []
     var width = TITLE_GAP * (len(row) - 1)
     for entry in row do
         var x0, x1 = shapeBounds(entry[1], 1)
+        bounds.push([x0, x1])
         width += (x1 - x0 + 1) * 8
     end
     var x = 80 - width / 2
     var items = []
-    for entry in row do
-        var x0, x1 = shapeBounds(entry[1], 1)
-        items.push({piece: entry[1], x: x - x0 * 8, y: y + entry[2]})
+    for i = 1, len(row) do
+        var x0, x1 = bounds[i][1], bounds[i][2]
+        items.push({piece: row[i][1], x: x - x0 * 8, y: y + row[i][2]})
         x += (x1 - x0 + 1) * 8 + TITLE_GAP
     end
     return items
 end
+
+## The pieces of the title, laid out once: the places never change, and the title is drawn every frame.
+global titlePieces = nil
 
 ## The first screen: the name, and the pieces, until START.
 func titleItems(hint)
     var logo = screenLabel("TETRIS", 80, 30, 24)
     logo.logo = true
     var items = [logo]
-    for item in titleRow([[Piece.I, 0], [Piece.O, 0], [Piece.T, 0], [Piece.Z, -4]], 52) do
-        items.push(item)
+    if titlePieces == nil then
+        titlePieces = titleRow([[Piece.I, 0], [Piece.O, 0], [Piece.T, 0], [Piece.Z, -4]], 52)
+        for item in titleRow([[Piece.L, 0], [Piece.J, 4], [Piece.S, 0]], 76) do
+            titlePieces.push(item)
+        end
     end
-    for item in titleRow([[Piece.L, 0], [Piece.J, 4], [Piece.S, 0]], 76) do
+    for item in titlePieces do
         items.push(item)
     end
     return withFooter(items, hint)

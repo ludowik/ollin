@@ -1,7 +1,7 @@
-## What the games that keep themselves as they go have in common (invaders, asteroids, tetris): the checks that decide
-## whether a value read back from the store can be trusted — a store is written by a program and can be edited by anyone
-## — the clamp that keeps what a game writes inside what the check accepts, and the cadence of the keeping. Imported with
-## a path relative to the importing file, "../lib/keep.ol".
+## What the games that keep themselves as they go have in common: the checks that decide whether a value read back from the
+## store can be trusted (invaders, asteroids, tetris) — a store is written by a program and can be edited by anyone —, the
+## clamp that keeps what a game writes inside what the check accepts, and the cadence of the keeping (invaders and
+## asteroids; tetris counts its own frames). Imported with a path relative to the importing file, "../lib/keep.ol".
 
 const KEEP_EVERY = 0.5          ## seconds between two keepings of a game that goes on
 
@@ -56,11 +56,10 @@ end
 ## Brings the fields of `t` that `inRanges` checks back inside their ranges, for a writer: a wait that kept falling during a
 ## long frame must not make the whole save refused at the next run.
 func clampToRanges(t, wholes, numbers)
-    for name, range in wholes do
-        t[name] = math.clamp(t[name], range[1], range[2])
-    end
-    for name, range in numbers do
-        t[name] = math.clamp(t[name], range[1], range[2])
+    for ranges in [wholes, numbers] do
+        for name, range in ranges do
+            t[name] = math.clamp(t[name], range[1], range[2])
+        end
     end
 end
 
@@ -91,4 +90,23 @@ end
 func markKept(state)
     keepWait = KEEP_EVERY
     keptState = state
+end
+
+## Called every frame: keeps the game (`save` does) when it changed screen, and twice a second while it goes on. The title
+## holds nothing worth keeping.
+func keepGoing(dt, state, save)
+    if state <> "title" and keepDue(dt, state) then
+        save()
+    end
+end
+
+## Puts the game back from the store: `restore` is given what `valid` accepts, and is not called when there is nothing to
+## trust. Whether it was.
+func loadKept(key, valid, restore)
+    var t = trusted(data.get(key), valid)
+    if t == nil then
+        return false
+    end
+    restore(t)
+    return true
 end

@@ -131,6 +131,7 @@ end
 ## crater opens on the side the hit came from — a bite taken symmetrically would hollow the shield
 ## from the middle and let a second shot straight through.
 func bite(sh, cx, cy, rows, dir)
+    sh.rows = nil
     var w = len(rows[1])
     var top = cy
     if dir < 0 then
@@ -150,6 +151,7 @@ end
 ## An alien that has descended into a shield does not nibble it: it erases its whole footprint, which
 ## is what makes the fleet's arrival final.
 func eraseBox(sh, cx, cy, w, h)
+    sh.rows = nil
     image.beginPixels(sh.img)
     for y = 0, h - 1 do
         for x = 0, w - 1 do
@@ -494,8 +496,12 @@ func dragTo(x)
     gunX = stopped
 end
 
-## One shield as save.ol writes it: a `#` for a pixel still whole and a `.` for one that was eaten.
+## One shield as save.ol writes it: a `#` for a pixel still whole and a `.` for one that was eaten. Read from the
+## texture once and kept in `sh.rows` until a hit changes the shield: reading its pixels twice a second was a hitch.
 func shieldRows(sh)
+    if sh.rows then
+        return sh.rows
+    end
     var rows = []
     for y = 0, SHIELD_H - 1 do
         var row = ""
@@ -505,6 +511,7 @@ func shieldRows(sh)
         end
         rows.push(row)
     end
+    sh.rows = rows
     return rows
 end
 
@@ -531,6 +538,7 @@ end
 
 ## Eats from a shield what the save says was eaten: it starts whole, as a wave builds it, and erosion only removes.
 func carveShield(sh, rows)
+    sh.rows = nil
     image.beginPixels(sh.img)
     for y = 1, SHIELD_H do
         for x = 1, SHIELD_W do
@@ -590,21 +598,15 @@ end
 
 ## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
 func loadGame()
-    var t = readSave(data.get(SAVE_KEY))
-    if t == nil then
+    if not loadKept(SAVE_KEY, saveValid, restoreSave) then
         return false
     end
-    restoreSave(t)
     markKept(state)
     return true
 end
 
-## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
-## nothing worth keeping.
 func autosave(dt)
-    if state <> "title" and keepDue(dt, state) then
-        saveGame()
-    end
+    keepGoing(dt, state, saveGame)
 end
 
 ## Everything the program owns is built here, in the order it depends on: the window first, since a
@@ -693,10 +695,7 @@ func mouse.pressed(x, y)
     end
     ## A finger has already been answered by touch.began, band included: the emulated click must not
     ## pause a second time, which would undo it.
-    if touchPlay then
-        return
-    end
-    if unpause() then
+    if touchPlay or unpause() then
         return
     end
     grab(x)

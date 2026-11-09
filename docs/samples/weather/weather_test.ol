@@ -88,23 +88,22 @@ assert(problem == nil and place.country == "", "a place with no country has an e
 ## Both languages say everything, in texts of the same kind: a key missing from one would show on the screen as nothing.
 assert(LANGUAGES[1] == "fr" and i18n.lang == "fr", "French is the default language")
 var reference = TEXTS[LANGUAGES[1]]
+## Both tables have the same keys, each of the same kind.
 func sameKeys(a, b, where)
-    for key, value in a do
-        assert(b[key] <> nil, "{where}: {key} is missing")
-        assert(typeof(b[key]) == typeof(value), "{where}: {key} is not of the same kind")
+    for pair in [[a, b], [b, a]] do
+        for key, value in pair[1] do
+            assert(pair[2][key] <> nil, "{where}: {key} is missing")
+            assert(typeof(pair[2][key]) == typeof(value), "{where}: {key} is not of the same kind")
+        end
     end
 end
 for code in LANGUAGES do
     var table = TEXTS[code]
     assert(table <> nil, "{code} is listed but has no texts")
     sameKeys(reference, table, code)
-    sameKeys(table, reference, code)
-    sameKeys(reference.sky, table.sky, "{code} sky")
-    sameKeys(table.sky, reference.sky, "{code} sky")
-    sameKeys(reference.reasons, table.reasons, "{code} reasons")
-    sameKeys(table.reasons, reference.reasons, "{code} reasons")
-    sameKeys(reference.cities, table.cities, "{code} cities")
-    sameKeys(table.cities, reference.cities, "{code} cities")
+    for part in ["sky", "reasons", "cities"] do
+        sameKeys(reference[part], table[part], "{code} {part}")
+    end
     for key, names in table.cities do
         assert(len(names) == 2 and names[1] <> "" and names[2] <> "", "{code}: {key} wants a name and a country")
     end
@@ -203,3 +202,12 @@ var mid = tempColour(14)
 assert(mid[1] > TEMP_STOPS[3][2][1] and mid[1] < TEMP_STOPS[4][2][1], "between two steps it is between their colours")
 assert(onTrack(5, 0, 10) == 0.5 and onTrack(-3, 0, 10) == 0 and onTrack(15, 0, 10) == 1, "held on the track")
 assert(onTrack(7, 7, 7) == 0.5, "a track of no width has a middle")
+
+## ── The skies and the bars ──
+for code, sky in SKIES do
+    assert(SKY[sky.kind] <> nil, "no sky for the kind {sky.kind} of the code {code}")
+end
+assert(SKY[skyOf(1234).kind] <> nil, "nor for a code the table does not know")
+var bar = barColours(2, 12)
+assert(len(bar) == 2 + BAR_SLICES and len(bar[1]) == 4, "the two ends and the slices between, as colours")
+assert(sameColour(bar[1], tempColour(2)) and sameColour(bar[2], tempColour(12)) and sameColour(bar[3], tempColour(2.5)), "each in the colour of its temperature")

@@ -19,6 +19,7 @@
 import "forecast.ol"
 import "pager.ol"
 import "scale.ol"
+import "icons.ol"
 import "texts.ol"
 import "../lib/draw.ol"
 
@@ -35,23 +36,13 @@ const CITIES = [
 const LANG_KEY = "lang"
 const REFRESH = 600             ## seconds before the weather is asked again
 const TIMEOUT = 15              ## seconds the service has to answer
-const SKY = {                   ## the top and the bottom of the sky behind each kind of weather
-    clear: [[0.16, 0.45, 0.85], [0.52, 0.76, 0.96]],
-    partly: [[0.25, 0.5, 0.82], [0.62, 0.78, 0.92]],
-    cloud: [[0.38, 0.45, 0.55], [0.66, 0.71, 0.77]],
-    fog: [[0.5, 0.55, 0.6], [0.74, 0.77, 0.8]],
-    rain: [[0.17, 0.25, 0.4], [0.4, 0.5, 0.62]],
-    snow: [[0.45, 0.55, 0.68], [0.82, 0.87, 0.93]],
-    storm: [[0.1, 0.1, 0.22], [0.32, 0.3, 0.45]]
-}
-const WAITING = [[0.12, 0.2, 0.38], [0.3, 0.42, 0.6]]
 const RETRY = 60                ## seconds before a page asks again after a failure
 const STALE = 60                ## seconds after which a page that comes into view asks again
 const NOTICE = 4                ## seconds a message of the search stays on the screen
 const PLACE_KEY = "place"
 
 global app = {
-    pages: [],                  ## one per place: {place, weather, failure, age, request}; the cities, then at most one place that was searched
+    pages: [],                  ## one per place: {place, weather, failure, view, age, request}; the cities, then at most one place that was searched
     index: 1,                   ## the page the screen settles on
     pos: 1,                     ## the page shown, fractional while the pages are dragged or slide
     dragging: false,
@@ -61,6 +52,7 @@ global app = {
     dirty: false,               ## the page changed and is not saved yet
     trail: [],                  ## the samples [time, position] of the drag, which its speed is read from
     vel: 0,                     ## pages per second, while sliding
+    layout: nil,                ## see layoutOf
     typing: "",                 ## the name being typed, which the text field of the interface edits
     search: nil,                ## the request for a name, while it is out
     notice: "",                 ## what a search has to say, for a few seconds
@@ -102,7 +94,7 @@ func giveUp(request)
 end
 
 func newPage(place)
-    return {place: place, weather: nil, failure: nil, age: 0, request: nil}
+    return {place: place, weather: nil, failure: nil, view: nil, age: 0, request: nil}
 end
 
 func onForecast(page, res)
@@ -112,7 +104,11 @@ func onForecast(page, res)
     if res.ok then
         weather, why = readForecast(res.body)
     end
+    page.view = nil
     if weather then
+        for day in weather.days do
+            day.bar = barColours(day.low, day.high)
+        end
         page.weather = weather
         page.failure = nil
         page.age = 0
@@ -134,6 +130,7 @@ func ask(page)
     giveUp(page.request)
     if not page.weather then
         page.failure = nil
+        page.view = nil
     end
     page.age = 0
     page.request = https.get(forecastUrl(page.place.lat, page.place.lon), {timeout: TIMEOUT}, func(res)
@@ -146,13 +143,18 @@ func say(text)
     app.noticeAge = 0
 end
 
+## The page of the place that was searched, after the cities, or nil.
+func searchedPage()
+    if len(app.pages) > len(CITIES) then
+        return app.pages[len(app.pages)]
+    end
+    return nil
+end
+
 ## What the next run starts from: the page, and the place that was searched if there is one.
 func save()
-    var searched = nil
-    if len(app.pages) > len(CITIES) then
-        searched = app.pages[len(app.pages)].place
-    end
-    data.set(PLACE_KEY, {index: app.index, searched: searched})
+    var searched = searchedPage()
+    data.set(PLACE_KEY, {index: app.index, searched: searched and searched.place or nil})
 end
 
 ## Settles on a page, asking it again if what it shows is old.
@@ -180,8 +182,9 @@ func show(place)
         end
     end
     var page = newPage(place)
-    if len(app.pages) > len(CITIES) then
-        giveUp(app.pages[len(app.pages)].request)
+    var old = searchedPage()
+    if old then
+        giveUp(old.request)
         app.pages[len(app.pages)] = page
     else
         app.pages.push(page)
@@ -255,18 +258,6 @@ func openSearch()
     searchField.edit()
 end
 
-## The search button, in the title row, left of the handle of the interface (the three bars the engine keeps in the corner).
-func searchButton()
-    var r = math.max(math.min(W, H) * 0.045, 16)
-    return {x: W - H * 0.054 - r * 1.6, y: H * 0.07, r: r}
-end
-
-func onSearchButton(x, y)
-    var b = searchButton()
-    var reach = b.r * 1.4
-    return (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) <= reach * reach
-end
-
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 ## A text typed while the field is closed opens it with that text, as typing a letter always did, unless it is only spaces.
@@ -326,105 +317,97 @@ end
 
 ## ── Drawing ────────────────────────────────────────────────────────────────────────────────────────
 
-## A text cut into lines of at most `width` characters, between words.
-func wrap(text, width)
-    var lines = []
-    var line = ""
-    for word in text.split(" ") do
-        if line <> "" and len(line) + 1 + len(word) > width then
-            lines.push(line)
-            line = word
-        elseif line == "" then
-            line = word
-        else
-            line = "{line} {word}"
-        end
-    end
-    lines.push(line)
-    return lines
-end
-
 ## The sky behind the weather of a page, or the waiting one while it has none.
 func paletteOf(page)
     return page.weather and SKY[skyOf(page.weather.code).kind] or WAITING
-end
-
-func drawSky(palette)
-    drawGradient(palette[1], palette[2])
 end
 
 ## The sky at a position of the pages: the sky of the page, or the blend of the skies of the two pages it is between.
 func skyAt(pos)
     var first, second, mix = skyBetween(pos, len(app.pages))
     var a = paletteOf(app.pages[first])
+    if mix == 0 then
+        return a
+    end
     var b = paletteOf(app.pages[second])
     return [mixColours(a[1], b[1], mix), mixColours(a[2], b[2], mix)]
 end
 
-func drawCloud(x, y, r, shade)
-    fillC([shade, shade, shade, 1])
-    graphics.circle(x - r * 0.55, y + r * 0.1, r * 0.5)
-    graphics.circle(x + r * 0.1, y - r * 0.2, r * 0.65)
-    graphics.circle(x + r * 0.65, y + r * 0.15, r * 0.45)
-    graphics.rect(x - r * 0.55, y + r * 0.1, r * 1.2, r * 0.5)
-end
-
-func drawSun(x, y, r)
-    graphics.stroke(1, 0.85, 0.3, 1)
-    graphics.strokeSize(math.max(r * 0.12, 1))
-    for i = 0, 7 do
-        var a = (i / 8 + elapsedTime * 0.03) * math.TAU
-        graphics.line(x + math.cos(a) * r * 1.25, y + math.sin(a) * r * 1.25, x + math.cos(a) * r * 1.65, y + math.sin(a) * r * 1.65)
-    end
-    graphics.noStroke()
-    fillC([1, 0.85, 0.3, 1])
-    graphics.circle(x, y, r)
-end
-
-## The picture of a kind of weather, `r` being about the size of its cloud or sun.
-func drawIcon(kind, x, y, r)
-    if kind == "clear" then
-        drawSun(x, y, r * 0.8)
-    elseif kind == "partly" then
-        drawSun(x - r * 0.45, y - r * 0.4, r * 0.55)
-        drawCloud(x + r * 0.1, y + r * 0.2, r, 1)
-    else
-        drawCloud(x, y - r * 0.15, r, kind == "storm" and 0.55 or kind == "rain" and 0.8 or 0.97)
-        graphics.stroke(0.55, 0.75, 1, 1)
-        graphics.strokeSize(math.max(r * 0.07, 1))
-        if kind == "rain" then
-            for i = -1, 1 do
-                var drift = (elapsedTime * 1.5 + i * 0.37) % 1
-                graphics.line(x + i * r * 0.5 + drift * r * 0.1, y + r * 0.55 + drift * r * 0.3,
-                              x + i * r * 0.5 - r * 0.08 + drift * r * 0.1, y + r * 0.8 + drift * r * 0.3)
-            end
-        elseif kind == "snow" then
-            graphics.noStroke()
-            fillC([1, 1, 1, 1])
-            for i = -1, 1 do
-                var drift = (elapsedTime * 0.6 + i * 0.31) % 1
-                graphics.circle(x + i * r * 0.5 + math.sin(elapsedTime * 2 + i) * r * 0.08, y + r * 0.5 + drift * r * 0.4, r * 0.07)
-            end
-        elseif kind == "fog" then
-            graphics.stroke(1, 1, 1, 0.8)
-            for i = 0, 2 do
-                graphics.line(x - r * 0.8 + i * r * 0.15, y + r * 0.55 + i * r * 0.2, x + r * 0.8 - i * r * 0.15, y + r * 0.55 + i * r * 0.2)
-            end
-        elseif kind == "storm" then
-            graphics.stroke(1, 0.9, 0.3, 1)
-            graphics.line(x + r * 0.1, y + r * 0.4, x - r * 0.15, y + r * 0.7)
-            graphics.line(x - r * 0.15, y + r * 0.7, x + r * 0.1, y + r * 0.7)
-            graphics.line(x + r * 0.1, y + r * 0.7, x - r * 0.1, y + r * 1.0)
-        end
-        graphics.noStroke()
-    end
-end
-
 const WHITE = [1, 1, 1, 1]
+const CARD = [0.05, 0.1, 0.2, 0.3]      ## the tint of a card, dark so that the white text keeps its contrast over a bright sky
+
+## Where things stand and how big they are, which only changes with the size of the area and the language: made once, and
+## again when either changes, since measuring texts and working out their places every frame was most of the cost of a
+## frame in which two pages are drawn.
+func layoutOf()
+    var key = "{i18n.lang} {W}x{H}"
+    if app.layout and app.layout.key == key then
+        return app.layout
+    end
+    var column = math.min(W, H * 0.62)
+    var width = column * 0.94
+    var r = math.max(math.min(W, H) * 0.045, 16)      ## the magnifier that opens the search, left of the handle of the interface (the three bars the engine keeps in the corner)
+    app.layout = {
+        key: key,
+        column: column,
+        button: {x: W - H * 0.054 - r * 1.6, y: H * 0.07, r: r},
+        card: {x: CX - width / 2, w: width, conditionsY: H * 0.47, conditionsH: H * 0.135, daysY: H * 0.625, daysH: H * 0.285},
+        hintSize: fitSize(tr("hint"), column * 0.04, column * 0.95)
+    }
+    return app.layout
+end
+
+func onSearchButton(x, y)
+    var b = layoutOf().button
+    var reach = b.r * 1.4
+    return (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) <= reach * reach
+end
+
+## What a page draws that only changes with its weather, the language or the area: the texts, and the sizes that make them
+## fit. Made once and kept in page.view until one of them changes (page.view is cleared when an answer comes).
+func viewOf(page, layout)
+    var view = page.view
+    if view and view.key == layout.key then
+        return view
+    end
+    var column = layout.column
+    view = {key: layout.key, name: placeLabel(page.place)}
+    view.nameSize = fitSize(view.name, column * 0.08, math.min(column * 0.95, 2 * (layout.button.x - 1.4 * layout.button.r - CX)))
+    var weather = page.weather
+    if weather then
+        var today = weather.days[1]
+        var card = layout.card
+        view.temp = "{weather.temp:.0f}°"
+        view.tempSize = fitSize(view.temp, column * 0.34, column * 0.8)
+        view.words = skyText(skyOf(weather.code))
+        view.wordsSize = fitSize(view.words, column * 0.065, column * 0.9)
+        view.highLow = tr("highLow")("{today.high:.0f}", "{today.low:.0f}")
+        view.cells = []
+        if weather.feels <> nil then
+            view.cells.push({label: tr("feelsLike"), value: "{weather.feels:.0f}°"})
+        end
+        view.cells.push({label: tr("wind"), value: "{weather.wind:.0f} km/h"})
+        for cell in view.cells do
+            cell.size = fitSize(cell.value, card.conditionsH * 0.25, card.w / len(view.cells) * 0.9)
+        end
+        view.daysTitle = tr("forecastTitle")(math.min(len(weather.days), FORECAST_DAYS))
+        view.days = []
+        for i = 1, math.min(len(weather.days), FORECAST_DAYS) do
+            var day = weather.days[i]
+            view.days.push({
+                label: i == 1 and tr("today") or date.weekdayName(day.weekday, i18n.lang, "short"),
+                low: "{day.low:.0f}°", high: "{day.high:.0f}°"
+            })
+        end
+    elseif page.failure then
+        view.lines = wrapText(page.failure(), column * 0.055, column * 0.9)
+    end
+    page.view = view
+    return view
+end
 
 ## The magnifier that opens the search.
-func drawSearchButton()
-    var b = searchButton()
+func drawSearchButton(b)
     fillC(WHITE, 0.18)
     graphics.circle(b.x, b.y, b.r)
     graphics.noFill()
@@ -434,8 +417,6 @@ func drawSearchButton()
     graphics.line(b.x + b.r * 0.18, b.y + b.r * 0.18, b.x + b.r * 0.5, b.y + b.r * 0.5)
     graphics.noStroke()
 end
-
-const CARD = [0.05, 0.1, 0.2, 0.3]      ## the tint of a card, dark so that the white text keeps its contrast over a bright sky
 
 ## A card over the sky: a rounded, tinted panel with a faint edge, and its title.
 func drawCard(x, y, w, h, title)
@@ -448,22 +429,21 @@ func drawCard(x, y, w, h, title)
 end
 
 ## The card of what the weather feels like now: a few figures side by side, each with its label.
-func drawConditions(weather, x, y, w, h)
-    drawCard(x, y, w, h, tr("conditions"))
-    var cells = []
-    if weather.feels <> nil then
-        cells.push([tr("feelsLike"), "{weather.feels:.0f}°"])
-    end
-    cells.push([tr("wind"), "{weather.wind:.0f} km/h"])
-    for i = 1, len(cells) do
-        var cx = x + w * (i - 0.5) / len(cells)
-        drawText(cells[i][1], cx, y + h * 0.5, math.min(h * 0.14, w * 0.05), "center", "center", WHITE, 0.65)
-        drawText(cells[i][2], cx, y + h * 0.77, fitSize(cells[i][2], h * 0.25, w / len(cells) * 0.9), "center", "center", WHITE)
+func drawConditions(view, card)
+    var y = card.conditionsY
+    var h = card.conditionsH
+    drawCard(card.x, y, card.w, h, tr("conditions"))
+    for i = 1, len(view.cells) do
+        var cell = view.cells[i]
+        var cx = card.x + card.w * (i - 0.5) / len(view.cells)
+        drawText(cell.label, cx, y + h * 0.5, math.min(h * 0.14, card.w * 0.05), "center", "center", WHITE, 0.65)
+        drawText(cell.value, cx, y + h * 0.77, cell.size, "center", "center", WHITE)
     end
 end
 
 ## The bar of a day, from its low to its high on a track that shows the lowest and the highest of all the days: cold
-## blue to warm orange along it, and a white dot where the temperature now stands on the day it is for.
+## blue to warm orange along it (the colours of the day, made when the forecast arrived), and a white dot where the
+## temperature now stands on the day it is for.
 func drawRange(day, lo, hi, now, x, y, w, h)
     fillC(WHITE, 0.15)
     graphics.rect(x, y - h / 2, w, h, h / 2)
@@ -474,14 +454,13 @@ func drawRange(day, lo, hi, now, x, y, w, h)
         from = to - h
     end
     var inner = to - from - h
-    fillC(tempColour(day.low))
+    fillC(day.bar[1])
     graphics.circle(from + h / 2, y, h / 2)
-    fillC(tempColour(day.high))
+    fillC(day.bar[2])
     graphics.circle(to - h / 2, y, h / 2)
-    var slices = 10
-    for k = 0, slices - 1 do
-        fillC(tempColour(day.low + (day.high - day.low) * (k + 0.5) / slices))
-        graphics.rect(from + h / 2 + inner * k / slices, y - h / 2, inner / slices + 1, h)
+    for k = 0, BAR_SLICES - 1 do
+        fillC(day.bar[3 + k])
+        graphics.rect(from + h / 2 + inner * k / BAR_SLICES, y - h / 2, inner / BAR_SLICES + 1, h)
     end
     if now <> nil then
         fillC(WHITE)
@@ -490,66 +469,56 @@ func drawRange(day, lo, hi, now, x, y, w, h)
 end
 
 ## The card of the days to come, a row each: the day, its sky, its low, its range and its high.
-func drawDays(weather, x, y, w, h)
-    var days = weather.days
-    var n = math.min(len(days), FORECAST_DAYS)
-    drawCard(x, y, w, h, tr("forecastTitle")(n))
-    var lo = days[1].low
-    var hi = days[1].high
+func drawDays(weather, view, card)
+    var x = card.x
+    var y = card.daysY
+    var w = card.w
+    var h = card.daysH
+    var n = len(view.days)
+    drawCard(x, y, w, h, view.daysTitle)
+    var lo = weather.days[1].low
+    var hi = weather.days[1].high
     for i = 1, n do
-        lo = math.min(lo, days[i].low)
-        hi = math.max(hi, days[i].high)
+        lo = math.min(lo, weather.days[i].low)
+        hi = math.max(hi, weather.days[i].high)
     end
     var top = y + w * 0.12
     var rowH = (y + h - top - h * 0.03) / n
     var size = math.min(rowH * 0.46, w * 0.055)
     for i = 1, n do
-        var day = days[i]
+        var day = weather.days[i]
+        var text = view.days[i]
         var cy = top + (i - 0.5) * rowH
         if i > 1 then
             fillC(WHITE, 0.12)
             graphics.rect(x + w * 0.05, cy - rowH / 2, w * 0.9, 1)
         end
-        drawText(i == 1 and tr("today") or date.weekdayName(day.weekday, i18n.lang, "short"), x + w * 0.05, cy, size, "left", "center", WHITE)
+        drawText(text.label, x + w * 0.05, cy, size, "left", "center", WHITE)
         drawIcon(skyOf(day.code).kind, x + w * 0.31, cy, math.min(rowH * 0.3, w * 0.05))
-        drawText("{day.low:.0f}°", x + w * 0.5, cy, size, "right", "center", WHITE, 0.6)
+        drawText(text.low, x + w * 0.5, cy, size, "right", "center", WHITE, 0.6)
         var now = nil
         if i == 1 then
             now = weather.temp          ## not `i == 1 and weather.temp or nil`: a temperature of 0 is falsy
         end
         drawRange(day, lo, hi, now, x + w * 0.54, cy, w * 0.26, math.max(rowH * 0.17, 4))
-        drawText("{day.high:.0f}°", x + w * 0.95, cy, size, "right", "center", WHITE)
+        drawText(text.high, x + w * 0.95, cy, size, "right", "center", WHITE)
     end
 end
 
-## The width the page is laid out in: the screen of a phone, but not wider than a tall column on a wide window.
-func columnWidth()
-    return math.min(W, H * 0.62)
-end
-
 ## One page, in the coordinates of the screen, over the sky: the place and the weather now, then two cards.
-func drawPage(page)
-    var column = columnWidth()
-    var weather = page.weather
-    var name = placeLabel(page.place)
-    var button = searchButton()
-    var room = math.min(column * 0.95, 2 * (button.x - 1.4 * button.r - CX))       ## the magnifier and the handle take the right, and the title is centred
-    drawText(name, CX, H * 0.07, fitSize(name, column * 0.08, room), "center", "center", WHITE)
-    if weather then
-        var sky = skyOf(weather.code)
-        var temp = "{weather.temp:.0f}°"
-        var today = weather.days[1]
-        drawText(temp, CX, H * 0.245, fitSize(temp, column * 0.34, column * 0.8), "center", "center", WHITE)
-        var words = skyText(sky)
-        drawText(words, CX, H * 0.36, fitSize(words, column * 0.065, column * 0.9), "center", "center", WHITE)
-        drawText(tr("highLow")("{today.high:.0f}", "{today.low:.0f}"), CX, H * 0.41, column * 0.05, "center", "center", WHITE, 0.85)
-        var card = column * 0.94
-        drawConditions(weather, CX - card / 2, H * 0.47, card, H * 0.135)
-        drawDays(weather, CX - card / 2, H * 0.625, card, H * 0.285)
-    elseif page.failure then
-        var lines = wrap(page.failure(), 26)
-        for i = 1, len(lines) do
-            drawText(lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", WHITE)
+func drawPage(page, layout)
+    var column = layout.column
+    var view = viewOf(page, layout)
+    drawText(view.name, CX, H * 0.07, view.nameSize, "center", "center", WHITE)
+    if page.weather then
+        drawText(view.temp, CX, H * 0.245, view.tempSize, "center", "center", WHITE)
+        drawText(view.words, CX, H * 0.36, view.wordsSize, "center", "center", WHITE)
+        drawText(view.highLow, CX, H * 0.41, column * 0.05, "center", "center", WHITE, 0.85)
+        drawConditions(view, layout.card)
+        drawDays(page.weather, view, layout.card)
+    elseif view.lines then
+        for i = 1, len(view.lines) do
+            drawText(view.lines[i], CX, H * 0.4 + (i - 1) * column * 0.075, column * 0.055, "center", "center", WHITE)
         end
     else
         drawText(tr("loading"), CX, H * 0.4, column * 0.08, "center", "center", WHITE, 0.8)
@@ -570,24 +539,25 @@ end
 func draw()
     graphics.font("sans")
     graphics.noStroke()
-    drawSky(skyAt(app.pos))
+    var layout = layoutOf()
+    var sky = skyAt(app.pos)
+    drawGradient(sky[1], sky[2])
     for i = 1, len(app.pages) do
         var offset = (i - app.pos) * W
-        if offset > -W and offset < W then
+        if offset > -W + 1 and offset < W - 1 then      ## a page less than a pixel wide on the screen is not drawn
             graphics.push()
             graphics.translate(offset, 0)
-            drawPage(app.pages[i])
+            drawPage(app.pages[i], layout)
             graphics.pop()
         end
     end
-    var column = columnWidth()
     drawDots(H * 0.93)
-    var text = app.notice
-    if text == "" then
-        text = tr("hint")
+    if app.notice == "" then
+        drawText(tr("hint"), CX, H * 0.972, layout.hintSize, "center", "center", WHITE, 0.7)
+    else
+        drawText(app.notice, CX, H * 0.972, fitSize(app.notice, layout.column * 0.04, layout.column * 0.95), "center", "center", WHITE)
     end
-    drawText(text, CX, H * 0.972, fitSize(text, column * 0.04, column * 0.95), "center", "center", WHITE, app.notice == "" and 0.7 or 1)
-    drawSearchButton()
+    drawSearchButton(layout.button)
 end
 
 func update(dt)

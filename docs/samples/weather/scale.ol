@@ -1,5 +1,7 @@
 ## Colours and proportions for drawing a temperature, with no screen in them so that weather_test.ol can try them.
 
+import "../lib/draw.ol"
+
 ## The colour of a temperature in degrees Celsius, as [r, g, b, a]: from cold blue through green to warm orange, by steps of a colour
 ## each, and held beyond the first and the last.
 const TEMP_STOPS = [
@@ -10,15 +12,6 @@ const TEMP_STOPS = [
     [26, [1.0, 0.75, 0.3, 1]],
     [34, [1.0, 0.45, 0.3, 1]]
 ]
-
-## The colour `mix` of the way from `a` to `b` (arrays of the same length, one number per channel).
-func mixColours(a, b, mix)
-    var out = []
-    for k = 1, len(a) do
-        out.push(a[k] + (b[k] - a[k]) * mix)
-    end
-    return out
-end
 
 func tempColour(temp)
     var last = len(TEMP_STOPS)
@@ -42,4 +35,29 @@ func onTrack(temp, lo, hi)
         return 0.5
     end
     return math.clamp((temp - lo) / (hi - lo), 0, 1)
+end
+
+## The top and the bottom of the sky behind each kind of weather (forecast.ol), as [r, g, b], and the sky of a page that has
+## no weather yet.
+const SKY = {
+    clear: [[0.16, 0.45, 0.85], [0.52, 0.76, 0.96]],
+    partly: [[0.25, 0.5, 0.82], [0.62, 0.78, 0.92]],
+    cloud: [[0.38, 0.45, 0.55], [0.66, 0.71, 0.77]],
+    fog: [[0.5, 0.55, 0.6], [0.74, 0.77, 0.8]],
+    rain: [[0.17, 0.25, 0.4], [0.4, 0.5, 0.62]],
+    snow: [[0.45, 0.55, 0.68], [0.82, 0.87, 0.93]],
+    storm: [[0.1, 0.1, 0.22], [0.32, 0.3, 0.45]]
+}
+const WAITING = [[0.12, 0.2, 0.38], [0.3, 0.42, 0.6]]
+
+const BAR_SLICES = 10
+
+## The colours the bar of a day is drawn in, from its low to its high: the colour of each end, then BAR_SLICES between.
+## They depend on the day alone, so they are made once, when the forecast arrives.
+func barColours(low, high)
+    var out = [tempColour(low), tempColour(high)]
+    for k = 0, BAR_SLICES - 1 do
+        out.push(tempColour(low + (high - low) * (k + 0.5) / BAR_SLICES))
+    end
+    return out
 end

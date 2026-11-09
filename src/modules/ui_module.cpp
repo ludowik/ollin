@@ -6,6 +6,7 @@
 #include "vm.h"
 #include <raylib.h>
 #include "engine_font.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -91,7 +92,6 @@ uint32_t s_drag_gen = 0;
 int s_edit = -1;
 uint32_t s_edit_gen = 0;
 std::string s_edit_text;
-int s_text_fields = 0;       // the live text fields: what ui_wants_text answers without a scan, once per frame
 double s_edit_blink = 0.0;   // when the cursor last moved: it shows solid for a moment, then blinks
 
 bool node_alive(int slot, uint32_t gen) {
@@ -113,8 +113,6 @@ int alloc_node(Node::Kind kind, const std::string& label, int parent) {
     n.gen = gen;
     n.alive = true;
     n.kind = kind;
-    if (kind == Node::TEXT_FIELD)
-        s_text_fields++;
     n.label = label;
     n.parent = parent;
     if (parent >= 0)
@@ -126,8 +124,6 @@ int alloc_node(Node::Kind kind, const std::string& label, int parent) {
 // released (a removed list must not keep its source alive). `parent` is left alone, so a dead row that a
 // draw loop still holds can read its parent's slot, which is always within the table.
 void kill_node(Node& n) {
-    if (n.alive && n.kind == Node::TEXT_FIELD)
-        s_text_fields--;
     n.alive = false;
     n.gen++;
     n.action = Value{};
@@ -1106,7 +1102,7 @@ bool ui_editing() {
 }
 
 bool ui_wants_text() {
-    return s_text_fields > 0;
+    return std::any_of(s_nodes.begin(), s_nodes.end(), [](const Node& n) { return n.alive && n.kind == Node::TEXT_FIELD; });
 }
 
 bool ui_edit_text(const std::string& text) {

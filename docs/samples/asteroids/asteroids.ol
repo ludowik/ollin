@@ -43,7 +43,6 @@ import "field.ol"
 import "save.ol"
 import "../lib/joystick.ol"
 
-
 const SHIP_R      = 11.0       ## the ship's collision radius; the outline is drawn at this scale
 const TURN_SPEED  = 5.2        ## radians per second, on the keyboard — turning is free and instant
 const TURN_SNAP   = 14.0       ## radians per second at which the nose swings to the stick's aim
@@ -683,21 +682,15 @@ end
 
 ## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
 func loadGame()
-    var t = readSave(data.get(SAVE_KEY))
-    if t == nil then
+    if not loadKept(SAVE_KEY, saveValid, restoreSave) then
         return false
     end
-    restoreSave(t)
     markKept(state)
     return true
 end
 
-## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
-## nothing worth keeping.
 func autosave(dt)
-    if state <> "title" and keepDue(dt, state) then
-        saveGame()
-    end
+    keepGoing(dt, state, saveGame)
 end
 
 ## A press ends the pause. A game kept by a run comes back in pause, and the way on from there must not be a key a
@@ -762,10 +755,7 @@ func touch.ended(id, x, y)
 end
 
 func mouse.pressed(x, y)
-    if begin() or touchPlay then    ## a finger was already answered by touch.began
-        return
-    end
-    if unpause() then
+    if begin() or touchPlay or unpause() then    ## a finger was already answered by touch.began
         return
     end
     fire()                          ## a real click, on a desktop: it fires as space does

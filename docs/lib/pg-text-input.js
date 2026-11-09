@@ -23,8 +23,10 @@
 // Programs that declare neither keyboard.typed nor a ui.textField ("wanted" stays false) are not touched at all.
 //
 // The engine and this module meet in window.__ollinTextInput: the engine calls frame(wanted) once per frame, show() and
-// hide(). Only the text of the sink comes through here; the control keys (backspace, return…) bubble from the sink to
-// the window as they always did, where the engine reads them as key names.
+// hide(), and the host calls reset() when a program stops (releaseProgramHolds, pg-run.js). Only the text of the sink
+// comes through here; the control keys (backspace, return…) bubble from the sink to the window as they always did,
+// where the engine reads them as key names. window.__ollinKbdBlocked, set by the playground while its editor has the
+// keyboard, makes the page leave the touches and the focus alone.
 
 // The characters an iPhone puts in place of the straight quote and apostrophe ("smart punctuation", which the page cannot
 // switch off): a name typed with "'" must reach the program with "'".
@@ -86,17 +88,16 @@ export function installTextInput(canvas) {
     frozen.pane.style.height = frozen.height
     frozen = null
   }
-  const onResize = () => {
-    if (frozen && orientation() !== frozen.orientation) thaw()
-  }
-  window.addEventListener('resize', onResize)
   const vv = window.visualViewport
   const noteViewport = (what) => note(what + ' inner ' + window.innerHeight + (vv ? ' visual ' + Math.round(vv.height) : '') +
     ' sink=' + focused())
-  const onNoteResize = () => noteViewport('resize')
-  const onNoteVisualResize = () => noteViewport('visual resize')
-  window.addEventListener('resize', onNoteResize)
-  if (vv) vv.addEventListener('resize', onNoteVisualResize)
+  const onResize = () => {
+    noteViewport('resize')
+    if (frozen && orientation() !== frozen.orientation) thaw()
+  }
+  const onVisualResize = () => noteViewport('visual resize')
+  window.addEventListener('resize', onResize)
+  if (vv) vv.addEventListener('resize', onVisualResize)
 
   const focused = () => document.activeElement === sink
   const blocked = () => !!window.__ollinKbdBlocked   // the editor of the playground has the keyboard
@@ -142,37 +143,37 @@ export function installTextInput(canvas) {
 
     hide() {
       note('hide()')
-      shown = false
-      dismissed = false
-      askedAt = -Infinity
-      sink.inputMode = 'none'
-      closing = true
-      sink.blur()
-      closing = false
+      release()
     },
 
     // A new program: no keyboard left up, nothing wanted, nothing typed.
     reset() {
+      release()
       api.wanted = false
       queue = ''
-      shown = false
-      askedAt = -Infinity
       composing = false
-      dismissed = false
-      sink.inputMode = 'none'
-      closing = true
-      sink.blur()
-      closing = false
       sink.textContent = ''
     },
   }
   window.__ollinTextInput = api
 
+  // Puts the keyboard away: the blur is the engine's own, which is no dismissal by the user.
+  function release() {
+    shown = false
+    dismissed = false
+    askedAt = -Infinity
+    sink.inputMode = 'none'
+    closing = true
+    sink.blur()
+    closing = false
+  }
+  const active = () => api.wanted && !blocked()
+
   // Takes the focus for the sink inside the tap, at its touchend: without a keyboard, unless show() asked for one while the
   // finger was down. Then the focus is taken with inputmode "text" from the start, which is the case an iPhone was
   // measured to accept (a focus() inside a gesture, on an element that wants a keyboard).
   function arm() {
-    if (!api.wanted || blocked() || shown) return
+    if (shown) return
     dismissed = false
     const asked = performance.now() - askedAt < ASK_LIFETIME
     note('touchend arms the sink, asked=' + asked)
@@ -183,10 +184,10 @@ export function installTextInput(canvas) {
   }
 
   canvas.addEventListener('touchstart', (e) => {
-    if (api.wanted && !blocked() && e.cancelable) e.preventDefault()
+    if (active() && e.cancelable) e.preventDefault()
   }, { passive: false })
   canvas.addEventListener('touchend', (e) => {
-    if (!api.wanted || blocked()) return
+    if (!active()) return
     arm()
     if (e.cancelable) e.preventDefault()
   }, { passive: false })
@@ -225,8 +226,7 @@ export function installTextInput(canvas) {
   return () => {
     if (window.__ollinTextInput === api) delete window.__ollinTextInput
     window.removeEventListener('resize', onResize)
-    window.removeEventListener('resize', onNoteResize)
-    if (vv) vv.removeEventListener('resize', onNoteVisualResize)
+    if (vv) vv.removeEventListener('resize', onVisualResize)
     thaw()
     sink.remove()
   }

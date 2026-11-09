@@ -15,21 +15,30 @@ func drawText(str, x, y, size, h, v, col, alpha = 1)
     graphics.noStroke()
 end
 
-## The whole canvas in strips of one colour each, from the colour `top` to the colour `bottom` (arrays [r, g, b, a]).
-## The strips overlap by a row, so that no seam shows between two of them. By default there is one strip per level
-## of the display that the colour crosses (a screen has 256 per channel): fewer show as steps, more change nothing.
-## `bands` forces the number.
-func drawGradient(top, bottom, bands = 0)
-    if bands <= 0 then
-        var levels = math.max(math.abs(bottom[1] - top[1]), math.abs(bottom[2] - top[2]), math.abs(bottom[3] - top[3])) * 255
-        bands = math.clamp(math.ceil(levels) + 1, 2, H)
+## The colour `mix` of the way from `a` to `b` (arrays of the same length, one number per channel).
+func mixColours(a, b, mix)
+    var out = []
+    for k = 1, len(a) do
+        out.push(a[k] + (b[k] - a[k]) * mix)
     end
+    return out
+end
+
+## The whole canvas in strips of one colour each, from the colour `top` to the colour `bottom` (arrays [r, g, b, a]).
+## The strips overlap by a row, so that no seam shows between two of them. There is one strip per level of the display
+## that the colour crosses (a screen has 256 per channel): fewer show as steps, more change nothing. The blend is written
+## out rather than made by mixColours, which builds an array: this runs every frame.
+func drawGradient(top, bottom)
+    var levels = math.max(math.abs(bottom[1] - top[1]), math.abs(bottom[2] - top[2]), math.abs(bottom[3] - top[3])) * 255
+    var bands = math.clamp(math.ceil(levels) + 1, 2, H)
+    var y0 = 0
     for i = 0, bands - 1 do
         var t = i / (bands - 1)
         graphics.fill(top[1] + (bottom[1] - top[1]) * t, top[2] + (bottom[2] - top[2]) * t,
             top[3] + (bottom[3] - top[3]) * t, 1)
-        var y0 = math.floor(H * i / bands)
-        graphics.rect(0, y0, W, math.floor(H * (i + 1) / bands) - y0 + 1)
+        var y1 = math.floor(H * (i + 1) / bands)
+        graphics.rect(0, y0, W, y1 - y0 + 1)
+        y0 = y1
     end
 end
 

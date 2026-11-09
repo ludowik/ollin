@@ -8,6 +8,7 @@
 
 import "rules.ol"
 import "sounds.ol"
+import "../lib/keep.ol"
 
 ## What can be tuned: the clock, the waits and the keys of the saved data.
 global config = {
@@ -115,7 +116,7 @@ end
 ## best score or a choice must survive that. The save keeps the choices too, for it also holds the choice being made on
 ## the screen the player left; the best score it does not keep, so that there is one place that says it.
 func loadBest()
-    game.best = data.get(bestKey(), 0)
+    game.best = wholeOr(data.get(bestKey(), 0), 0, config.maxScore)
 end
 
 func endGame()

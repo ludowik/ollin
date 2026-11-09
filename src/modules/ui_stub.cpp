@@ -11,16 +11,14 @@
 namespace {
 
 Value inert_class();
+Value inert_field_class();
 
-const char* const k_text_field_mark = "isTextField";
-
-// The handle of a text field carries a mark, so that edit() can refuse any other element as the real module does.
+// The handle of a text field is of a class of its own, a kind of the inert element, so that edit() can refuse any other
+// element as the real module does without a field of the handle showing it.
 Value make_inert(bool text_field = false) {
-    MapBuilder handle;
-    handle.klass(inert_class());
-    if (text_field)
-        handle.set(k_text_field_mark, Value::make_bool(true));
-    return handle.done();
+    return MapBuilder()
+        .klass(text_field ? inert_field_class() : inert_class())
+        .done();
 }
 
 int stub_button(CallCtx& ctx) {
@@ -63,7 +61,7 @@ int stub_self(CallCtx& ctx) {
 }
 
 int stub_edit(CallCtx& ctx) {
-    if (ctx.args[0].map_get(Value(std::string(k_text_field_mark))).is_nil())
+    if (!ctx.args[0].is_instance_of(inert_field_class()))
         throw std::runtime_error("field.edit: this ui element is not a text field");
     return ctx.ret(ctx.args[0]);
 }
@@ -89,6 +87,11 @@ Value make_inert_class() {
 
 Value inert_class() {
     static Value cls = make_inert_class();
+    return cls;
+}
+
+Value inert_field_class() {
+    static Value cls = Value::make_class("UiField", inert_class());
     return cls;
 }
 

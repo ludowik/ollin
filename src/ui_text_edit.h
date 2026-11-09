@@ -41,6 +41,5 @@ inline std::string text_edit_tail(const std::string& text, Fits fits) {
         else
             low = middle + 1;
     }
-    std::string tail = text.substr(utf8_byte_offset(text, low));
-    return fits(tail) ? tail : std::string();
+    return text.substr(utf8_byte_offset(text, low));
 }
