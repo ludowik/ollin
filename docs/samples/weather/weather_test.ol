@@ -90,3 +90,12 @@ assert(pageAfterDrag(2.9, 40, 2, 5) == 3 and pageAfterDrag(1.1, -40, 2, 5) == 1,
 assert(pageAfterDrag(0.8, -5, 1, 5) == 1 and pageAfterDrag(5.3, 5, 5, 5) == 5, "the ends hold")
 assert(slide(1, 3, 0.05) > 1 and slide(1, 3, 0.05) < 3 and slide(3, 1, 0.05) < 3)
 assert(slide(2.9995, 3, 0.016) == 3 and slide(1, 3, 10) == 3, "a slide ends on the page and never overshoots it")
+
+var from, to, mix = skyBetween(2.25, 5)
+assert(from == 2 and to == 3 and mix == 0.25, "a quarter of the way from page 2 to page 3")
+from, to, mix = skyBetween(3, 5)
+assert(from == 3 and to == 4 and mix == 0, "on a page, only its own sky")
+from, to, mix = skyBetween(0.7, 5)
+assert(from == 1 and to == 2 and mix == 0, "pulled past the first page, its sky holds")
+from, to, mix = skyBetween(5.3, 5)
+assert(from == 5 and to == 5, "pulled past the last page, its sky holds")

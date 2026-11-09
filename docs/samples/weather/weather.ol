@@ -296,6 +296,22 @@ func drawSky(palette)
     drawGradient(palette[1], palette[2])
 end
 
+## The sky at a position of the pages: the sky of the page, or the blend of the skies of the two pages it is between.
+func skyAt(pos)
+    var first, second, mix = skyBetween(pos, len(app.pages))
+    var a = paletteOf(app.pages[first])
+    var b = paletteOf(app.pages[second])
+    var out = []
+    for i = 1, 2 do
+        var colour = []
+        for k = 1, 3 do
+            colour.push(a[i][k] + (b[i][k] - a[i][k]) * mix)
+        end
+        out.push(colour)
+    end
+    return out
+end
+
 func drawCloud(x, y, r, shade)
     fillC([shade, shade, shade, 1])
     graphics.circle(x - r * 0.55, y + r * 0.1, r * 0.5)
@@ -383,12 +399,11 @@ func drawForecast(days, x, y, w, h)
         drawText("{day.low:.0f}°", cx, y + h * 0.95, h * 0.14, "center", "center", WHITE, 0.65)
     end
 end
-## One page, in the coordinates of the screen: the sky of its weather, the place, the reading and the days to come.
+## One page, in the coordinates of the screen, over the sky: the place, the reading and the days to come.
 func drawPage(page)
     var column = math.min(W, H * 0.62)
     var weather = page.weather
     var sky = weather and skyOf(weather.code) or nil
-    drawSky(paletteOf(page))
     var name = page.place.name
     if page.place.country <> "" then
         name = "{name}, {page.place.country}"
@@ -426,8 +441,7 @@ end
 func draw()
     graphics.font("sans")
     graphics.noStroke()
-    var nearest = app.pages[math.clamp(math.floor(app.pos + 0.5), 1, len(app.pages))]
-    drawSky(paletteOf(nearest))           ## shows where a drag pulls the first or the last page away from the edge
+    drawSky(skyAt(app.pos))
     for i = 1, len(app.pages) do
         var offset = math.floor((i - app.pos) * W + 0.5)
         if offset > -W and offset < W then

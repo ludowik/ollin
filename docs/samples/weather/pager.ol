@@ -27,3 +27,10 @@ func slide(pos, target, dt)
     end
     return pos + gap * math.min(1, dt * SLIDE)
 end
+
+## The two pages whose skies the screen blends at a position, and how much of the second: the sky does not slide with
+## the pages, it changes colour from one to the next, and holds at the ends where a drag pulls past them.
+func skyBetween(pos, last)
+    var first = math.clamp(math.floor(pos), 1, last)
+    return first, math.min(first + 1, last), math.clamp(pos - first, 0, 1)
+end
