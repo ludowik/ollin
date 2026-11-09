@@ -60,7 +60,15 @@ accepts("the saucer a little outside the field, about to leave", func(t) t.sauce
 accepts("the wait for the saucer run far below zero", func(t) t.saucerTimer = -123456.5 end)
 accepts("the wait for a ship run far below zero", func(t) t.spawn = -9876.5 end)
 accepts("the wait for a wave run a frame below zero", func(t) t.waveWait = -0.016 end)
+accepts("a shot born past an edge, before the next step wraps it", func(t) t.shots[1].x = -8.0 t.saucerShots[1].x = FIELD_W + 20.0 end)
 accepts("a ship turned many times round", func(t) t.ship.ang = -54321.5 end)
+
+## What a long frame leaves in the game is brought inside the ranges by the writer, so that the save is not refused.
+var long_frame = goodSave()
+long_frame.waveWait = -5.0
+long_frame.spawn = 99.0
+clampToRanges(long_frame, SAVE_WHOLES, SAVE_NUMBERS)
+assert(readSave(long_frame) <> nil and long_frame.waveWait == -1, "a wait that fell far below zero is clamped into a save that is trusted")
 
 ## ── What is refused ───────────────────────────────────────────────────────────────────────────────
 
@@ -110,14 +118,14 @@ refuses("more shots than the ship may have in the air", func(t) t.shots = [shot(
 refuses("a shot with no life left to spend", func(t) t.shots[1].left = nil end)
 refuses("a shot that lives for ever", func(t) t.shots[1].left = 30 end)
 refuses("a shot that is already dead", func(t) t.shots[1].left = -1 end)
-refuses("a shot outside the field", func(t) t.shots[2].y = FIELD_H + 1 end)
+refuses("a shot far outside the field", func(t) t.shots[2].y = FIELD_H + SAVE_EDGE + 1 end)
 refuses("a shot that is not a map", func(t) t.shots = [5] end)
 refuses("more saucer shots than can be", func(t) t.saucerShots = [] for i = 1, 9 do t.saucerShots.push(shot(0.5)) end end)
-refuses("a saucer shot outside the field", func(t) t.saucerShots[1].x = -3 end)
+refuses("a saucer shot far outside the field", func(t) t.saucerShots[1].x = -SAVE_EDGE - 1 end)
 
 refuses("a saucer that is not a map", func(t) t.saucer = 5 end)
 refuses("a saucer far outside", func(t) t.saucer.x = FIELD_W + 3 * SAUCER_BIG_R end)
-refuses("a saucer off the field vertically", func(t) t.saucer.y = FIELD_H + 1 end)
+refuses("a saucer off the field vertically", func(t) t.saucer.y = FIELD_H + SAVE_EDGE + 1 end)
 refuses("a saucer with no size", func(t) t.saucer.small = nil end)
 refuses("a saucer whose size is a number", func(t) t.saucer.small = 1 end)
 refuses("a saucer too fast", func(t) t.saucer.vx = 500 end)

@@ -102,7 +102,6 @@ global ufoDir = 1        ## it comes from the other side each time
 global shots = 0         ## shots fired, which is what prices the mystery ship
 global popup = nil       ## {text, x, y, left}: what a kill was worth, written where it happened
 const BEST_KEY = "best"
-const SAVE_EVERY = 0.5   ## seconds between two keepings of a game that goes on
 global best = 0          ## the best score, kept from one run to the next
 
 global state = "title"   ## "title", "play" or "over": every input asks this first
@@ -116,9 +115,6 @@ global touchPlay = false ## a finger has been seen: aiming is by hand, firing by
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
 global grabGun = 0.0     ## RELATIVE, so touching the screen never teleports the cannon
 global acc = 0.0
-
-global saveWait = 0.0    ## the time left before the game is kept again
-global savedState = ""   ## the screen it was last kept on: a change of screen is kept at once
 
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
 ## arches — and the erosion of the previous one is genuinely gone, the textures being new.
@@ -280,11 +276,13 @@ func ufoUpdate(dt)
             ufo = {x: x, dir: ufoDir}
             ufoDir = -ufoDir
             ufoWait = UFO_PERIOD
-            ufoVoice.start()
         end
         return
     end
     ufo.x = ufo.x + UFO_SPEED * ufo.dir * dt
+    if not ufoVoice.isPlaying() then
+        ufoVoice.start()        ## at the start of a crossing, and again for one that a save brought back
+    end
     ufoVoice.freq(UFO_HUM + UFO_WARBLE * math.sin(elapsedTime * UFO_RATE * 6.28318))
     if ufo.x < -UFO_W or ufo.x > FIELD_W then    ## it left the field: it was worth nothing
         ufo = nil
@@ -519,6 +517,7 @@ func saveState()
         fx: [], fy: [], fa: [], shields: [], gunX: gunX, shotLive: shotLive, shotX: shotX, shotY: shotY,
         bombs: bombs, respawn: respawn, ufoWait: ufoWait, ufoDir: ufoDir, ufo: ufo
     }
+    clampToRanges(t, SAVE_WHOLES, SAVE_NUMBERS)
     for a in fleet do
         t.fx.push(a.x)
         t.fy.push(a.y)
@@ -586,8 +585,7 @@ end
 ## Keeps the game; `data` leaves the file alone when it is what was kept last.
 func saveGame()
     data.set(SAVE_KEY, saveState())
-    saveWait = SAVE_EVERY
-    savedState = state
+    markKept(state)
 end
 
 ## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
@@ -597,19 +595,14 @@ func loadGame()
         return false
     end
     restoreSave(t)
-    savedState = state
-    saveWait = SAVE_EVERY
+    markKept(state)
     return true
 end
 
 ## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
 ## nothing worth keeping.
 func autosave(dt)
-    if state == "title" then
-        return
-    end
-    saveWait -= dt
-    if state <> savedState or saveWait <= 0.0 then
+    if state <> "title" and keepDue(dt, state) then
         saveGame()
     end
 end
@@ -618,7 +611,7 @@ end
 ## sprite is a texture and a texture needs a graphics context.
 func setup()
     graphics.canvas(W, H, "Ollin Invaders")
-    best = data.get(BEST_KEY, 0)
+    best = wholeOr(data.get(BEST_KEY, 0), 0, SAVE_WHOLES.score[2])
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
     graphics.viewport(FIELD_W, FIELD_H)

@@ -61,6 +61,13 @@ accepts("a whole number for a fraction", func(t) t.gunX = 80 t.respawn = 1 end)
 accepts("the wait for the mystery ship run far below zero", func(t) t.ufoWait = -123456.5 end)
 accepts("the wait for the cannon ended a frame below zero", func(t) t.respawn = -0.0406 end)
 
+## What a long frame leaves in the game is brought inside the ranges by the writer, so that the save is not refused.
+var long_frame = goodSave()
+long_frame.respawn = -5.0
+long_frame.shotY = -900.0
+clampToRanges(long_frame, SAVE_WHOLES, SAVE_NUMBERS)
+assert(readSave(long_frame) <> nil and long_frame.respawn == -1 and long_frame.shotY == -FIELD_H, "a wait or a shot that went far is clamped into a save that is trusted")
+
 ## ── What is refused ───────────────────────────────────────────────────────────────────────────────
 
 func refuses(name, change)

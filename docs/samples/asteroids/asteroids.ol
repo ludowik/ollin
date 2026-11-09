@@ -87,7 +87,6 @@ global state = "title"
 global paused = false
 global score = 0
 const BEST_KEY = "best"
-const SAVE_EVERY = 0.5         ## seconds between two keepings of a game that goes on
 global best = 0                ## the best score, kept from one run to the next
 global lives = LIVES
 global wave = 1
@@ -103,8 +102,6 @@ global saucer = nil
 global saucerShots = []
 global saucerTimer = SAUCER_PERIOD
 global debris = []             ## the fading sparks of anything that came apart
-global saveWait = 0.0          ## the time left before the game is kept again
-global savedState = ""         ## the screen it was last kept on: a change of screen is kept at once
 
 ## The outlines at the sizes the game draws them, sized ONCE by buildArt (see shapes.ol).
 global rockArt = []           ## [shape][size]
@@ -640,11 +637,13 @@ end
 ## cadence of a held trigger, the heartbeat. The best score has its own key. A rock keeps its `dead` mark and the
 ## saucer its radius, which restoreSave puts right.
 func saveState()
-    return {
+    var t = {
         v: SAVE_VERSION, state: state, score: score, lives: lives, wave: wave, nextExtra: nextExtra, spawn: spawn,
         waveWait: waveWait, saucerTimer: saucerTimer, ship: ship, rocks: rocks, shots: shots,
         saucer: saucer, saucerShots: saucerShots
     }
+    clampToRanges(t, SAVE_WHOLES, SAVE_NUMBERS)
+    return t
 end
 
 ## Puts a state read by readSave in the game. A game that was running comes back in pause.
@@ -679,8 +678,7 @@ end
 ## Keeps the game; `data` leaves the file alone when it is what was kept last.
 func saveGame()
     data.set(SAVE_KEY, saveState())
-    saveWait = SAVE_EVERY
-    savedState = state
+    markKept(state)
 end
 
 ## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
@@ -690,19 +688,14 @@ func loadGame()
         return false
     end
     restoreSave(t)
-    savedState = state
-    saveWait = SAVE_EVERY
+    markKept(state)
     return true
 end
 
 ## Called every frame: keeps the game when it changed screen, and twice a second while it goes on. The title holds
 ## nothing worth keeping.
 func autosave(dt)
-    if state == "title" then
-        return
-    end
-    saveWait -= dt
-    if state <> savedState or saveWait <= 0.0 then
+    if state <> "title" and keepDue(dt, state) then
         saveGame()
     end
 end
@@ -945,7 +938,7 @@ end
 ## Everything the program owns is built here, in the order it depends on.
 func setup()
     graphics.canvas(W, H, "Ollin Asteroids")
-    best = data.get(BEST_KEY, 0)
+    best = wholeOr(data.get(BEST_KEY, 0), 0, SAVE_WHOLES.score[2])
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
     graphics.viewport(FIELD_W, FIELD_H)

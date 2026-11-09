@@ -11,6 +11,7 @@
 
 import "rules.ol"
 import "play.ol"
+import "../lib/keep.ol"
 
 const SAVE_KEY = "tetris.save"
 const SAVE_VERSION = 1
@@ -50,14 +51,6 @@ func saveState()
     return t
 end
 
-func isWhole(v, low, high)
-    return typeof(v) == "int" and v >= low and v <= high
-end
-
-func isOneOf(v, list)
-    return typeof(v) == "string" and list.contains(v)
-end
-
 ## Whether a save read back can be trusted: every field there and of its sort, in its range, and a falling piece that fits.
 func saveValid(t)
     if typeof(t) <> "map" or t.v <> SAVE_VERSION then
@@ -75,7 +68,7 @@ func saveValid(t)
         end
     end
     for name in SAVE_BOOLS do
-        if typeof(t[name]) <> "bool" then
+        if not isBool(t[name]) then
             return false
         end
     end
@@ -104,7 +97,7 @@ end
 
 ## The state a value holds, or nil when it is not a save that can be trusted.
 func readSave(value)
-    return saveValid(value) and value or nil
+    return trusted(value, saveValid)
 end
 
 ## Puts a state read by readSave in the game. A game that was running comes back in pause.

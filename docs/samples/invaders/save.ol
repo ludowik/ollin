@@ -8,6 +8,7 @@
 ## shield that is not the size of the field's — is refused WHOLE, and the game starts as if there were none.
 
 import "field.ol"
+import "../lib/keep.ol"
 
 const SAVE_KEY = "save"
 const SAVE_VERSION = 1
@@ -27,42 +28,13 @@ const SAVE_NUMBERS = {
     ufoWait: [-999999999, 100]
 }
 
-func isWhole(v, low, high)
-    return typeof(v) == "int" and v >= low and v <= high
-end
-
-func isNumber(v, low, high)
-    return (typeof(v) == "int" or typeof(v) == "float") and v >= low and v <= high
-end
-
-func isOneOf(v, list)
-    return typeof(v) == "string" and list.contains(v)
-end
-
-func isBool(v)
-    return typeof(v) == "bool"
-end
-
 func isSign(v)
     return v == 1 or v == -1
 end
 
-## Whether `list` holds `count` entries that all pass `check`.
-func allOf(list, count, check)
-    if typeof(list) <> "array" or len(list) <> count then
-        return false
-    end
-    for v in list do
-        if not check(v) then
-            return false
-        end
-    end
-    return true
-end
-
 ## One shield: SHIELD_H rows of SHIELD_W characters, `#` where it is whole and `.` where it was eaten.
 func isShield(rows)
-    return allOf(rows, SHIELD_H, func(row)
+    return isArrayOf(rows, SHIELD_H, SHIELD_H, func(row)
         if typeof(row) <> "string" or len(row) <> SHIELD_W then
             return false
         end
@@ -98,27 +70,21 @@ func saveValid(t)
     if typeof(t) <> "map" or t.v <> SAVE_VERSION or not isOneOf(t.state, SAVE_STATES) then
         return false
     end
-    for name, range in SAVE_WHOLES do
-        if not isWhole(t[name], range[1], range[2]) then
-            return false
-        end
-    end
-    for name, range in SAVE_NUMBERS do
-        if not isNumber(t[name], range[1], range[2]) then
-            return false
-        end
+    if not inRanges(t, SAVE_WHOLES, SAVE_NUMBERS) then
+        return false
     end
     if not isSign(t.heading) or not isSign(t.ufoDir) or not isBool(t.turning) or not isBool(t.shotLive) then
         return false
     end
     var aliens = COLS * ROWS
-    if not allOf(t.fx, aliens, isAlienX) or not allOf(t.fy, aliens, isAlienY) or not allOf(t.fa, aliens, isBool) then
+    if not isArrayOf(t.fx, aliens, aliens, isAlienX) or not isArrayOf(t.fy, aliens, aliens, isAlienY)
+        or not isArrayOf(t.fa, aliens, aliens, isBool) then
         return false
     end
-    if not allOf(t.shields, SHIELDS, isShield) then
+    if not isArrayOf(t.shields, SHIELDS, SHIELDS, isShield) then
         return false
     end
-    if typeof(t.bombs) <> "array" or len(t.bombs) > BOMB_MAX or not allOf(t.bombs, len(t.bombs), isBomb) then
+    if not isArrayOf(t.bombs, 0, BOMB_MAX, isBomb) then
         return false
     end
     return t.ufo == nil or isUfo(t.ufo)
@@ -126,5 +92,5 @@ end
 
 ## The state a value holds, or nil when it is not a save that can be trusted.
 func readSave(value)
-    return saveValid(value) and value or nil
+    return trusted(value, saveValid)
 end
