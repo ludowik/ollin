@@ -49,6 +49,7 @@ une langue de plus s'ajoute dans la table, avec ses textes dans cette langue, sa
 actuels, qui ne limitent pas la règle :
 - les textes de Blockudoku et de Sudoku (`docs/samples/blockudoku/texts.ol`, `docs/samples/sudoku/texts.ol` et leurs tests
   `texts_test.ol`), le français étant la langue par défaut de ces jeux et l'anglais la seconde ;
+- les textes de la météo (`docs/samples/weather/texts.ol`, vérifiés par `weather_test.ol`), même répartition : français par défaut, anglais en second ;
 - les noms des jours et des mois de `date.weekdayName` et `date.monthName` (tables de `src/modules/date_module.cpp` et
   tests de `tests/regressions/modules/date.ol`), l'anglais étant la langue par défaut du moteur.
 
