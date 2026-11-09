@@ -255,12 +255,16 @@ func mouse.pressed(x, y)
     app.speed = 0
 end
 
-func mouse.released(x, y)
-    if not app.dragging then
-        return
-    end
+## Lets go of the pages: they settle on the page the drag points to.
+func release()
     app.dragging = false
     settle(pageAfterDrag(app.pos, app.speed, app.index, len(app.pages)))
+end
+
+func mouse.released(x, y)
+    if app.dragging then
+        release()
+    end
 end
 
 ## ── Drawing ────────────────────────────────────────────────────────────────────────────────────────
@@ -281,6 +285,11 @@ func wrap(text, width)
     end
     lines.push(line)
     return lines
+end
+
+## The sky behind the weather of a page, or the waiting one while it has none.
+func paletteOf(page)
+    return page.weather and SKY[skyOf(page.weather.code).kind] or WAITING
 end
 
 func drawSky(palette)
@@ -379,7 +388,7 @@ func drawPage(page)
     var column = math.min(W, H * 0.62)
     var weather = page.weather
     var sky = weather and skyOf(weather.code) or nil
-    drawSky(sky and SKY[sky.kind] or WAITING)
+    drawSky(paletteOf(page))
     var name = page.place.name
     if page.place.country <> "" then
         name = "{name}, {page.place.country}"
@@ -417,6 +426,8 @@ end
 func draw()
     graphics.font("sans")
     graphics.noStroke()
+    var nearest = app.pages[math.clamp(math.floor(app.pos + 0.5), 1, len(app.pages))]
+    drawSky(paletteOf(nearest))           ## shows where a drag pulls the first or the last page away from the edge
     for i = 1, len(app.pages) do
         var offset = math.floor((i - app.pos) * W + 0.5)
         if offset > -W and offset < W then
@@ -442,6 +453,9 @@ func update(dt)
         if page.age >= REFRESH and not page.request then
             ask(page)
         end
+    end
+    if app.dragging and not mouse.isDown() then
+        release()               ## a release that was never reported (the system takes the touch away) must not leave the pages held
     end
     if app.dragging then
         var x = mouse.position()
