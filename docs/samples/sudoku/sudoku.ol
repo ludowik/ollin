@@ -14,12 +14,13 @@ import "generator.ol"
 import "sounds.ol"
 import "texts.ol"
 import "../lib/draw.ol"
+import "../lib/area.ol"
+import "../lib/menu.ol"
 
 const HINTS = 3                      ## hints per puzzle
 
 global config = {
     saveKey: "sudoku.game",
-    soundKey: "sudoku.sound",
     errorsKey: "sudoku.errors",
     inputKey: "sudoku.input",
     dailyKey: "sudoku.daily",
@@ -83,23 +84,13 @@ global game = {
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
 
-func rectOf(x, y, w, h)
-    return {x: x, y: y, w: w, h: h}
-end
-
-func inRect(x, y, r)
-    return x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
-end
-
 ## The grid and its controls in a column when the area is tall, side by side when it is wide: whichever gives the
 ## cells the room. Computed again only when W or H change.
 func layoutCompute()
     var L = game.layout
-    if W == L.w and H == L.h then
+    if not areaChanged(L) then
         return
     end
-    L.w = W
-    L.h = H
     var m = SIZE * config.margin
     var colH = 15.6
     var rowW = 15.0
@@ -169,15 +160,6 @@ end
 
 func showScreen(name)
     game.screen = name
-end
-
-## The rectangle of the i-th of n entries of a menu, centred in the area.
-func optionRect(i, n)
-    var w = math.min(W - 2 * SIZE * config.margin, SIZE * 0.8)
-    var h = math.min(SIZE * 0.1, (H * 0.84) / (n * 1.35))
-    var gap = h * 0.35
-    var top = H / 2 - (n * h + (n - 1) * gap) / 2
-    return rectOf(CX - w / 2, top + (i - 1) * (h + gap), w, h)
 end
 
 ## ── The game ────────────────────────────────────────────────────────────────────────────────────
@@ -479,9 +461,7 @@ end
 ## A tap arrives twice in the same frame (touch, then the mouse the system emulates from it), and a switch is the
 ## one press that is not idempotent: press() ignores the second path of the same gesture.
 func toggleSound()
-    setSound(not sounds.on)
-    data.set(config.soundKey, sounds.on)
-    if sounds.on then
+    if switchSound() then
         sounds.confirm.play()
     end
 end
@@ -511,23 +491,6 @@ func drawButton(label, r, fill, textSize, ink = nil)
     fillC(fill)
     graphics.rect(r.x, r.y, r.w, r.h, L.c * 0.28)
     drawText(label, r.x + r.w / 2, r.y + r.h / 2, fitSize(label, textSize, r.w * 0.88), "center", "center", ink)
-end
-
-## The button of the options screen: a thick toothed wheel, with a hole through to the paper.
-func drawGear(r)
-    var s = r.w
-    fillC(config.blue)
-    graphics.push()
-    graphics.translate(r.x + s / 2, r.y + s / 2)
-    graphics.rectMode("center")
-    for k = 1, 8 do
-        graphics.rect(0, -s * 0.34, s * 0.20, s * 0.20, s * 0.04)
-        graphics.rotate(45)
-    end
-    graphics.pop()
-    graphics.circle(r.x + s / 2, r.y + s / 2, s * 0.30)
-    graphics.fill(config.paper)
-    graphics.circle(r.x + s / 2, r.y + s / 2, s * 0.13)
 end
 
 func drawHeader()
@@ -735,31 +698,6 @@ func drawPlay()
     drawWon()
 end
 
-## The title of a screen that replaces the game: the background is already painted.
-func drawScreenTitle(title)
-    drawText(title.upper(), CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
-end
-
-func drawEntries(entries)
-    for i, entry in entries do
-        var r = optionRect(i, len(entries))
-        var fill = config.button
-        if entry.primary then
-            fill = config.buttonOn
-        end
-        drawButton(entry.label, r, fill, r.h * 0.4)
-        if entry.done then
-            graphics.stroke(1, 1, 1, 1)
-            graphics.strokeSize(math.max(3, r.h * 0.1))
-            var cx = r.x + r.w - r.h * 0.6
-            var cy = r.y + r.h / 2
-            graphics.line(cx - r.h * 0.18, cy, cx - r.h * 0.04, cy + r.h * 0.14)
-            graphics.line(cx - r.h * 0.04, cy + r.h * 0.14, cx + r.h * 0.2, cy - r.h * 0.16)
-            graphics.noStroke()
-        end
-    end
-end
-
 func drawGenerating()
     var dots = math.floor(elapsedTime * 3) % 4
     var text = tr("generating")
@@ -772,7 +710,7 @@ end
 
 func optionEntries()
     var soundKey = "menuSoundOff"
-    if sounds.on then
+    if soundSwitch.on then
         soundKey = "menuSoundOn"
     end
     var errorsKey = "menuErrorsOff"
@@ -793,13 +731,8 @@ func optionEntries()
     ]
 end
 
-func languageEntries()
-    var entries = []
-    for code in i18n.languages do
-        entries.push({label: nameOfLanguage(code), lang: code, primary: code == i18n.lang})
-    end
-    entries.push({label: tr("back"), goes: "options"})
-    return entries
+func startFromEntry(entry)
+    startGame(entry.level, entry.daily)
 end
 
 func newEntries()
@@ -820,37 +753,6 @@ func dailyEntries()
     end
     entries.push({label: tr("back"), goes: "new"})
     return entries
-end
-
-## A press on a menu: the entry under it, if any.
-func pressEntries(entries, x, y)
-    for i, entry in entries do
-        if inRect(x, y, optionRect(i, len(entries))) then
-            if entry.lang <> nil then
-                chooseLanguage(entry.lang)
-            elseif entry.toggle <> nil then
-                entry.toggle()
-            elseif entry.level <> nil then
-                startGame(entry.level, entry.daily)
-            else
-                showScreen(entry.goes)
-            end
-            return
-        end
-    end
-end
-
-## A screen made of a menu: its title, and the entries that make its buttons.
-func menuScreen(titleKey, entries)
-    return {
-        draw: func()
-            drawScreenTitle(tr(titleKey))
-            drawEntries(entries())
-        end,
-        press: func(x, y)
-            pressEntries(entries(), x, y)
-        end
-    }
 end
 
 func helpLines(size, width)
@@ -893,8 +795,8 @@ end
 global screens = {
     options: menuScreen("options", optionEntries),
     language: menuScreen("menuLanguage", languageEntries),
-    new: menuScreen("chooseLevel", newEntries),
-    daily: menuScreen("daily", dailyEntries),
+    new: menuScreen("chooseLevel", newEntries, startFromEntry),
+    daily: menuScreen("daily", dailyEntries, startFromEntry),
     help: {draw: drawHelp, press: func(x, y) showScreen("options") end},
     generating: {draw: drawGenerating, press: func(x, y) end}
 }
@@ -999,7 +901,9 @@ func setup()
     graphics.fitArea()
     buildSounds()
     restoreLanguage()
-    setSound(data.get(config.soundKey, true))
+    useMenu({ink: config.ink, button: config.button, primary: config.buttonOn, accent: config.blue, paper: config.paper,
+             margin: config.margin, width: 0.8, height: 0.1, soundKey: "sudoku.sound",
+             drawButton: drawButton, showScreen: showScreen})
     game.errors = data.get(config.errorsKey, true) == true
     game.input = data.get(config.inputKey, "cell")
     if game.input <> "digit" then

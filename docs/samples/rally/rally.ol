@@ -15,6 +15,7 @@ import "terrain.ol"
 import "scenery.ol"
 import "vehicle.ol"
 import "engine.ol"
+import "../lib/area.ol"
 import "../lib/chasecam.ol"
 import "../lib/joystick.ol"
 import "../lib/tilt.ol"
@@ -167,10 +168,6 @@ end
 func wheelButton()
     var size = SIZE * 0.14
     return { x: W - size - SIZE * 0.03, y: SIZE * 0.03, w: size, h: size }
-end
-
-func inRect(x, y, r)
-    return x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
 end
 
 ## Whether any finger is on the pedal. touch.points() is read rather than a callback, because the

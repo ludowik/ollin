@@ -1,17 +1,7 @@
 ## The SOUND of Sudoku: a few short buffers computed once at startup, so that nothing is calculated while one plays.
 ## The browser keeps the engine silent until the first gesture, which the first tap already is.
 
-global sounds = {place: nil, erase: nil, bad: nil, unit: nil, win: [], confirm: nil, on: true}
-
-## Turns the whole sound on or off through the master volume, which also silences what is already playing.
-func setSound(on)
-    sounds.on = on
-    if on then
-        audio.volume(1)
-    else
-        audio.volume(0)
-    end
-end
+global sounds = {place: nil, erase: nil, bad: nil, unit: nil, win: [], confirm: nil}
 
 const WIN_NOTES = ["C5", "E5", "G5", "C6", "E6", "G6"]
 

@@ -2,17 +2,7 @@
 ## calculated while one plays. The browser keeps the engine silent until the first gesture, which the
 ## first piece picked up already is.
 
-global sounds = {place: nil, clear: [], bad: nil, over: nil, confirm: nil, on: true}
-
-## Turns the whole sound on or off through the master volume, which also silences what is already playing.
-func setSound(on)
-    sounds.on = on
-    if on then
-        audio.volume(1)
-    else
-        audio.volume(0)
-    end
-end
+global sounds = {place: nil, clear: [], bad: nil, over: nil, confirm: nil}
 
 ## One note per step of the combo.
 const CLEAR_NOTES = ["C5", "E5", "G5", "C6", "E6"]

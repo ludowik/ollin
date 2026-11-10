@@ -15,6 +15,8 @@ import "deal.ol"
 import "sounds.ol"
 import "texts.ol"
 import "../lib/draw.ol"
+import "../lib/area.ol"
+import "../lib/menu.ol"
 
 ## What can be tuned: scores, durations, the keys of the saved data, the colours. Nothing here changes while
 ## the game runs.
@@ -27,7 +29,6 @@ global config = {
     liftTouch: 1.7,             ## cells between the finger and the bottom of the piece it holds
     liftMouse: 0.6,
     bestKey: "blockudoku.best",
-    soundKey: "blockudoku.sound",
     saveKey: "blockudoku.game",
     floatPop: 0.18,             ## seconds for a gained point to appear where it was earned
     floatHold: 0.12,            ## seconds it stays there before being drawn into the score
@@ -36,7 +37,7 @@ global config = {
     outlineInk: [0.04, 0.05, 0.09, 1],
     floatTint: [0.60, 0.75, 0.95, 1],   ## a gained point: light enough for its dark outline to read
     streakTint: [0.98, 0.85, 0.40, 1],
-    blue: [0.22, 0.45, 0.85],           ## the one colour of every block; the rules only make it lighter
+    blue: [0.22, 0.45, 0.85, 1],        ## the one colour of every block; the rules only make it lighter
     paper: 1,                           ## the background
     button: [0.22, 0.27, 0.40],         ## the fill of a button
     buttonPrimary: [0.30, 0.55, 0.95],  ## the one that matters on the end screen
@@ -90,17 +91,6 @@ global game = {
 
 ## ── Layout ──────────────────────────────────────────────────────────────────────────────────────
 
-## True when W or H differ from the area `cache` was computed for, which it then remembers: what depends on the
-## area alone is computed again only then.
-func areaChanged(cache)
-    if W == cache.w and H == cache.h then
-        return false
-    end
-    cache.w = W
-    cache.h = H
-    return true
-end
-
 ## The board and its trays in a column when the area is tall, side by side when it is wide: whichever
 ## gives the larger cell. It depends on W and H alone, so it is recomputed only when they change.
 func layoutCompute()
@@ -118,12 +108,10 @@ func layoutCompute()
     var portrait = cp >= cl
     var c = math.floor(math.max(cp, cl))
     var gear = math.max(SIZE * 0.08, 40)
-    L.gearS = gear
-    L.gearX = W - m - gear
-    L.gearY = m
+    L.gear = rectOf(W - m - gear, m, gear, gear)
     if portrait then
         ## The header must not run under the gear: a narrow and short area shrinks the board until it clears.
-        while c > 8 and (W + GRID * c) / 2 > L.gearX - 0.3 * m and (H - colH * c) / 2 < L.gearY + gear + 0.3 * m do
+        while c > 8 and (W + GRID * c) / 2 > L.gear.x - 0.3 * m and (H - colH * c) / 2 < L.gear.y + gear + 0.3 * m do
             c -= 1
         end
     end
@@ -138,9 +126,7 @@ func layoutCompute()
         L.scoreY = top
         L.bestX = L.bx + 3.5 * c
         L.bestY = top
-        L.btnX = L.bx + 6.2 * c
-        L.btnY = top
-        L.btnW = 2.8 * c
+        L.newBtn = rectOf(L.bx + 6.2 * c, top, 2.8 * c, 1.1 * c)
         L.tc = 0.55 * c
         L.sw = 1.5 * c
         L.sh = 1.6 * c
@@ -157,9 +143,7 @@ func layoutCompute()
         L.scoreY = L.by
         L.bestX = colX
         L.bestY = L.by + 1.6 * c
-        L.btnX = colX + 2.5 * c
-        L.btnY = L.by + 1.65 * c
-        L.btnW = 2.3 * c
+        L.newBtn = rectOf(colX + 2.5 * c, L.by + 1.65 * c, 2.3 * c, 1.1 * c)
         L.tc = 0.36 * c
         L.sw = 2.4 * c
         L.sh = 1.0 * c
@@ -168,15 +152,7 @@ func layoutCompute()
             L.sy[i] = L.by + 3.0 * c + (i - 0.5) * 2.0 * c
         end
     end
-    L.btnH = 1.1 * c
-    L.overW = 4.4 * c
-    L.overH = 1.4 * c
-    L.overX = L.bx + bs / 2 - L.overW / 2
-    L.overY = L.by + 5.2 * c
-end
-
-func inRect(x, y, rx, ry, rw, rh)
-    return x >= rx and x <= rx + rw and y >= ry and y <= ry + rh
+    L.over = rectOf(L.bx + bs / 2 - 2.2 * c, L.by + 5.2 * c, 4.4 * c, 1.4 * c)
 end
 
 ## The catalogue: every shape the game can deal, as large as the screen lets them be.
@@ -238,15 +214,6 @@ func showScreen(name)
     assert(name == "game" or screens[name] <> nil, "unknown screen")
     game.screen = name
     game.screenTick = game.tick
-end
-
-## The rectangle of the i-th of n entries of a menu, centred in the area.
-func optionRect(i, n)
-    var w = math.min(W - 2 * SIZE * config.margin, SIZE * 0.7)
-    var h = SIZE * 0.11
-    var gap = h * 0.35
-    var top = H / 2 - (n * h + (n - 1) * gap) / 2
-    return CX - w / 2, top + (i - 1) * (h + gap), w, h
 end
 
 ## ── Game ────────────────────────────────────────────────────────────────────────────────────────
@@ -622,18 +589,18 @@ func pressAt(id, x, y)
         return
     end
     layoutCompute()
-    if inRect(x, y, L.gearX, L.gearY, L.gearS, L.gearS) then
+    if inRect(x, y, L.gear) then
         if game.dragId == nil then
             showScreen("options")
         end
         return
     end
-    if inRect(x, y, L.btnX, L.btnY, L.btnW, L.btnH) then
+    if inRect(x, y, L.newBtn) then
         newGame()
         return
     end
     if game.state == "over" then
-        if inRect(x, y, L.overX, L.overY, L.overW, L.overH) then
+        if inRect(x, y, L.over) then
             newGame()
         end
         return
@@ -743,27 +710,11 @@ func drawPiece(p, alpha = 1, stuck = false)
     drawShape(p.shape, p.x - p.shape.w * p.size / 2, p.y - p.shape.h * p.size / 2, p.size, alpha, stuck)
 end
 
-func drawButton(label, x, y, w, h, fill, textSize, alpha = 1)
+func drawButton(label, r, fill, textSize, alpha = 1)
     var L = game.layout
     graphics.fill(fill[1], fill[2], fill[3], alpha)
-    graphics.rect(x, y, w, h, L.c * 0.3)
-    drawText(label, x + w / 2, y + h / 2, fitSize(label, textSize, w * 0.9), "center", "center", config.onButton, alpha)
-end
-
-## The button of the options screen: a thick toothed wheel in the blue of the blocks, with a hole through to the paper.
-func drawGear(x, y, s)
-    graphics.fill(config.blue[1], config.blue[2], config.blue[3])
-    graphics.push()
-    graphics.translate(x + s / 2, y + s / 2)
-    graphics.rectMode("center")
-    for k = 1, 8 do
-        graphics.rect(0, -s * 0.34, s * 0.20, s * 0.20, s * 0.04)
-        graphics.rotate(45)
-    end
-    graphics.pop()
-    graphics.circle(x + s / 2, y + s / 2, s * 0.30)
-    graphics.fill(config.paper)
-    graphics.circle(x + s / 2, y + s / 2, s * 0.13)
+    graphics.rect(r.x, r.y, r.w, r.h, L.c * 0.3)
+    drawText(label, r.x + r.w / 2, r.y + r.h / 2, fitSize(label, textSize, r.w * 0.9), "center", "center", config.onButton, alpha)
 end
 
 func drawHeader()
@@ -773,8 +724,8 @@ func drawHeader()
     drawText("{math.round(game.display.score)}", L.scoreX, L.scoreY + c * 0.5, c * 0.95 * game.display.pop, "left", "top", config.ink)
     drawText(tr("best").upper(), L.bestX, L.bestY, c * 0.36, "left", "top", config.muted)
     drawText("{game.best}", L.bestX, L.bestY + c * 0.5, c * 0.7, "left", "top", config.ink)
-    drawButton(tr("newGame"), L.btnX, L.btnY, L.btnW, L.btnH, config.button, c * 0.42)
-    drawGear(L.gearX, L.gearY, L.gearS)
+    drawButton(tr("newGame"), L.newBtn, config.button, c * 0.42)
+    drawGear(L.gear)
 end
 
 ## The points in flight: each grows where it was earned, then flies to the score, smaller as it goes.
@@ -897,45 +848,7 @@ func drawOver()
     else
         drawText("{tr("best")} {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
     end
-    drawButton(tr("newGame"), L.overX, L.overY, L.overW, L.overH, config.buttonPrimary, c * 0.55, game.fade.a)
-end
-
-## The title of a screen that replaces the game: the background is already painted.
-func drawScreenTitle(title)
-    drawText(title.upper(), CX, SIZE * 0.06, SIZE * 0.05, "center", "center", config.ink)
-end
-
-## The buttons of a menu screen, top to bottom: {label, primary, and what a press does: lead somewhere (goes), pick a language (lang) or switch the sound}.
-func optionEntries()
-    var entries = []
-    for entry in config.menu do
-        var key = entry.text
-        if entry.sound then
-            key = sounds.on and "menuSoundOn" or "menuSoundOff"
-        end
-        entries.push({label: tr(key), goes: entry.goes, sound: entry.sound, primary: entry.primary})
-    end
-    return entries
-end
-
-func languageEntries()
-    var entries = []
-    for code in i18n.languages do
-        entries.push({label: nameOfLanguage(code), lang: code, primary: code == i18n.lang})
-    end
-    entries.push({label: tr("back"), goes: "options"})
-    return entries
-end
-
-func drawEntries(entries)
-    for i, entry in entries do
-        var x, y, w, h = optionRect(i, len(entries))
-        var fill = config.button
-        if entry.primary then
-            fill = config.buttonPrimary
-        end
-        drawButton(entry.label, x, y, w, h, fill, h * 0.4)
-    end
+    drawButton(tr("newGame"), L.over, config.buttonPrimary, c * 0.55, game.fade.a)
 end
 
 ## Switches the sound and keeps the choice for the next launch. A tap arrives twice in the same frame
@@ -943,41 +856,24 @@ end
 ## idempotent: the gesture is marked as handled, as a change of screen does.
 func toggleSound()
     game.screenTick = game.tick
-    setSound(not sounds.on)
-    data.set(config.soundKey, sounds.on)
-    if sounds.on then
+    if switchSound() then
         sounds.confirm.play()
     end
 end
 
-## A press on a menu: the entry under it, if any.
-func pressEntries(entries, x, y)
-    for i, entry in entries do
-        var rx, ry, rw, rh = optionRect(i, len(entries))
-        if inRect(x, y, rx, ry, rw, rh) then
-            if entry.lang <> nil then
-                chooseLanguage(entry.lang)
-            elseif entry.sound then
-                toggleSound()
-            else
-                showScreen(entry.goes)
-            end
-            return
+## The buttons of a menu screen, top to bottom: {label, primary, and what a press does: lead somewhere (goes), pick a language (lang) or switch the sound}.
+func optionEntries()
+    var entries = []
+    for entry in config.menu do
+        var key = entry.text
+        var toggle = nil
+        if entry.sound then
+            key = soundSwitch.on and "menuSoundOn" or "menuSoundOff"
+            toggle = toggleSound
         end
+        entries.push({label: tr(key), goes: entry.goes, toggle: toggle, primary: entry.primary})
     end
-end
-
-## A screen made of a menu: its title, and the entries that make its buttons.
-func menuScreen(titleKey, entries)
-    return {
-        draw: func()
-            drawScreenTitle(tr(titleKey))
-            drawEntries(entries())
-        end,
-        press: func(x, y)
-            pressEntries(entries(), x, y)
-        end
-    }
+    return entries
 end
 
 func backToOptions(x, y)
@@ -1024,7 +920,9 @@ func setup()
     buildShapes()
     buildSounds()
     restoreLanguage()
-    setSound(data.get(config.soundKey, true))
+    useMenu({ink: config.ink, button: config.button, primary: config.buttonPrimary, accent: config.blue, paper: config.paper,
+             margin: config.margin, width: 0.7, height: 0.11, soundKey: "blockudoku.sound",
+             drawButton: drawButton, showScreen: showScreen})
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then
         newGame()
