@@ -123,7 +123,7 @@ class Joystick
             ## the thumb is held at the disc's edge, as a real stick would be
             var dx = self.px - cx
             var dy = self.py - cy
-            var d = math.sqrt(dx * dx + dy * dy)
+            var d = math.hypot(dx, dy)
             var kx = self.px
             var ky = self.py
             if d > r then

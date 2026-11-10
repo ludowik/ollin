@@ -58,7 +58,7 @@ end
 func centreDist()
     var dx = moonX() - sunX()
     var dy = moonY() - sunY()
-    return math.sqrt(dx * dx + dy * dy)
+    return math.hypot(dx, dy)
 end
 
 ## The area two discs share — exact geometry, with no approximation: two circular sectors minus

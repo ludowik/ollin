@@ -188,6 +188,48 @@ static int math_clamp(CallCtx& ctx) {
     return ctx.ret(num_value(x < lo ? lo : x > hi ? hi : x));
 }
 
+static int math_lerp(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    double a = num_arg(args, argc, 0, "math.lerp");
+    double b = num_arg(args, argc, 1, "math.lerp");
+    double t = num_arg(args, argc, 2, "math.lerp");
+    return ctx.ret(num_value(a + (b - a) * t));
+}
+
+// A zero-width interval is a step at `lo`, where the division would give nan.
+static int math_smoothstep(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    double lo = num_arg(args, argc, 0, "math.smoothstep");
+    double hi = num_arg(args, argc, 1, "math.smoothstep");
+    double x = num_arg(args, argc, 2, "math.smoothstep");
+    if (hi == lo)
+        return ctx.ret(num_value(x < lo ? 0.0 : 1.0));
+    double t = (x - lo) / (hi - lo);
+    t = t < 0.0 ? 0.0 : t > 1.0 ? 1.0 : t;
+    return ctx.ret(num_value(t * t * (3.0 - 2.0 * t)));
+}
+
+static int math_hypot(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    double x = num_arg(args, argc, 0, "math.hypot");
+    double y = num_arg(args, argc, 1, "math.hypot");
+    return ctx.ret(num_value(std::hypot(x, y)));
+}
+
+// The fraction of the gap closed depends on dt through an exponential, so the result does not change with the frame rate.
+static int math_approach(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    double cur = num_arg(args, argc, 0, "math.approach");
+    double target = num_arg(args, argc, 1, "math.approach");
+    double rate = num_arg(args, argc, 2, "math.approach");
+    double dt = num_arg(args, argc, 3, "math.approach");
+    return ctx.ret(num_value(cur + (target - cur) * (1.0 - std::exp(-rate * dt))));
+}
+
 static int math_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -357,6 +399,10 @@ Value make_math_module() {
         .fn("sqrt", math_sqrt)
         .fn("pow", math_pow)
         .fn("clamp", math_clamp)
+        .fn("lerp", math_lerp)
+        .fn("smoothstep", math_smoothstep)
+        .fn("hypot", math_hypot)
+        .fn("approach", math_approach)
         .fn("min", math_min)
         .fn("max", math_max)
         // logarithms and the exponential

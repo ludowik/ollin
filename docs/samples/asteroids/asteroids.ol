@@ -507,7 +507,7 @@ func steerShip(dt)
     end
     var sx = pad.steer()
     var sy = pad.throttle()
-    var m = math.sqrt(sx * sx + sy * sy)
+    var m = math.hypot(sx, sy)
     if m > AIM_DEAD then
         ## The stick's y is measured UPWARDS, the field's downwards: the sign is flipped here, once.
         ship.ang += angleTo(ship.ang, math.atan2(-sy, sx)) * math.min(1.0, TURN_SNAP * dt)
@@ -524,7 +524,7 @@ func steerShip(dt)
     var k = 1.0 - DRAG * dt
     ship.vx *= k
     ship.vy *= k
-    var sp = math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy)
+    var sp = math.hypot(ship.vx, ship.vy)
     if sp > MAX_SPEED then
         ship.vx = ship.vx / sp * MAX_SPEED
         ship.vy = ship.vy / sp * MAX_SPEED

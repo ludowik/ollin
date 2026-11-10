@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-09 21:41</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-10 20:29</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -457,7 +457,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-09 21:41</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-10 20:29</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1594,6 +1594,10 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
     <tr><td><code>math.atan2(y, x)</code></td><td>function</td><td>The angle of the vector (x, y), in radians</td></tr>
     <tr><td><code>math.deg(rad)</code> / <code>math.rad(deg)</code></td><td>function</td><td>Converts radians ↔ degrees</td></tr>
     <tr><td><code>math.clamp(x, lo, hi)</code></td><td>function</td><td>Clamps <code>x</code> to the interval [lo, hi]</td></tr>
+    <tr><td><code>math.lerp(a, b, t)</code></td><td>function</td><td><code>a + (b - a) * t</code>: <code>a</code> at <code>t = 0</code>, <code>b</code> at <code>t = 1</code>, and beyond them outside that range (unlike <code>math.map</code>, nothing is clamped)</td></tr>
+    <tr><td><code>math.smoothstep(lo, hi, x)</code></td><td>function</td><td>0 up to <code>lo</code>, 1 from <code>hi</code>, and an S-shaped curve in between that is flat at both ends. A zero-width interval is a step at <code>lo</code></td></tr>
+    <tr><td><code>math.hypot(x, y)</code></td><td>function</td><td>The length of the vector (x, y): <code>sqrt(x*x + y*y)</code></td></tr>
+    <tr><td><code>math.approach(cur, target, rate, dt)</code></td><td>function</td><td>Moves <code>cur</code> towards <code>target</code> by a fraction of the gap that depends on <code>dt</code> (the frame time) through an exponential, so the motion looks the same at any frame rate. A higher <code>rate</code> is sharper: the gap shrinks by a factor e every <code>1 / rate</code> seconds</td></tr>
     <tr><td><code>math.min(...)</code> / <code>math.max(...)</code></td><td>function</td><td>The minimum / maximum of a list of arguments</td></tr>
     <tr><td><code>math.map(x, ilo, ihi, olo, ohi)</code></td><td>function</td><td>Rescales <code>x</code> from [ilo, ihi] to [olo, ohi], clamping <code>x</code> to [ilo, ihi] first</td></tr>
     <tr><td><code>math.isNan(x)</code> / <code>math.isInf(x)</code></td><td>function</td><td>Tests for NaN / infinity</td></tr>

@@ -19,23 +19,23 @@ end
 func mixColours(a, b, mix)
     var out = []
     for k = 1, len(a) do
-        out.push(a[k] + (b[k] - a[k]) * mix)
+        out.push(math.lerp(a[k], b[k], mix))
     end
     return out
 end
 
 ## The whole canvas in strips of one colour each, from the colour `top` to the colour `bottom` (arrays [r, g, b, a]).
 ## The strips overlap by a row, so that no seam shows between two of them. There is one strip per level of the display
-## that the colour crosses (a screen has 256 per channel): fewer show as steps, more change nothing. The blend is written
-## out rather than made by mixColours, which builds an array: this runs every frame.
+## that the colour crosses (a screen has 256 per channel): fewer show as steps, more change nothing. It runs every frame,
+## so the blend is made channel by channel rather than by mixColours, which builds an array.
 func drawGradient(top, bottom)
     var levels = math.max(math.abs(bottom[1] - top[1]), math.abs(bottom[2] - top[2]), math.abs(bottom[3] - top[3])) * 255
     var bands = math.clamp(math.ceil(levels) + 1, 2, H)
     var y0 = 0
     for i = 0, bands - 1 do
         var t = i / (bands - 1)
-        graphics.fill(top[1] + (bottom[1] - top[1]) * t, top[2] + (bottom[2] - top[2]) * t,
-            top[3] + (bottom[3] - top[3]) * t, 1)
+        graphics.fill(math.lerp(top[1], bottom[1], t), math.lerp(top[2], bottom[2], t),
+            math.lerp(top[3], bottom[3], t), 1)
         var y1 = math.floor(H * (i + 1) / bands)
         graphics.rect(0, y0, W, y1 - y0 + 1)
         y0 = y1

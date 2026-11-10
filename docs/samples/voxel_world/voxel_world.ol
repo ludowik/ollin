@@ -2,10 +2,9 @@
 ## (beginChunk/endChunk) and freed far away (freeChunk). The view
 ## distance is self-adapting (the ViewDistance class, view_distance.ol). Touch joystick.
 ## Movement with inertia: the speed, the turn and the eye height ease towards their target
-## instead of taking it up at once (see approach).
+## instead of taking it up at once (math.approach).
 
 import "../lib/joystick.ol"
-import "../lib/approach.ol"
 import "view_distance.ol"
 ## The world's shape — biome, altitude, blocks, trees, and the baking of a chunk — lives apart: it
 ## is what the noise decides, while this file holds what moves.
@@ -332,13 +331,13 @@ func movePlayer()
     var turn = pad.steer()
     if keyboard.isDown("left") then turn = turn - 1 end
     if keyboard.isDown("right") then turn = turn + 1 end
-    turnVel = approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL, deltaTime)
+    turnVel = math.approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL, deltaTime)
     yaw = yaw - turnVel * deltaTime
 
     var thr = pad.throttle()      ## the joystick, in [-1;1], forwards and backwards
     if keyboard.isDown("up") then thr = thr + 1 end
     if keyboard.isDown("down") then thr = thr - 1 end   ## the down arrow goes backwards
-    vel = approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL, deltaTime)
+    vel = math.approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL, deltaTime)
     ## Below a millimetre a second we are at a standstill: cutting out avoids running the collision
     ## test for an invisible move.
     if math.abs(vel) < 0.001 then
@@ -497,7 +496,7 @@ func update(dt)
 
     ## The terrain rises in one-block steps: putting the eye straight on it would make it jump
     ## a whole notch at once. It is left to reach the step gradually.
-    camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE, deltaTime)
+    camY = math.approach(camY, ground(camX, camZ) + EYE, EYE_RISE, deltaTime)
     cam.setPos(camX, camY, camZ)
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
                camY + math.sin(PITCH),

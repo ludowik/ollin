@@ -7,7 +7,6 @@
 ##
 ## Units are SI — metres, seconds, newtons, newton-metres — so the numbers below can be checked
 ## against a real car's: 9500 rpm in fifth is 50 m/s, 180 km/h, and first gear runs out at 53 km/h.
-import "../lib/approach.ol"
 
 class Engine
     func init()
@@ -68,7 +67,7 @@ class Engine
             self.reverse = reverse
             self.gear = 1
         end
-        self.load = approach(self.load, throttle, 8.0, dt)
+        self.load = math.approach(self.load, throttle, 8.0, dt)
 
         if self.shiftTimer > 0 then
             self.shiftTimer = self.shiftTimer - dt
@@ -107,7 +106,7 @@ class Engine
         if self.shiftTimer > 0 then
             rate = 7.0
         end
-        self.rpm = approach(self.rpm, target, rate, dt)
+        self.rpm = math.approach(self.rpm, target, rate, dt)
 
         if self.shiftTimer > 0 then
             return 0.0

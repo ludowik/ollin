@@ -119,7 +119,7 @@ func drawSource(r, t, s)
     var oy = r.y + titleHeight() + pad * 0.3
 
     ## the read head, sweeping from where the step began to where it ends
-    var head = lerp(s.p0, s.p1, ramp(t, 0, 0.8))
+    var head = math.lerp(s.p0, s.p1, math.smoothstep(0, 0.8, t))
     var upto = s.hl or head
     var lo = s.from or s.p1
 
@@ -131,7 +131,7 @@ func drawSource(r, t, s)
     elseif s.drop then
         tint = Color(0.6, 0.62, 0.7, 0.30)
     elseif s.made then
-        tint = fade(tokenColor(s.made), 0.12 + 0.28 * ramp(t, 0.4, 0.8))
+        tint = fade(tokenColor(s.made), 0.12 + 0.28 * math.smoothstep(0.4, 0.8, t))
     end
     if s.from then
         for idx = s.from, math.min(math.ceil(upto) - 1, n) do
@@ -158,7 +158,7 @@ func drawSource(r, t, s)
             var y = oy + (run.lineOf[tok.from] - 1) * lh + lh * 0.9 + tok.depth * fs * 0.1
             var alpha = 1.0
             if k > before then
-                alpha = ramp(t, 0.5, 0.8)
+                alpha = math.smoothstep(0.5, 0.8, t)
             end
             box(x + cw * 0.05, y, (tok.to - tok.from) * cw - cw * 0.1, math.max(fs * 0.07, 2), 1,
                 fade(tokenColor(tok), alpha))
@@ -229,12 +229,12 @@ func drawStream(r, t, s, srcInfo)
                 drawChip(chip, run.tokens[k], x, y, 1.0, L.fs, L.tfs)
             else
                 ## the new token flies in from the text it was cut from
-                var u = ramp(t, 0.5, 1)
+                var u = math.smoothstep(0.5, 1, t)
                 if u > 0 then
                     var tok = run.tokens[k]
                     var sx = srcInfo.ox + (run.colOf[tok.from or 1] - 1) * srcInfo.cw - chip.w / 2
                     var sy = srcInfo.oy + (run.lineOf[tok.from or 1] - 1) * srcInfo.lh
-                    drawChip(chip, tok, lerp(sx, x, u), lerp(sy, y, u), u, L.fs, L.tfs)
+                    drawChip(chip, tok, math.lerp(sx, x, u), math.lerp(sy, y, u), u, L.fs, L.tfs)
                 end
             end
         end

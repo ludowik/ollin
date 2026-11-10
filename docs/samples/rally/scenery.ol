@@ -27,7 +27,7 @@ func bakePosts()
         var b = TRACK[i % n + 1]
         var dx = b.x - a.x
         var dz = b.z - a.z
-        var len = math.sqrt(dx * dx + dz * dz)
+        var len = math.hypot(dx, dz)
         var nx = -dz / len
         var nz = dx / len
         while along <= len do

@@ -49,7 +49,7 @@ func buildMoon(size)
         for x = 0, size - 1 do
             var dx = x - r + 0.5
             var dy = y - r + 0.5
-            var d = math.sqrt(dx * dx + dy * dy)
+            var d = math.hypot(dx, dy)
             if d > r then
                 image.setPixel(moon, x, y, 0, 0, 0, 0)
             else
@@ -151,7 +151,7 @@ func centreDist()
     var rl = moonRadius()
     var dx = moonX() - CX
     var dy = moonY() - umbraCentre()
-    return math.sqrt(dx * dx + dy * dy) / rl
+    return math.hypot(dx, dy) / rl
 end
 
 func phase(d)

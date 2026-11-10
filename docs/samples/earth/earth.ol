@@ -93,7 +93,7 @@ func zoomBy(factor)
 end
 
 func screenDistance(x0, y0, x1, y1)
-    return math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
+    return math.hypot(x1 - x0, y1 - y0)
 end
 
 ## How far the globe turns for a pixel of drag, in degrees: the point of the surface under the finger
@@ -184,11 +184,6 @@ func drawStars()
     end
 end
 
-func smooth(lo, hi, x)
-    var t = math.clamp((x - lo) / (hi - lo), 0, 1)
-    return t * t * (3 - 2 * t)
-end
-
 ## The radius of the globe's disc on the screen: the limb is where the view just grazes the surface, at the
 ## point on the side of the globe that stands back from the centre by GLOBE²/distance towards the camera.
 ## The centre of the globe is the camera's target, so it is the centre of the screen.
@@ -217,7 +212,7 @@ func drawHalo()
     var warms = []
     for i = 1, HALO_STEPS do
         var lit = HALO_COS[i + 1] * sunRight + HALO_SIN[i + 1] * sunUp     ## the Sun, along this part of the rim
-        glows.push(math.max(smooth(-0.25, 0.55, lit), behind * behind * 0.9))
+        glows.push(math.max(math.smoothstep(-0.25, 0.55, lit), behind * behind * 0.9))
         warms.push(math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind))
     end
     var thickness = radius * 0.006 + 1

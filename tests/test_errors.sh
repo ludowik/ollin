@@ -1115,6 +1115,22 @@ check_error "math.min with a non-number among floats" \
     'math.min(1.5, "a")' \
     "math.min"
 
+check_error "math.lerp with a missing argument" \
+    'math.lerp(1, 2)' \
+    "math.lerp"
+
+check_error "math.hypot with a non-number" \
+    'math.hypot(3, "a")' \
+    "math.hypot"
+
+check_error "math.approach without its time step" \
+    'math.approach(0, 1, 6)' \
+    "math.approach"
+
+check_error "math.smoothstep with a non-number" \
+    'math.smoothstep(0, 1, nil)' \
+    "math.smoothstep"
+
 check_error "math.randInt without argument" \
     'math.randInt()' \
     "math.randInt: at least one argument required"

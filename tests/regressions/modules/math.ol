@@ -89,3 +89,25 @@ assert(math.noise(0.3) <> math.noise(0.3, 0.7), "a second coordinate is not igno
 
 ## the natural logarithm, and its inverse
 assert(math.log(1) == 0 and math.abs(math.log(math.exp(1)) - 1) < 1e-12)
+
+## lerp is not clamped: t outside [0, 1] extrapolates, and whole numbers stay integers.
+assert(math.lerp(10, 20, 0.5) == 15 and math.lerp(10, 20, 0) == 10 and math.lerp(10, 20, 1) == 20)
+assert(math.lerp(10, 20, 2) == 30 and math.lerp(10, 20, -1) == 0)
+assert(typeof(math.lerp(2, 4, 0.5)) == "int" and typeof(math.lerp(0, 1, 0.25)) == "float")
+
+## smoothstep saturates outside the interval, is 1/2 at its middle and flat at both ends.
+assert(math.smoothstep(2, 4, 1) == 0 and math.smoothstep(2, 4, 5) == 1)
+assert(math.smoothstep(2, 4, 3) == 0.5)
+assert(math.smoothstep(0, 1, 0.1) < 0.1 * 0.3 and math.smoothstep(0, 1, 0.9) > 1 - 0.1 * 0.3)
+assert(math.smoothstep(4, 2, 3) == 0.5 and math.smoothstep(4, 2, 5) == 0, "a descending interval runs backwards")
+assert(math.smoothstep(3, 3, 2.9) == 0 and math.smoothstep(3, 3, 3) == 1, "a zero-width interval is a step, not nan")
+
+## hypot is the length of the vector, without squaring by hand.
+assert(math.hypot(3, 4) == 5 and math.hypot(-3, 4) == 5 and math.hypot(0, 0) == 0)
+assert(mathNear(math.hypot(1, 1), math.sqrt(2)))
+
+## approach closes the same fraction of the gap whatever the frame rate: two half steps equal one whole step.
+assert(math.approach(0, 10, 6, 0) == 0, "no time passed")
+assert(mathNear(math.approach(math.approach(0, 10, 6, 0.05), 10, 6, 0.05), math.approach(0, 10, 6, 0.1)))
+assert(math.approach(0, 10, 6, 10) > 9.99 and math.approach(0, 10, 6, 10) <= 10)
+assert(math.approach(10, 0, 6, 0.1) < 10 and math.approach(10, 0, 6, 0.1) > 0, "it works downwards too")

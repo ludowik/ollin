@@ -17,7 +17,6 @@
 ## ignored around the neutral so a hand that is not perfectly still does not wander. Past the dead
 ## zone the steering rises from 0, not from a step, and the result is smoothed so that a sensor's
 ## jitter does not reach the wheels.
-import "approach.ol"
 
 class Tilt
     func init(fullLock, deadZone, rate)
@@ -33,7 +32,7 @@ class Tilt
         assert(fullLock > deadZone, "Tilt: fullLock must be larger than deadZone")
         self.fullLock = fullLock
         self.deadZone = deadZone
-        self.rate = rate          ## how eagerly the steering follows the roll (see approach.ol)
+        self.rate = rate          ## how eagerly the steering follows the roll (math.approach)
         self.neutral = 0.0
         self.steer = 0.0
     end
@@ -53,7 +52,7 @@ class Tilt
         if offset < 0 then
             target = -target
         end
-        self.steer = approach(self.steer, target, self.rate, dt)
+        self.steer = math.approach(self.steer, target, self.rate, dt)
         return self.steer
     end
 end

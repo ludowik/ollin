@@ -307,7 +307,7 @@ func drawTokens(r, t, s)
     var L = chipLayout(r.w)
     var top = r.y + titleHeight()
     ## where peek() is, sliding from where the line began to where it ends
-    var cur = lerp(s.p0, s.p1, ramp(t, 0, 0.8))
+    var cur = math.lerp(s.p0, s.p1, math.smoothstep(0, 0.8, t))
     for k, tok in run.tokens do
         var chip = L.chips[k]
         var consumed = math.clamp(cur - k, 0, 1)
@@ -318,8 +318,8 @@ func drawTokens(r, t, s)
     var a = L.chips[at]
     var b = L.chips[next]
     var frac = cur - at
-    var x = lerp(r.x + L.pad + a.x + a.w / 2, r.x + L.pad + b.x + b.w / 2, frac)
-    var y = lerp(top + a.y + a.h, top + b.y + b.h, frac)
+    var x = math.lerp(r.x + L.pad + a.x + a.w / 2, r.x + L.pad + b.x + b.w / 2, frac)
+    var y = math.lerp(top + a.y + a.h, top + b.y + b.h, frac)
     var size = L.fs * 0.5
     graphics.noStroke()
     graphics.fill(CARET)
@@ -407,8 +407,8 @@ func drawTree(r, i, t, s)
     end
     var pc = forestPixels(cur, r)
     var pb = forestPixels(before, r)
-    var e = ramp(t, 0.05, 0.8)
-    var arrive = ramp(t, 0.1, 0.6)
+    var e = math.smoothstep(0.05, 0.8, t)
+    var arrive = math.smoothstep(0.1, 0.6, t)
     var focus = focusOf(s)
 
     ## the frame of every node: where it is now, between where it was and where it goes
@@ -418,8 +418,8 @@ func drawTree(r, i, t, s)
         var alpha = 1.0
         if before.by.has(item.id) then
             var o = pb[item.id]
-            f = {x: lerp(o.x, f.x, e), y: lerp(o.y, f.y, e), w: lerp(o.w, f.w, e), h: lerp(o.h, f.h, e),
-                 fs: lerp(o.fs, f.fs, e)}
+            f = {x: math.lerp(o.x, f.x, e), y: math.lerp(o.y, f.y, e), w: math.lerp(o.w, f.w, e), h: math.lerp(o.h, f.h, e),
+                 fs: math.lerp(o.fs, f.fs, e)}
         else
             alpha = arrive
             var grow = 0.85 + 0.15 * arrive

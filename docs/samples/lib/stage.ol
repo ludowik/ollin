@@ -88,19 +88,6 @@ global codeCache = {}
 global stage = {title: "", menu: "", programs: [], lessons: [], build: nil, cpp: {}, file: "", owner: "",
                 columns: 82, watch: nil, errorNote: nil, skip: false, keywords: {}, speed: 1.0, pace: nil}
 
-func lerp(a, b, t)
-    return a + (b - a) * t
-end
-
-func ease(t)
-    return t * t * (3 - 2 * t)
-end
-
-## 0 until `from`, 1 from `to`, eased in between.
-func ramp(t, from, to)
-    return ease(math.clamp((t - from) / (to - from), 0, 1))
-end
-
 func fade(c, alpha)
     return Color(c.r, c.g, c.b, alpha)
 end
@@ -553,15 +540,15 @@ func drawCode(r, i, t, s)
     var rows = math.max(math.floor((bottom - top) / lh), 1)
 
     ## the view and the bar glide from the previous line to this one, inside the same function
-    var e = ease(math.clamp(t / 0.45, 0, 1))
+    var e = math.smoothstep(0, 0.45, t)
     var first = codeTop(s, rows)
     var barLine = s.at
     var barSpan = s.span
     if i > 1 and run.steps[i - 1].fn == s.fn then
         var before = run.steps[i - 1]
-        first = lerp(codeTop(before, rows), first, e)
-        barLine = lerp(before.at, s.at, e)
-        barSpan = lerp(before.span, s.span, e)
+        first = math.lerp(codeTop(before, rows), first, e)
+        barLine = math.lerp(before.at, s.at, e)
+        barSpan = math.lerp(before.span, s.span, e)
     end
 
     var barY = top + (barLine - first) * lh

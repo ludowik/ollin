@@ -43,7 +43,7 @@ func distanceToTrack(x, z)
         var pz = a.z + abz * t
         var dx = x - px
         var dz = z - pz
-        var d = math.sqrt(dx * dx + dz * dz)
+        var d = math.hypot(dx, dz)
         if d < best then best = d end
     end
     return best
