@@ -7,9 +7,9 @@
 ## or a name, which are functions of it. The reasons an answer cannot be read (forecast.ol) and the kinds of sky are
 ## named by a key, and said here.
 
-const LANGUAGES = ["fr", "en"]      ## the order of the language list; the first one is the default
+import "../lib/i18n.ol"
 
-global i18n = {lang: LANGUAGES[1]}
+const LANGUAGES = ["fr", "en"]      ## the order of the language list; the first one is the default
 
 const TEXTS = {
     fr: {
@@ -176,18 +176,7 @@ const TEXTS = {
     }
 }
 
-func tr(key)
-    return TEXTS[i18n.lang][key]
-end
-
-## Switches language; an unknown code changes nothing. Says whether it did.
-func setLanguage(code)
-    if TEXTS[code] == nil then
-        return false
-    end
-    i18n.lang = code
-    return true
-end
+useLanguages(LANGUAGES, TEXTS, "lang")
 
 ## The words of a kind of sky of forecast.ol: its table entry, or the code alone when the table does not know it.
 func skyText(sky)

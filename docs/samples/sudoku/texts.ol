@@ -4,9 +4,9 @@
 ## Every language has the same keys, which docs/samples/sudoku/texts_test.ol checks. A text is a string, except the ones
 ## that take figures (the hints, the names of a unit, the help), which are functions of them.
 
-const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default
+import "../lib/i18n.ol"
 
-global i18n = {lang: LANGUAGES[1]}
+const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default
 
 const TEXTS = {
     fr: {
@@ -129,10 +129,7 @@ const TEXTS = {
     }
 }
 
-## The text for a key, in the current language.
-func tr(key)
-    return TEXTS[i18n.lang][key]
-end
+useLanguages(LANGUAGES, TEXTS, "sudoku.lang")
 
 ## The words of a hint ({kind, cell, digit, unit}, see hintFor), which is left as it is: the screen still reads its
 ## unit as a number. Uses the tables of board.ol and unitInfo of solver.ol.
@@ -151,11 +148,3 @@ func hintText(h)
     return tr("hintPlain")(words)
 end
 
-## Switches language; an unknown code changes nothing. Says whether it did.
-func setLanguage(code)
-    if TEXTS[code] == nil then
-        return false
-    end
-    i18n.lang = code
-    return true
-end

@@ -6,6 +6,7 @@ import "forecast.ol"
 import "pager.ol"
 import "scale.ol"
 import "texts.ol"
+import "../lib/i18n_testlib.ol"
 
 func q(t)
     return t.replace("'", string.fromCode(34))
@@ -86,24 +87,10 @@ assert(problem == nil and place.country == "", "a place with no country has an e
 
 ## ── The texts ──
 ## Both languages say everything, in texts of the same kind: a key missing from one would show on the screen as nothing.
-assert(LANGUAGES[1] == "fr" and i18n.lang == "fr", "French is the default language")
-var reference = TEXTS[LANGUAGES[1]]
-## Both tables have the same keys, each of the same kind.
-func sameKeys(a, b, where)
-    for pair in [[a, b], [b, a]] do
-        for key, value in pair[1] do
-            assert(pair[2][key] <> nil, "{where}: {key} is missing")
-            assert(typeof(pair[2][key]) == typeof(value), "{where}: {key} is not of the same kind")
-        end
-    end
-end
+checkLanguages()
+assert(i18n.languages[1] == "fr", "French is the default language")
 for code in LANGUAGES do
     var table = TEXTS[code]
-    assert(table <> nil, "{code} is listed but has no texts")
-    sameKeys(reference, table, code)
-    for part in ["sky", "reasons", "cities"] do
-        sameKeys(reference[part], table[part], "{code} {part}")
-    end
     for key, names in table.cities do
         assert(len(names) == 2 and names[1] <> "" and names[2] <> "", "{code}: {key} wants a name and a country")
     end
@@ -127,7 +114,6 @@ end
 assert(setLanguage("en") and skyText(skyOf(3)) == "Overcast" and skyText(skyOf(1234)) == "Weather code 1234")
 assert(reasonText("notJson") == "the answer is not JSON" and reasonText("unheard of") == "unheard of")
 assert(setLanguage("fr") and skyText(skyOf(3)) == "Couvert" and skyText(skyOf(61)) == "Pluie légère")
-assert(setLanguage("de") == false and i18n.lang == "fr", "an unknown language changes nothing")
 
 print("weather forecast ok")
 

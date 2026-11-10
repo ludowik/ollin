@@ -33,7 +33,6 @@ const CITIES = [
     {id: "cairo", lat: 30.0626, lon: 31.2497},
     {id: "rio", lat: -22.9028, lon: -43.2075}
 ]
-const LANG_KEY = "lang"
 const REFRESH = 600             ## seconds before the weather is asked again
 const TIMEOUT = 15              ## seconds the service has to answer
 const RETRY = 60                ## seconds before a page asks again after a failure
@@ -231,12 +230,9 @@ global searchField = nil
 global languageName = nil
 
 ## A language chosen from the list of the interface: kept for the next run, and the interface is declared again in it.
-func chooseLanguage(name)
-    for code in LANGUAGES do
-        if TEXTS[code].name == name and setLanguage(code) then
-            data.set(LANG_KEY, code)
-            buildInterface()
-        end
+func chooseLanguageNamed(name)
+    if chooseLanguage(languageNamed(name)) then
+        buildInterface()
     end
 end
 
@@ -246,11 +242,7 @@ func buildInterface()
     ui.clear()
     languageName = tr("name")
     searchField = ui.textField(tr("cityLabel"), ref app.typing, 30, tr("cityPlaceholder"), lookUp)
-    var names = []
-    for code in LANGUAGES do
-        names.push(TEXTS[code].name)
-    end
-    ui.list(tr("languageLabel"), names, ref languageName, chooseLanguage)
+    ui.list(tr("languageLabel"), languageNames(), ref languageName, chooseLanguageNamed)
 end
 
 func openSearch()
@@ -597,7 +589,7 @@ func cleanPlace(place)
 end
 
 func setup()
-    setLanguage(data.get(LANG_KEY, i18n.lang))
+    restoreLanguage()
     graphics.canvas(W, H, tr("windowTitle"))
     graphics.fitArea()
     buildInterface()

@@ -5,9 +5,9 @@
 ## the help, which is a function of the figures of the rules: they live in the game's config, not here. A title is
 ## the text of its menu entry in capitals: the game does that when it draws it.
 
-const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default
+import "../lib/i18n.ol"
 
-global i18n = {lang: LANGUAGES[1]}
+const LANGUAGES = ["fr", "en"]      ## the order of the language menu; the first one is the default
 
 const TEXTS = {
     fr: {
@@ -68,16 +68,5 @@ const TEXTS = {
     }
 }
 
-## The text for a key, in the current language.
-func tr(key)
-    return TEXTS[i18n.lang][key]
-end
+useLanguages(LANGUAGES, TEXTS, "blockudoku.lang")
 
-## Switches language; an unknown code changes nothing. Says whether it did.
-func setLanguage(code)
-    if TEXTS[code] == nil then
-        return false
-    end
-    i18n.lang = code
-    return true
-end

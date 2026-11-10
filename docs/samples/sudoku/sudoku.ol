@@ -19,7 +19,6 @@ const HINTS = 3                      ## hints per puzzle
 
 global config = {
     saveKey: "sudoku.game",
-    langKey: "sudoku.lang",
     soundKey: "sudoku.sound",
     errorsKey: "sudoku.errors",
     inputKey: "sudoku.input",
@@ -477,11 +476,6 @@ end
 
 ## ── Settings ────────────────────────────────────────────────────────────────────────────────────
 
-func chooseLanguage(code)
-    setLanguage(code)
-    data.set(config.langKey, code)
-end
-
 ## A tap arrives twice in the same frame (touch, then the mouse the system emulates from it), and a switch is the
 ## one press that is not idempotent: press() ignores the second path of the same gesture.
 func toggleSound()
@@ -801,8 +795,8 @@ end
 
 func languageEntries()
     var entries = []
-    for code in LANGUAGES do
-        entries.push({label: TEXTS[code].name, lang: code, primary: code == i18n.lang})
+    for code in i18n.languages do
+        entries.push({label: nameOfLanguage(code), lang: code, primary: code == i18n.lang})
     end
     entries.push({label: tr("back"), goes: "options"})
     return entries
@@ -1004,7 +998,7 @@ func setup()
     graphics.canvas(W, H, "Sudoku")
     graphics.fitArea()
     buildSounds()
-    setLanguage(data.get(config.langKey, i18n.lang))
+    restoreLanguage()
     setSound(data.get(config.soundKey, true))
     game.errors = data.get(config.errorsKey, true) == true
     game.input = data.get(config.inputKey, "cell")

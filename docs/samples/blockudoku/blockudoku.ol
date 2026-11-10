@@ -27,7 +27,6 @@ global config = {
     liftTouch: 1.7,             ## cells between the finger and the bottom of the piece it holds
     liftMouse: 0.6,
     bestKey: "blockudoku.best",
-    langKey: "blockudoku.lang",
     soundKey: "blockudoku.sound",
     saveKey: "blockudoku.game",
     floatPop: 0.18,             ## seconds for a gained point to appear where it was earned
@@ -921,8 +920,8 @@ end
 
 func languageEntries()
     var entries = []
-    for code in LANGUAGES do
-        entries.push({label: TEXTS[code].name, lang: code, primary: code == i18n.lang})
+    for code in i18n.languages do
+        entries.push({label: nameOfLanguage(code), lang: code, primary: code == i18n.lang})
     end
     entries.push({label: tr("back"), goes: "options"})
     return entries
@@ -937,12 +936,6 @@ func drawEntries(entries)
         end
         drawButton(entry.label, x, y, w, h, fill, h * 0.4)
     end
-end
-
-## Picks a language and keeps it for the next launch.
-func chooseLanguage(code)
-    setLanguage(code)
-    data.set(config.langKey, code)
 end
 
 ## Switches the sound and keeps the choice for the next launch. A tap arrives twice in the same frame
@@ -1030,7 +1023,7 @@ func setup()
     graphics.fitArea()
     buildShapes()
     buildSounds()
-    setLanguage(data.get(config.langKey, i18n.lang))
+    restoreLanguage()
     setSound(data.get(config.soundKey, true))
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then
