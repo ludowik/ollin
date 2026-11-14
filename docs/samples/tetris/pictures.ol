@@ -95,8 +95,6 @@ func stippleRows(dots, sides)
     return rows
 end
 
-## ── The data ───────────────────────────────────────────────────────────────────────────────────────
-
 ## The dots of the long piece, and the six cells the handheld shows of it with its own dots: a bar standing (its top,
 ## a middle, its bottom) and a bar lying (its left end, a middle, its right end), by the sides they have.
 const STIPPLE_DOTS = ["..+..+", "+.....", "...+.+", ".+....", ".....+", "+.+...", "....+.", ".+...."]
@@ -151,8 +149,6 @@ const WALL_ROWS = ["_# __# _", "_#___#__", "########", " __# __#", "___#___#", "
 ## The corners of the frames of the panel: the boxes with a light and a mid-dark line, and the box of the next piece.
 const PANEL_CORNER = ["_   ", "  ++", " ++ ", " +  "]
 const NEXT_CORNER = ["__...", "_.   ", ".  .+", ". .+#", ". +# "]
-
-## ── Putting them together ──────────────────────────────────────────────────────────────────────────
 
 func addPicture(art, rects, ox, oy)
     for r in rects do

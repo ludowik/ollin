@@ -26,8 +26,6 @@ global codeCache = {}
 global stage = {title: "", menu: "", programs: [], lessons: [], build: nil, cpp: {}, file: "", owner: "",
                 columns: 82, watch: nil, errorNote: nil, skip: false, keywords: {}, speed: 1.0, pace: nil}
 
-## ── loading a program ────────────────────────────────────────────────────────
-
 ## What the player needs of every step: how long it takes, and the sentence being said. `pace` is the
 ## example's own rule: it returns the time of a line when the program plays by itself and when it is
 ## paced by hand. A sentence adds to the first the time to read it.
@@ -58,8 +56,6 @@ func loadProgram(index)
     state.name = stage.programs[index].name
     restart()
 end
-
-## ── the player ───────────────────────────────────────────────────────────────
 
 ## A position that falls exactly between two steps is the END of the one before: at rest the bar,
 ## the highlighted number and the explanation then all speak of the line that has just run.

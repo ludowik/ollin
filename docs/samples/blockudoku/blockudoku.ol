@@ -39,7 +39,7 @@ global config = {
     streakTint: [0.98, 0.85, 0.40, 1],
     blue: [0.22, 0.45, 0.85, 1],        ## the one colour of every block; the rules only make it lighter
     paper: 1,                           ## the background
-    button: [0.22, 0.27, 0.40],         ## the fill of a button
+    button: [0.22, 0.27, 0.40],
     buttonPrimary: [0.30, 0.55, 0.95],  ## the one that matters on the end screen
     invalid: [0.95, 0.25, 0.25],        ## where a held piece cannot go
     ink: [0.13, 0.15, 0.21, 1],

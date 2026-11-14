@@ -73,8 +73,6 @@ func weekday(text)
     return parts and parts.weekday
 end
 
-## ── Reading an answer ──────────────────────────────────────────────────────────────────────────────
-
 ## A list of numbers of the answer: an array, as long as `count`, of numbers.
 func numbersOf(list, count)
     if typeof(list) <> "array" or len(list) < count then

@@ -47,8 +47,8 @@ global SPEED_MAX = 8.0
 ## Inertia: the speed and the turn do not follow the joystick's command all at
 ## once, they ease towards it. The eye then perceives a start and a braking rather than a uniform
 ## motion switched on and off.
-global vel = 0.0            ## the current forward speed
-global turnVel = 0.0        ## the current turning speed
+global vel = 0.0
+global turnVel = 0.0
 global ACCEL = 5.0          ## how eager the forward motion is; higher is sharper
 global TURN_ACCEL = 7.0
 global EYE_RISE = 6.0       ## smoothing of the eye height, the terrain rising in steps of 1
@@ -546,8 +546,8 @@ func draw()
     graphics.ambient(AMB)           ## drawClouds lowered the ambient, so restore it for the terrain
 
     pad.draw()
-    vd.draw()                          ## the - / + buttons (ViewDistance)
-    drawCamButton()                  ## the "C" button, which toggles the control camera
+    vd.draw()
+    drawCamButton()
     var camlbl = "player"
     if debugCam then camlbl = "control" end
     graphics.stroke(colors.WHITE)

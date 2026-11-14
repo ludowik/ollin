@@ -15,8 +15,6 @@ import "programs.ol"
 
 global stream = {prog: 0, w: 0, h: 0, chips: []}              ## the chips, laid out for one size
 
-## ── loading a program ────────────────────────────────────────────────────────
-
 ## A line takes a moment; a token to file, or a sentence to read, takes longer. Paced by hand, every
 ## line takes the same short time, a token a little longer.
 func paceOf(st)
@@ -93,8 +91,6 @@ func computeLayout()
     end
     return L
 end
-
-## ── the source ───────────────────────────────────────────────────────────────
 
 func drawSource(r, t, s)
     panel(r, "SOURCE")
@@ -183,8 +179,6 @@ func drawSource(r, t, s)
 
     return {ox: ox, oy: oy, cw: cw, lh: lh}
 end
-
-## ── the stream of tokens ─────────────────────────────────────────────────────
 
 func chipLayout(r)
     if stream.prog == state.prog and stream.w == W and stream.h == H then

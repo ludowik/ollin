@@ -25,8 +25,6 @@ global look = {
     padInk: [0.890, 0.973, 0.835, 1]
 }
 
-## ── Pictures ───────────────────────────────────────────────────────────────────────────────────────
-
 ## The pictures of pictures.ol, as the rectangles that paint them. The long piece has a block for each of its 16 sets of
 ## edges (look.stipple[sides + 1], the sides being 1 left, 2 right, 4 top and 8 bottom), the others one block each.
 look.stipple = []
@@ -46,8 +44,6 @@ for ch, rows in FONT_ROWS do
     look.font[ch] = pictureRects(rows)
 end
 look.art = screenArt(look.font)
-
-## ── Drawing ────────────────────────────────────────────────────────────────────────────────────────
 
 ## A rectangle given in points of the handheld's screen, in one of its four greens. Its edges are rounded down to
 ## whole pixels, so that two neighbours always meet with no seam between them at any scale.

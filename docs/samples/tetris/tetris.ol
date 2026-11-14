@@ -71,8 +71,6 @@ func loadStyle()
     applyStyle()
 end
 
-## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
-
 func keyboard.keypressed(key)
     var commands = KEY_COMMANDS[key]
     if commands then
@@ -130,8 +128,6 @@ func readInput()
     held.down = keyboard.isDown("down") or keyboard.isDown("s") or pads.down == true
 end
 
-## ── Layout ─────────────────────────────────────────────────────────────────────────────────────────
-
 ## Works the layout out again only when the area or the pads shown change (layout.ol holds how).
 func layoutCompute()
     var L = view.layout
@@ -140,8 +136,6 @@ func layoutCompute()
     end
     view.layout = computeLayout(W, H, view.touchSeen)
 end
-
-## ── Engine entry points ────────────────────────────────────────────────────────────────────────────
 
 func setup()
     graphics.canvas(W, H, "Tetris")

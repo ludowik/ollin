@@ -123,8 +123,6 @@ func screenItems(hint)
     return nil
 end
 
-## ── The screen of the game ─────────────────────────────────────────────────────────────────────────
-
 ## What the panel shows: the numbers of the three cards and the piece to come.
 func panelInfo()
     return {score: game.score, level: game.level, lines: linesShown(), next: game.next}

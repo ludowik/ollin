@@ -50,7 +50,7 @@ global nextExtra = EXTRA_AT
 
 global ship = nil              ## nil while the wreck is shown: no ship on the field
 global spawn = 0.0             ## the countdown to the next ship
-global waveWait = 0.0          ## the countdown to the next wave
+global waveWait = 0.0
 
 global rocks = []
 global shots = []

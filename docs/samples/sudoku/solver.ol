@@ -62,8 +62,6 @@ func stateRemove(st, i, d)
     st.empty += 1
 end
 
-## ── The random numbers: a small generator of our own, so that a seed gives the same sequence on every platform ──
-
 func rngNew(seed)
     var s = seed & 0xFFFFFFFF
     if s == 0 then
@@ -102,8 +100,6 @@ func shuffled(list, rng)
     end
     return out
 end
-
-## ── The search ──────────────────────────────────────────────────────────────────────────────────
 
 ## The empty cell with the fewest candidates, the first one when several tie: cell, mask, count (cell 0 and count N + 1
 ## when there is no empty cell). The scan of every node of a search, so the tables are read into locals once.
@@ -182,8 +178,6 @@ end
 func solverFill(rng)
     return solverCount(boardNew(), 1, rng).solution
 end
-
-## ── The logic ───────────────────────────────────────────────────────────────────────────────────
 
 ## Which unit unit number u (1 to 27) is: "row", "column" or "box", and its number among those.
 func unitInfo(u)

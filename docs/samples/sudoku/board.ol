@@ -8,7 +8,7 @@ const N = 9
 const BOX = 3
 const CELLS = N * N
 const ALL = 0x3FE                 ## the mask of the digits 1 to 9
-const HINTS = 3                   ## hints per puzzle
+const HINTS = 3
 
 ## The tables every rule needs, filled once by boardBuild(): the row, column and box of each cell, the 27 units
 ## (nine rows, nine columns, nine boxes, each a list of 9 cells), the 20 peers of each cell (the cells that share a
@@ -180,8 +180,6 @@ func boardDigitCount(g, d)
     return n
 end
 
-## ── Notes: a mask per cell of the digits the player has pencilled in ─────────────────────────────
-
 func notesNew()
     return boardNew()
 end
@@ -197,8 +195,6 @@ func notesClean(notes, i, d)
         notes[p] = notes[p] & ~bit
     end
 end
-
-## ── Saved text ──────────────────────────────────────────────────────────────────────────────────
 
 func boardEncode(g)
     return g.join()

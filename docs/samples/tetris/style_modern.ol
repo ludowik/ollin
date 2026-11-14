@@ -167,8 +167,6 @@ func modernGame()
     modernWellText(f)
 end
 
-## ── The screens before the game ────────────────────────────────────────────────────────────────────
-
 ## TETRIS, each letter in the colour of a piece.
 func modernLogo(it, m)
     var size = it.size * m.s * 1.05
