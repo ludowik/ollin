@@ -65,6 +65,17 @@ assert(#spiralOf(pentagon, 8, 3) > 8)
 assert(#spiralOf([[0, 0], [100, 0], [100, 3], [0, 3]], 8, 1) < 4)
 assert(#spiralOf([[0, 0], [1, 0]], 8, 1) == 0)
 
+## A point on a straight side is not a corner: a spiral asked to start there starts at the next real one.
+var collinear = [[0, 0], [50, 0], [100, 0], [100, 80], [0, 80]]
+for first = 1, 5 do
+    var line = spiralOf(collinear, 8, first)
+    assert(#line > 10)
+    for p in line do
+        assert(p[1] >= 0 and p[1] <= 100 and p[2] >= 0 and p[2] <= 80)
+    end
+end
+assert(#spiralOf([[0, 0], [50, 0], [100, 0]], 8, 1) == 0)
+
 ## A drawing covers the area with segments whose end lengths only grow.
 var art = drawing(200, 300, 50, 4)
 assert(#art.segments > 100)

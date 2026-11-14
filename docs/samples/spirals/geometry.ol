@@ -67,7 +67,7 @@ end
 ## to). The spiral runs along the line of an edge, moved inwards, until that line meets the line of another edge; the lines
 ## are moved a little further in at every corner, in proportion to the angle turned, so that after a whole turn the spiral
 ## lies `spacing` further in. An edge that has shrunk to nothing is never met, because its line meets the spiral later than
-## the next one does. `first` is the edge it starts on. It ends where it can no longer go on inside the polygon, and gives
+## the next one does. `first` is the edge it starts on, or the next one that begins at a real corner. It ends where it can no longer go on inside the polygon, and gives
 ## its points in order.
 func spiralOf(poly, spacing, first)
     var m = #poly
@@ -85,9 +85,21 @@ func spiralOf(poly, spacing, first)
         dy.push((b[2] - a[2]) / d)
         c.push(-dy[i] * a[1] + dx[i] * a[2])
     end
-    var before = (first + m - 2) % m + 1
-    var turn = math.atan2(dx[before] * dy[first] - dy[before] * dx[first], dx[before] * dx[first] + dy[before] * dy[first])
     var edge = first
+    var before = (edge + m - 2) % m + 1
+    var cross = dx[before] * dy[edge] - dy[before] * dx[edge]
+    for tries = 1, m do
+        if cross > 1e-3 then
+            break
+        end
+        before = edge
+        edge = edge % m + 1
+        cross = dx[before] * dy[edge] - dy[before] * dx[edge]
+    end
+    if cross <= 1e-3 then
+        return []
+    end
+    var turn = math.atan2(cross, dx[before] * dx[edge] + dy[before] * dy[edge])
     var offset = spacing / 2
     var from = cornerOf(dx, dy, c, before, offset - spacing * turn / math.TAU, edge, offset)
     var points = [from]
@@ -95,9 +107,9 @@ func spiralOf(poly, spacing, first)
         var best = nil
         var bestLength = nil
         for k = 1, m do
-            var cross = dx[edge] * dy[k] - dy[edge] * dx[k]
-            if k <> edge and cross > 1e-3 then
-                var angle = math.atan2(cross, dx[edge] * dx[k] + dy[edge] * dy[k])
+            var turned = dx[edge] * dy[k] - dy[edge] * dx[k]
+            if k <> edge and turned > 1e-3 then
+                var angle = math.atan2(turned, dx[edge] * dx[k] + dy[edge] * dy[k])
                 var next = offset + spacing * angle / math.TAU
                 var corner = cornerOf(dx, dy, c, edge, offset, k, next)
                 var length = (corner[1] - from[1]) * dx[edge] + (corner[2] - from[2]) * dy[edge]
