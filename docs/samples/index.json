@@ -16,6 +16,9 @@
 
   { "group": "2D drawing", "name": "Primitives 2D", "file": "primitives.ol", "icon": "icons/primitives.png",
     "description": "A tour of the 2D primitives: lines, shapes, curves and text." },
+  { "group": "2D drawing", "name": "Polygon spirals", "file": "spirals/spirals.ol",
+    "description": "A random pen drawing: a plain cut into cells, each filled with an angular spiral, laid down line by line.",
+    "controls": "Tap, click or press any key to draw a new one." },
   { "group": "2D drawing", "name": "Perlin noise (per pixel)", "file": "pixels.ol", "icon": "icons/pixels.png",
     "description": "Perlin noise drawn pixel by pixel into a small buffer, animated and scaled up to the window." },
   { "group": "2D drawing", "name": "Image (loadData)", "file": "image_demo.ol", "icon": "icons/image_demo.png",
