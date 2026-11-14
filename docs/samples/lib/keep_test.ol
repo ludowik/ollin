@@ -33,4 +33,29 @@ assert(keepDue(KEEP_EVERY, "play"), "the time came")
 markKept("play")
 assert(keepDue(0.0, "over"), "a change of screen is kept at once")
 
+## keepGoing keeps a game that changed screen at once and one that goes on every KEEP_EVERY seconds, and never the title.
+var kept = 0
+var keep = func() kept += 1 end
+markKept("play")
+keepGoing(0.1, "play", keep)
+assert(kept == 0, "nothing to keep a moment after a keeping")
+keepGoing(KEEP_EVERY, "play", keep)
+assert(kept == 1, "a game that goes on is kept when the time comes")
+keepGoing(KEEP_EVERY, "title", keep)
+assert(kept == 1, "the title holds nothing worth keeping")
+markKept("play")
+keepGoing(0.0, "over", keep)
+assert(kept == 2, "a change of screen is kept at once")
+
+## loadKept hands the restorer what the check accepts, and only that.
+var restored = nil
+var restore = func(t) restored = t end
+var accepts = func(t) return typeof(t) == "map" and isWhole(t.n, 0, 9) end
+data.set("keep_test.save", {n: 3})
+assert(loadKept("keep_test.save", accepts, restore) and restored.n == 3, "a save that is trusted is put back")
+restored = nil
+data.set("keep_test.save", {n: "three"})
+assert(not loadKept("keep_test.save", accepts, restore) and restored == nil, "a save that is not trusted is not")
+assert(not loadKept("keep_test.never_written", accepts, restore) and restored == nil, "nor is a store with nothing in it")
+
 print("keep ok")
