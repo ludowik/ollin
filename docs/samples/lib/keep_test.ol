@@ -51,10 +51,11 @@ assert(kept == 2, "a change of screen is kept at once")
 var restored = nil
 var restore = func(t) restored = t end
 var accepts = func(t) return typeof(t) == "map" and isWhole(t.n, 0, 9) end
-data.set("keep_test.save", {n: 3})
+keepSaved("keep_test.save", {n: 3, state: "play"})
 assert(loadKept("keep_test.save", accepts, restore) and restored.n == 3, "a save that is trusted is put back")
+assert(not keepDue(0.0, "play"), "and what was put back counts as kept, on its own screen")
 restored = nil
-data.set("keep_test.save", {n: "three"})
+data.set("keep_test.save", {n: "three", state: "play"})
 assert(not loadKept("keep_test.save", accepts, restore) and restored == nil, "a save that is not trusted is not")
 assert(not loadKept("keep_test.never_written", accepts, restore) and restored == nil, "nor is a store with nothing in it")
 

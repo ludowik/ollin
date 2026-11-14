@@ -7,7 +7,6 @@
 ##   chase.update(dt, targetX, targetY, targetZ, headingRad)   ## every frame, before drawing
 ##   chase.apply(cam)                                          ## cam = graphics.camera(...)
 
-
 class ChaseCamera
     func init(distance, height, stiffness)
         self.distance = distance

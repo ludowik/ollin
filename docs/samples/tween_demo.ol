@@ -1,9 +1,6 @@
 ## The tween module moves an object's field from its CURRENT value towards a target, over a
 ## duration, along a curve. The engine advances the tweens every frame: there is nothing to call
 ## in draw(), one declares and forgets.
-##
-## Click anywhere to restart the animations. The menu's "Curve" list chooses the
-## curve applied to the star, and the slider sets the duration.
 
 global config = {curve: "easeInOutQuad", duration: 1.2}
 

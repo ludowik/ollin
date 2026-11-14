@@ -76,7 +76,6 @@ global game = {
     pressTick: -1,
     pop: {cell: 0, s: 1},            ## the cell that grows a little when a digit is placed in it
     win: {t: 0, cell: 0},            ## the wave over the grid when it is solved
-    help: {key: "", size: 0, lines: []},   ## the wrapped help, see helpLayout
     done: {},                        ## the puzzles of the day solved: "20261019:2" -> true
     layout: {w: 0, h: 0, c: 0, bx: 0, by: 0, pad: [], tools: []}
 }
@@ -434,8 +433,8 @@ func setup()
     graphics.fitArea()
     buildSounds()
     restoreLanguage()
-    useMenu({ink: config.ink, button: config.button, primary: config.buttonOn, accent: config.blue, paper: config.paper,
-             margin: config.margin, width: 0.8, height: 0.1, soundKey: "sudoku.sound",
+    useMenu({ink: config.ink, muted: config.muted, button: config.button, primary: config.buttonOn, accent: config.blue, paper: config.paper,
+             margin: config.margin, textMargin: config.textMargin, width: 0.8, height: 0.1, soundKey: "sudoku.sound",
              drawButton: drawButton, showScreen: showScreen})
     game.errors = data.get(config.errorsKey, true) == true
     game.input = data.get(config.inputKey, "cell")

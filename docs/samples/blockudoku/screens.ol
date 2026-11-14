@@ -39,7 +39,7 @@ end
 ## The screens that replace the game, by name: how each is drawn and what a press on it does.
 global screens = {
     options: menuScreen("options", optionEntries),
-    help: {draw: drawHelp, press: backToOptions},
+    help: helpScreen(helpParagraphs),
     pieces: {draw: drawGallery, press: backToOptions},
     language: menuScreen("menuLanguage", languageEntries)
 }

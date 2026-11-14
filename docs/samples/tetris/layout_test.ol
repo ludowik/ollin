@@ -31,8 +31,8 @@ func touching(p, q)
     if p.r <> nil or q.r <> nil then
         var disc = p.r <> nil and p or q
         var box = boxOf(disc == p and q or p)
-        var nx = math.max(box.x0, math.min(disc.x, box.x1))
-        var ny = math.max(box.y0, math.min(disc.y, box.y1))
+        var nx = math.clamp(disc.x, box.x0, box.x1)
+        var ny = math.clamp(disc.y, box.y0, box.y1)
         var dx = disc.x - nx
         var dy = disc.y - ny
         return dx * dx + dy * dy < disc.r * disc.r

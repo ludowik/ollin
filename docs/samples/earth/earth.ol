@@ -89,7 +89,7 @@ func placeCamera()
 end
 
 func zoomBy(factor)
-    zoom.factor = math.max(zoom.min, math.min(zoom.max, zoom.factor * factor))
+    zoom.factor = math.clamp(zoom.factor * factor, zoom.min, zoom.max)
 end
 
 func screenDistance(x0, y0, x1, y1)

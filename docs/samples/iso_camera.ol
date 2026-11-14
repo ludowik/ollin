@@ -1,5 +1,4 @@
 ## An interactive isometric camera.
-## Drag to orbit - wheel or pinch to zoom - double-click to recentre.
 
 ## `size` and `angle` are the STARTING values and stay untouched, which is what lets the
 ## double-click restore them; where the camera is right now lives in `view`.
@@ -47,7 +46,7 @@ end
 ## a wheel notch is a step, a pinch is a ratio. Anything else — the bounds, the camera update —
 ## would otherwise be written twice and drift.
 func zoomBy(factor)
-    view.size = math.max(config.minSize, math.min(config.maxSize, view.size * factor))
+    view.size = math.clamp(view.size * factor, config.minSize, config.maxSize)
     cam.fovy = view.size
 end
 

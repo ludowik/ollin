@@ -50,6 +50,10 @@ func optionEntries()
     ]
 end
 
+func helpParagraphs()
+    return tr("help")({box: BOX, size: N, hints: HINTS})
+end
+
 func startFromEntry(entry)
     startGame(entry.level, entry.daily)
 end
@@ -80,6 +84,6 @@ global screens = {
     language: menuScreen("menuLanguage", languageEntries),
     new: menuScreen("chooseLevel", newEntries, startFromEntry),
     daily: menuScreen("daily", dailyEntries, startFromEntry),
-    help: {draw: drawHelp, press: func(x, y) showScreen("options") end},
+    help: helpScreen(helpParagraphs),
     generating: {draw: drawGenerating, press: func(x, y) end}
 }

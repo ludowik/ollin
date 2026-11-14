@@ -5,11 +5,8 @@ One section per library whose use needs more than its header: how to wire it, an
 ## stage.ol and stage_draw.ol — the stage of the step-by-step examples
 
 `stage.ol` is the player: the state, loading a program, the keys and the taps. `stage_draw.ol` is what it looks like: the
-palette, and the panels, the chips, the code, the note, the header and the buttons. An example imports `stage.ol` only.
-
-Shared by "How the lexer works" and "How the parser works": the palette, the player (play, pause, step by step, back,
-restart, the speed), the panel that shows the engine's own C++ with a bar on the line being run, the panel that explains
-what happens, the header and the buttons at the bottom. Both examples are written the same way: copy one.
+palette, and the panels, the chips, the code, the note, the header and the buttons. An example imports `stage.ol` (and
+`area.ol`, for `rectOf`). "How the lexer works" and "How the parser works" share it and are written the same way: copy one.
 
 ### Writing an example
 

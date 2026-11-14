@@ -83,3 +83,25 @@ global fireId = nil            ## the finger holding the trigger, if any — nil
 global fireTimer = 0.0         ## the cadence of a held trigger, on the glass as on the keyboard
 global touchPlay = false       ## a finger has played: the hint and the mouse relays follow it
 global demo = 0.0              ## the title screen's own clock
+
+## Scoring passes through here alone, so the extra ship cannot be missed on one of the four things
+## worth points.
+func award(points)
+    score += points
+    while score >= nextExtra do
+        lives += 1
+        nextExtra += EXTRA_AT
+    end
+    if score > best then
+        best = score
+        data.set(BEST_KEY, best)
+    end
+end
+
+func burst(x, y, n, spread)
+    for i = 1, n do
+        var a = math.rand() * math.TAU
+        var sp = spread * (0.3 + math.rand() * 0.7)
+        debris.push({x: x, y: y, vx: math.cos(a) * sp, vy: math.sin(a) * sp, left: 0.35 + math.rand() * 0.4})
+    end
+end

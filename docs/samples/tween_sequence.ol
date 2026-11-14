@@ -1,8 +1,6 @@
 ## The tween module, with a SEQUENCE of steps: `tween.sequence` plays them one after another, each
 ## starting from what the previous one left. The engine advances them every frame;
 ## the drawing only READS fields, and never speaks of time.
-##
-## Click anywhere to pause the scene, or to resume it.
 
 global ball = {x: 0, y: 0, rx: 0, ry: 0, tint: Color(0.45, 0.8, 1)}
 

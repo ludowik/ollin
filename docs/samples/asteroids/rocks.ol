@@ -43,28 +43,6 @@ func newWave()
     saucerTimer = SAUCER_PERIOD
 end
 
-## Scoring passes through here alone, so the extra ship cannot be missed on one of the four things
-## worth points.
-func award(points)
-    score += points
-    while score >= nextExtra do
-        lives += 1
-        nextExtra += EXTRA_AT
-    end
-    if score > best then
-        best = score
-        data.set(BEST_KEY, best)
-    end
-end
-
-func burst(x, y, n, spread)
-    for i = 1, n do
-        var a = math.rand() * math.TAU
-        var sp = spread * (0.3 + math.rand() * 0.7)
-        debris.push({x: x, y: y, vx: math.cos(a) * sp, vy: math.sin(a) * sp, left: 0.35 + math.rand() * 0.4})
-    end
-end
-
 ## Breaking a rock is the game's central act: it REPLACES the rock with two faster, smaller ones,
 ## and only the smallest leaves nothing behind. The rock is MARKED and not removed: a single sweep
 ## at the end of the frame takes the dead away, so a collision pass never has to rebuild the list

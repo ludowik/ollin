@@ -54,6 +54,7 @@ global shotLive = false
 global bombs = []        ## up to BOMB_MAX {x, y}
 global lives = LIVES
 global respawn = 0.0     ## > 0: the cannon was hit, and the field holds still
+global marchStep = 0     ## which of the four notes the next pass plays
 global ticks = 0         ## logical ticks, which is what makes the bomb sprite turn
 
 global ufo = nil         ## {x, dir} while it crosses, nil between crossings

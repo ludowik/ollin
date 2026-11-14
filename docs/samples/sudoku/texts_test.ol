@@ -11,17 +11,9 @@ assert(i18n.languages[1] == "fr", "French is the default language")
 
 var rules = {box: 3, size: 9, hints: 3}
 var hint = {row: 2, col: 5, digit: 7, unit: "x"}
-var reference = TEXTS[LANGUAGES[1]]
+checkHelp(rules, ["{rules.box}x{rules.box}", "{rules.hints}"])
 for code in LANGUAGES do
     var table = TEXTS[code]
-    var paragraphs = table.help(rules)
-    assert(len(paragraphs) == len(reference.help(rules)), "{code}: the help has another number of paragraphs")
-    for text in paragraphs do
-        assert(len(text) > 0, "{code}: an empty paragraph")
-        assert(text.find("\{") == nil, "{code}: a placeholder was not replaced in: {text}")
-    end
-    var all = paragraphs.join(" ")
-    assert(all.find("{rules.box}x{rules.box}") <> nil and all.find("{rules.hints}") <> nil, "{code}: the help lost a figure of the rules")
     ## the texts that take figures say them
     var naked = table.hintNaked(hint)
     assert(naked.find("{hint.row}") <> nil and naked.find("{hint.col}") <> nil and naked.find("{hint.digit}") <> nil, "{code}: the naked-single hint lost a figure")

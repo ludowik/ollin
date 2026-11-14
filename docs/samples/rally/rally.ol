@@ -201,7 +201,7 @@ func update(dt)
     engineSound.update(car.engine)
 
     speedFeel = math.approach(speedFeel, math.clamp(math.abs(car.speed) / car.engine.topSpeed(), 0, 1), SPEED_FEEL_RATE, dt)
-    chase.height = CHASE_HEIGHT + (CHASE_HEIGHT_FAST - CHASE_HEIGHT) * speedFeel
+    chase.height = math.lerp(CHASE_HEIGHT, CHASE_HEIGHT_FAST, speedFeel)
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
     cam.fovy = math.min(viewFov() + FOV_SPEED_GAIN * speedFeel, FOV_CAP)

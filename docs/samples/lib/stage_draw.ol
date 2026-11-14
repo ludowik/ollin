@@ -2,7 +2,6 @@
 ## the buttons that stage.ol puts on the screen.
 
 import "draw.ol"
-import "area.ol"
 
 const BG = Color(0.07, 0.08, 0.12)
 const PANEL = Color(0.11, 0.12, 0.17)
@@ -35,6 +34,10 @@ const MIN_CHIP_TYPE_FONT = 8.5   ## the smallest name of a token type on a chip
 
 const PUNCTUATION = ["COMMA", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACKET", "RBRACKET", "COLON",
                      "SEMICOLON", "DOT", "DOT_DOT_DOT", "QUESTION"]
+
+global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
+global noteCache = {prog: 0, id: 0, w: 0, h: 0, lines: [], size: 0}   ## the sentence, wrapped for one size
+global codeCache = {}
 
 func fade(c, alpha)
     return Color(c.r, c.g, c.b, alpha)
@@ -339,17 +342,11 @@ func drawHeader(L)
     ## the program and what it teaches, shrunk to leave the right end to the menu's handle
     var text = stage.programs[state.prog].name + "  -  " + stage.lessons[state.prog]
     var base = math.max(SIZE * 0.026, 10)
-    var fs = base
+    var fs = fitSize(text, base, W - 2 * L.m - SIZE * 0.2)
     graphics.fontSize(fs)
-    var room = W - 2 * L.m - SIZE * 0.2
-    var w = graphics.textSize(text)
-    if w > room then
-        fs = fs * room / w
-        graphics.fontSize(fs)
-        if fs < 9 then
-            text = stage.programs[state.prog].name   ## too long for a narrow screen: the lesson is left out
-            graphics.fontSize(base)
-        end
+    if fs < 9 then
+        text = stage.programs[state.prog].name   ## too long for a narrow screen: the lesson is left out
+        graphics.fontSize(base)
     end
     label(text, L.m, L.m * 0.8 + SIZE * 0.065, DIM)
     ## progress

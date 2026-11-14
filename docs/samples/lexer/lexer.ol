@@ -9,6 +9,7 @@
 ## from src/lexer.cpp into cpp_source.ol) with a bar on the line being run. Each token that comes out is filed in the stream
 ## below, and the program's text is underlined in the colour of the token it became. The player is the one of lib/stage.ol.
 
+import "../lib/area.ol"
 import "../lib/stage.ol"
 import "tracer.ol"
 import "programs.ol"

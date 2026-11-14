@@ -1,5 +1,4 @@
-## What a phone's keyboard really does, shown on the screen: touch the field (open the interface at the top right if it is
-## folded), type, then touch the "done" key above the keyboard, or swipe it down. The lines on the left are what the page saw —
+## What a phone's keyboard really does, shown on the screen: the lines on the left are what the page saw —
 ## the focus it took and lost, the keys the keyboard sent, the size of the visible area — newest last, as keyboard.trace()
 ## gives them. Take a screenshot of it when something does not behave as it should.
 

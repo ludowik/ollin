@@ -1,8 +1,7 @@
 ## The audio and sound modules — EVERYTHING heard here is computed: not one file is loaded.
 ##
-## Put your fingers on the keys: each note SOUNDS AS LONG AS the finger stays down, and several
-## fingers play several notes at once — the `touch` module follows them, each by its identifier.
-## Drag without lifting and the note follows the key under the finger.
+## Each note SOUNDS AS LONG AS the finger stays down, and several fingers play several notes at once — the `touch` module
+## follows them, each by its identifier.
 ##
 ## The example shows the `sound` module's TWO kinds of object, each doing what it is good at:
 ##   an OSCILLATOR held for a pressed key — its duration is not known in advance, and its
@@ -263,7 +262,7 @@ func update(dt)
         bow.freq(110 + bowPos * 660)
     end
     var v = bow.volume()
-    bow.volume(v + (target - v) * math.min(1, dt * 8))
+    bow.volume(math.lerp(v, target, math.min(1, dt * 8)))
 
     glow = math.max(glow - dt * 2.5, 0)
 end

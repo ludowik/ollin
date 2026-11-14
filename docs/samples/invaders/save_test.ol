@@ -1,6 +1,6 @@
 ## The save of Invaders (docs/samples/invaders/save.ol): that a game written and read back through `data` is accepted,
 ## and that a save which cannot be trusted — another version, a field missing or of the wrong sort, a number out of its
-## range, a fleet or a shield of the wrong size — is refused WHOLE. What invaders.ol does with a save it has accepted
+## range, a fleet or a shield of the wrong size — is refused WHOLE. What resume.ol does with a save it has accepted
 ## needs the screen, and is looked at there.
 
 import "save.ol"

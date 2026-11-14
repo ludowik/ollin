@@ -147,4 +147,3 @@ func hintText(h)
     end
     return tr("hintPlain")(words)
 end
-

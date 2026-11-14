@@ -122,3 +122,29 @@ func buildArt()
         small: {hull: scaleShape(SAUCER, SAUCER_SMALL_R), deck: scaleShape(SAUCER_DECK, SAUCER_SMALL_R)}
     }
 end
+
+## The score, the wave and the ships left belong to a game in progress: showing them on the title screen would announce a
+## score of zero and two spare ships before anything has started.
+func drawHud()
+    graphics.fontSize(14)
+    graphics.stroke(INK)
+    graphics.textMode("left", "top")
+    graphics.text("{score}", 18, 14)
+    graphics.textMode("right", "top")
+    graphics.text("WAVE {wave}", FIELD_W - 18, 14)
+    drawLives()
+    if state == "over" then
+        graphics.fontSize(24)
+        graphics.stroke(WARM)
+        graphics.textMode("center", "center")
+        graphics.text("GAME OVER", FIELD_W / 2, FIELD_H / 2 - 14)
+        graphics.fontSize(12)
+        graphics.stroke(INK)
+        graphics.text("SCORE {score} — press or tap to play again", FIELD_W / 2, FIELD_H / 2 + 14)
+    elseif paused then
+        graphics.fontSize(20)
+        graphics.stroke(WARM)
+        graphics.textMode("center", "center")
+        graphics.text("PAUSED", FIELD_W / 2, FIELD_H / 2)
+    end
+end

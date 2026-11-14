@@ -62,7 +62,7 @@ end
 ## same distanceToTrack pass serves the height AND the color below instead of running twice.
 func heightFromDist(x, z, d)
     var t = math.min(d / TRACK_WIDTH, 1.0)     ## 0 on the centreline, 1 at the verge and beyond
-    return rawHeight(x, z) * t + 1.0 * (1 - t)
+    return math.lerp(1.0, rawHeight(x, z), t)
 end
 
 func heightAt(x, z)
@@ -89,9 +89,7 @@ end
 func tintAt(h, d)
     var grass = grassAt(h)
     var t = roadMixAt(d)
-    return Color(grass.r + (ROAD_COLOR.r - grass.r) * t,
-                 grass.g + (ROAD_COLOR.g - grass.g) * t,
-                 grass.b + (ROAD_COLOR.b - grass.b) * t)
+    return Color(math.lerp(grass.r, ROAD_COLOR.r, t), math.lerp(grass.g, ROAD_COLOR.g, t), math.lerp(grass.b, ROAD_COLOR.b, t))
 end
 
 ## Where lattice point (i, j), each in [-n; n + 1], lives in the flat arrays: (2n + 2) points per row.

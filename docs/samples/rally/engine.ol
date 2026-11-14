@@ -99,7 +99,7 @@ class Engine
         if self.shiftTimer <= 0 and (self.gear == 1 or self.reverse) then
             ## The clutch slips when pulling away: the revs rise with the pedal before the car has
             ## any speed to give them.
-            target = math.max(target, self.idle + (math.min(self.launchRpm, limit - 400.0) - self.idle) * throttle)
+            target = math.max(target, math.lerp(self.idle, math.min(self.launchRpm, limit - 400.0), throttle))
         end
         target = math.max(target, self.idle)
         var rate = 18.0

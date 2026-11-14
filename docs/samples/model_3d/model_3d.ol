@@ -1,9 +1,6 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
-## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
-## Drag with the mouse or a finger to turn it, or steer it with the ARROW KEYS; otherwise it rotates
-## gently on its own — space stops that drift and starts it again. Wheel or pinch to zoom,
-## double-click or Return to put it back as it was found.
-## The "Model" menu switches between them, covering the three ways a file can carry its appearance:
+## visible whatever the aspect ratio, and the rotation is interactive, by quaternion, drifting gently when left alone.
+## The models cover the three ways a file can carry its appearance:
 ## a model may hold its geometry ALONE, and then the fill tints it; it may hold a TEXTURE, and then
 ## a white fill shows it as painted; or it may hold a COLOUR PER VERTEX, which paints one mesh in
 ## many colours with no image at all — that is the terrain, coloured by altitude. Four of them are

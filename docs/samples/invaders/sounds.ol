@@ -14,7 +14,6 @@ global sndAlien = nil
 global sndGun   = nil
 global sndUfo   = nil
 global ufoVoice = nil
-global marchStep = 0     ## which of the four notes the next pass plays
 
 ## The mystery ship's tone and its warble: they describe a SOUND, so they live with the sounds even
 ## though the crossing that plays them is the game's business.

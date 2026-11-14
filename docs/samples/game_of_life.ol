@@ -1,6 +1,4 @@
-## Conway's Game of Life (B3/S23) on a toroidal grid. Space pauses, R restarts.
-## Mouse or finger (an iPhone included): a press pauses and lights the cell, dragging draws,
-## a double tap restarts.
+## Conway's Game of Life (B3/S23) on a toroidal grid.
 
 ## The tunables, all of them here. They stay separate constants rather than one config map: the
 ## step and draw loops read them once per CELL, so a map lookup would be paid tens of thousands

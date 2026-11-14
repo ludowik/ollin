@@ -1,5 +1,4 @@
 ## The 3D primitives: cube, sphere, cylinder, plane, line, point, cone, torus.
-## Drag to spin each primitive on itself.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.

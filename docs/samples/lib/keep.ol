@@ -100,13 +100,20 @@ func keepGoing(dt, state, save)
     end
 end
 
+## Puts the game away: `t` is what the game made of itself, and its `state` is the screen it is kept on.
+func keepSaved(key, t)
+    data.set(key, t)
+    markKept(t.state)
+end
+
 ## Puts the game back from the store: `restore` is given what `valid` accepts, and is not called when there is nothing to
-## trust. Whether it was.
+## trust. Whether it was. What came back counts as kept, on the screen it carries.
 func loadKept(key, valid, restore)
     var t = trusted(data.get(key), valid)
     if t == nil then
         return false
     end
     restore(t)
+    markKept(t.state)
     return true
 end

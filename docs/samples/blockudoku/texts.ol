@@ -69,4 +69,3 @@ const TEXTS = {
 }
 
 useLanguages(LANGUAGES, TEXTS, "blockudoku.lang")
-

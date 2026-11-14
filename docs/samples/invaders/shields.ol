@@ -91,3 +91,23 @@ func carveShield(sh, rows)
     end
     image.endPixels(sh.img)
 end
+
+## Is a shield straight above the muzzle? Its own pixels answer, so a hole shot earlier is a clear
+## line again — the shelter is asked, not a rectangle around it. The cannon's column can only meet
+## ONE shield, so it is found first and its rows are then read directly: going through shieldAt per
+## row re-tested the four shields sixteen times for the same answer.
+func sheltered()
+    var x = gunX + GUN_W / 2
+    for sh in shields do
+        if x >= sh.x and x < sh.x + SHIELD_W then
+            for y = 0, SHIELD_H - 1 do
+                var r, g, b, a = image.getPixel(sh.img, x - sh.x, y)
+                if a > 0.5 then
+                    return true
+                end
+            end
+            return false
+        end
+    end
+    return false
+end

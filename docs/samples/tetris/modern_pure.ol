@@ -24,7 +24,7 @@ func modernTone(col, k)
         if k < 0 then
             out.push(v * (1 + k))
         else
-            out.push(v + (1 - v) * k)
+            out.push(math.lerp(v, 1, k))
         end
     end
     out.push(col[4])

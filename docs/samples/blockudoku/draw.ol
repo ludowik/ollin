@@ -71,8 +71,8 @@ func drawFloaters()
             var ox, oy = cellOrigin(f.row, f.col)
             var x0 = ox + c / 2
             var y0 = oy + c / 2
-            var x = x0 + (tx - x0) * k
-            var y = y0 + (ty - y0) * k
+            var x = math.lerp(x0, tx, k)
+            var y = math.lerp(y0, ty, k)
             var size = c * 0.46 * grow * (1 - 0.75 * k)
             var alpha = 1 - math.max(0, (k - 0.8) / 0.2)
             var edge = size * 0.07
@@ -175,20 +175,6 @@ func drawOver()
         drawText("{tr("best")} {game.best}", mx, L.by + 4.4 * c, c * 0.5, "center", "center", config.muted, game.fade.a)
     end
     drawButton(tr("newGame"), L.over, config.buttonPrimary, c * 0.55, game.fade.a)
-end
-
-func drawHelp()
-    helpCompute()
-    var help = game.help
-    drawScreenTitle(tr("menuHelp"))
-    var y = help.y
-    for line in help.lines do
-        if line <> "" then
-            drawText(line, help.x, y, help.size, "left", "top", config.ink)
-        end
-        y += help.size * 1.35
-    end
-    drawText(tr("tapBack"), CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
 end
 
 func drawGallery()

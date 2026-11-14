@@ -1,5 +1,5 @@
 ## A pocket calculator. Operations run in the order they are typed, as on a simple pocket calculator: 2 + 3 x 4 = gives 20,
-## not 14. Tap the keys, or use the keyboard: digits, return for "=", backspace to delete a digit, escape to clear.
+## not 14.
 ##
 ## engine.ol holds the arithmetic (it has its own test); this file is the keypad: the layout, the input and the drawing.
 ## The layout follows the area (graphics.fitArea) and is computed again at each frame, so nothing has to be kept in step.

@@ -1,9 +1,9 @@
 ## The save of Asteroids, with no drawing: the game under way as one map, written as it goes and read back at the
 ## start, so that a run begins where the last one stopped — the ship and its speed, every rock, the shots and the
-## saucer in the air, the score, the wave and the lives. The best score is kept apart (asteroids.ol), so that an
+## saucer in the air, the score, the wave and the lives. The best score is kept apart, so that an
 ## older save can never lower it. A game that was running comes back in pause.
 ##
-## Only the shape of a save is settled here: asteroids.ol reads the game into a map and puts a map back. A save that
+## Only the shape of a save is settled here: resume.ol reads the game into a map and puts a map back. A save that
 ## cannot be trusted — another version, a field missing or of the wrong sort, a number out of its range, a rock of a
 ## size or a shape that does not exist — is refused WHOLE, and the game starts as if there were none.
 

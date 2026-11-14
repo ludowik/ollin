@@ -61,21 +61,6 @@ func restoreSave(t)
     paused = state == "play"
 end
 
-## Keeps the game; `data` leaves the file alone when it is what was kept last.
 func saveGame()
-    data.set(SAVE_KEY, saveState())
-    markKept(state)
-end
-
-## The game as a run began it: put back where the last run left it when there is a save to trust. Whether it was.
-func loadGame()
-    if not loadKept(SAVE_KEY, saveValid, restoreSave) then
-        return false
-    end
-    markKept(state)
-    return true
-end
-
-func autosave(dt)
-    keepGoing(dt, state, saveGame)
+    keepSaved(SAVE_KEY, saveState())
 end

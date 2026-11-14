@@ -201,9 +201,9 @@ func veilA(rho)
     ## A CRISP edge: the hue nearly reaches the copper within a third of a radius, the rest of
     ## the umbra being roughly uniform. Spreading that gradient gave a soft, mushy shadow.
     var s = math.clamp((R_UMBRA - rho) / (0.35 * R_UMBRA), 0, 1)
-    var r = UMBRA_EDGE.r + (UMBRA_CENTRE.r - UMBRA_EDGE.r) * s
-    var v = UMBRA_EDGE.g + (UMBRA_CENTRE.g - UMBRA_EDGE.g) * s
-    var b = UMBRA_EDGE.b + (UMBRA_CENTRE.b - UMBRA_EDGE.b) * s
+    var r = math.lerp(UMBRA_EDGE.r, UMBRA_CENTRE.r, s)
+    var v = math.lerp(UMBRA_EDGE.g, UMBRA_CENTRE.g, s)
+    var b = math.lerp(UMBRA_EDGE.b, UMBRA_CENTRE.b, s)
     if rho > OZONE then
         ## Ozone in the upper atmosphere absorbs red: photographers know
         ## that turquoise fringe at the shadow's edge well.

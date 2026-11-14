@@ -34,7 +34,7 @@ func update(dt)
         d.left -= dt
         return d.left > 0.0
     end)
-    autosave(dt)
+    keepGoing(dt, state, saveGame)
 
     if state == "title" then
         demo += dt
@@ -195,34 +195,10 @@ end
 func draw()
     graphics.clear(Color(0.02, 0.02, 0.04))
     drawField()
-
-    ## The score, the wave and the ships left belong to a game in progress: showing them on the
-    ## title screen would announce a score of zero and two spare ships before anything has started.
-    if state <> "title" then
-        graphics.fontSize(14)
-        graphics.stroke(INK)
-        graphics.textMode("left", "top")
-        graphics.text("{score}", 18, 14)
-        graphics.textMode("right", "top")
-        graphics.text("WAVE {wave}", FIELD_W - 18, 14)
-        drawLives()
-    end
-
     if state == "title" then
         drawTitle()
-    elseif state == "over" then
-        graphics.fontSize(24)
-        graphics.stroke(WARM)
-        graphics.textMode("center", "center")
-        graphics.text("GAME OVER", FIELD_W / 2, FIELD_H / 2 - 14)
-        graphics.fontSize(12)
-        graphics.stroke(INK)
-        graphics.text("SCORE {score} — press or tap to play again", FIELD_W / 2, FIELD_H / 2 + 14)
-    elseif paused then
-        graphics.fontSize(20)
-        graphics.stroke(WARM)
-        graphics.textMode("center", "center")
-        graphics.text("PAUSED", FIELD_W / 2, FIELD_H / 2)
+    else
+        drawHud()
     end
 
     if touchPlay and state == "play" then
@@ -243,5 +219,5 @@ func setup()
     ## The field is laid out but not started: the title screen holds it, and its rocks are the ones
     ## the first wave will drift — nothing is built twice.
     newWave()
-    loadGame()
+    loadKept(SAVE_KEY, saveValid, restoreSave)
 end

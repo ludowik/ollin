@@ -68,7 +68,7 @@ func drawBoard()
         if game.state == "won" then
             var wave = math.clamp(1 - math.abs(game.win.t * 18 - math.abs(board.rowOf[i] - board.rowOf[game.win.cell]) - math.abs(board.colOf[i] - board.colOf[game.win.cell])) / 3, 0, 1)
             if wave > 0 then
-                tint = [tint[1] + (config.gold[1] - tint[1]) * wave, tint[2] + (config.gold[2] - tint[2]) * wave, tint[3] + (config.gold[3] - tint[3]) * wave, 1]
+                tint = mixColours(tint, config.gold, wave)
             end
         end
         fillC(tint)
@@ -221,40 +221,4 @@ func drawGenerating()
     drawText(text, CX, CY - SIZE * 0.03, fitSize(text, SIZE * 0.06, W * 0.9), "center", "center", config.ink)
     drawText(".".repeat(dots), CX, CY + SIZE * 0.05, SIZE * 0.08, "center", "center", config.muted)
     drawText(levelName(game.job.level), CX, CY + SIZE * 0.15, SIZE * 0.04, "center", "center", config.muted)
-end
-
-func helpLines(size, width)
-    return wrapParagraphs(tr("help")({box: BOX, size: N, hints: HINTS}), size, width)
-end
-
-## The size and the lines of the help, wrapped again only when the area or the language changes.
-func helpLayout()
-    var key = "{W}x{H} {i18n.lang}"
-    var cache = game.help
-    if cache.key <> key then
-        var width = W - 2 * SIZE * config.textMargin
-        var size = SIZE * 0.04
-        var lines = helpLines(size, width)
-        while len(lines) * size * 1.3 > H - SIZE * 0.2 and size > 8 do
-            size = size * 0.92
-            lines = helpLines(size, width)
-        end
-        cache.key = key
-        cache.size = size
-        cache.lines = lines
-    end
-    return cache
-end
-
-func drawHelp()
-    drawScreenTitle(tr("menuHelp"))
-    var help = helpLayout()
-    var y = SIZE * 0.12
-    for line in help.lines do
-        if line <> "" then
-            drawText(line, SIZE * config.textMargin, y, help.size, "left", "top", config.ink)
-        end
-        y += help.size * 1.3
-    end
-    drawText(tr("tapBack"), CX, H - SIZE * 0.04, SIZE * 0.027, "center", "center", config.muted)
 end

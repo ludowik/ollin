@@ -1,6 +1,6 @@
 ## The save of Asteroids (docs/samples/asteroids/save.ol): that a game written and read back through `data` is
 ## accepted, and that a save which cannot be trusted — another version, a field missing or of the wrong sort, a number
-## out of its range, a rock of a size or a shape that does not exist — is refused WHOLE. What asteroids.ol does with a
+## out of its range, a rock of a size or a shape that does not exist — is refused WHOLE. What resume.ol does with a
 ## save it has accepted needs the screen, and is looked at there.
 
 import "save.ol"

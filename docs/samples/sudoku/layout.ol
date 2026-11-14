@@ -1,4 +1,4 @@
-## Where the grid and its controls go: in a column when the area is tall, side by side when it is wide.
+## Where the grid and its controls go.
 
 ## The grid and its controls in a column when the area is tall, side by side when it is wide: whichever gives the
 ## cells the room. Computed again only when W or H change.

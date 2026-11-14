@@ -2,7 +2,6 @@
 ## palette, the player, the panel that shows the engine's own C++ with a bar on the line being run, the panel that explains
 ## what happens, the header and the buttons. How to write an example, the format of a step and the keys are in README.md.
 
-import "draw.ol"
 import "area.ol"
 import "stage_draw.ol"
 
@@ -13,9 +12,6 @@ global state = {pos: 0.0, playing: true, stepping: false, goal: 0.0, speed: 1.0,
 global run = nil          ## the trace of the program on show
 global loaded = {}        ## the traces already made, by program: a trace never changes
 global hits = []          ## the buttons drawn at the bottom, for the taps
-global monoRatio = nil    ## the width of a monospaced character, per pixel of font size
-global noteCache = {prog: 0, id: 0, w: 0, h: 0, lines: [], size: 0}   ## the sentence, wrapped for one size
-global codeCache = {}
 
 ## What an example hands over, besides the programs and the engine's text above: `title` heads the
 ## screen, `menu` names the menu, `file` and `owner` name the C++ in the code panel, `columns` is how
@@ -183,7 +179,7 @@ end
 
 func hitAt(x, y)
     for h in hits do
-        if x >= h.x and x <= h.x + h.w and y >= h.y and y <= h.y + h.h then
+        if inRect(x, y, h) then
             return h.id
         end
     end

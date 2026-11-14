@@ -17,6 +17,24 @@ func sameTexts(reference, table, where)
     end
 end
 
+## The help of every language: a function of the figures of the rules, with as many paragraphs as the first language, none
+## empty, no placeholder left, and every figure of `figures` (texts) in it.
+func checkHelp(rules, figures)
+    var reference = i18n.texts[i18n.languages[1]].help(rules)
+    for code in i18n.languages do
+        var paragraphs = i18n.texts[code].help(rules)
+        assert(len(paragraphs) == len(reference), "{code}: the help has another number of paragraphs")
+        for text in paragraphs do
+            assert(len(text) > 0, "{code}: an empty paragraph")
+            assert(text.find("\{") == nil, "{code}: a placeholder was not replaced in: {text}")
+        end
+        var all = paragraphs.join(" ")
+        for figure in figures do
+            assert(all.find(figure) <> nil, "{code}: the help lost {figure}")
+        end
+    end
+end
+
 func checkLanguages()
     var reference = i18n.texts[i18n.languages[1]]
     assert(i18n.lang == i18n.languages[1], "the first language is the one a program starts in")

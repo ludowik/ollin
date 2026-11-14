@@ -11,6 +11,7 @@
 ## with a bar on the line being run. The player is the one of lib/stage.ol; SKIP runs up to the next line that reads a token
 ## or changes the tree, a single expression taking a few hundred lines.
 
+import "../lib/area.ol"
 import "../lib/stage.ol"
 import "tracer.ol"
 import "programs.ol"

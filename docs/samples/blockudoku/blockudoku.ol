@@ -61,7 +61,7 @@ global config = {
     stuckLight: 0.62                    ## a piece that fits nowhere: the blue, washed out toward white, still within reach
 }
 config.floatLife = config.floatPop + config.floatHold + config.floatFlight
-config.blueStuck = config.blue.map(func(v) return v + (1 - v) * config.stuckLight end)
+config.blueStuck = config.blue.map(func(v) return math.lerp(v, 1, config.stuckLight) end)
 
 ## Everything that changes while the game runs.
 global game = {
@@ -85,8 +85,7 @@ global game = {
     screen: "game",             ## what is shown: the game, the options menu, the help, the languages or the catalogue of every piece
     screenTick: -1,             ## the tick of the last change of screen or of sound: the second path of the same gesture is ignored
     tick: 0,                    ## frames so far, which tells two gestures from one gesture that arrives twice
-    sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []},   ## the catalogue's layout, computed again when W or H change
-    help: {w: 0, h: 0, lang: "", x: 0, y: 0, size: 0, lines: []}   ## the help text cut into lines, computed again when W, H or the language change
+    sheet: {w: 0, h: 0, u: 0, ox: 0, oy: 0, items: []}   ## the catalogue's layout, computed again when W or H change
 }
 
 ## ── Game ────────────────────────────────────────────────────────────────────────────────────────
@@ -480,8 +479,8 @@ func setup()
     buildShapes()
     buildSounds()
     restoreLanguage()
-    useMenu({ink: config.ink, button: config.button, primary: config.buttonPrimary, accent: config.blue, paper: config.paper,
-             margin: config.margin, width: 0.7, height: 0.11, soundKey: "blockudoku.sound",
+    useMenu({ink: config.ink, muted: config.muted, button: config.button, primary: config.buttonPrimary, accent: config.blue, paper: config.paper,
+             margin: config.margin, textMargin: config.textMargin, width: 0.7, height: 0.11, soundKey: "blockudoku.sound",
              drawButton: drawButton, showScreen: showScreen})
     game.best = data.get(config.bestKey, 0)
     if not loadGame() then

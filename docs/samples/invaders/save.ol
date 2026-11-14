@@ -1,9 +1,9 @@
 ## The save of Invaders, with no drawing: the game under way as one map, written as it goes and read back at the
 ## start, so that a run begins where the last one stopped — the fleet as it marches, the shields as they were eaten,
-## the shot and the bombs in the air, the score, the wave and the lives. The best score is kept apart (invaders.ol),
+## the shot and the bombs in the air, the score, the wave and the lives. The best score is kept apart,
 ## so that an older save can never lower it. A game that was running comes back in pause.
 ##
-## Only the shape of a save is settled here: invaders.ol reads the game into a map and puts a map back. A save that
+## Only the shape of a save is settled here: resume.ol reads the game into a map and puts a map back. A save that
 ## cannot be trusted — another version, a field missing or of the wrong sort, a number out of its range, a fleet or a
 ## shield that is not the size of the field's — is refused WHOLE, and the game starts as if there were none.
 

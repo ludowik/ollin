@@ -1,5 +1,4 @@
-## Where everything goes: the board and its trays in a column when the area is tall, side by side when it is wide, the
-## catalogue of every piece, and the help text cut into lines.
+## Where everything goes: the board and its trays, the catalogue of every piece, and the help text cut into lines.
 
 ## The board and its trays in a column when the area is tall, side by side when it is wide: whichever
 ## gives the larger cell. It depends on W and H alone, so it is recomputed only when they change.
@@ -90,32 +89,4 @@ end
 ## cannot drift from the rules.
 func helpParagraphs()
     return tr("help")({box: BOX, cell: config.pointsPerCell, zone: GRID * config.pointsPerClearedCell, streak: config.streakBonus})
-end
-
-## The help cut into lines no wider than areaW: a blank line ends each paragraph.
-func wrapHelp(size, areaW)
-    return wrapParagraphs(helpParagraphs(), size, areaW)
-end
-
-## The help at the largest size that fits under the title.
-func helpCompute()
-    var help = game.help
-    if not areaChanged(help) and help.lang == i18n.lang then
-        return
-    end
-    help.lang = i18n.lang
-    var m = SIZE * config.textMargin
-    var top = SIZE * config.titleBand
-    var areaW = W - 2 * m
-    var areaH = H - top - m
-    var size = math.floor(SIZE * 0.04)
-    var lines = wrapHelp(size, areaW)
-    while len(lines) * size * 1.35 > areaH and size > 10 do
-        size -= 1
-        lines = wrapHelp(size, areaW)
-    end
-    help.x = m
-    help.y = top
-    help.size = size
-    help.lines = lines
 end
