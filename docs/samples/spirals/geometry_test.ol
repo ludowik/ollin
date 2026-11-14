@@ -14,7 +14,7 @@ assert(near(polygonArea(half), 40))
 assert(#clipHalfPlane(square, 1, 0, -1) == 0)
 assert(near(polygonArea(clipHalfPlane(square, 1, 0, 20)), 100))
 
-assert(#withoutRepeats([[0, 0], [0, 0], [5, 0], [5, 5]]) == 3)
+assert(#withoutShortEdges([[0, 0], [0, 0], [5, 0], [5, 5]], 1e-6) == 3)
 
 ## Two seeds share the box along the line halfway between them.
 var box = [0, 0, 10, 10]
@@ -75,6 +75,30 @@ for first = 1, 5 do
     end
 end
 assert(#spiralOf([[0, 0], [50, 0], [100, 0]], 8, 1) == 0)
+
+## A spiral goes on until the polygon has no room left: on the rectangle its last point is within a spacing and a half of the
+## middle, which is 40 from every long side.
+var deepest = spiralOf(rect, 8, 1)
+var last = deepest[#deepest]
+assert(math.min(last[1], 100 - last[1], last[2], 80 - last[2]) >= 40 - 12)
+
+## Whatever the cells, a spiral never crosses itself.
+for run = 1, 3 do
+    var grid = seedGrid(300, 300, 60)
+    for gy = 2, #grid - 1 do
+        for gx = 2, #grid[gy] - 1 do
+            var seed = grid[gy][gx]
+            var poly = cellOf(seed[1], seed[2], neighboursOf(grid, gx, gy), [-100, -100, 400, 400])
+            var pts = spiralOf(poly, 5, math.randInt(1, #poly))
+            assert(#pts > 3)
+            for i = 1, #pts - 1 do
+                for j = i + 2, #pts - 1 do
+                    assert(not segmentsCross(pts[i], pts[i + 1], pts[j], pts[j + 1]))
+                end
+            end
+        end
+    end
+end
 
 ## A drawing covers the area with segments whose end lengths only grow.
 var art = drawing(200, 300, 50, 4)

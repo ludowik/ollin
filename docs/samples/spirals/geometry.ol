@@ -33,14 +33,15 @@ func clipHalfPlane(poly, nx, ny, c)
     return out
 end
 
-## The polygon without the points that sit on their successor: clipping leaves some, and an edge of no length has no direction.
-func withoutRepeats(poly)
+## The polygon without the points that sit within `minLength` of their successor: clipping leaves some, and the direction
+## of an edge that short is only rounding.
+func withoutShortEdges(poly, minLength)
     var out = []
     var n = #poly
     for i = 1, n do
         var a = poly[i]
         var b = poly[i % n + 1]
-        if math.hypot(b[1] - a[1], b[2] - a[2]) > 1e-6 then
+        if math.hypot(b[1] - a[1], b[2] - a[2]) > minLength then
             out.push(a)
         end
     end
@@ -60,16 +61,58 @@ func cellOf(sx, sy, others, box)
             cell = clipHalfPlane(cell, nx, ny, nx * (sx + o[1]) / 2 + ny * (sy + o[2]) / 2)
         end
     end
-    return withoutRepeats(cell)
+    return withoutShortEdges(cell, 1e-6)
+end
+
+## The distance from the point (px, py) to the segment (ax, ay)-(bx, by).
+func pointToSegment(px, py, ax, ay, bx, by)
+    var vx = bx - ax
+    var vy = by - ay
+    var t = math.clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy), 0, 1)
+    return math.hypot(px - (ax + vx * t), py - (ay + vy * t))
+end
+
+## Whether the segments a-b and c-d cross each other.
+func segmentsCross(a, b, c, d)
+    var s1 = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1])
+    var s2 = (b[1] - a[1]) * (d[2] - a[2]) - (b[2] - a[2]) * (d[1] - a[1])
+    var s3 = (d[1] - c[1]) * (a[2] - c[2]) - (d[2] - c[2]) * (a[1] - c[1])
+    var s4 = (d[1] - c[1]) * (b[2] - c[2]) - (d[2] - c[2]) * (b[1] - c[1])
+    return s1 * s2 < 0 and s3 * s4 < 0
+end
+
+## Whether the segment a-b crosses a segment of `points` (consecutive points), the last one apart, or comes closer than `gap`
+## to one of them, those within two gaps of the end of the path apart: the pen is coming back onto an earlier turn of the
+## spiral. Only the segments of the last turn are looked at, which is `reach` of them.
+func closesOn(points, a, b, gap, reach)
+    var last = #points - 1
+    var along = 0.0
+    for i = last, math.max(1, last - reach), -1 do
+        var c = points[i]
+        var d = points[i + 1]
+        if i < last and segmentsCross(a, b, c, d) then
+            return true
+        end
+        if along >= 2 * gap and (pointToSegment(a[1], a[2], c[1], c[2], d[1], d[2]) < gap
+                or pointToSegment(b[1], b[2], c[1], c[2], d[1], d[2]) < gap
+                or pointToSegment(c[1], c[2], a[1], a[2], b[1], b[2]) < gap
+                or pointToSegment(d[1], d[2], a[1], a[2], b[1], b[2]) < gap) then
+            return true
+        end
+        along += math.hypot(d[1] - c[1], d[2] - c[2])
+    end
+    return false
 end
 
 ## An angular spiral inside a convex polygon of positive area (its points turn towards the side the left-hand normals point
 ## to). The spiral runs along the line of an edge, moved inwards, until that line meets the line of another edge; the lines
 ## are moved a little further in at every corner, in proportion to the angle turned, so that after a whole turn the spiral
 ## lies `spacing` further in. An edge that has shrunk to nothing is never met, because its line meets the spiral later than
-## the next one does. `first` is the edge it starts on, or the next one that begins at a real corner. It ends where it can no longer go on inside the polygon, and gives
-## its points in order.
+## the next one does. `first` is the edge it starts on, or the next one that begins at a real corner. It goes on until the
+## next line would come closer than half a spacing to the turn before, which is where the polygon has no room left, and
+## gives its points in order.
 func spiralOf(poly, spacing, first)
+    poly = withoutShortEdges(poly, spacing / 2)
     var m = #poly
     if m < 3 then
         return []
@@ -85,7 +128,7 @@ func spiralOf(poly, spacing, first)
         dy.push((b[2] - a[2]) / d)
         c.push(-dy[i] * a[1] + dx[i] * a[2])
     end
-    var edge = first
+    var edge = (first - 1) % m + 1
     var before = (edge + m - 2) % m + 1
     var cross = dx[before] * dy[edge] - dy[before] * dx[edge]
     for tries = 1, m do
@@ -119,22 +162,11 @@ func spiralOf(poly, spacing, first)
                 end
             end
         end
-        if best == nil or bestLength < spacing * 0.5 then
+        if best == nil or closesOn(points, from, best.corner, spacing / 2, 2 * m + 2) then
             break
         end
-        var corner = best.corner
-        var inside = true
-        for k = 1, m do
-            if -dy[k] * corner[1] + dx[k] * corner[2] - c[k] < spacing * 0.3 then
-                inside = false
-                break
-            end
-        end
-        if not inside then
-            break
-        end
-        points.push(corner)
-        from = corner
+        points.push(best.corner)
+        from = best.corner
         edge = best.edge
         offset = best.offset
     end

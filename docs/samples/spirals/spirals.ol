@@ -9,7 +9,7 @@ const PAPER = Color(0.93, 0.92, 0.88)
 const INK = Color(0.06, 0.06, 0.08)
 const CELL = 0.17         ## the width of a cell, in sizes of the area
 const SPACING = 0.012     ## the distance between two lines of a spiral
-const PEN_SPEED = 5       ## sizes of the area per second
+const PEN_SPEED = 8       ## sizes of the area per second
 const WAIT = 0.3          ## seconds before a press can start another drawing: a tap arrives as a touch and as a mouse press
 
 global art = nil          ## the drawing: {segments, ends}
