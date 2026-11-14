@@ -8,6 +8,7 @@ const N = 9
 const BOX = 3
 const CELLS = N * N
 const ALL = 0x3FE                 ## the mask of the digits 1 to 9
+const HINTS = 3                   ## hints per puzzle
 
 ## The tables every rule needs, filled once by boardBuild(): the row, column and box of each cell, the 27 units
 ## (nine rows, nine columns, nine boxes, each a list of 9 cells), the 20 peers of each cell (the cells that share a
