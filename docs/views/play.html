@@ -32,6 +32,7 @@
                    background:#0f1117; }
     #gate-icon { width:96px; height:96px; border-radius:22px; object-fit:cover; background:#1a1d2e; }
     #gate h1 { margin:0; font-size:22px; font-weight:600; }
+    #gate-about, #gate-controls { margin:0; max-width:340px; color:#a3adc4; font-size:14px; line-height:1.5; }
     #gate-note { margin:0; color:#a3adc4; font-size:14px; min-height:1.4em; }
     #gate-hint { margin:8px 0 0; max-width:320px; color:#a3adc4; font-size:13px; line-height:1.5; }
     .big-btn { padding:14px 34px; border:0; border-radius:12px; background:#9ba1ff; color:#0f1117;
@@ -59,6 +60,8 @@
   <div id="gate">
     <img id="gate-icon" alt="" hidden>
     <h1 id="gate-title"></h1>
+    <p id="gate-about" hidden></p>
+    <p id="gate-controls" hidden></p>
     <p id="gate-note"></p>
     <button id="go-btn" class="big-btn" type="button" disabled>Loading…</button>
     <button id="install-btn" class="ghost-btn" type="button" hidden>Install as an app</button>

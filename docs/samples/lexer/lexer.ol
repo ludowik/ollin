@@ -1,21 +1,13 @@
-## How the lexer works. The lexer is the first stage of the engine: it reads the program's TEXT, one
-## character at a time, and cuts it into TOKENS — the words the parser then assembles into
-## statements. This example replays that cut, step by step.
+## How the lexer works: the first stage of the engine reads the program's text one character at a time and cuts it into
+## tokens. This example replays that cut.
 ##
-## What runs here is a copy of src/lexer.cpp written in Ollin (tracer.ol) that records every move it
-## makes, so the animation shows the engine's real rules and not a drawing of them: the same keyword
-## table, the same two-character operators, the same refusals. lexer_test.ol checks that
-## it cuts a program into exactly the tokens the C++ lexer gives.
+## What runs is a copy of src/lexer.cpp written in Ollin (tracer.ol) that records every move it makes, so the animation shows
+## the engine's real rules and not a drawing of them: the same keyword table, the same two-character operators, the same
+## refusals. lexer_test.ol checks that it cuts a program into exactly the tokens the C++ lexer gives.
 ##
-## The caret is the read head: the character the lexer is about to read. The highlighted span is the
-## lexeme being built. The panel on the right shows the engine's own code, copied verbatim from
-## src/lexer.cpp into cpp_source.ol, and the bar in it is the line the lexer is running: it moves
-## from line to line as the program does, goes down into identifier(), number()... when they are
-## called, and comes back to the line that called them. Each token that comes out is filed in the
-## stream below, and the program's text is underlined in the colour of the token it became.
-##
-## The player, the keys and the buttons are those of lib/stage.ol, where they are described. Here, 1 to 4
-## pick a program.
+## The caret is the read head and the highlighted span the lexeme being built. On the right, the engine's own code (copied
+## from src/lexer.cpp into cpp_source.ol) with a bar on the line being run. Each token that comes out is filed in the stream
+## below, and the program's text is underlined in the colour of the token it became. The player is the one of lib/stage.ol.
 
 import "../lib/stage.ol"
 import "tracer.ol"

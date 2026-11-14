@@ -1595,10 +1595,12 @@ async function openRemoteProject(slug) {
 // repository's version back. To keep or edit it, the banner offers "Create a project".
 function fillExampleGroup(panel, items) {
   for (const ex of items) {
-    panel.appendChild(menuItem('📄 ' + ex.name, false, () => {
+    const item = menuItem('📄 ' + ex.name, false, () => {
       closeMenu()
       ctx.navigate('playground', 'sample/' + ex.file)
-    }))
+    })
+    item.title = Samples.aboutText(ex)
+    panel.appendChild(item)
   }
 }
 

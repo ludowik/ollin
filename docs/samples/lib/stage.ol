@@ -1,39 +1,6 @@
-## The STAGE shared by the examples that replay the engine step by step ("How the lexer works",
-## "How the parser works"): the palette, the player (play, pause, step by step, back, restart, the
-## speed), the panel that shows the engine's own C++ with a bar on the line being run, the panel that
-## explains what happens, the header and the buttons at the bottom.
-##
-## An example is a program that fills the `stage` map below in its setup() and draws what is its own
-## between drawHeader() and drawFooter(), inside its draw():
-##
-##   stage.programs   the programs it can show, each a map with a `name`
-##   stage.lessons    a sentence per program, shown under the title
-##   stage.build(i)   the trace of program i: a map with `steps`, the list the player replays. A step
-##                    carries `fn`, `at`, `span` (the line it lights in the code panel, and how many
-##                    more lines its statement covers), `also` (a second line to mark), `stack` (the
-##                    calls in progress), `note` (a sentence, said from there on), `err` (the message
-##                    when the engine gives up), and what the example needs besides. The stage adds
-##                    `dur`, `hand`, `said` and `noteId`.
-##   stage.cpp        the engine's text, by function: {first, lines, trimmed}
-##
-## setup() fills `stage` (all of it but `skip` and `speed` is needed), then calls openMenu() and
-## loadProgram(1). draw() begins with beginFrame(), takes its
-## room from baseLayout() and adds its own panels to the header, the code panel, the explanation and
-## the buttons (drawHeader, drawCode, drawNote, drawFooter). Both examples are written that way: copy one.
-## A step also gets `event` (true when the line changed something, which SKIP runs up to) from the
-## example, and `watchText` from here.
-##
-## The player: a program plays by itself, and a tap pauses and resumes it. STEP BY STEP is the other
-## way to read it: nothing moves until you ask, every tap (or the Next button, or the right arrow) runs
-## the next line, and Back (or the left arrow) goes back one. The Step button, the S key and the menu
-## switch the mode on and off; Play leaves it. With `stage.skip`, SKIP (or the E key) runs up to the
-## next step flagged `event`. Keys: space plays and pauses, up/down change the speed, a digit picks a
-## program, r restarts. F7, F8 and F9 stand for the Apple keyboard's previous, play/pause and next keys
-## (with fn, unless the system uses F-keys as standard). The menu and the buttons do the same with a finger.
-##
-## The callbacks that live here are update, keyboard.keypressed and mouse.pressed: a module can declare
-## them, a class cannot. A const of the program that imports this file is not visible from here, which
-## is why the example's own words come through `stage`.
+## The stage shared by the examples that replay the engine step by step ("How the lexer works", "How the parser works"): the
+## palette, the player, the panel that shows the engine's own C++ with a bar on the line being run, the panel that explains
+## what happens, the header and the buttons. How to write an example, the format of a step and the keys are in README.md.
 
 import "draw.ol"
 

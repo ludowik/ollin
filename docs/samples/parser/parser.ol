@@ -1,24 +1,15 @@
-## How the parser works. The parser is the second stage of the engine: it takes the TOKENS the lexer
-## cut and assembles them into a TREE, the shape of the program — which statement holds which
-## expression, which operator applies to which operands. This example replays that assembly, one line
-## of the engine's code at a time.
+## How the parser works: the second stage of the engine takes the tokens the lexer cut and assembles them into a tree, the
+## shape of the program. This example replays that assembly, one line of the engine's code at a time.
 ##
-## What runs here is a copy of src/parser.cpp written in Ollin (tracer.ol) that records every line it
-## runs and what the line did to the tree, so the animation shows the engine's real rules and not a
-## drawing of them: the same precedence table, the same order of attempts, the same refusals.
-## parser_test.ol checks that it builds exactly the trees the C++ parser builds. The
-## tokens are the ones the lexer of the other example cuts.
+## What runs is a copy of src/parser.cpp written in Ollin (tracer.ol) that records every line it runs and what the line did to
+## the tree, so the animation shows the engine's real rules: the same precedence table, the same order of attempts, the same
+## refusals. parser_test.ol checks that it builds exactly the trees the C++ parser builds.
 ##
-## The top left shows the tokens, and an arrow under the one the parser is looking at, peek(). The
-## bottom left is the tree being built: a node appears when the engine makes it, and goes under its
-## parent when the engine puts it there, so pieces that are finished wait side by side until a parent
-## picks them up. The panel on the right shows the engine's own code, copied verbatim from
-## src/parser.cpp into cpp_source.ol, and the bar in it is the line the parser is running: it goes
-## down into expr(), binary_level()... as they are called, and comes back to the line that called them.
-##
-## The player, the keys and the buttons are those of lib/stage.ol, where they are described. Here, 1 to 5
-## pick a program, and SKIP (or the E key) runs up to the next line that reads a token or changes the
-## tree: a single expression takes a few hundred lines.
+## Top left, the tokens and an arrow under the one the parser is looking at, peek(). Bottom left, the tree being built: a node
+## appears when the engine makes it and goes under its parent when the engine puts it there, so finished pieces wait side by
+## side until a parent picks them up. On the right, the engine's own code (copied from src/parser.cpp into cpp_source.ol)
+## with a bar on the line being run. The player is the one of lib/stage.ol; SKIP runs up to the next line that reads a token
+## or changes the tree, a single expression taking a few hundred lines.
 
 import "../lib/stage.ol"
 import "tracer.ol"

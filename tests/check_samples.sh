@@ -104,6 +104,17 @@ for e in entries:
         errs.append(f"{icon}: {os.path.getsize(path) // 1024} KB, more than the {ICON_MAX // 1024} KB an icon may weigh")
     elif open(path, "rb").read(8) != b"\x89PNG\r\n\x1a\n":
         errs.append(f"{icon}: not a PNG")
+# The TEXTS the app shows beside an example: what it is (`description`, required: one sentence) and how it is played
+# (`controls`, for an example that takes input). They are what the headers of the programs used to say, so that a header
+# keeps only the idea of the program.
+for e in entries:
+    f = e.get("file")
+    desc = e.get("description")
+    if not (isinstance(desc, str) and desc.strip().endswith(".") and "\n" not in desc):
+        errs.append(f"{f}: 'description' must be one sentence ending in a full stop")
+    ctl = e.get("controls")
+    if ctl is not None and not (isinstance(ctl, str) and ctl.strip()):
+        errs.append(f"{f}: 'controls', when given, must be a text")
 for p in sorted(glob.glob("docs/samples/icons/*")):
     rel = os.path.relpath(p, "docs/samples").replace(os.sep, "/")
     if rel not in named:

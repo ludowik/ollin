@@ -1,15 +1,11 @@
-## Art of Rally, minimal — one car (a Lancia Stratos), one circuit, free exploration. Drive with the ARROW KEYS
-## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
-## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
-## On a phone, hold it like a steering wheel in landscape: its tilt steers, and two pedals at the
-## bottom corners — brake on the left, throttle on the right — take the thumbs. Straight ahead is
-## the phone's standard position, held level, so there is nothing to set up; the button at the top
-## right takes the way the phone is held at that moment as straight ahead instead. Turn the phone
-## upright and the drawing area follows: the controls and the HUD re-place themselves from W, H and
-## SIZE, the camera widens to keep the road in view, and the steering goes back to the standard
-## position.
-## No lap timing, no opponents, no collision against the verge — just driving the circuit and the
-## hills around it.
+## Art of Rally, minimal: one car (a Lancia Stratos), one circuit, free exploration. No lap timing, no opponents, no collision
+## against the verge, just driving the circuit and the hills around it. The chase camera follows on its own and the engine note
+## follows the revs (the audio starts on the first key or touch).
+##
+## On a phone the steering wheel is the phone: held level in landscape is straight ahead, so there is nothing to set up, and the
+## button at the top right takes the way the phone is held at that moment as straight ahead instead. Turn the phone upright and
+## the controls and the HUD re-place themselves from W, H and SIZE, the camera widens to keep the road in view, and the
+## steering goes back to the standard position.
 
 import "terrain.ol"
 import "scenery.ol"

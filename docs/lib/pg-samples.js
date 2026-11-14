@@ -1,7 +1,7 @@
 // The catalogue of examples, samples/index.json: the one link between the site's menus and the files
 // of docs/samples. The playground's "Open an example" menu and the home screen both read it here.
 
-// The entries as listed — {group, name, file[, icon]} — or `fallback` when the file cannot be read.
+// The entries as listed — {group, name, file, description[, icon, controls]} — or `fallback` when the file cannot be read.
 export function fetchCatalog(fallback = []) {
   return fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => fallback)
 }
@@ -16,4 +16,9 @@ export function groupCatalog(entries) {
     groups.get(g).push(ex)
   }
   return groups
+}
+
+// What an entry says of itself, for a tooltip: what it is, then how it is played.
+export function aboutText(entry) {
+  return [entry.description, entry.controls].filter(Boolean).join('\n')
 }

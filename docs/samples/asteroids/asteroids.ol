@@ -1,42 +1,13 @@
-## Ollin Asteroids — the drifting field, the ship with no brake, four shots at a time, the rocks
-## that split into faster ones, the saucer that shoots back, and the heartbeat under it all.
+## Asteroids.
 ##
-## The RULE that makes this genre work, and the one most often missed: the ship has NO brake.
-## Thrust adds to a velocity that never goes away, so every manoeuvre has to be paid for with the
-## opposite one. Turning is free and instant, moving is not — that asymmetry IS the game, and any
-## friction strong enough to stop the ship would quietly delete it.
+## The rule that makes the genre: the ship has NO brake. Thrust adds to a velocity that never goes away, so every manoeuvre
+## is paid for with the opposite one. Turning is free and instant, moving is not — that asymmetry is the game, and any
+## friction strong enough to stop the ship would delete it.
 ##
-## The second rule: shooting a rock does not remove it, it MULTIPLIES it. A large rock becomes two
-## medium ones, a medium two small, and each generation moves faster than the one before. Clearing
-## a wave therefore makes the field more dangerous before it makes it empty, which is why a careful
-## player shoots the small ones first.
-##
-## Everything wraps: an object leaving an edge comes back on the other side. The field has no
-## walls, so there is no corner to hide in — the only shelter is empty space, and it is temporary.
-##
-## The heartbeat is not a soundtrack. Its tempo is the number of rocks LEFT, so it quickens on its
-## own as the wave empties: the sound tells the player how much is still out there without a single
-## number being read.
-##
-## The saucer's aim improves with the SCORE, as the original's did. A beginner is shot at wildly, a
-## good player is shot at deliberately — the game gets harder because the player got better, not
-## because a wave counter said so.
-##
-## The game has THREE states, and one variable says which: the title screen, the play, and the end.
-## Every input asks that variable first, so no callback has to guess whether the game is running.
-##
-## Desktop: left and right turn, up thrusts, space fires (held down, it keeps firing), P pauses.
-##
-## On a touch screen the control is MODERN, not a copy of the cabinet's five buttons. The joystick
-## sits under the RIGHT thumb and is read as a DIRECTION, not as a turn: the nose swings to where
-## the stick points and the thrust is the stick's own distance from the centre, so a player aims
-## where they want to go instead of spelling it out with turn-left, turn-right, thrust. The LEFT
-## half of the glass is the trigger, held down rather than tapped. Two thumbs, two jobs, and
-## neither ever crosses the other — the first version steered with one thumb and fired with taps of
-## the same hand, which is what made it unplayable.
+## The second rule: shooting a rock multiplies it. A large rock becomes two medium ones, a medium two small, and each
+## generation moves faster than the one before, so clearing a wave makes the field more dangerous before it makes it empty.
+## Everything wraps: the field has no walls, so there is no corner to hide in.
 
-## The look and the sound live apart: the outlines in shapes.ol, the notes and the noises in
-## sounds.ol. The joystick is not ours to keep here — it is shared with the voxel example.
 import "shapes.ol"
 import "sounds.ol"
 import "field.ol"

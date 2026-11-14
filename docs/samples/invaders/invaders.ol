@@ -1,40 +1,10 @@
-## Ollin Invaders — the fleet, the cannon, one shot, the shields, the fleet shooting back, the
-## mystery ship crossing above it, the sound, and a title screen to start from.
+## Space Invaders. Only the mechanics follow the arcade original: the three creatures are ours (sprites.ol).
 ##
-## The RULE that makes this genre work, and the one most often missed: the fleet does not move as a
-## block. ONE alien advances per tick. Fifty-five aliens therefore take fifty-five ticks to complete
-## a pass, three take three — so the game accelerates as it empties, and that speed is a CONSEQUENCE
-## of the rule, never a setting. The wave only drops and reverses at the END of a pass, which is what
-## keeps the formation square.
-##
-## The three creatures are ours, drawn in sprites.ol. Only the MECHANICS are faithful to the arcade
-## original, whose sprites are its author's work.
-##
-## The fleet answers: only the LOWEST living alien of a column may drop a bomb, three bombs at most
-## in the air. Being shot costs a life, and so does letting the fleet reach the cannon's line.
-##
-## The mystery ship is worth a value taken from a TABLE indexed by the number of shots the player
-## has fired — that is how the original priced it, and it is why 300 can be hunted rather than hoped
-## for. It stays away while the wave is nearly cleared, so the last aliens are not shot at through it.
-##
-## The MARCH is the sound this game is remembered for, and it is not a soundtrack: four descending
-## notes, one per pass of the fleet. Since a pass takes one tick per living alien, the beat speeds up
-## on its own as the wave empties — the same rule that drives the movement drives the music, and
-## nothing times it.
-##
-## The game has THREE states, and one variable says which: the title screen, the play, and the end.
-## Every input asks that variable first, so no callback has to guess whether the game is running.
-##
-## Desktop: left and right arrows, space to fire, P pauses. On a touch screen the pause is a tap in
-## the TOP BAND, where the score is written: the rest of the screen aims, so the pause needs a place
-## of its own — and that band is the one spot no thumb visits while playing. Mobile: ONE finger anywhere DRAGS the cannon —
-## the movement is relative, so touching the screen never teleports it — and firing is
-## automatic — a finger that aims everywhere cannot also mean "fire" by tapping, and the one-shot
-## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
-## is what a good player's thumb does anyway.
+## The rule that makes the genre: the fleet does not move as a block. ONE alien advances per tick, so fifty-five aliens
+## take fifty-five ticks to complete a pass and three take three. The game accelerates as it empties — a consequence of the
+## rule, never a setting — and the wave only drops and reverses at the end of a pass, which keeps the formation square.
+## The march sound plays one note per pass, so its beat follows the fleet's speed with nothing to time it.
 
-## The look and the sound live apart: patterns, inks and their builder in sprites.ol, the notes and
-## the noises in sounds.ol. What stays here is the GAME — its rules, its state and its frame.
 import "sprites.ol"
 import "sounds.ol"
 import "field.ol"
@@ -71,7 +41,7 @@ const UFO_VALUES = [100, 50, 50, 100, 150, 100, 100, 50, 300, 100, 100, 100, 50,
 const POPUP_TIME = 0.9          ## how long the value stays written where the ship died
 const EXTRA_LIFE  = 1500        ## a life is given each time the score passes another of these
 const BLAST_TIME  = 0.18        ## how long a kill is shown coming apart
-const PAUSE_BAND  = 20          ## the top band, in field pixels: a tap there pauses on a touch screen
+const PAUSE_BAND  = 20          ## the top band, in field pixels, where a tap pauses on a touch screen: the rest of the screen aims, and no thumb visits this spot while playing
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
 global shields = []      ## four {img, x}: each one its own texture, so each erodes on its own
@@ -111,7 +81,7 @@ global nextLife = EXTRA_LIFE
 global demo = 0.0        ## the title screen's own clock, which animates the three creatures
 
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
-global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
+global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game (a finger that aims everywhere cannot also tap to fire, and the one-shot rule already paces the cannon)
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
 global grabGun = 0.0     ## RELATIVE, so touching the screen never teleports the cannon
 global acc = 0.0

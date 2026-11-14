@@ -146,6 +146,10 @@ export async function init(ctx) {
       const name = entry ? entry.name : fallbackName
       const icon = entry && entry.icon ? await loadIcon(entry.icon) : null
       $('gate-title').textContent = name
+      for (const [id, text] of [['gate-about', entry && entry.description], ['gate-controls', entry && entry.controls]]) {
+        $(id).textContent = text || ''
+        $(id).hidden = !text
+      }
       if (icon) {
         const img = $('gate-icon')
         img.src = icon.src

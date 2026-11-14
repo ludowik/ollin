@@ -1,39 +1,30 @@
-## A copy of src/parser.cpp that RECORDS every line it runs. parseTrace(source) lexes a program with
-## the lexer of the other example, then runs the engine's parsing rules on its tokens one C++ line at a
-## time, and returns the steps the animation replays — each step is the line the parser is on, and what
-## that line did to the tree — together with the tree itself.
-## parser_test.ol checks that the tree is exactly the one the C++ parser builds, and
-## tests/check_trace_source.sh that every line named below is the line of parser.cpp it claims to be.
+## A copy of src/parser.cpp that RECORDS every line it runs. parseTrace(source) lexes a program with the lexer of the other
+## example, then runs the engine's parsing rules on its tokens one C++ line at a time, and returns the steps the animation
+## replays (the format of a step is in ../lib/README.md) together with the tree. parser_test.ol checks that the tree is exactly
+## the one the C++ parser builds, and tests/check_trace_source.sh that every line named below is the line of parser.cpp it
+## claims to be.
 ##
-## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index`
-## counts the lines of that function in cpp_source.ol (generated from parser.cpp), and the text is the
-## beginning of the line, so a parser.cpp that moved on is noticed instead of lighting up the wrong
-## line. The helpers peek(), advance(), check(), match(), expect() and the predicates are stepped
-## OVER, as a debugger's "next" would: their effect shows on the line that calls them. A line that
-## calls a function of the parser is lit twice: when it calls, and when the result comes back.
+## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index` counts the lines of that
+## function in cpp_source.ol (generated from parser.cpp), and the text is the beginning of the line, so a parser.cpp that
+## moved on is noticed instead of lighting up the wrong line. The helpers peek(), advance(), check(), match(), expect() and
+## the predicates are stepped OVER, as a debugger's "next" would. A line that calls a function of the parser is lit twice:
+## when it calls, and when the result comes back.
 ##
-## What is NOT covered: try, import, class, enum and switch statements, `ref`, `super`, and ranges.
-## They are the same recursive descent as what is covered, and the example's programs do not use them.
-## The trace follows the program up to the line that reaches one, marks that step `stop` and ends there
-## (the tree as it stood), instead of showing something wrong.
+## NOT covered: try, import, class, enum and switch statements, `ref`, `super`, and ranges. They are the same recursive
+## descent as what is covered, and the example's programs do not use them. The trace follows the program up to the line
+## that reaches one, marks that step `stop` and ends there (the tree as it stood), instead of showing something wrong.
 ##
-## A step is a map:
-##   fn, at, span   the function and the line (and how many more lines the statement covers)
-##   also           a second line to mark, the `case` label a switch jumped through
-##   stack          the calls in progress: "parse > parse_one_stmt > decl_stmt"
+## The fields of a step that are the parser's own:
 ##   p0, p1         the parser's position (peek() is token number p) before and after the line
 ##   fx             what the line did to the tree: see applyEffect
 ##   ret            the node the line hands back to its caller
 ##   w              the locals worth watching, as [name, value] pairs
-##   err, errLine   the refusal, and the line of the program it names
+##   errLine        the line of the program the refusal names
 ##   stop           what the parser reached that this trace does not follow: the last step of its trace
-##   note           a sentence, on the lines that deserve one
-##   event          true when the line consumed a token, changed the tree, or failed
 ##
-## The tree is made of nodes {id, kind, attrs, kids, parent, slot}, one kind per node struct of
-## ast.h. A node's `attrs` are its plain fields (a name, an operator), its `kids` the nodes it holds,
-## each under the name of the field that holds it. Nodes are only ever changed by applyEffect, so the
-## view can replay the steps and get the tree as it was.
+## The tree is made of nodes {id, kind, attrs, kids, parent, slot}, one kind per node struct of ast.h. `attrs` are a node's
+## plain fields (a name, an operator), `kids` the nodes it holds, each under the name of the field that holds it. Nodes are
+## only changed by applyEffect, so the view can replay the steps and get the tree as it was.
 
 import "../lexer/tracer.ol"
 import "cpp_source.ol"

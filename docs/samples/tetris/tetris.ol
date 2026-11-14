@@ -1,21 +1,15 @@
-## Tetris, as the handheld of 1989 plays it: a well of 10 by 18, the seven pieces turning by the original
-## Nintendo rotation (no wall kicks, no hold, no ghost, no hard drop), the score of 40, 100, 300 and 1200 times the
-## level, a speed that grows with the level, and the folk tune of Type A. The screens are the handheld's: the title,
-## the choice of A-TYPE (the level rises every ten lines) or B-TYPE (rubble to dig through, 25 lines to clear) and of
-## the music, then the level, and for B-TYPE the height of the rubble.
+## Tetris, as the handheld of 1989 plays it: a well of 10 by 18, the seven pieces turning by the original Nintendo rotation (no
+## wall kicks, no hold, no ghost, no hard drop), the score of 40, 100, 300 and 1200 times the level, a speed that grows with
+## the level, and the folk tune of Type A. The screens are the handheld's: the title, the choice of A-TYPE (the level rises
+## every ten lines) or B-TYPE (rubble to dig through, 25 lines to clear) and of the music, then the level, and for B-TYPE the
+## height of the rubble.
 ##
-## Left and right move a piece (held, they repeat after a short wait), down drops it faster and pays a point a row,
-## X or up turns it clockwise and Z counter-clockwise. On the screens before the game the arrows choose, X or Enter
-## confirms and Z goes back. Enter starts and pauses, M switches the music, V switches the style (see below). On a
-## touch screen the pads appear with the first touch: a cross, the two buttons A and B, START and STYLE.
-##
-## rules.ol holds the rules, sounds.ol the sound and play.ol the game itself, which runs on a clock of 60 steps a
-## second whatever the speed of the screen, so that the counts of frames of the rules mean what they say; this file
-## is what the player touches: the keyboard and the pads, where the picture goes (layout.ol), and the style it is seen in. There
-## are two, the same game in both: the ORIGINAL (style_gb.ol), the screen of the handheld in 160 by 144 points scaled to
-## fit the area (graphics.fitArea), and the MODERN (style_modern.ol), in the very same places. A style only reads the
-## state of the game; V or the STYLE pad changes it, and the one chosen is kept for the next run. So is the game
-## itself (save.ol): a run begins on the screen the last one left, in pause if a game was on.
+## The game runs on a clock of 60 steps a second whatever the speed of the screen, so that the counts of frames of the rules
+## mean what they say. This file is what the player touches: the keyboard and the pads. It shows the game in one of two
+## styles, the same game in the very same places (layout.ol): the ORIGINAL (style_gb.ol), the handheld's screen of 160 by 144
+## points scaled to fit the area, and the MODERN (style_modern.ol). A style only reads the state of the game. The style chosen
+## is kept for the next run, and so is the game itself (save.ol): a run begins on the screen the last one left, in pause if a
+## game was on.
 
 import "rules.ol"
 import "sounds.ol"

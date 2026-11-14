@@ -125,6 +125,7 @@ export async function init(ctx) {
       tile.href = '#/run/sample/' + entry.file
       tile.append(entry.icon ? imageIcon('samples/' + entry.icon, entry.name) : generatedIcon(entry.name))
       label(tile, entry.name)
+      tile.title = Samples.aboutText(entry)
       group.tiles.appendChild(tile)
     }
     page.appendChild(group.sec)

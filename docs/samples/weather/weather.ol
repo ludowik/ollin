@@ -1,20 +1,14 @@
-## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the
-## https and json modules. The cities are pages side by side, as in the weather application of a phone: drag the screen
-## sideways (or press left and right) to pass from one to the next, and the dots at the bottom say which page it is.
-## Every page keeps its own reading and asks the service again every ten minutes on its own, so a page that comes
-## into view already shows its weather, and a page that is asked again keeps showing the old one until the answer
-## replaces it. A name is looked up from the magnifier, or by typing: both open the text field of the engine's
-## interface (ui.textField), which takes the keyboard of the system, the one of a phone included, so the accents, the
-## hyphen and the apostrophe of a name come as the system makes them. Return or a touch elsewhere looks the name up,
-## and the place found becomes one more page, after the cities. Return, when no field is open, asks again. The page
-## and the language the last run left are kept from one run to the next. The app speaks French (the default) and
-## English, chosen from the list of the interface: the words are in texts.ol, and a language is one more table there.
+## Weather: how it is now and over the next days in a city, asked of Open-Meteo, a free weather service, with the https and
+## json modules. The cities are pages side by side, as in the weather application of a phone, and the dots at the bottom say
+## which page it is. Every page keeps its own reading and asks the service again every ten minutes on its own, so a page that
+## comes into view already shows its weather, and a page that is asked again keeps showing the old one until the answer
+## replaces it. A name is looked up from the magnifier or by typing, in the text field of the engine's interface
+## (ui.textField), which takes the keyboard of the system, so the accents of a name come as the system makes them; the place
+## found becomes one more page, after the cities. The page and the language the last run left are kept for the next one.
 ##
-## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered,
-## so a page with no weather yet says "loading". forecast.ol holds the addresses and the reading of the answers,
-## pager.ol the motion of the pages, scale.ol the colours of a temperature, and weather_test.ol tries them, and the
-## answers on texts written the way the service writes them. The service is reached from the browser, and only from it: elsewhere every request fails with
-## "unsupported", which the screen reports.
+## An answer comes LATER: https.get returns at once and the function given to it runs when the service has answered, so a
+## page with no weather yet says "loading". The service is reached from the browser, and only from it: elsewhere every
+## request fails with "unsupported", which the screen reports.
 
 import "forecast.ol"
 import "pager.ol"

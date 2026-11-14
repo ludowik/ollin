@@ -257,6 +257,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   gauche en manque davantage — un renversement serait une branche jamais exécutée (vérifié).
   `tests/check_samples.sh` garde le catalogue : fichier listé existant, `.ol` du dossier tous
   listés hors les trois bibliothèques d'import, groupes contigus.
+  Chaque entrée porte une `description` (obligatoire : une phrase) et, si l'exemple prend des
+  entrées, des `controls` : l'application les montre en infobulle (tuile de l'écran principal,
+  menu d'exemples) et sur l'écran de lancement du mode kiosque, et `check_samples.sh` les garde.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
 - **Mode kiosque (`#/play/sample/<fichier>`, vue `play`)** : un exemple du DÉPÔT, plein écran, sans barre ni
   lien, sans moyen d'aller ailleurs. **Décisions de l'utilisateur** : exemples seulement (jamais un projet
@@ -766,6 +769,13 @@ fonctions, découpage clair) plutôt que d'être paraphrasé.
   redite du nom d'une fonction/variable, évidence, commentaire périmé, séparateurs décoratifs.
 - S'applique à **tout code écrit ou édité** (C++ du moteur comme `.ol`). Ne pas ré-ajouter de
   bruit lors d'une modification. Cette règle prime sur le style verbeux hérité.
+
+**Où va la documentation d'un exemple (décision de l'utilisateur)** : l'en-tête d'un `.ol` tient en une
+phrase (ce que c'est) et le paragraphe de l'idée qui le distingue. Ce qui se joue (`description`,
+`controls`) est dans `docs/samples/index.json` ; le pourquoi d'une règle, en commentaire devant la
+fonction qui l'applique ; les longs récits (protocole de `stage.ol`, vérification d'un traceur) dans un
+`README.md` du dossier. Jamais dans un en-tête : le plan des fichiers (les `import` le disent),
+l'historique (git le garde), les contrôles.
 
 ## Maintenance de CLAUDE.md
 

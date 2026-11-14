@@ -1,12 +1,8 @@
-## Sudoku: fill the 9x9 grid so that every row, column and 3x3 box holds the digits 1 to 9 once. Tap a cell, then a
-## digit; the pencil notes the digits a cell could hold; a hint circles a cell and says how to find its digit.
+## Sudoku: fill the 9x9 grid so that every row, column and 3x3 box holds the digits 1 to 9 once. The pencil notes the digits a
+## cell could hold; a hint circles a cell and says how to find its digit.
 ##
-## board.ol holds the rules, solver.ol the solver and the logic that grades a puzzle and gives the hints,
-## generator.ol the puzzles, sounds.ol the sound, texts.ol the words in French and English; this file is the game: its
-## state, its input, its animations and its drawing. The layout follows the orientation of the area (graphics.fitArea)
-## and is computed again whenever it is needed, so nothing has to be kept in step.
-##
-## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs.
+## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs. The layout follows the
+## orientation of the area (graphics.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
 
 import "board.ol"
 import "solver.ol"

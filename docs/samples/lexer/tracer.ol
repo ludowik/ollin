@@ -1,34 +1,22 @@
-## A copy of src/lexer.cpp that RECORDS every line it runs. trace(source) executes the engine's
-## lexer rules on a program, one C++ line at a time, and returns the list of steps the animation
-## replays — each step is the line the lexer is on — together with the tokens it produced.
-## lexer_test.ol checks that the tokens are exactly the ones the C++ lexer gives, and
+## A copy of src/lexer.cpp that RECORDS every line it runs. trace(source) executes the engine's lexer rules on a program, one
+## C++ line at a time, and returns the steps the animation replays (the format of a step is in ../lib/README.md) together
+## with the tokens it produced. lexer_test.ol checks that the tokens are exactly the ones the C++ lexer gives, and
 ## tests/check_trace_source.sh that every line named below is the line of lexer.cpp it claims to be.
 ##
-## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index`
-## counts the lines of that function in cpp_source.ol (generated from lexer.cpp), and the text is
-## the beginning of the line, so a lexer.cpp that moved on is noticed instead of lighting up the
-## wrong line. The helpers peek(), advance(), match(), at_end(), emit() and the is_* tests are
-## stepped OVER, as a debugger's "next" would: their effect shows on the line that calls them.
+## Each call `self.run(function, index, "start of the line", {extras})` records one step: `index` counts the lines of that
+## function in cpp_source.ol (generated from lexer.cpp), and the text is the beginning of the line, so a lexer.cpp that
+## moved on is noticed instead of lighting up the wrong line. The helpers peek(), advance(), match(), at_end(), emit() and
+## the is_* tests are stepped OVER, as a debugger's "next" would: their effect shows on the line that calls them.
 ##
-## Verified beyond the tests, once, against the engine: lexer.cpp built with gcov ran every program
-## of the repository and the number of times each line ran matched the number of steps on it, except
-## where this file shows a line differently on purpose — a call line lit twice (when it calls and when
-## it gets the result back), a `case` label (marked beside the statement it leads to), a brace. One
-## real difference: the engine reads BYTES, this reads characters, so `pos` and the number of turns of
-## a loop over accented text differ.
-##
-## A step is a map:
-##   fn, at, span   the function and the line (and how many more lines the statement covers)
-##   also           a second line to mark, the `case` label a switch jumped through
-##   stack          the calls in progress: "tokenize > identifier"
+## The fields of a step that are the lexer's own:
 ##   p0, p1         the read head before and after the line: the position of the NEXT character
 ##   from, hl       the span of the lexeme being built (hl: where it ends, when not at the head)
 ##   drop           true while what is read is thrown away (blanks, comments)
 ##   made           the token this line builds, tok the same token when it reaches the final stream
-##   err            the message when the lexer gives up
-##   note           a sentence, on the lines that deserve one
 ##   c, w           the locals worth watching: c, and w = [name, value]
 ##   pos, line      the lexer's own pos (counted from 0 in its own text) and line
+##
+## The engine reads BYTES and this reads characters, so `pos` and the number of turns of a loop over accented text differ.
 
 import "cpp_source.ol"
 
