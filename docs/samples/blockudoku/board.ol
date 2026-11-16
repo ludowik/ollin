@@ -30,11 +30,7 @@ func boardInside(r, c)
 end
 
 func boardNew()
-    var g = []
-    for i = 1, CELLS do
-        g[i] = 0
-    end
-    return g
+    return [0].repeat(CELLS)
 end
 
 func boardBuildZones()

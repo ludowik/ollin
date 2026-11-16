@@ -67,11 +67,7 @@ func turnedBy(kind, turn, dir)
 end
 
 func newWell()
-    var g = []
-    for i = 1, COLS * ROWS do
-        g[i] = 0
-    end
-    return g
+    return [0].repeat(COLS * ROWS)
 end
 
 func wellIdx(x, y)

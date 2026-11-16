@@ -98,11 +98,7 @@ func boardBuild()
 end
 
 func boardNew()
-    var g = []
-    for i = 1, CELLS do
-        g.push(0)
-    end
-    return g
+    return [0].repeat(CELLS)
 end
 
 ## The digits cell i could take, looking at its peers only: a mask.

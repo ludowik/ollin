@@ -13,12 +13,7 @@ const GUESSES_HARD = 12           ## a puzzle the singles cannot solve is Hard u
 
 ## The state of a grid, or nil when two of its digits clash.
 func stateNew(g)
-    var st = {g: g.copy(), row: [], col: [], box: [], empty: 0}
-    for k = 1, N do
-        st.row.push(0)
-        st.col.push(0)
-        st.box.push(0)
-    end
+    var st = {g: g.copy(), row: [0].repeat(N), col: [0].repeat(N), box: [0].repeat(N), empty: 0}
     for i = 1, CELLS do
         var d = g[i]
         if d == 0 then

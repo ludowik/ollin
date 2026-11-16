@@ -25,11 +25,7 @@ func idx(x, y)
 end
 
 func emptyGrid()
-    var g = []
-    for i = 1, COLS * ROWS do
-        g[i] = 0
-    end
-    return g
+    return [0].repeat(COLS * ROWS)
 end
 
 func set(g, x, y)

@@ -9,11 +9,7 @@ func paint(rects, w, h, overlap)
     var shades = [" ", ".", "+", "#"]
     var grid = []
     for j = 1, h do
-        var row = []
-        for i = 1, w do
-            row.push("_")
-        end
-        grid.push(row)
+        grid.push(["_"].repeat(w))
     end
     for r in rects do
         assert(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= w and r[2] + r[4] <= h, "a rectangle outside the picture")
