@@ -66,17 +66,11 @@ global titlePieces = nil
 func titleItems(hint)
     var logo = screenLabel("TETRIS", 80, 30, 24)
     logo.logo = true
-    var items = [logo]
     if titlePieces == nil then
         titlePieces = titleRow([[Piece.I, 0], [Piece.O, 0], [Piece.T, 0], [Piece.Z, -4]], 52)
-        for item in titleRow([[Piece.L, 0], [Piece.J, 4], [Piece.S, 0]], 76) do
-            titlePieces.push(item)
-        end
+            .concat(titleRow([[Piece.L, 0], [Piece.J, 4], [Piece.S, 0]], 76))
     end
-    for item in titlePieces do
-        items.push(item)
-    end
-    return withFooter(items, hint)
+    return withFooter([logo].concat(titlePieces), hint)
 end
 
 ## The second screen: the type of game, and the music.

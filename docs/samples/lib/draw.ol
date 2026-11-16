@@ -68,9 +68,7 @@ end
 func wrapParagraphs(paragraphs, size, width)
     var lines = []
     for text in paragraphs do
-        for line in wrapText(text, size, width) do
-            lines.push(line)
-        end
+        lines = lines.concat(wrapText(text, size, width))
         lines.push("")
     end
     return lines
