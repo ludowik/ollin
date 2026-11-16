@@ -1609,16 +1609,16 @@ dispatch_loop:
                 }
             }
         } else if (obj.is_string()) {
-            // String pseudo-methods are served by the `string` module, which never changes, so
-            // every pass after the first is a cache hit.
+            // String pseudo-methods are served by the `string` module, so every pass after the
+            // first is a cache hit (the cache watches the module's layout: a script may add a member).
             // (The module lives as long as the VM, so there is no aliasing risk.)
             const Value* meth = module_member(string_module_, key, key_sptr);
             R[A] = meth ? *meth : Value{};
         } else if (obj.is_array()) {
             if (key_sptr) {
                 // Pseudo-methods: a single lookup in the map built at startup (see
-                // array_module.cpp), as for strings, and cached per site since that map is
-                // immutable. A missing field is an error, not nil: an array has no free fields.
+                // array_module.cpp), as for strings, and cached per site
+                // the same way. A missing field is an error, not nil: an array has no free fields.
                 const Value* meth = module_member(array_module_, key, key_sptr);
                 if (!meth)
                     throw std::runtime_error("runtime: array has no field '" + key.as_string() + "'");

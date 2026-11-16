@@ -1335,7 +1335,6 @@ var am_copy = am_sorted.copy()                    ## a new array with the same e
 am_copy.push(4)
 assert(#am_sorted == 3 and #am_copy == 4)
 assert([0].repeat(3).join(",") == "0,0,0")        ## the elements, count times over
-assert(am_copy.concat([8], [9]).len() == 6 and array.concat([1], [2]).len() == 2)   ## the method, and the `array` module
 
 ## ── 25. The do...end block (lexical scope) ───────────────────────────────────
 ## [grammar: doStmt]

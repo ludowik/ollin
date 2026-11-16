@@ -112,8 +112,13 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
-// The elements of the receiver, then those of each array after it, in a NEW array. Every argument must be an array: a nil
-// or a number there is a mistake, not an empty list. The elements are SHARED, as everywhere in the language.
+// The result of concat and repeat may not be longer than an array can be: a refusal, not a slow allocation.
+static void arr_check_size(double total, const char* fn) {
+    if (total > (double)k_array_max)
+        throw std::runtime_error(std::string(fn) + ": result longer than " + std::to_string(k_array_max) + " elements");
+}
+
+// Every argument must be an array: a nil or a number there is a mistake, not an empty list.
 static int arr_concat(CallCtx& ctx) {
     arr_check(ctx, 1, "concat: expected (array, array...)");
     size_t total = 0;
@@ -123,8 +128,7 @@ static int arr_concat(CallCtx& ctx) {
                                      ctx.args[i].type_name());
         total += ctx.args[i].aptr->items.size();
     }
-    if (total > (size_t)k_array_max)
-        throw std::runtime_error("array.concat: result longer than " + std::to_string(k_array_max) + " elements");
+    arr_check_size((double)total, "array.concat");
     Value result = Value::make_array();
     std::vector<Value>& out = result.aptr->items;
     out.reserve(total);
@@ -144,8 +148,7 @@ static int arr_repeat(CallCtx& ctx) {
     if (count <= 0 || items.empty())
         return ctx.ret(result);
     // In double, before any cast: a huge count would overflow the product in size_t and pass the ceiling.
-    if (count * (double)items.size() > (double)k_array_max)
-        throw std::runtime_error("array.repeat: result longer than " + std::to_string(k_array_max) + " elements");
+    arr_check_size(count * (double)items.size(), "array.repeat");
     const size_t n = (size_t)count;
     std::vector<Value>& out = result.aptr->items;
     out.reserve(n * items.size());

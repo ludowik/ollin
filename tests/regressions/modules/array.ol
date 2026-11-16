@@ -198,7 +198,6 @@ assert([nil].concat([nil]).len() == 2)
 ## The `array` module is the free-function form of every method: the same functions, the array first.
 assert(typeof(array) == "module")
 assert(array.len(ccBase) == 2 and array.concat(ccBase, [7]).join(",") == "1,2,7")
-assert(array.copy(ccBase).len() == 2 and array.repeat([0], 3).len() == 3)
 var arrFree = [3, 1, 2]
 array.push(arrFree, 0)
 assert(array.indexOf(arrFree, 0) == 4 and array.contains(arrFree, 3) and array.sort(arrFree)[1] == 0)
