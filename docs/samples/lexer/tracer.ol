@@ -1096,7 +1096,7 @@ func trace(source)
         if e <> "lexer error" then
             throw e
         end
-        result.error = result.steps[#result.steps].err
+        result.error = result.steps.last().err
     end
     return result
 end

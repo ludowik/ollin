@@ -394,7 +394,7 @@ class ParseTracer
 
     ## Gives a local of the call in progress a value to show in the watch line.
     func local(name, value)
-        var f = self.frames[#self.frames]
+        var f = self.frames.last()
         var w = []
         var found = false
         for pair in f.w do
@@ -456,7 +456,7 @@ class ParseTracer
         f.p0 = self.mark
         f.p1 = self.pos
         f.fx = self.pending
-        f.w = self.frames[#self.frames].w
+        f.w = self.frames.last().w
         if f.ret then
             f.ret = f.ret.id
         end
@@ -483,7 +483,7 @@ class ParseTracer
     ## A construct this trace does not follow: the line that reached it stays lit and says so, and the
     ## trace ends there, with the tree as it stood.
     func notCovered(what)
-        var last = self.result.steps[#self.result.steps]
+        var last = self.result.steps.last()
         last.stop = what
         last.event = true
         last.note = "The parser now reads {what}, which this animation does not follow. It stops here: the tree is what had been built so far."
@@ -1955,7 +1955,7 @@ func parseTrace(source)
         result.tree = t.parse()
     catch e
         if e == "parse error" then
-            var last = result.steps[#result.steps]
+            var last = result.steps.last()
             result.error = last.err
             result.errorLine = last.errLine
         elseif e <> "stop" then

@@ -73,7 +73,7 @@ for i = 1, len(title) do
     end
 end
 assert(find(title, "PUSH START") <> nil)
-assert(title[len(title)].text == "V  MODERN STYLE" and title[len(title)].dim == true and title[len(title)].size == 6)
+assert(title.last().text == "V  MODERN STYLE" and title.last().dim == true and title.last().size == 6)
 fits(title)
 game.frame = 39
 assert(find(titleItems(""), "PUSH START") <> nil)

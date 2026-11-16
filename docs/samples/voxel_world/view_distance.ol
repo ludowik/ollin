@@ -147,7 +147,7 @@ class ViewDistance
     ## Elects the window's rate and returns the number of frames on time for it. A rate lower than
     ## the one kept is adopted only after DEMOTE windows.
     func voteCadence()
-        var vote = self.CAD[#self.CAD]
+        var vote = self.CAD.last()
         var kept = self.ok[#self.CAD]
         for j, hz in self.CAD do
             if self.ok[j] >= self.n * self.VOTE_PART then

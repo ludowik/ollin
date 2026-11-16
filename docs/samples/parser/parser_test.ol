@@ -355,7 +355,7 @@ refuses("var x = 1 +" + NEWLINE, "2: unexpected token ''")
 ## of showing something wrong: the steps up to there are kept
 func notCovered(text, what)
     var r = parseTrace(unquote(text))
-    var last = r.steps[#r.steps]
+    var last = r.steps.last()
     assert(last.stop == what and last.event and last.note.startsWith("The parser now reads"), "'{text}': the last step should say it")
     assert(r.error == nil and r.tree == nil, "'{text}' is not a refusal")
     for st in r.steps do
@@ -375,7 +375,7 @@ notCovered("var x = ]1; 3]", "an open-left range")
 
 ## the lines before the construct are followed as usual, here inside a block
 var inner = parseTrace(unquote("if x then" + NEWLINE + "    var y = 1" + NEWLINE + "    class A end" + NEWLINE + "end"))
-assert(inner.steps[#inner.steps].stop == "a class" and #inner.steps > 40, "a class inside an if: {#inner.steps} steps")
+assert(inner.steps.last().stop == "a class" and #inner.steps > 40, "a class inside an if: {#inner.steps} steps")
 
 ## the trace itself, line by line. `break` is the shortest statement: parse() asks parse_one_stmt() for a
 ## statement, whose switch sends it to break_stmt(); the result goes back up, and parse() finds the end.
@@ -410,9 +410,9 @@ func checkTrace(text)
         assert(s.event == (s.p1 > s.p0 or #s.fx > 0 or s.err <> nil), "step {k} is wrongly flagged as an event")
     end
     if r.error then
-        assert(r.steps[#r.steps].err == r.error and r.tree == nil, "the refusal is not the last step")
+        assert(r.steps.last().err == r.error and r.tree == nil, "the refusal is not the last step")
     else
-        var last = r.steps[#r.steps]
+        var last = r.steps.last()
         assert(last.fn == "parse" and PCPP["parse"].trimmed[last.at].startsWith("return prog;"), "the parse does not end in parse()")
     end
     return r
@@ -452,7 +452,7 @@ checkTrace("var x = (1 + 2")
 
 ## a refusal is recorded on the line that makes it, with the line of the program it names
 var refused = checkTrace("var ok = 1" + NEWLINE + "var 3 = 2")
-var last = refused.steps[#refused.steps]
+var last = refused.steps.last()
 assert(last.errLine == 2 and last.err == "unexpected token '3'" and last.fn == "decl_stmt" and last.event)
 
 ## a token knows the line it is on, and the parser reads them in order

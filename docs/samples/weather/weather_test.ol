@@ -182,7 +182,7 @@ assert(mixColours([1, 2], [3, 4], 0)[2] == 2 and mixColours([1, 2], [3, 4], 1)[1
 func sameColour(a, b)
     return math.abs(a[1] - b[1]) + math.abs(a[2] - b[2]) + math.abs(a[3] - b[3]) < 1e-9
 end
-assert(sameColour(tempColour(-40), TEMP_STOPS[1][2]) and sameColour(tempColour(80), TEMP_STOPS[len(TEMP_STOPS)][2]), "held beyond the ends")
+assert(sameColour(tempColour(-40), TEMP_STOPS[1][2]) and sameColour(tempColour(80), TEMP_STOPS.last()[2]), "held beyond the ends")
 assert(sameColour(tempColour(10), TEMP_STOPS[3][2]), "exact on a step")
 var mid = tempColour(14)
 assert(mid[1] > TEMP_STOPS[3][2][1] and mid[1] < TEMP_STOPS[4][2][1], "between two steps it is between their colours")

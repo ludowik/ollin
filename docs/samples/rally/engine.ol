@@ -43,7 +43,7 @@ class Engine
                 return math.map(rpm, r[i - 1], r[i], t[i - 1], t[i])
             end
         end
-        return t[#t]
+        return t.last()
     end
 
     ## Engine revolutions per wheel revolution, the final drive included.
@@ -56,7 +56,7 @@ class Engine
 
     ## The speed, in m/s, at which the top gear reaches the limiter.
     func topSpeed()
-        return self.limiter / 9.5493 * self.wheelRadius / (self.ratios[#self.ratios] * self.finalDrive)
+        return self.limiter / 9.5493 * self.wheelRadius / (self.ratios.last() * self.finalDrive)
     end
 
     ## One step. `speed` is the car's speed along its direction of travel (never negative),

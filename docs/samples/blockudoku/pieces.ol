@@ -176,5 +176,5 @@ func randomShape(level)
             return s
         end
     end
-    return pieces.shapes[len(pieces.shapes)]
+    return pieces.shapes.last()
 end

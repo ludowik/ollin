@@ -112,9 +112,9 @@ func checkTrace(source)
         assert(r.steps[tok.step].tok == tok, "token {tok.type} does not point at its step")
     end
     if r.error then
-        assert(r.steps[#r.steps].err == r.error, "the error is not the last step")
+        assert(r.steps.last().err == r.error, "the error is not the last step")
     else
-        assert(r.tokens[#r.tokens].type == "EOF_T", "the tokens do not end on EOF_T")
+        assert(r.tokens.last().type == "EOF_T", "the tokens do not end on EOF_T")
     end
     return r
 end

@@ -139,7 +139,7 @@ end
 ## The page of the place that was searched, after the cities, or nil.
 func searchedPage()
     if len(app.pages) > len(CITIES) then
-        return app.pages[len(app.pages)]
+        return app.pages.last()
     end
     return nil
 end
