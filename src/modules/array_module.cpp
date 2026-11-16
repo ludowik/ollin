@@ -10,6 +10,7 @@
 #include "module_utils.h"
 #include "../vm.h"
 #include <algorithm>
+#include <exception>
 #include <stdexcept>
 
 // Uniform message convention: "array.<method>: expected (array, <params>)". The name keeps the
