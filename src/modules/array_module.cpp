@@ -112,7 +112,7 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
-// The first and the last element, nil for an empty array (reading past the end is nil everywhere).
+// The first and the last element, nil for an empty array.
 static int arr_first(CallCtx& ctx) {
     arr_check(ctx, 1, "first: expected (array)");
     return ctx.ret(ctx.args[0].array_get(1));
