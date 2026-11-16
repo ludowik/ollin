@@ -141,7 +141,7 @@ class VM {
     // Array pseudo-methods AND the global "array" module — the SAME object serves both, like string_module_
     // (see array_module.cpp).
     Value array_module_;
-    // Map pseudo-methods (len, keys, values, has, delete, copy) AND the global "map" module — the SAME
+    // Map pseudo-methods (len, keys, values, has, delete, copy, clear) AND the global "map" module — the SAME
     // object serves both (see map_module.cpp and Map::kind).
     Value map_module_;
     uint32_t ip = 0;

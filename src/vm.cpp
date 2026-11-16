@@ -56,7 +56,7 @@ static MetaKeys& MK() {
 }
 
 // What `obj.key` gives when `obj`'s own data has no such entry: the prototype chain, then the map module's pseudo-methods
-// (len, keys, values, has, delete, copy) — an all-cold fallback, never tried for an INSTANCE: an instance is expected to
+// (len, keys, values, has, delete, copy, clear) — an all-cold fallback, never tried for an INSTANCE: an instance is expected to
 // define or inherit its own fields. Out of line, so that none of it sits in run_goto.
 [[gnu::noinline]] Value VM::map_member_miss(const Value& obj, const Value& key, const InternedStr* key_sptr) {
     Value chained = proto_chain_rest(obj, key);
@@ -1599,7 +1599,7 @@ dispatch_loop:
             } else {
                 // Absent from the own data: walk the prototype chain (the class, then the classes it extends).
                 // NOT cached, because mutating the CLASS does not bump the instance's layout.
-                // The map module's pseudo-methods (len, keys, values, has, delete, copy) are only an
+                // The map module's pseudo-methods (len, keys, values, has, delete, copy, clear) are only an
                 // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
                 // path — never tried for an INSTANCE (!is_instance), same restriction `len`
                 // always had: an instance is expected to define or inherit its own fields.
@@ -1982,7 +1982,7 @@ dispatch_loop:
             // Maps do not inject self in general: a module such as `math` must not receive
             // itself, so math.noise(x) calls noise(x) — and every OTHER module is a map too
             // (Map::kind, collections/map.h). The one exception is the map module's own
-            // pseudo-methods (len, keys, values, has, delete, copy) called on a PLAIN map or enum
+            // pseudo-methods (len, keys, values, has, delete, copy, clear) called on a PLAIN map or enum
             // (`m.len()`), recognized by function pointer (is_map_module_fn). The `kind !=
             // MODULE` guard matters in its own right: `len` is a REAL key of the `map` module
             // itself (map.len IS map_len, found in map's own data, not through the fallback),

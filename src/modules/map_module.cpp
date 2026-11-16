@@ -61,6 +61,20 @@ static int map_delete(CallCtx& ctx) {
     return ctx.ret(old);
 }
 
+// Empties the map ITSELF, so every holder of it sees it empty. A frozen enum, a module and a class are refused: what
+// they hold is their definition, not their contents. An instance keeps its class.
+static int map_clear(CallCtx& ctx) {
+    map_check(ctx, 1, "clear: expected (map)");
+    Map& m = *ctx.args[0].mptr;
+    if (m.kind == Map::ENUM)
+        throw std::runtime_error("cannot modify an enum");
+    if (m.kind == Map::MODULE || ctx.args[0].is_class())
+        throw std::runtime_error("map.clear: a module or a class cannot be cleared");
+    m.data.clear();
+    m.version = m.layout = ++g_map_epoch;
+    return ctx.ret(ctx.args[0]);
+}
+
 // SHALLOW; the result is always a plain map (a frozen enum becomes writable), and an instance keeps its class.
 // A class is refused: its entries are its methods.
 static int map_copy(CallCtx& ctx) {
@@ -80,7 +94,7 @@ static int map_copy(CallCtx& ctx) {
 // one and forgotten in the other can't happen — the old two-list form let exactly that compile
 // silently, m.newFn() then just never getting self.
 static const struct { const char* name; Value::BuiltinFn fn; } k_map_fns[] = {
-    {"len", map_len}, {"keys", map_keys}, {"values", map_values}, {"has", map_has}, {"delete", map_delete}, {"copy", map_copy},
+    {"len", map_len}, {"keys", map_keys}, {"values", map_values}, {"has", map_has}, {"delete", map_delete}, {"copy", map_copy}, {"clear", map_clear},
 };
 
 Value make_map_module() {

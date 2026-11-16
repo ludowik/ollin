@@ -1192,6 +1192,7 @@ b.x = <span class="num">99</span>
 <tr><td><code>map.values(m)</code> · <code>m.values()</code></td><td>An array of the map's values</td></tr>
 <tr><td><code>map.has(m, key)</code> · <code>m.has(key)</code></td><td><code>true</code> when <code>key</code> is present</td></tr>
 <tr><td><code>map.delete(m, key)</code> · <code>m.delete(key)</code></td><td>Removes <code>key</code> and returns its former value, or <code>nil</code> when it was absent</td></tr>
+<tr><td><code>map.clear(m)</code> · <code>m.clear()</code></td><td>Removes <strong>every</strong> entry of the map itself and returns it — every other holder of the map sees it empty. A frozen enum, a module and a class are refused; an instance loses its fields and keeps its class</td></tr>
 <tr><td><code>map.copy(m)</code> · <code>m.copy()</code></td><td>A <strong>new</strong> ordinary map with the same entries — <strong>shallow</strong>, so a value that is itself a map or an array is shared. A frozen enum copies into a map that can be written. An instance is copied with <code>map.copy(obj)</code> and keeps its class; a class cannot be copied</td></tr>
 </table>
 <pre><code><span class="kw">var</span> m = {a: <span class="num">1</span>, b: <span class="num">2</span>, c: <span class="num">3</span>}
@@ -1380,6 +1381,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
 <tr><td><code>arr.reduce(fn, init)</code></td><td>Folds the array into a single value with <code>fn(accumulator, value, index)</code>, starting from <code>init</code> — which is <strong>required</strong></td></tr>
 <tr><td><code>arr.reverse()</code></td><td>Reverses the order of the elements <strong>in place</strong> and returns the array</td></tr>
+<tr><td><code>arr.clear()</code></td><td>Removes <strong>every</strong> element of the array itself and returns it. Unlike <code>a = []</code>, which puts a new array in the variable, <code>clear</code> empties the array that every other holder shares</td></tr>
 <tr><td><code>arr.sort([cmp])</code></td><td>Sorts the array <strong>in place</strong> and returns it. <code>cmp(a, b)</code> is true when <code>a</code> comes first; without it, by type — <code>nil</code>, then numbers, then strings, then the rest — and by value within each type</td></tr>
 </table>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]

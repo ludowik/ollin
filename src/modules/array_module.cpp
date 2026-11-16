@@ -119,6 +119,13 @@ static int arr_reverse(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
+// Empties the array ITSELF, so every holder of it sees it empty; the capacity is kept for the next fill.
+static int arr_clear(CallCtx& ctx) {
+    arr_check(ctx, 1, "clear: expected (array)");
+    ctx.args[0].aptr->items.clear();
+    return ctx.ret(ctx.args[0]);
+}
+
 // The first and the last element, nil for an empty array.
 static int arr_first(CallCtx& ctx) {
     arr_check(ctx, 1, "first: expected (array)");
@@ -320,6 +327,7 @@ Value make_array_module() {
         .fn("repeat", arr_repeat)
         .fn("concat", arr_concat)
         .fn("reverse", arr_reverse)
+        .fn("clear", arr_clear)
         .fn("first", arr_first)
         .fn("last", arr_last)
         .fn("join", arr_join)

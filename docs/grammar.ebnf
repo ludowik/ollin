@@ -301,7 +301,7 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* writing a nil VALUE removes the key — m.k = nil is a delete, not a "present but
                     nil" entry; a nil KEY is unaffected by this, and indexes like any other value *)
                  (* copy semantics: reference counting, with no clone; an empty map is falsy, "empty is false" *)
-                 (* the `map` module: len, keys, values, has, delete, copy. Usable either as a free
+                 (* the `map` module: len, keys, values, has, delete, copy, clear. Usable either as a free
                     function (map.keys(m)) or as a pseudo-method on the map (m.keys()) — the two
                     forms share one implementation. typeof tells a built-in module (math, string,
                     map itself, …) apart from a plain map: "module" vs "map" *)
@@ -309,7 +309,7 @@ arrayLit       = "[" [ expr { "," expr } [ "," ] ] "]" ;
              (* the comma is REQUIRED between two elements, and allowed before the "]" *)
              (* shared by reference, through reference counting; an empty array is falsy, "empty is false" *)
              (* the `array` module: every array method — len, push, add, enqueue, pop, dequeue, insert, delete, remove,
-                indexOf, contains, copy, repeat, concat, first, last, reverse, map, filter, reduce, sort, join — is also a function of the global
+                indexOf, contains, copy, repeat, concat, first, last, reverse, clear, map, filter, reduce, sort, join — is also a function of the global
                 module `array`, the array being the first argument: a.concat(b) is array.concat(a, b). Like `string`,
                 the module is shared by every array *)
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;

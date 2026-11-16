@@ -116,3 +116,49 @@ var mcPointDup = map.copy(mcPoint)
 mcPointDup.x = 10
 assert(instanceOf(mcPointDup, McPoint) and mcPointDup.sum() == 12 and mcPoint.sum() == 3)
 assert(not instanceOf(map.copy({x: 1}), McPoint))
+
+## clear empties the map ITSELF and returns it: whoever else holds it sees it empty, and a cached read sees it too.
+var mkMap = {x: 1, y: 2}
+var mkAlias = mkMap
+func mkRead(m)
+    return m.x
+end
+assert(mkRead(mkMap) == 1 and mkRead(mkMap) == 1)      ## the same site read twice, so it is cached
+assert(mkMap.clear() == mkMap and #mkAlias == 0 and not mkMap.has("x"))
+assert(mkRead(mkMap) == nil)
+mkMap.z = 3
+assert(#mkAlias == 1 and map.clear({}).len() == 0)
+## an instance keeps its class, only its fields go
+class MkPoint
+    func init()
+        self.q = 1
+    end
+    func hi()
+        return "hi"
+    end
+end
+var mkPoint = MkPoint()
+map.clear(mkPoint)
+assert(mkPoint.q == nil and mkPoint.hi() == "hi" and instanceOf(mkPoint, MkPoint))
+## a frozen enum, a module and a class are refused, and what they held is still there
+enum MkColor
+    RED,
+    GREEN
+end
+var mkRefused = 0
+try
+    MkColor.clear()
+catch e
+    mkRefused += 1
+end
+try
+    map.clear(math)
+catch e
+    mkRefused += 1
+end
+try
+    map.clear(MkPoint)
+catch e
+    mkRefused += 1
+end
+assert(mkRefused == 3 and MkColor.RED == 1 and math.sin(0) == 0 and MkPoint().hi() == "hi")

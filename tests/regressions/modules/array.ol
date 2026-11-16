@@ -227,3 +227,18 @@ assert([].reverse().len() == 0 and [1, 2].reverse().join(",") == "2,1")
 var rvKeep = [1, 2, 3]
 assert(rvKeep.copy().reverse().join(",") == "3,2,1" and rvKeep.join(",") == "1,2,3")     ## reverse a copy to keep the order
 assert(array.reverse([4, 5]).join(",") == "5,4")
+
+## clear empties the array ITSELF and returns it: whoever else holds it sees it empty.
+var clArr = [1, 2, 3]
+var clAlias = clArr
+assert(clArr.clear() == clArr and #clArr == 0 and #clAlias == 0)
+clArr.push(9)
+assert(#clAlias == 1 and clAlias[1] == 9)             ## and it can be filled again
+assert([].clear().len() == 0 and array.clear([1, 2]).len() == 0)
+var clKept = {k: 1}
+var clHolder = [clKept, [1]]
+clHolder.clear()
+assert(clKept.k == 1)                                  ## what it held is not destroyed for the others
+var clSelf = []
+clSelf.push(clSelf)
+assert(#clSelf.clear() == 0)                           ## an array holding itself

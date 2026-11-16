@@ -248,6 +248,15 @@ check_error "string.split with one argument"         'print(string.split("a"))' 
 check_error "map.copy of a class" 'class C
 end
 print(map.copy(C))' "map.copy: a class cannot be copied"
+check_error "map.clear of a module"    'print(map.clear(math))'    "map.clear: a module or a class cannot be cleared"
+check_error "map.clear of a class"     'class C
+end
+print(map.clear(C))'    "map.clear: a module or a class cannot be cleared"
+check_error "map.clear of an enum"     'enum E
+    A
+end
+print(E.clear())'    "cannot modify an enum"
+check_error "map.clear of a number"    'print(map.clear(5))'    "map.clear: expected (map)"
 check_error "map.copy of a number" 'print(map.copy(5))' "map.copy: expected (map)"
 
 # array.repeat takes a whole count, and refuses a result longer than an array can be.

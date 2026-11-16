@@ -713,6 +713,7 @@ assert(m.values().len() == 3)
 assert(m.delete("a") == 11)
 assert(not m.has("a"))
 assert(map.copy(m).len() == m.copy().len() and m.copy() <> m)   ## a new map with the same entries
+assert(m.clear() == m and #m == 0)                       ## empties itself and returns itself
 
 ## nested map
 var scene = {camera: {fov: 60}}
@@ -1335,6 +1336,7 @@ var am_copy = am_sorted.copy()                    ## a new array with the same e
 am_copy.push(4)
 assert(#am_sorted == 3 and #am_copy == 4)
 assert(am_copy.reverse()[1] == 4 and am_copy[1] == 4)   ## in place
+assert(am_copy.clear() == am_copy and #am_copy == 0)    ## emptied itself, and returned
 assert([0].repeat(3).join(",") == "0,0,0")        ## the elements, count times over
 
 ## ── 25. The do...end block (lexical scope) ───────────────────────────────────
