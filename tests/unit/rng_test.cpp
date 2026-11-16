@@ -50,6 +50,16 @@ static void test_below() {
                counts[2] < 10500,
            "below(3) is fair");
     expect(rng.below(1) == 0, "below(1) is 0");
+    Rng pinned(1);
+    expect(pinned.below(1000) == 566 && pinned.below(1000) == 745 && pinned.below(1000) == 971,
+           "below(1000) from seed 1: fixed values, the same on every platform");
+    // A bound above 2^63 throws away about half of the draws: the rejection loop must still end inside the range.
+    Rng wide_bound(3);
+    uint64_t bound = (1ULL << 63) + 12345;
+    bool rejected_inside = true;
+    for (int i = 0; i < 1000; i++)
+        rejected_inside = rejected_inside && wide_bound.below(bound) < bound;
+    expect(rejected_inside, "below(2^63 + k) stays in range through the rejection path");
     bool wide = false;
     for (int i = 0; i < 100; i++)
         wide = wide || rng.below(1000000) > 32767;

@@ -55,7 +55,7 @@ math.seed(8)
 assert(math.rand() <> mathRandA, "another seed, another sequence")
 ## The generator is integer arithmetic only, so a seed gives the SAME numbers on every platform: these are fixed values.
 math.seed(1)
-assert(math.randInt(1, 1000) == 466 and math.randInt(1, 1000) == 520 and math.randInt(1, 1000) == 591)
+assert(math.randInt(1, 1000) == 567 and math.randInt(1, 1000) == 746 and math.randInt(1, 1000) == 972)
 assert(math.abs(math.rand() - 0.4443592170557721) < 1e-15, "a float has its 53 bits")
 ## randInt reaches the whole range asked, which rand() of Windows (32767) did not, and a draw is fair.
 math.seed(3)

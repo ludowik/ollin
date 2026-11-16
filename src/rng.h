@@ -9,9 +9,9 @@
 #include <cstdint>
 
 struct Rng {
-    uint64_t state = 0;
+    uint64_t state;
 
-    explicit Rng(uint64_t seed = 0)
+    explicit Rng(uint64_t seed)
         : state(seed) {
     }
 
@@ -36,14 +36,20 @@ struct Rng {
         return unit() * 2.0 - 1.0;
     }
 
-    // In [0, n), n > 0, with no bias: the draws that would favour the small values are thrown away.
+    // In [0, n), n > 0, with no bias (Lemire): the high half of next() * n is the answer, and the draws that would
+    // favour the small values are thrown away. The division that gives the threshold is only reached when the low half
+    // is below n, which happens with probability n / 2^64 : the usual draw costs a multiplication and no division.
     uint64_t below(uint64_t n) {
-        uint64_t threshold = (0 - n) % n;   // 2^64 mod n
-        uint64_t r;
-        do {
-            r = next();
-        } while (r < threshold);
-        return r % n;
+        unsigned __int128 m = (unsigned __int128)next() * n;
+        uint64_t low = (uint64_t)m;
+        if (low < n) {
+            uint64_t threshold = (0 - n) % n;   // 2^64 mod n
+            while (low < threshold) {
+                m = (unsigned __int128)next() * n;
+                low = (uint64_t)m;
+            }
+        }
+        return (uint64_t)(m >> 64);
     }
 
     // In [lo, hi], lo <= hi, the whole range of int64 included.
