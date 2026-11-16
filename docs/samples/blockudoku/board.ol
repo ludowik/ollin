@@ -131,17 +131,9 @@ func boardClear(g, cleared)
     end
 end
 
-func boardCopy(g)
-    var copy = boardNew()
-    for i = 1, CELLS do
-        copy[i] = g[i]
-    end
-    return copy
-end
-
 ## What placing the shape at (r, c) WOULD clear, on a copy: the grid is left as it is.
 func boardPreview(g, shape, r, c)
-    var copy = boardCopy(g)
+    var copy = g.copy()
     boardPlace(copy, shape, r, c)
     var cleared = boardFull(copy)
     return cleared
@@ -240,7 +232,7 @@ func boardPlaysFrom(g, left, budget)
                     if budget.tries < 0 then
                         return false
                     end
-                    var after = boardCopy(g)
+                    var after = g.copy()
                     boardPlace(after, s, r, c)
                     if boardPlaysFrom(after, rest, budget) then
                         return true

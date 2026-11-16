@@ -105,14 +105,6 @@ func boardNew()
     return g
 end
 
-func boardCopy(g)
-    var copy = []
-    for i = 1, CELLS do
-        copy.push(g[i])
-    end
-    return copy
-end
-
 ## The digits cell i could take, looking at its peers only: a mask.
 func boardCandidates(g, i)
     var used = 0

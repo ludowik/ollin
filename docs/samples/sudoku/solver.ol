@@ -13,7 +13,7 @@ const GUESSES_HARD = 12           ## a puzzle the singles cannot solve is Hard u
 
 ## The state of a grid, or nil when two of its digits clash.
 func stateNew(g)
-    var st = {g: [], row: [], col: [], box: [], empty: 0}
+    var st = {g: g.copy(), row: [], col: [], box: [], empty: 0}
     for k = 1, N do
         st.row.push(0)
         st.col.push(0)
@@ -21,7 +21,6 @@ func stateNew(g)
     end
     for i = 1, CELLS do
         var d = g[i]
-        st.g.push(d)
         if d == 0 then
             st.empty += 1
         else
@@ -90,10 +89,7 @@ func rngInt(rng, n)
 end
 
 func shuffled(list, rng)
-    var out = []
-    for v in list do
-        out.push(v)
-    end
+    var out = list.copy()
     for i = len(out), 2, -1 do
         var j = rngInt(rng, i)
         out[i], out[j] = out[j], out[i]
@@ -139,7 +135,7 @@ func solverSearch(st, limit, found, rng)
     if st.empty == 0 then
         found.count += 1
         if found.solution == nil then
-            found.solution = boardCopy(st.g)
+            found.solution = st.g.copy()
         end
         return
     end

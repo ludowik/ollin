@@ -29,7 +29,7 @@ func generatorAttempt(job)
     end
     job.attempt += 1
     job.solution = solverFill(rng)
-    job.g = boardCopy(job.solution)
+    job.g = job.solution.copy()
     job.target = range[1] + rngInt(rng, range[2] - range[1] + 1) - 1
     job.order = shuffled(cells, rng)
     job.pos = 0

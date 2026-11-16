@@ -27,7 +27,7 @@ assert(maskCount(ALL) == 9 and maskCount(0) == 0 and maskLow(0b101000) == 3 and 
 var g = parse(EASY)
 assert(boardFilled(g) == 30 and not boardHasConflict(g) and not boardComplete(g))
 assert(maskDigits(boardCandidates(g, boardIdx(1, 3))).join() == "124", "the candidates of a cell: {maskDigits(boardCandidates(g, boardIdx(1, 3))).join()}")
-var clash = boardCopy(g)
+var clash = g.copy()
 clash[boardIdx(1, 3)] = 5
 var marks = boardConflicts(clash)
 assert(marks[boardIdx(1, 3)] == 1 and marks[boardIdx(1, 1)] == 1 and marks[boardIdx(9, 9)] == 0, "a digit repeated in a row is marked, with its twin")
@@ -67,7 +67,7 @@ assert(plain <> nil and plain.daily == nil and plain.hints == 0 and plain.level 
 assert(gameDecode(nil, 3, 4) == nil and gameDecode("", 3, 4) == nil and gameDecode("a|b|c", 3, 4) == nil)
 assert(gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 4, 3, nil), 3, 4) == nil, "more hints than the game gives")
 assert(gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 2, 5, nil), 3, 4) == nil and gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 2, 0, nil), 3, 4) == nil, "a level out of range")
-var forged = boardCopy(played)
+var forged = played.copy()
 forged[1] = 9
 assert(gameDecode(gameEncode(boardDecode(puzzleText), forged, savedNotes, 2, 3, nil), 3, 4) == nil, "a grid that lost a clue")
 var badNotes = notesNew()
@@ -77,7 +77,7 @@ assert(gameDecode(text.replace("2026,10,19", "2026,10"), 3, 4) == nil and gameDe
 assert(gameDecode(text + "|x", 3, 4) == nil, "a text with a part too many")
 assert(gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 1.5, 3, nil), 3, 4) == nil and gameDecode(gameEncode(boardDecode(puzzleText), played, savedNotes, 2, 2.5, nil), 3, 4) == nil, "a hint count or a level that is not whole")
 assert(gameDecode(text.replace("2026,10,19", "2026,10,1.5"), 3, 4) == nil, "a day that is not whole")
-var halfNotes = boardCopy(savedNotes)
+var halfNotes = savedNotes.copy()
 halfNotes[3] = 1.5
 assert(gameDecode(gameEncode(boardDecode(puzzleText), played, halfNotes, 2, 3, nil), 3, 4) == nil, "a note that is not whole")
 
@@ -93,7 +93,7 @@ end
 dead[boardIdx(2, 9)] = 9
 dead[boardIdx(3, 9)] = 9
 assert(solverCount(dead, 2, nil).count == 0, "two 9 in a column: no solution")
-var loose = boardCopy(g)
+var loose = g.copy()
 var removed = 0
 for i = 1, CELLS do
     if loose[i] <> 0 and solverCount(loose, 2, nil).count == 1 then
@@ -142,7 +142,7 @@ var solution = parse(EASY_SOLUTION)
 var hint = hintFor(g, solution)
 assert(hint.kind == "naked" or hint.kind == "hidden", "the first hint is a single: {hint.kind}")
 assert(hint.digit == solution[hint.cell] and g[hint.cell] == 0)
-var wrong = boardCopy(g)
+var wrong = g.copy()
 wrong[boardIdx(1, 3)] = 1
 var mistake = hintFor(wrong, solution)
 assert(mistake.kind == "mistake" and mistake.cell == boardIdx(1, 3) and mistake.digit == solution[boardIdx(1, 3)], "a wrong digit comes first")
@@ -150,7 +150,7 @@ assert(mistake.kind == "mistake" and mistake.cell == boardIdx(1, 3) and mistake.
 ## Following the hints from a puzzle always leads to its solution, and what a hint says is true.
 for level = 1, 3 do
     var p = generatePuzzle(500 + level, level)
-    var play = boardCopy(p.puzzle)
+    var play = p.puzzle.copy()
     var guard = 0
     while boardFilled(play) < CELLS do
         var h = hintFor(play, p.solution)

@@ -1169,10 +1169,7 @@ class ParseTracer
             self.run("multi_assign_stmt", 8, "s->targets.push_back(expr());", {ret: e})
         end
         var i = 1
-        var targets = []
-        for k in s.kids do
-            targets.push(k)
-        end
+        var targets = s.kids.copy()
         while true do
             var more = i <= #targets
             self.run("multi_assign_stmt", 9, "for (auto& t : s->targets)")

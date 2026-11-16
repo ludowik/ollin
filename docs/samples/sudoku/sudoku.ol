@@ -111,8 +111,8 @@ end
 ## Puts a generated puzzle in play.
 func installPuzzle(made, level, daily)
     tween.cancelAll()
-    game.puzzle = boardCopy(made.puzzle)
-    game.grid = boardCopy(made.puzzle)
+    game.puzzle = made.puzzle.copy()
+    game.grid = made.puzzle.copy()
     game.solution = made.solution
     game.notes = notesNew()
     game.undo = []
@@ -153,7 +153,7 @@ end
 
 ## A move is kept before it is made, with every note, so that undoing it puts everything back.
 func pushUndo(i)
-    game.undo.push({cell: i, value: game.grid[i], notes: boardCopy(game.notes)})
+    game.undo.push({cell: i, value: game.grid[i], notes: game.notes.copy()})
 end
 
 func undoMove()
