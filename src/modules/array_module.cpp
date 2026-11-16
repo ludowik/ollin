@@ -10,7 +10,6 @@
 #include "module_utils.h"
 #include "../vm.h"
 #include <algorithm>
-#include <cmath>
 #include <exception>
 #include <stdexcept>
 
@@ -113,13 +112,10 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
-// The elements of the array, `count` times over: `[0].repeat(81)` is eighty-one zeros. The elements are SHARED,
-// not duplicated, as everywhere in the language: `[[]].repeat(3)` is three times the same array.
+// The elements are SHARED, not duplicated, as everywhere in the language: `[[]].repeat(3)` is the same array three times.
 static int arr_repeat(CallCtx& ctx) {
     arr_check(ctx, 1, "repeat: expected (array, count)");
-    double count = num_arg(ctx.args, ctx.argc, 1, "array.repeat");
-    if (std::isnan(count) || count != std::floor(count))
-        throw std::runtime_error("array.repeat: the count must be a whole number");
+    double count = count_arg(ctx.args, ctx.argc, 1, "array.repeat");
     const std::vector<Value>& items = ctx.args[0].aptr->items;
     Value result = Value::make_array();
     if (count <= 0 || items.empty())
@@ -127,9 +123,10 @@ static int arr_repeat(CallCtx& ctx) {
     // In double, before any cast: a huge count would overflow the product in size_t and pass the ceiling.
     if (count * (double)items.size() > (double)k_array_max)
         throw std::runtime_error("array.repeat: result longer than " + std::to_string(k_array_max) + " elements");
+    const size_t n = (size_t)count;
     std::vector<Value>& out = result.aptr->items;
-    out.reserve((size_t)count * items.size());
-    for (size_t i = 0; i < (size_t)count; i++)
+    out.reserve(n * items.size());
+    for (size_t i = 0; i < n; i++)
         out.insert(out.end(), items.begin(), items.end());
     return ctx.ret(result);
 }

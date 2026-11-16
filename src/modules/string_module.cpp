@@ -461,9 +461,7 @@ static int str_repeat(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.repeat");
-    double d = num_arg(args, argc, 1, "string.repeat");
-    if (std::isnan(d) || d != std::floor(d))
-        throw std::runtime_error("string.repeat: the count must be a whole number");
+    double d = count_arg(args, argc, 1, "string.repeat");
     std::string sep = (argc >= 3) ? std::string(str_arg(args, argc, 2, "string.repeat")) : std::string();
     if (d <= 0)
         return ctx.ret(Value(std::string("")));

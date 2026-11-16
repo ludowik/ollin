@@ -101,6 +101,15 @@ static inline long long whole_arg(const Value* args, int argc, int i, const char
     return (long long)v;
 }
 
+// The count of a `repeat`: a number that must be WHOLE, of any size (a count of zero or less is the caller's to answer
+// with an empty result, and one too large for it to refuse). NaN is no whole number, so it is refused here.
+static inline double count_arg(const Value* args, int argc, int i, const char* fn) {
+    double v = num_arg(args, argc, i, fn);
+    if (v != std::floor(v))
+        throw std::runtime_error(std::string(fn) + ": the count must be a whole number");
+    return v;
+}
+
 static inline const std::string& str_arg(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc)
         throw std::runtime_error(std::string(fn) + ": missing argument");

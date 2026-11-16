@@ -175,18 +175,9 @@ var rpRows = [[]].repeat(3)
 rpRows[1].push("x")
 assert(#rpRows[2] == 1 and #rpRows[3] == 1)
 ## whereas a new call makes a new array, which is how a grid of distinct rows is built
-var rpGrid = []
-for r = 1, 3 do
-    rpGrid.push([0].repeat(2))
-end
-rpGrid[1][1] = 5
-assert(rpGrid[2][1] == 0)
-## the ceiling is the size of an array, and it is a refusal, not a slow allocation
+var rpA = [0].repeat(2)
+var rpB = [0].repeat(2)
+rpA[1] = 5
+assert(rpB[1] == 0)
+## the ceiling is the size of an array (the refusal past it is in test_errors.sh)
 assert([1].repeat(16777216).len() == 16777216)
-var rpBig = nil
-try
-    var tooBig = [1, 2].repeat(16777216)
-catch e
-    rpBig = e
-end
-assert(rpBig == "array.repeat: result longer than 16777216 elements")
