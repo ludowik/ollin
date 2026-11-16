@@ -112,6 +112,18 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
+// The first and the last element, nil for an empty array (reading past the end is nil everywhere).
+static int arr_first(CallCtx& ctx) {
+    arr_check(ctx, 1, "first: expected (array)");
+    return ctx.ret(ctx.args[0].array_get(1));
+}
+
+static int arr_last(CallCtx& ctx) {
+    arr_check(ctx, 1, "last: expected (array)");
+    int64_t size = ctx.args[0].array_size();
+    return ctx.ret(size > 0 ? ctx.args[0].array_get(size) : Value{});
+}
+
 // The result of concat and repeat may not be longer than an array can be: a refusal, not a slow allocation.
 static void arr_check_size(double total, const char* fn) {
     if (total > (double)k_array_max)
@@ -300,6 +312,8 @@ Value make_array_module() {
         .fn("copy", arr_copy)
         .fn("repeat", arr_repeat)
         .fn("concat", arr_concat)
+        .fn("first", arr_first)
+        .fn("last", arr_last)
         .fn("join", arr_join)
         .done();
 }

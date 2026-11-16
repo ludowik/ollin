@@ -208,3 +208,12 @@ func arrShadow(array)
     return array.len()
 end
 assert(arrShadow([1, 2, 3]) == 3)
+
+## first and last read the ends WITHOUT removing them, and give nil for an empty array (reading past the end is nil).
+var flArr = [3, 1, 2]
+assert(flArr.first() == 3 and flArr.last() == 2 and #flArr == 3)
+assert([7].first() == 7 and [7].last() == 7)
+assert([].first() == nil and [].last() == nil)
+assert([nil, 5].first() == nil and [5, nil].last() == nil)       ## a nil element is an element, and reads as nil too
+assert([[1], [2, 3]].last().last() == 3)
+assert(array.first(flArr) == 3 and array.last(flArr) == 2)

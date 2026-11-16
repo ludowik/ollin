@@ -1334,6 +1334,7 @@ assert(am_mixed[1] == nil and am_mixed[2] == 1 and am_mixed[3] == 2.5 and am_mix
 var am_copy = am_sorted.copy()                    ## a new array with the same elements
 am_copy.push(4)
 assert(#am_sorted == 3 and #am_copy == 4)
+assert(am_copy.first() == 1 and am_copy.last() == 4)   ## the ends, without removing them
 assert([0].repeat(3).join(",") == "0,0,0")        ## the elements, count times over
 
 ## ── 25. The do...end block (lexical scope) ───────────────────────────────────
