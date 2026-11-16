@@ -124,12 +124,8 @@ end
 
 func detach(nodes, child)
     if child.parent <> 0 then
-        var keep = []
-        for k in nodes[child.parent].kids do
-            if k.id <> child.id then
-                keep.push(k)
-            end
-        end
+        var keep = nodes[child.parent].kids.copy()
+        keep.remove(child)
         nodes[child.parent].kids = keep
         child.parent = 0
         child.slot = ""

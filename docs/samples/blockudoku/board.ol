@@ -215,12 +215,8 @@ func boardPlaysFrom(g, left, budget)
         return true
     end
     for k, s in left do
-        var rest = []
-        for j, other in left do
-            if j <> k then
-                rest.push(other)
-            end
-        end
+        var rest = left.copy()
+        rest.delete(k)
         for r = 1, GRID do
             for c = 1, GRID do
                 if boardCanPlace(g, s, r, c) then
