@@ -67,6 +67,12 @@ struct Map {
     // changed.
     uint64_t layout = 0;
 
+    // Marks the map as changed in layout and content at once, for a bulk rewrite (copy, clear). MapPool::release keeps
+    // its own inline spelling: it is inlined all over run_goto, whose code layout is measured.
+    void mark_rebuilt() {
+        version = layout = ++g_map_epoch;
+    }
+
     Value get(const Value& k) const;
     // Location of the value, or nullptr when absent. This is what lets the GET_INDEX inline
     // cache keep a NON-owning reference: the map itself keeps the value alive as long as its

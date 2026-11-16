@@ -61,8 +61,7 @@ static int map_delete(CallCtx& ctx) {
     return ctx.ret(old);
 }
 
-// Empties the map ITSELF, so every holder of it sees it empty. A frozen enum, a module and a class are refused: what
-// they hold is their definition, not their contents. An instance keeps its class.
+// Refused: what an enum, a module or a class holds is its definition. An instance keeps its class.
 static int map_clear(CallCtx& ctx) {
     map_check(ctx, 1, "clear: expected (map)");
     Map& m = *ctx.args[0].mptr;
@@ -70,8 +69,11 @@ static int map_clear(CallCtx& ctx) {
         throw std::runtime_error("cannot modify an enum");
     if (m.kind == Map::MODULE || ctx.args[0].is_class())
         throw std::runtime_error("map.clear: a module or a class cannot be cleared");
-    m.data.clear();
-    m.version = m.layout = ++g_map_epoch;
+    if (m.data.size() > MapPool::POOL_MAX_SIZE)
+        decltype(m.data){}.swap(m.data);   // a big map gives its buckets back: the pool would keep them pinned
+    else
+        m.data.clear();
+    m.mark_rebuilt();
     return ctx.ret(ctx.args[0]);
 }
 
@@ -84,7 +86,7 @@ static int map_copy(CallCtx& ctx) {
     const Map& source = *ctx.args[0].mptr;
     Value result = Value::make_map();
     result.mptr->data = source.data;   // one allocation at the right size, where Map::set would rehash as it grows
-    result.mptr->version = result.mptr->layout = ++g_map_epoch;
+    result.mptr->mark_rebuilt();
     result.set_class(source.proto);
     return ctx.ret(result);
 }

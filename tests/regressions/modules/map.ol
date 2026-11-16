@@ -140,25 +140,30 @@ end
 var mkPoint = MkPoint()
 map.clear(mkPoint)
 assert(mkPoint.q == nil and mkPoint.hi() == "hi" and instanceOf(mkPoint, MkPoint))
-## a frozen enum, a module and a class are refused, and what they held is still there
+## a frozen enum, a module and a class are refused (the messages are in test_errors.sh), and what they held is still there
 enum MkColor
     RED,
     GREEN
 end
-var mkRefused = 0
 try
     MkColor.clear()
 catch e
-    mkRefused += 1
 end
 try
     map.clear(math)
 catch e
-    mkRefused += 1
 end
 try
     map.clear(MkPoint)
 catch e
-    mkRefused += 1
 end
-assert(mkRefused == 3 and MkColor.RED == 1 and math.sin(0) == 0 and MkPoint().hi() == "hi")
+assert(MkColor.RED == 1 and math.sin(0) == 0 and MkPoint().hi() == "hi")
+
+## a big map is emptied and filled again as any other (its memory is given back, not kept by the pool)
+var mkBig = {}
+for mkI = 1, 3000 do
+    mkBig[mkI] = mkI
+end
+assert(#mkBig == 3000 and #mkBig.clear() == 0)
+mkBig[5] = "again"
+assert(#mkBig == 1 and mkBig[5] == "again" and mkBig[1] == nil)
