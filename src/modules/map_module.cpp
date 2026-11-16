@@ -1,11 +1,11 @@
 // Free-function form of what a map already does through indexing and iteration (`m[k]`, `m.k`,
 // `for k, v in m`) — a global "map" module, alongside `data`, `string` and the rest. `map.keys(m)`
-// works on any map; so does `m.keys()`, the usual pseudo-method form — GET_INDEX serves these six
+// works on any map; so does `m.keys()`, the usual pseudo-method form — GET_INDEX serves these
 // names as a cold fallback (see op_GET_INDEX in vm.cpp), and CALL_METHOD recognizes them by
 // function pointer (is_map_module_fn, below) to decide whether to inject `self`. It does NOT
 // inject self for a map receiver in general — `math.sin(x)` must not hand `math` to `sin` as an
 // extra argument, and every other module IS a map (Map::kind, collections/map.h) — only for a
-// function resolved to be one of these six specifically, whatever map it was read from.
+// function resolved to be one of these specifically, whatever map it was read from.
 #include "map_module.h"
 #include "module_utils.h"
 #include "../vm.h"
@@ -61,24 +61,22 @@ static int map_delete(CallCtx& ctx) {
     return ctx.ret(old);
 }
 
-// A SHALLOW copy: a new, ordinary map holding the same entries. What the values hold is shared, as
-// anywhere else in the language. A frozen enum copies into a map that can be written, and an
-// instance keeps its class (reached as `map.copy(obj)`: an instance is never served the pseudo-methods).
-// A class is refused: its entries are its methods, and a copy would be neither a class nor an object.
+// SHALLOW; the result is always a plain map (a frozen enum becomes writable), and an instance keeps its class.
+// A class is refused: its entries are its methods.
 static int map_copy(CallCtx& ctx) {
     map_check(ctx, 1, "copy: expected (map)");
     if (ctx.args[0].is_class())
         throw std::runtime_error("map.copy: a class cannot be copied");
+    const Map& source = *ctx.args[0].mptr;
     Value result = Value::make_map();
-    for (auto& [k, v] : ctx.args[0].mptr->data)
-        result.map_set(k, v);
-    if (ctx.args[0].mptr->proto.is_class())
-        result.set_class(ctx.args[0].mptr->proto);
+    result.mptr->data = source.data;   // one allocation at the right size, where Map::set would rehash as it grows
+    result.mptr->version = result.mptr->layout = ++g_map_epoch;
+    result.set_class(source.proto);
     return ctx.ret(result);
 }
 
 // The single list of the module's own functions: both make_map_module (the module's content) and
-// is_map_module_fn (CALL_METHOD's self-injection test) read it, so a 6th pseudo-method added to
+// is_map_module_fn (CALL_METHOD's self-injection test) read it, so a pseudo-method added to
 // one and forgotten in the other can't happen — the old two-list form let exactly that compile
 // silently, m.newFn() then just never getting self.
 static const struct { const char* name; Value::BuiltinFn fn; } k_map_fns[] = {

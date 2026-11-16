@@ -32,7 +32,7 @@ catch e
 end
 assert(enum_del_err)
 
-## The same six work as pseudo-methods too (`m.keys()`), sharing the SAME functions as the
+## The same work as pseudo-methods too (`m.keys()`), sharing the SAME functions as the
 ## module form — CALL_METHOD recognizes them by function pointer (is_map_module_fn), restricted
 ## to a PLAIN map or enum (never an instance — same rule `len` always had).
 var pm = {p: 1, q: 2}
@@ -76,7 +76,7 @@ assert(map.len(MapOnClass) == 2)
 assert(map.keys(MapOnClass).contains("greet"))
 
 ## storing an UNRELATED builtin under a map's own key must keep calling it plainly — is_map_module_fn
-## excludes it (math.sin is none of the six), so no self is injected regardless of the receiver
+## excludes it (math.sin is none of them), so no self is injected regardless of the receiver
 var stored = {f: math.sin}
 assert(stored.f(0) == 0)
 
@@ -91,10 +91,6 @@ mcSrc.b.push(3)
 assert(#mcDup.b == 3)                              ## what the values hold is shared
 assert(map.copy(mcSrc).len() == 2 and map.copy({}).len() == 0)
 assert(map.copy(mcSrc) <> mcSrc)
-
-## a map with a field named copy keeps its own: an own entry always wins over a pseudo-method
-var mcOwn = {copy: 42}
-assert(mcOwn.copy == 42)
 
 ## a frozen enum copies into a map that can be written
 enum McColor

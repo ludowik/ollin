@@ -301,7 +301,7 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* writing a nil VALUE removes the key — m.k = nil is a delete, not a "present but
                     nil" entry; a nil KEY is unaffected by this, and indexes like any other value *)
                  (* copy semantics: reference counting, with no clone; an empty map is falsy, "empty is false" *)
-                 (* the `map` module: len, keys, values, has, delete. Usable either as a free
+                 (* the `map` module: len, keys, values, has, delete, copy. Usable either as a free
                     function (map.keys(m)) or as a pseudo-method on the map (m.keys()) — the two
                     forms share one implementation. typeof tells a built-in module (math, string,
                     map itself, …) apart from a plain map: "module" vs "map" *)
