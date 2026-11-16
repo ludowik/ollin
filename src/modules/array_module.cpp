@@ -112,6 +112,13 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
+static int arr_reverse(CallCtx& ctx) {
+    arr_check(ctx, 1, "reverse: expected (array)");
+    std::vector<Value>& items = ctx.args[0].aptr->items;
+    std::reverse(items.begin(), items.end());
+    return ctx.ret(ctx.args[0]);
+}
+
 // The first and the last element, nil for an empty array.
 static int arr_first(CallCtx& ctx) {
     arr_check(ctx, 1, "first: expected (array)");
@@ -312,6 +319,7 @@ Value make_array_module() {
         .fn("copy", arr_copy)
         .fn("repeat", arr_repeat)
         .fn("concat", arr_concat)
+        .fn("reverse", arr_reverse)
         .fn("first", arr_first)
         .fn("last", arr_last)
         .fn("join", arr_join)

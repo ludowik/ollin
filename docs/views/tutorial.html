@@ -1379,6 +1379,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.map(fn)</code></td><td>A <strong>new</strong> array holding <code>fn(value, index)</code> for each element</td></tr>
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
 <tr><td><code>arr.reduce(fn, init)</code></td><td>Folds the array into a single value with <code>fn(accumulator, value, index)</code>, starting from <code>init</code> — which is <strong>required</strong></td></tr>
+<tr><td><code>arr.reverse()</code></td><td>Reverses the order of the elements <strong>in place</strong> and returns the array</td></tr>
 <tr><td><code>arr.sort([cmp])</code></td><td>Sorts the array <strong>in place</strong> and returns it. <code>cmp(a, b)</code> is true when <code>a</code> comes first; without it, by type — <code>nil</code>, then numbers, then strings, then the rest — and by value within each type</td></tr>
 </table>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
@@ -1433,7 +1434,7 @@ t.reduce(<span class="kw">func</span>(acc, v)  <span class="kw">return</span> ac
 t.sort()                                <span class="cmt">## t BECOMES [1, 2, 3]</span>
 t.sort(<span class="kw">func</span>(a, b)  <span class="kw">return</span> a &gt; b  <span class="kw">end</span>)         <span class="cmt">## [3, 2, 1], largest first</span></code></pre>
 
-<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> reorders the array <strong>itself</strong> — it returns it as well, so it chains, and that return value is the same array, not a copy. Sort a copy (<code>t.copy().sort()</code>) if you need to keep the order you had.</div>
+<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> and <code>reverse</code> reorder the array <strong>itself</strong> — they return it as well, so they chain, and that return value is the same array, not a copy. Sort or reverse a copy (<code>t.copy().sort()</code>) if you need to keep the order you had.</div>
 
 <div class="callout tip">The function you pass is <strong>your own code</strong>, called once per element (and for <code>sort</code>, once per comparison). It may do anything, including raising an error, which stops the walk and reaches your <code>try</code> — a sort interrupted that way leaves the array in a valid but partly reordered state. Note also that <code>filter</code> reads its answer as a <strong>truth</strong>, so the usual rule applies: <code>0</code>, <code>""</code> and an empty array count as false. <code>join</code>, by contrast, never calls any code of yours.</div>
 

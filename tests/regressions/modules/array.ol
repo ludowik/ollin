@@ -217,3 +217,18 @@ assert([].first() == nil and [].last() == nil)
 assert([nil, 5].first() == nil and [5, nil].last() == nil)       ## a nil element is an element, and reads as nil too
 assert([[1], [2, 3]].last().last() == 3)
 assert(array.first(flArr) == 3 and array.last(flArr) == 2)
+
+## reverse reorders the array ITSELF and returns it, like sort.
+var rvArr = [1, nil, 3]
+var rvBack = rvArr.reverse()
+assert(rvBack == rvArr)                              ## the same array, not a copy
+assert(rvArr[1] == 3 and rvArr[2] == nil and rvArr[3] == 1)
+assert([].reverse().len() == 0 and [5].reverse()[1] == 5 and [1, 2].reverse().join(",") == "2,1")
+var rvKeep = [1, 2, 3]
+assert(rvKeep.copy().reverse().join(",") == "3,2,1" and rvKeep.join(",") == "1,2,3")     ## reverse a copy to keep the order
+var rvTurns = [1, 2, 3]
+for rvI, rvV in rvTurns do
+    rvTurns.reverse()                                ## the loop walks a snapshot: three turns, three reversals
+end
+assert(rvTurns.join(",") == "3,2,1")
+assert(array.reverse([4, 5]).join(",") == "5,4")

@@ -309,7 +309,7 @@ arrayLit       = "[" [ expr { "," expr } [ "," ] ] "]" ;
              (* the comma is REQUIRED between two elements, and allowed before the "]" *)
              (* shared by reference, through reference counting; an empty array is falsy, "empty is false" *)
              (* the `array` module: every array method — len, push, add, enqueue, pop, dequeue, insert, delete, remove,
-                indexOf, contains, copy, repeat, concat, first, last, map, filter, reduce, sort, join — is also a function of the global
+                indexOf, contains, copy, repeat, concat, first, last, reverse, map, filter, reduce, sort, join — is also a function of the global
                 module `array`, the array being the first argument: a.concat(b) is array.concat(a, b). Like `string`,
                 the module is shared by every array *)
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
