@@ -1981,8 +1981,8 @@ dispatch_loop:
             Value& recv = regs[cb];
             // Maps do not inject self in general: a module such as `math` must not receive
             // itself, so math.noise(x) calls noise(x) — and every OTHER module is a map too
-            // (Map::kind, collections/map.h). The one exception is the map module's own five
-            // pseudo-methods (len, keys, values, has, delete) called on a PLAIN map or enum
+            // (Map::kind, collections/map.h). The one exception is the map module's own six
+            // pseudo-methods (len, keys, values, has, delete, copy) called on a PLAIN map or enum
             // (`m.len()`), recognized by function pointer (is_map_module_fn). The `kind !=
             // MODULE` guard matters in its own right: `len` is a REAL key of the `map` module
             // itself (map.len IS map_len, found in map's own data, not through the fallback),
@@ -1992,7 +1992,7 @@ dispatch_loop:
             // how `math.sin(x)` must not receive `math`). A plain map can also just hold an
             // unrelated builtin under one of its own keys (`{f: math.sin}`), and calling THAT
             // must never inject self either — is_map_module_fn alone already excludes it, since
-            // math.sin isn't one of the five.
+            // math.sin isn't one of the six.
             bool map_pseudo_call = recv.is_map() && recv.mptr->kind != Map::MODULE && fn.is_builtin() &&
                                     is_map_module_fn(fn.as_builtin());
             bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_pseudo_call;

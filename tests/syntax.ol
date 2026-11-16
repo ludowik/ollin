@@ -697,7 +697,7 @@ assert(m.b    == 6)
 m["d"] = nil
 assert(m["d"] == nil and m.len() == 4)   ## a, b, c, e — "d" is gone, not just nil
 
-## the `map` module: the free-function form of len/keys/values/has/delete
+## the `map` module: the free-function form of len/keys/values/has/delete/copy
 assert(map.len(m) == 4)
 assert(map.has(m, "e") and not map.has(m, "d"))
 assert(map.keys(m).len() == 4)
@@ -705,13 +705,14 @@ assert(map.values(m).len() == 4)
 assert(map.delete(m, "e") == 5)
 assert(not map.has(m, "e"))
 
-## the same five, as pseudo-methods directly on the map — both forms share one implementation
+## the same six, as pseudo-methods directly on the map — both forms share one implementation
 assert(m.len() == 3)
 assert(m.has("a") and not m.has("e"))
 assert(m.keys().len() == 3)
 assert(m.values().len() == 3)
 assert(m.delete("a") == 11)
 assert(not m.has("a"))
+assert(map.copy(m).len() == m.copy().len() and m.copy() <> m)   ## a new map with the same entries
 
 ## nested map
 var scene = {camera: {fov: 60}}
@@ -1330,6 +1331,9 @@ assert(am_sorted[1] == 1 and am_sorted[2] == 2 and am_sorted[3] == 3)
 var am_mixed = [2.5, nil, "z", 1]
 am_mixed.sort()
 assert(am_mixed[1] == nil and am_mixed[2] == 1 and am_mixed[3] == 2.5 and am_mixed[4] == "z")
+var am_copy = am_sorted.copy()                    ## a new array with the same elements
+am_copy.push(4)
+assert(#am_sorted == 3 and #am_copy == 4)
 
 ## ── 25. The do...end block (lexical scope) ───────────────────────────────────
 ## [grammar: doStmt]

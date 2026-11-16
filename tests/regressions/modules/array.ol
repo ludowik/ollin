@@ -139,3 +139,25 @@ arrKinds.sort()
 assert(arrKinds[1] == nil and arrKinds[2] == 1.5 and arrKinds[3] == 3)
 assert(arrKinds[4] == "a" and arrKinds[5] == "z")
 assert(arrKinds[6].k == 1 and arrKinds[7].k == 2)
+
+## copy is a SHALLOW copy: a new array with the same elements, in the same order, the nil ones included.
+var cpSrc = [1, nil, "x", 4]
+var cpDup = cpSrc.copy()
+assert(#cpDup == 4 and cpDup[1] == 1 and cpDup[2] == nil and cpDup[3] == "x" and cpDup[4] == 4)
+cpDup[1] = 99
+cpDup.push(5)
+assert(cpSrc[1] == 1 and #cpSrc == 4)       ## changing the copy leaves the original alone
+cpSrc.pop()
+assert(#cpDup == 5)                         ## and the other way round
+assert([].copy().len() == 0)
+## what the elements hold is shared, as anywhere else in the language
+var cpInner = {n: 1}
+var cpNest = [cpInner, [1, 2]]
+var cpNestDup = cpNest.copy()
+cpInner.n = 2
+cpNest[2].push(3)
+assert(cpNestDup[1].n == 2 and #cpNestDup[2] == 3)
+## the use the tutorial names: sort a copy to keep the order that was
+var cpOrder = [3, 1, 2]
+var cpSorted = cpOrder.copy().sort()
+assert(cpOrder[1] == 3 and cpSorted[1] == 1)

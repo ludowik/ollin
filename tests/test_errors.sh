@@ -245,6 +245,12 @@ check_error "string.split with a non-number max"     'print(string.split("a", ",
 check_error "string.split with one argument"         'print(string.split("a"))'          "string.split: missing argument"
 
 # array.join takes a string separator, and says so instead of converting one silently.
+# map.copy takes a map or an instance: a class is neither a map to copy nor an object, and a number is no map.
+check_error "map.copy of a class" 'class C
+end
+print(map.copy(C))' "map.copy: a class cannot be copied"
+check_error "map.copy of a number" 'print(map.copy(5))' "map.copy: expected (map)"
+
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
 
 # string.number gives nil for a text that is not a number, but a non-STRING is a mistake of the

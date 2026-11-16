@@ -1176,7 +1176,7 @@ m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
 <h3>Copy semantics</h3>
-<div class="callout warn">Maps are <strong>shared by reference</strong>, with reference counting. Assigning a map to another variable does not clone it.</div>
+<div class="callout warn">Maps are <strong>shared by reference</strong>, with reference counting. Assigning a map to another variable does not clone it — <code>m.copy()</code> does, one level deep.</div>
 <pre><code><span class="kw">var</span> a = {x: <span class="num">1</span>}
 <span class="kw">var</span> b = a          <span class="cmt">## b points at the same map</span>
 b.x = <span class="num">99</span>
@@ -1184,7 +1184,7 @@ b.x = <span class="num">99</span>
 <div class="callout">A consequence: <code>==</code> compares maps by <strong>reference</strong> and not by content — <code>{} == {}</code> is <code>0</code>. For equality by value, see <a href="#classes">Equality and comparison</a>.</div>
 
 <h3>The <code>map</code> module</h3>
-<p>Five functions, usable either as a free function taking the map explicitly, or as a method directly on the map — the two forms share the same implementation:</p>
+<p>Six functions, usable either as a free function taking the map explicitly, or as a method directly on the map — the two forms share the same implementation:</p>
 <table>
 <tr><th>Function</th><th>Description</th></tr>
 <tr><td><code>map.len(m)</code> · <code>m.len()</code></td><td>The number of keys — also <code>#m</code></td></tr>
@@ -1192,6 +1192,7 @@ b.x = <span class="num">99</span>
 <tr><td><code>map.values(m)</code> · <code>m.values()</code></td><td>An array of the map's values</td></tr>
 <tr><td><code>map.has(m, key)</code> · <code>m.has(key)</code></td><td><code>true</code> when <code>key</code> is present</td></tr>
 <tr><td><code>map.delete(m, key)</code> · <code>m.delete(key)</code></td><td>Removes <code>key</code> and returns its former value, or <code>nil</code> when it was absent</td></tr>
+<tr><td><code>map.copy(m)</code> · <code>m.copy()</code></td><td>A <strong>new</strong> ordinary map with the same entries — <strong>shallow</strong>, so a value that is itself a map or an array is shared. A frozen enum copies into a map that can be written. An instance is copied with <code>map.copy(obj)</code> and keeps its class; a class cannot be copied</td></tr>
 </table>
 <pre><code><span class="kw">var</span> m = {a: <span class="num">1</span>, b: <span class="num">2</span>, c: <span class="num">3</span>}
 <span class="bi">assert</span>(m.keys().len() == <span class="num">3</span>)
@@ -1370,6 +1371,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.contains(v)</code></td><td><code>true</code> when the array holds an element identical to <code>v</code>, <code>false</code> otherwise</td></tr>
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
+<tr><td><code>arr.copy()</code></td><td>A <strong>new</strong> array with the same elements. The copy is <strong>shallow</strong>: a map, an array or an instance held by the array is shared, not duplicated</td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
 <tr><td><code>arr.map(fn)</code></td><td>A <strong>new</strong> array holding <code>fn(value, index)</code> for each element</td></tr>
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
@@ -1415,7 +1417,7 @@ t.reduce(<span class="kw">func</span>(acc, v)  <span class="kw">return</span> ac
 t.sort()                                <span class="cmt">## t BECOMES [1, 2, 3]</span>
 t.sort(<span class="kw">func</span>(a, b)  <span class="kw">return</span> a &gt; b  <span class="kw">end</span>)         <span class="cmt">## [3, 2, 1], largest first</span></code></pre>
 
-<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> reorders the array <strong>itself</strong> — it returns it as well, so it chains, and that return value is the same array, not a copy. Sort a copy if you need to keep the order you had.</div>
+<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> reorders the array <strong>itself</strong> — it returns it as well, so it chains, and that return value is the same array, not a copy. Sort a copy (<code>t.copy().sort()</code>) if you need to keep the order you had.</div>
 
 <div class="callout tip">The function you pass is <strong>your own code</strong>, called once per element (and for <code>sort</code>, once per comparison). It may do anything, including raising an error, which stops the walk and reaches your <code>try</code> — a sort interrupted that way leaves the array in a valid but partly reordered state. Note also that <code>filter</code> reads its answer as a <strong>truth</strong>, so the usual rule applies: <code>0</code>, <code>""</code> and an empty array count as false. <code>join</code>, by contrast, never calls any code of yours.</div>
 

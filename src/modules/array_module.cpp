@@ -102,6 +102,15 @@ static int arr_remove(CallCtx& ctx) {
     return ctx.ret(removed);
 }
 
+// A SHALLOW copy: a new array holding the same elements, the nil ones included. What the elements
+// hold (a map, an array, an instance) is shared, as anywhere else in the language.
+static int arr_copy(CallCtx& ctx) {
+    arr_check(ctx, 1, "copy: expected (array)");
+    Value result = Value::make_array();
+    result.aptr->items = ctx.args[0].aptr->items;
+    return ctx.ret(result);
+}
+
 // The higher-order members below COPY the array and the function out of `ctx.args` before running
 // any Ollin code: `call_value` can grow the register file, which reallocates it, and a reference
 // into it would then dangle — `[1, 2, 3].map(f)` with a deeply recursive `f` gave back nil values.
@@ -242,6 +251,7 @@ Value make_array_module() {
         .fn("filter", arr_filter)
         .fn("reduce", arr_reduce)
         .fn("sort", arr_sort)
+        .fn("copy", arr_copy)
         .fn("join", arr_join)
         .done();
 }
