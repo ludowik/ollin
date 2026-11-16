@@ -250,6 +250,12 @@ end
 print(map.copy(C))' "map.copy: a class cannot be copied"
 check_error "map.copy of a number" 'print(map.copy(5))' "map.copy: expected (map)"
 
+# array.repeat takes a whole count, and refuses a result longer than an array can be.
+check_error "array.repeat with a fraction"       'print([1].repeat(1.5))'        "array.repeat: the count must be a whole number"
+check_error "array.repeat with a non-number"     'print([1].repeat("a"))'        "array.repeat: argument 2 expected number"
+check_error "array.repeat with no count"         'print([1].repeat())'           "array.repeat: missing argument"
+check_error "array.repeat past the ceiling"      'print([1, 2].repeat(16777216))' "array.repeat: result longer than 16777216 elements"
+
 # array.join takes a string separator, and says so instead of converting one silently.
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
 

@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+// The most elements an array can hold: `set` refuses an index beyond it, and so does `repeat`.
+inline constexpr int64_t k_array_max = 16'777'216;
+
 struct Array {
     std::vector<Value> items;
     int refcount = 1;
@@ -21,7 +24,7 @@ struct Array {
         int64_t i = idx - 1;
         if (i < 0)
             throw std::runtime_error("runtime: array index must be >= 1 (got " + std::to_string(idx) + ")");
-        if (i >= 16'777'216)
+        if (i >= k_array_max)
             throw std::runtime_error("runtime: array index too large (" + std::to_string(idx) + ")");
         // Appending just past the end is how a script BUILDS an array (`arr[i] = …` in a loop),
         // and resize-then-assign touched the cell twice: a nil default-constructed, then

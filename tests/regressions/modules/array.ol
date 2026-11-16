@@ -161,3 +161,32 @@ assert(cpNestDup[1].n == 2 and #cpNestDup[2] == 3)
 var cpOrder = [3, 1, 2]
 var cpSorted = cpOrder.copy().sort()
 assert(cpOrder[1] == 3 and cpSorted[1] == 1)
+
+## repeat gives the elements of the array `count` times over, as a NEW array.
+assert([0].repeat(5).join(",") == "0,0,0,0,0")
+assert([1, 2].repeat(3).join(",") == "1,2,1,2,1,2")
+var rpBase = [7, 8]
+rpBase.repeat(2).push(9)
+assert(#rpBase == 2)                              ## the array repeated is left alone
+assert([1, 2].repeat(1).len() == 2 and [1].repeat(0).len() == 0 and [1].repeat(-3).len() == 0 and [].repeat(4).len() == 0)
+assert([nil].repeat(3).len() == 3)                ## a nil is an element like another
+## the elements are SHARED, as everywhere in the language: three times the same array
+var rpRows = [[]].repeat(3)
+rpRows[1].push("x")
+assert(#rpRows[2] == 1 and #rpRows[3] == 1)
+## whereas a new call makes a new array, which is how a grid of distinct rows is built
+var rpGrid = []
+for r = 1, 3 do
+    rpGrid.push([0].repeat(2))
+end
+rpGrid[1][1] = 5
+assert(rpGrid[2][1] == 0)
+## the ceiling is the size of an array, and it is a refusal, not a slow allocation
+assert([1].repeat(16777216).len() == 16777216)
+var rpBig = nil
+try
+    var tooBig = [1, 2].repeat(16777216)
+catch e
+    rpBig = e
+end
+assert(rpBig == "array.repeat: result longer than 16777216 elements")

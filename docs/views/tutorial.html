@@ -1372,6 +1372,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 <tr><td><code>arr.copy()</code></td><td>A <strong>new</strong> array with the same elements. The copy is <strong>shallow</strong>: a map, an array or an instance held by the array is shared, not duplicated</td></tr>
+<tr><td><code>arr.repeat(n)</code></td><td>A <strong>new</strong> array holding the elements of <code>arr</code> <code>n</code> times over: <code>[0].repeat(81)</code> is eighty-one zeros. <code>n</code> must be a whole number, and <code>0</code> or less gives an empty array. The elements are <strong>shared</strong>, not duplicated — see the note below the table</td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
 <tr><td><code>arr.map(fn)</code></td><td>A <strong>new</strong> array holding <code>fn(value, index)</code> for each element</td></tr>
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
@@ -1388,6 +1389,12 @@ a.delete(<span class="num">2</span>)        <span class="cmt">## removes 99 → 
 q.enqueue(<span class="str">"a"</span>)
 q.enqueue(<span class="str">"b"</span>)
 q.dequeue()         <span class="cmt">## "a"</span></code></pre>
+
+<div class="callout tip"><code>repeat</code> <strong>shares</strong> its elements, like every assignment in the language: <code>[[]].repeat(3)</code> is the same inner array three times, so pushing to one pushes to all. For a grid of distinct rows, call <code>repeat</code> once per row:
+<pre><code><span class="kw">var</span> grid = []
+<span class="kw">for</span> r = <span class="num">1</span>, <span class="num">3</span> <span class="kw">do</span>
+    grid.push([<span class="num">0</span>].repeat(<span class="num">4</span>))   <span class="cmt">## a new row each time</span>
+<span class="kw">end</span></code></pre></div>
 
 <div class="callout warn"><code>for i, v in arr</code> walks a <strong>snapshot</strong> taken when the loop starts: deleting from
 <code>arr</code> mid-loop does not corrupt the walk, but <code>i</code> keeps counting positions in that

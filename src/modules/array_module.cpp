@@ -10,6 +10,7 @@
 #include "module_utils.h"
 #include "../vm.h"
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <stdexcept>
 
@@ -109,6 +110,27 @@ static int arr_copy(CallCtx& ctx) {
     arr_check(ctx, 1, "copy: expected (array)");
     Value result = Value::make_array();
     result.aptr->items = ctx.args[0].aptr->items;
+    return ctx.ret(result);
+}
+
+// The elements of the array, `count` times over: `[0].repeat(81)` is eighty-one zeros. The elements are SHARED,
+// not duplicated, as everywhere in the language: `[[]].repeat(3)` is three times the same array.
+static int arr_repeat(CallCtx& ctx) {
+    arr_check(ctx, 1, "repeat: expected (array, count)");
+    double count = num_arg(ctx.args, ctx.argc, 1, "array.repeat");
+    if (std::isnan(count) || count != std::floor(count))
+        throw std::runtime_error("array.repeat: the count must be a whole number");
+    const std::vector<Value>& items = ctx.args[0].aptr->items;
+    Value result = Value::make_array();
+    if (count <= 0 || items.empty())
+        return ctx.ret(result);
+    // In double, before any cast: a huge count would overflow the product in size_t and pass the ceiling.
+    if (count * (double)items.size() > (double)k_array_max)
+        throw std::runtime_error("array.repeat: result longer than " + std::to_string(k_array_max) + " elements");
+    std::vector<Value>& out = result.aptr->items;
+    out.reserve((size_t)count * items.size());
+    for (size_t i = 0; i < (size_t)count; i++)
+        out.insert(out.end(), items.begin(), items.end());
     return ctx.ret(result);
 }
 
@@ -253,6 +275,7 @@ Value make_array_module() {
         .fn("reduce", arr_reduce)
         .fn("sort", arr_sort)
         .fn("copy", arr_copy)
+        .fn("repeat", arr_repeat)
         .fn("join", arr_join)
         .done();
 }
