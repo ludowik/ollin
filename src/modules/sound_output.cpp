@@ -26,15 +26,6 @@ AudioStream s_stream{};
 bool s_stream_ready = false;
 std::atomic<uint64_t> s_mix_epoch{0};
 
-// Per-voice noise: xorshift, a few integer operations. rand() would be forbidden here — shared
-// global state, with no guarantee of being lock-free.
-inline float noise_next(uint32_t& state) {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    return (float)((double)state / 2147483648.0 - 1.0);
-}
-
 // Correction of a DISCONTINUITY (PolyBLEP). A sawtooth or a square computed directly jumps from
 // one value to another between two samples, and that jump carries harmonics far above half the
 // sample rate, which FOLD back down as inharmonic partials. Hence a metallic, out-of-tune sound,
@@ -54,7 +45,7 @@ inline double poly_blep(double t, double dt) {
     return 0.0;
 }
 
-inline float wave_sample(int shape, double phase, double dt, uint32_t& noise_state) {
+inline float wave_sample(int shape, double phase, double dt, Rng& noise) {
     switch (shape) {
     case 1: {   // square: two discontinuities per turn, at 0 and at 0.5
         double s = phase < 0.5 ? 1.0 : -1.0;
@@ -74,7 +65,7 @@ inline float wave_sample(int shape, double phase, double dt, uint32_t& noise_sta
         // an inaudible gain.
         return (float)(1.0 - 4.0 * std::fabs(phase - 0.5));
     case 4:   // noise
-        return noise_next(noise_state);
+        return (float)noise.signed_unit();
     default:  // sine
         return (float)std::sin(phase * 6.283185307179586);
     }
@@ -185,7 +176,7 @@ void mix_callback(void* buffer, unsigned int frames) {
             // The ramp applies ON TOP OF the envelope: a zero attack would otherwise be a jump, and
             // therefore a click. Five milliseconds are not heard as a fade.
             v.gain += (target - v.gain) * ramp;
-            float s = wave_sample(shape, v.phase, step, v.noise_state) * v.gain;
+            float s = wave_sample(shape, v.phase, step, v.noise) * v.gain;
             out[i * 2] += s * g_left;
             out[i * 2 + 1] += s * g_right;
             v.phase += step;

@@ -1,7 +1,7 @@
 #include "module_utils.h"
+#include "../rng.h"
 #include "value.h"
 #include "vm.h"
-#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -78,8 +78,10 @@ static int color_str(CallCtx& ctx) {
 static int color_random(CallCtx& ctx) {
     (void)ctx.args;
     (void)ctx.argc;
-    auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
-    return ctx.ret(make_color_instance(color_class(), rnd(), rnd(), rnd()));
+    double r = g_engine_rng.unit();
+    double g = g_engine_rng.unit();
+    double b = g_engine_rng.unit();
+    return ctx.ret(make_color_instance(color_class(), r, g, b));
 }
 
 // args[0] is self; returns a new pastel Color instance, mixed 50 % with white.

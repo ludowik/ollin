@@ -86,6 +86,7 @@ static void test_sources() {
 
 int frame_rate_failures();   // frame_rate_test.cpp
 int ui_text_edit_failures();   // ui_text_edit_test.cpp
+int rng_failures();   // rng_test.cpp
 
 int main() {
     test_dir();
@@ -95,6 +96,7 @@ int main() {
     test_sources();
     s_failures += frame_rate_failures();
     s_failures += ui_text_edit_failures();
+    s_failures += rng_failures();
     if (s_failures) {
         std::printf("%d unit check(s) failed\n", s_failures);
         return 1;

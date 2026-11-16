@@ -43,3 +43,12 @@ assert(len(map.keys(colors)) == 15, "the palette has fifteen colours")
 ## a Color may be built from any map that has r, g, b and a, the absent ones defaulting to 0 and 1
 var cxFromMap = Color({r: 1, g: 0.5, b: 0})
 assert(cxFromMap.r == 1 and cxFromMap.g == 0.5 and cxFromMap.b == 0 and cxFromMap.a == 1)
+
+## Color.random draws from the same generator as math.rand: opaque, each channel in [0, 1), and the same after the same seed.
+math.seed(4)
+var cxRandA = Color.random()
+math.seed(4)
+var cxRandB = Color.random()
+assert(cxRandA.a == 1 and cxRandA.r >= 0 and cxRandA.r < 1 and cxRandA.g >= 0 and cxRandA.g < 1 and cxRandA.b >= 0 and cxRandA.b < 1)
+assert(cxRandA.r == cxRandB.r and cxRandA.g == cxRandB.g and cxRandA.b == cxRandB.b, "the same seed, the same colour")
+assert(Color.random().r <> Color.random().r, "and two draws differ")

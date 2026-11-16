@@ -1,4 +1,5 @@
 #pragma once
+#include "../rng.h"
 #include "sound_env.h"
 #include <atomic>
 #include <cstdint>
@@ -16,6 +17,9 @@
 // the mixer.
 
 constexpr int k_max_voices = 16;
+
+// Every voice and every tone starts its noise from the same seed: the noise is the same sequence each time.
+constexpr uint64_t k_noise_seed = 0x9e3779b9u;
 
 struct Voice {
     // Written by the script, read by the audio thread.
@@ -44,7 +48,7 @@ struct Voice {
     // Private to the audio thread.
     double phase = 0.0;
     float gain = 0.0f;
-    uint32_t noise_state = 0x9e3779b9u;
+    Rng noise{k_noise_seed};  // the voice's own: a shared generator would be shared state on the audio thread
     uint32_t seen_trigger = 0;
     double env_t = 0.0;        // time elapsed since the trigger
     double env_hold_at = -1.0; // moment of release, -1 while the note is held

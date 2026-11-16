@@ -1,9 +1,8 @@
 #define _USE_MATH_DEFINES
 #include "module_utils.h"
+#include "../rng.h"
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
-#include <ctime>
 #include <limits>
 
 #ifndef M_PI
@@ -35,18 +34,15 @@ static void noise_init_default() {
     }
 }
 
-// Reshuffles the table with a local deterministic PRNG (xorshift64), independent of rand() and
-// math.seed, so noise and randomness do not influence each other.
+// Reshuffles the table with a generator of its own, independent of math.seed, so noise and randomness do not influence
+// each other.
 static void noise_reseed(uint64_t seed) {
     int p[256];
     for (int i = 0; i < 256; i++)
         p[i] = i;
-    uint64_t s = seed ? seed : 0x9E3779B97F4A7C15ULL;
+    Rng rng(seed);
     for (int i = 255; i > 0; i--) {
-        s ^= s << 13;
-        s ^= s >> 7;
-        s ^= s << 17;
-        int j = (int)(s % (uint64_t)(i + 1));
+        int j = (int)rng.below((uint64_t)(i + 1));
         int tmp = p[i];
         p[i] = p[j];
         p[j] = tmp;
@@ -230,11 +226,19 @@ static int math_approach(CallCtx& ctx) {
     return ctx.ret(num_value(cur + (target - cur) * (1.0 - std::exp(-rate * dt))));
 }
 
+// Integer argument: (int64_t)num_arg is UB — and traps on WASM — when the double is NaN, infinite
+// or out of int64 range. double_fits_int64 (value.h) guards the cast and yields a clear error.
+static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
+    double d = num_arg(args, argc, i, fn);
+    if (!double_fits_int64(d))
+        throw std::runtime_error(std::string(fn) + ": integer argument out of range");
+    return (int64_t)d;
+}
+
 static int math_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    int64_t s = (int64_t)num_arg(args, argc, 0, "math.seed");
-    srand((unsigned)s);
+    g_engine_rng.seed((uint64_t)int_arg(args, argc, 0, "math.seed"));
     return ctx.ret(Value());
 }
 
@@ -307,7 +311,7 @@ static int math_max(CallCtx& ctx) {
 static int math_rand(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double r = (double)rand() / ((double)RAND_MAX + 1.0);
+    double r = g_engine_rng.unit();
     if (argc == 0)
         return ctx.ret(Value(r));
     if (argc == 1)
@@ -315,15 +319,6 @@ static int math_rand(CallCtx& ctx) {
     double lo = num_arg(args, argc, 0, "math.rand");
     double hi = num_arg(args, argc, 1, "math.rand");
     return ctx.ret(Value(lo + r * (hi - lo)));
-}
-
-// Integer argument: (int64_t)num_arg is UB — and traps on WASM — when the double is NaN, infinite
-// or out of int64 range. double_fits_int64 (value.h) guards the cast and yields a clear error.
-static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
-    double d = num_arg(args, argc, i, fn);
-    if (!double_fits_int64(d))
-        throw std::runtime_error(std::string(fn) + ": integer argument out of range");
-    return (int64_t)d;
 }
 
 static int math_rand_int(CallCtx& ctx) {
@@ -335,13 +330,13 @@ static int math_rand_int(CallCtx& ctx) {
         int64_t hi = int_arg(args, argc, 0, "math.randInt");
         if (hi <= 0)
             throw std::runtime_error("math.randInt: argument must be > 0");
-        return ctx.ret(Value((int64_t)(rand() % hi + 1)));
+        return ctx.ret(Value(g_engine_rng.between(1, hi)));
     }
     int64_t lo = int_arg(args, argc, 0, "math.randInt");
     int64_t hi = int_arg(args, argc, 1, "math.randInt");
     if (lo > hi)
         throw std::runtime_error("math.randInt: lo must be <= hi");
-    return ctx.ret(Value(lo + (int64_t)(rand() % (hi - lo + 1))));
+    return ctx.ret(Value(g_engine_rng.between(lo, hi)));
 }
 
 // Fractal Perlin noise (fBm) in 1, 2 or 3 dimensions, returning a FLOAT in [0, 1].
@@ -375,13 +370,16 @@ static int math_noise(CallCtx& ctx) {
 static int math_noise_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    int64_t s = (int64_t)num_arg(args, argc, 0, "math.noiseSeed");
+    int64_t s = int_arg(args, argc, 0, "math.noiseSeed");
     noise_reseed((uint64_t)s);
     return ctx.ret(Value());
 }
 
+void math_reset() {
+    g_engine_rng.seed(rng_clock_seed());
+}
+
 Value make_math_module() {
-    srand((unsigned)time(nullptr));
     noise_init_default();
     return MapBuilder()
         // constants

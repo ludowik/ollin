@@ -303,7 +303,7 @@ int new_buffer(std::vector<float>&& samples) {
 
 // Waveform sampled offline. It is the SAME shape table as the oscillator's, but computed here once
 // and for all, so a buffer costs nothing to play.
-double wave_at(int shape, double phase, uint32_t& noise_state) {
+double wave_at(int shape, double phase, Rng& noise) {
     switch (shape) {
     case SHAPE_SQUARE:
         return phase < 0.5 ? 1.0 : -1.0;
@@ -312,10 +312,7 @@ double wave_at(int shape, double phase, uint32_t& noise_state) {
     case SHAPE_TRIANGLE:
         return 1.0 - 4.0 * std::fabs(phase - 0.5);
     case SHAPE_NOISE:
-        noise_state ^= noise_state << 13;
-        noise_state ^= noise_state >> 17;
-        noise_state ^= noise_state << 5;
-        return (double)noise_state / 2147483648.0 - 1.0;
+        return noise.signed_unit();
     default:
         return std::sin(phase * 6.283185307179586);
     }
@@ -332,9 +329,9 @@ int sound_tone(CallCtx& ctx) {
     std::vector<float> samples(n);
     double phase = 0.0;
     double step = hz / (double)k_audio_sample_rate;
-    uint32_t noise_state = 0x9e3779b9u;
+    Rng noise(k_noise_seed);
     for (size_t i = 0; i < n; i++) {
-        samples[i] = (float)wave_at(shape, phase, noise_state);
+        samples[i] = (float)wave_at(shape, phase, noise);
         phase += step;
         if (phase >= 1.0)
             phase -= 1.0;

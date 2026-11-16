@@ -53,6 +53,34 @@ math.seed(7)
 assert(math.rand() == mathRandA and math.randInt(1, 1000) == mathRandB)
 math.seed(8)
 assert(math.rand() <> mathRandA, "another seed, another sequence")
+## The generator is integer arithmetic only, so a seed gives the SAME numbers on every platform: these are fixed values.
+math.seed(1)
+assert(math.randInt(1, 1000) == 466 and math.randInt(1, 1000) == 520 and math.randInt(1, 1000) == 591)
+assert(math.abs(math.rand() - 0.4443592170557721) < 1e-15, "a float has its 53 bits")
+## randInt reaches the whole range asked, which rand() of Windows (32767) did not, and a draw is fair.
+math.seed(3)
+var mathWide = 0
+var mathThirds = [0, 0, 0]
+for mathI = 1, 3000 do
+    if math.randInt(1, 100000) > 32767 then
+        mathWide += 1
+    end
+    var mathV = math.randInt(1, 3)
+    mathThirds[mathV] += 1
+end
+assert(mathWide > 1500, "two thirds of 1..100000 lie beyond 32767")
+assert(mathThirds[1] > 850 and mathThirds[1] < 1150 and mathThirds[2] > 850 and mathThirds[2] < 1150 and mathThirds[3] > 850 and mathThirds[3] < 1150, "randInt(1, 3) is fair")
+assert(math.randInt(-4611686018427387904, 4611686018427387904) <> nil, "a range wider than 2^62 does not overflow")
+## noise has a generator of its own: math.seed leaves it alone, and noiseSeed gives it its own reproducible table.
+var mathNoise = math.noise(0.3, 0.7)
+math.seed(99)
+assert(math.noise(0.3, 0.7) == mathNoise, "math.seed does not touch the noise")
+math.noiseSeed(5)
+var mathNoiseA = math.noise(0.3, 0.7)
+math.noiseSeed(5)
+assert(math.noise(0.3, 0.7) == mathNoiseA, "the same noiseSeed gives the same noise")
+math.noiseSeed(6)
+assert(math.noise(0.3, 0.7) <> mathNoiseA, "another noiseSeed, another noise")
 
 ## ── math.min / math.max with a float among the arguments, and the forms of rand, randInt and noise ──
 ## All integers stay integers; one float makes the result a float of the same value.

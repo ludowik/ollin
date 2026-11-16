@@ -1173,6 +1173,18 @@ check_error "math.randInt with a bound past the integers" \
     'math.randInt(1e30)' \
     "math.randInt: integer argument out of range"
 
+check_error "math.seed with a number past the integers" \
+    'math.seed(1e30)' \
+    "math.seed: integer argument out of range"
+
+check_error "math.noiseSeed with a number past the integers" \
+    'math.noiseSeed(1e30)' \
+    "math.noiseSeed: integer argument out of range"
+
+check_error "math.seed with a nil" \
+    'math.seed(nil)' \
+    "math.seed: argument 1 expected number, got nil"
+
 check_error "math.noise without argument" \
     'math.noise()' \
     "math.noise: expects 1, 2 or 3 arguments"
