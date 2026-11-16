@@ -256,6 +256,11 @@ check_error "array.repeat with a non-number"     'print([1].repeat("a"))'       
 check_error "array.repeat with no count"         'print([1].repeat())'           "array.repeat: missing argument"
 check_error "array.repeat past the ceiling"      'print([1, 2].repeat(16777216))' "array.repeat: result longer than 16777216 elements"
 
+# array.concat takes arrays only: a nil or a number is a mistake, and it is named.
+check_error "array.concat with a nil"            'print([1].concat(nil))'          "array.concat: argument 2 expected array, got nil"
+check_error "array.concat with a number last"    'print([1].concat([2], 3))'       "array.concat: argument 3 expected array, got int"
+check_error "array.concat with no array"         'print(array.concat(5))'          "array.concat: expected (array, array...)"
+
 # array.join takes a string separator, and says so instead of converting one silently.
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
 

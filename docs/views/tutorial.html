@@ -1373,6 +1373,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 <tr><td><code>arr.copy()</code></td><td>A <strong>new</strong> array with the same elements. The copy is <strong>shallow</strong>: a map, an array or an instance held by the array is shared, not duplicated</td></tr>
 <tr><td><code>arr.repeat(n)</code></td><td>A <strong>new</strong> array holding the elements of <code>arr</code> <code>n</code> times over: <code>[0].repeat(81)</code> is eighty-one zeros. <code>n</code> must be a whole number, and <code>0</code> or less gives an empty array, and a result longer than an array can be (16,777,216 elements) is an error. The elements are <strong>shared</strong>, not duplicated — see the note below the table</td></tr>
+<tr><td><code>arr.concat(other, …)</code></td><td>A <strong>new</strong> array with the elements of <code>arr</code>, then those of each <code>other</code> array given, in order — any number of them, and none gives a copy. Every argument must be an array, and the elements are shared, as for <code>copy</code></td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
 <tr><td><code>arr.map(fn)</code></td><td>A <strong>new</strong> array holding <code>fn(value, index)</code> for each element</td></tr>
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
@@ -1395,6 +1396,13 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="kw">for</span> r = <span class="num">1</span>, <span class="num">3</span> <span class="kw">do</span>
     grid.push([<span class="num">0</span>].repeat(<span class="num">4</span>))   <span class="cmt">## a new row each time</span>
 <span class="kw">end</span></code></pre></div>
+
+<h3>The <code>array</code> module</h3>
+<p>Every method above is also a function of the global <code>array</code> module, taking the array first — the same functions, as <code>map.keys(m)</code> and <code>m.keys()</code> are for maps:</p>
+<pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>]
+<span class="bi">assert</span>(array.len(a) == <span class="num">2</span>)
+<span class="bi">assert</span>(array.concat(a, [<span class="num">3</span>], [<span class="num">4</span>]).join(<span class="str">","</span>) == <span class="str">"1,2,3,4"</span>)   <span class="cmt">## the same as a.concat([3], [4])</span></code></pre>
+<p>A local variable or a parameter may still be called <code>array</code>. Like <code>string</code>, the module is shared by every array: adding a member to it, <code>array.last = func(a) … end</code>, makes <code>[1, 2].last()</code> work everywhere.</p>
 
 <div class="callout warn"><code>for i, v in arr</code> walks a <strong>snapshot</strong> taken when the loop starts: deleting from
 <code>arr</code> mid-loop does not corrupt the walk, but <code>i</code> keeps counting positions in that

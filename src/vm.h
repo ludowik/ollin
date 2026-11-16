@@ -113,8 +113,9 @@ class VM {
     };
     std::vector<GetIndexCache> gicache_;
 
-    // Member of an IMMUTABLE module map (string_module_, array_module_), through the same
-    // per-site cache: these maps never change, so every pass after the first is a hit. A null
+    // Member of a module map (string_module_, array_module_), through the same per-site cache,
+    // validated on the map's layout since a script may add a member to these global modules
+    // (`array.zip = …`) or replace one. Almost every pass after the first is a hit. A null
     // `key_sptr` means the key is not a string (indexing a string by integer, say) and the
     // lookup is done directly, uncached.
     const Value* module_member(const Value& mod, const Value& key, const InternedStr* key_sptr) {
@@ -137,11 +138,11 @@ class VM {
     Chunk owned_chunk;
     const Chunk* ch = nullptr;
     Value string_module_;
-    // Array pseudo-methods, built once (see array_module.cpp). Engine-internal: NOT a global
-    // module exposed to scripts.
+    // Array pseudo-methods AND the global "array" module — the SAME object serves both, like string_module_
+    // (see array_module.cpp).
     Value array_module_;
     // Map pseudo-methods (len, keys, values, has, delete, copy) AND the global "map" module — the SAME
-    // object serves both, unlike array_module_ (see map_module.cpp and Map::kind).
+    // object serves both (see map_module.cpp and Map::kind).
     Value map_module_;
     uint32_t ip = 0;
     std::vector<Value> globals;

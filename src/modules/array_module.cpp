@@ -112,6 +112,29 @@ static int arr_copy(CallCtx& ctx) {
     return ctx.ret(result);
 }
 
+// The elements of the receiver, then those of each array after it, in a NEW array. Every argument must be an array: a nil
+// or a number there is a mistake, not an empty list. The elements are SHARED, as everywhere in the language.
+static int arr_concat(CallCtx& ctx) {
+    arr_check(ctx, 1, "concat: expected (array, array...)");
+    size_t total = 0;
+    for (int i = 0; i < ctx.argc; i++) {
+        if (!ctx.args[i].is_array())
+            throw std::runtime_error("array.concat: argument " + std::to_string(i + 1) + " expected array, got " +
+                                     ctx.args[i].type_name());
+        total += ctx.args[i].aptr->items.size();
+    }
+    if (total > (size_t)k_array_max)
+        throw std::runtime_error("array.concat: result longer than " + std::to_string(k_array_max) + " elements");
+    Value result = Value::make_array();
+    std::vector<Value>& out = result.aptr->items;
+    out.reserve(total);
+    for (int i = 0; i < ctx.argc; i++) {
+        const std::vector<Value>& items = ctx.args[i].aptr->items;
+        out.insert(out.end(), items.begin(), items.end());
+    }
+    return ctx.ret(result);
+}
+
 // The elements are SHARED, not duplicated, as everywhere in the language: `[[]].repeat(3)` is the same array three times.
 static int arr_repeat(CallCtx& ctx) {
     arr_check(ctx, 1, "repeat: expected (array, count)");
@@ -273,6 +296,7 @@ Value make_array_module() {
         .fn("sort", arr_sort)
         .fn("copy", arr_copy)
         .fn("repeat", arr_repeat)
+        .fn("concat", arr_concat)
         .fn("join", arr_join)
         .done();
 }

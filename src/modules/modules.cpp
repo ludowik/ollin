@@ -4,6 +4,7 @@
 #include "https_module.h"
 #include "image_module.h"
 #include "map_module.h"
+#include "array_module.h"
 #include "motion_module.h"
 #include "mouse_module.h"
 #include "sound_module.h"
@@ -54,6 +55,7 @@ static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modu
     { "graphics", make_graphics_module, gfx_program_reset },   // fitArea off, the orientation lock released
     { "string",   make_string_module,   nullptr          },
     { "map",      make_map_module,      nullptr          },
+    { "array",    make_array_module,    nullptr          },
     { "colors",   make_colors_module,   nullptr          },
     { "blend",    make_blend_module,    nullptr          },
     { "window",   make_window_module,   nullptr          },

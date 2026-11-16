@@ -181,3 +181,30 @@ rpA[1] = 5
 assert(rpB[1] == 0)
 ## the ceiling is the size of an array (the refusal past it is in test_errors.sh)
 assert([1].repeat(16777216).len() == 16777216)
+
+## concat: the elements of the receiver, then those of each array given, in a NEW array.
+var ccBase = [1, 2]
+assert(ccBase.concat([3], [4, 5]).join(",") == "1,2,3,4,5")
+assert(ccBase.concat().join(",") == "1,2" and ccBase.concat([]).len() == 2 and [].concat([], []).len() == 0)
+ccBase.concat([3]).push(9)
+assert(#ccBase == 2)                              ## the array and its arguments are left alone
+assert(ccBase.concat(ccBase).join(",") == "1,2,1,2")
+var ccInner = [[]]
+var ccBoth = ccInner.concat(ccInner)
+ccBoth[1].push("x")
+assert(#ccInner[1] == 1 and #ccBoth[2] == 1)      ## the elements are shared
+assert([nil].concat([nil]).len() == 2)
+
+## The `array` module is the free-function form of every method: the same functions, the array first.
+assert(typeof(array) == "module")
+assert(array.len(ccBase) == 2 and array.concat(ccBase, [7]).join(",") == "1,2,7")
+assert(array.copy(ccBase).len() == 2 and array.repeat([0], 3).len() == 3)
+var arrFree = [3, 1, 2]
+array.push(arrFree, 0)
+assert(array.indexOf(arrFree, 0) == 4 and array.contains(arrFree, 3) and array.sort(arrFree)[1] == 0)
+assert(array.map([1, 2], func(v) return v * 2 end).join(",") == "2,4" and array.join([1, 2], "-") == "1-2")
+## a local may take the name, as it may take `string` or `map`
+func arrShadow(array)
+    return array.len()
+end
+assert(arrShadow([1, 2, 3]) == 3)

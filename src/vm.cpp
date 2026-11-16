@@ -2253,7 +2253,7 @@ void VM::execute(Chunk chunk) {
         if (owned_chunk.identifier_index(name) >= 0) // do not BUILD a module the program never names
             init_global(name, module_of(name));
     string_module_ = module_of("string");
-    array_module_ = make_array_module();
+    array_module_ = module_of("array");
     map_module_ = module_of("map");
     init_global("deltaTime", Value(0.0));
     init_global("elapsedTime", Value(0.0));
