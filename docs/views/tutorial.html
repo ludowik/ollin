@@ -1403,7 +1403,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>]
 <span class="bi">assert</span>(array.len(a) == <span class="num">2</span>)
 <span class="bi">assert</span>(array.concat(a, [<span class="num">3</span>], [<span class="num">4</span>]).join(<span class="str">","</span>) == <span class="str">"1,2,3,4"</span>)   <span class="cmt">## the same as a.concat([3], [4])</span></code></pre>
-<p>Like <code>string</code>, the module is shared by every array: adding a member to it, <code>array.last = func(a) … end</code>, makes <code>[1, 2].last()</code> work everywhere.</p>
+<p>Like <code>string</code>, the module is shared by every array: adding a member to it, <code>array.second = func(a) return a[2] end</code>, makes <code>[1, 2].second()</code> work everywhere.</p>
 
 <div class="callout warn"><code>for i, v in arr</code> walks a <strong>snapshot</strong> taken when the loop starts: deleting from
 <code>arr</code> mid-loop does not corrupt the walk, but <code>i</code> keeps counting positions in that
