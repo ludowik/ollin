@@ -103,31 +103,12 @@ for i = 1, CELLS do
 end
 assert(solverCount(loose, 2, nil).count == 2, "taking every clue out that can go leaves a puzzle with several solutions")
 
-## The random numbers: a seed gives the same sequence, and the numbers stay in range.
-var r1 = rngNew(42)
-var r2 = rngNew(42)
-var r3 = rngNew(43)
-var same = true
-var differs = false
-for k = 1, 20 do
-    var a = rngNext(r1)
-    same = same and a == rngNext(r2)
-    differs = differs or a <> rngNext(r3)
-end
-assert(same and differs, "the same seed gives the same numbers, another seed other ones")
-var seen = {}
-for k = 1, 400 do
-    var v = rngInt(r1, 9)
-    assert(v >= 1 and v <= 9, "rngInt out of range: {v}")
-    seen[v] = true
-end
-assert(len(seen) == 9, "all nine values come up")
-assert(shuffled([1, 2, 3, 4, 5], rngNew(1)).sort(func(a, b) return a < b end).join() == "12345", "a shuffle keeps the elements")
+## A grid filled at random is a valid solution, and the same seed fills the same grid.
 for seed in [1, 2, 3] do
-    var full = solverFill(rngNew(seed))
+    var full = solverFill(Random(seed))
     assert(boardComplete(full), "seed {seed}: the filled grid is a valid solution")
 end
-assert(solverFill(rngNew(7)).join() == solverFill(rngNew(7)).join() and solverFill(rngNew(7)).join() <> solverFill(rngNew(8)).join())
+assert(solverFill(Random(7)).join() == solverFill(Random(7)).join() and solverFill(Random(7)).join() <> solverFill(Random(8)).join())
 
 ## ── The logic and the grade ─────────────────────────────────────────────────────────────────────
 assert(logicSolve(g, false), "the naked singles solve the easy puzzle")
@@ -202,6 +183,14 @@ while not generatorStep(job, 0) do
     steps += 1
 end
 assert(steps > 5 and job.result.puzzle.join() == twice.puzzle.join(), "steps change nothing to the result: {steps} steps")
+
+## ...and so does one that the rest of the program draws numbers beside: the puzzle has a generator of its own.
+var busy = generatorNew(777, 2)
+while not generatorStep(busy, 0) do
+    math.rand()
+    math.randInt(1, 100)
+end
+assert(busy.result.puzzle.join() == twice.puzzle.join(), "drawing from the engine generator in between changes nothing")
 
 ## The puzzle of the day: a date and a level give one seed; the days and the levels differ.
 assert(dailySeed(2026, 10, 19, 1) == dailySeed(2026, 10, 19, 1))

@@ -56,42 +56,6 @@ func stateRemove(st, i, d)
     st.empty += 1
 end
 
-func rngNew(seed)
-    var s = seed & 0xFFFFFFFF
-    if s == 0 then
-        s = 2463534242
-    end
-    var rng = {s: s}
-    for k = 1, 8 do
-        rngNext(rng)
-    end
-    return rng
-end
-
-## xorshift32: 32 bits kept by hand, the integers being 64 bits wide.
-func rngNext(rng)
-    var x = rng.s
-    x = x ~ ((x << 13) & 0xFFFFFFFF)
-    x = x ~ (x >> 17)
-    x = x ~ ((x << 5) & 0xFFFFFFFF)
-    rng.s = x
-    return x
-end
-
-## An integer from 1 to n.
-func rngInt(rng, n)
-    return rngNext(rng) % n + 1
-end
-
-func shuffled(list, rng)
-    var out = list.copy()
-    for i = len(out), 2, -1 do
-        var j = rngInt(rng, i)
-        out[i], out[j] = out[j], out[i]
-    end
-    return out
-end
-
 ## The empty cell with the fewest candidates, the first one when several tie: cell, mask, count (cell 0 and count N + 1
 ## when there is no empty cell). The scan of every node of a search, so the tables are read into locals once.
 func stateBestCell(st)
@@ -123,8 +87,8 @@ func stateBestCell(st)
     return best, bestMask, bestN
 end
 
-## Looks for the solutions of the state, on the cell with the fewest candidates, until `limit` are found. With an
-## rng the digits are tried in a random order. `found` gets the count, the first solution, and how many cells were
+## Looks for the solutions of the state, on the cell with the fewest candidates, until `limit` are found. With a
+## Random the digits are tried in a random order. `found` gets the count, the first solution, and how many cells were
 ## guessed on (a cell with more than one candidate).
 func solverSearch(st, limit, found, rng)
     if st.empty == 0 then
@@ -143,7 +107,7 @@ func solverSearch(st, limit, found, rng)
     end
     var digits = maskDigits(bestMask)
     if rng <> nil then
-        digits = shuffled(digits, rng)
+        digits.shuffle(rng)
     end
     for d in digits do
         statePlace(st, best, d)

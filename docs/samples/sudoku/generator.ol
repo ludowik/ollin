@@ -3,8 +3,8 @@
 ## (solver.ol); one that is not of the level wanted is thrown away and another is drawn, a few times over, and the
 ## nearest one is kept when none was right.
 ##
-## A puzzle only depends on its seed: the random numbers are our own (rngNew), so the same seed gives the same puzzle
-## on every platform, which is what the puzzle of the day relies on. It is made by a JOB that advances a little at a
+## A puzzle only depends on its seed: it draws from a Random of its own, which nothing else touches and which gives the
+## same numbers on every platform, so the same seed gives the same puzzle, which is what the puzzle of the day relies on. It is made by a JOB that advances a little at a
 ## time, so that a screen can keep drawing while a hard puzzle is being cut; the steps change nothing in the result.
 
 ## The clues a puzzle of each level is cut down to, as a range the draw picks in: the easy levels stop early, the
@@ -14,7 +14,7 @@ const ATTEMPTS = 8
 
 ## Starts a puzzle of the level (1 to 4) for a seed.
 func generatorNew(seed, level)
-    var job = {rng: rngNew(seed), level: level, attempt: 0, best: nil, result: nil, solution: nil, g: nil, order: nil, pos: 0, clues: 0, target: 0}
+    var job = {rng: Random(seed), level: level, attempt: 0, best: nil, result: nil, solution: nil, g: nil, order: nil, pos: 0, clues: 0, target: 0}
     generatorAttempt(job)
     return job
 end
@@ -30,8 +30,8 @@ func generatorAttempt(job)
     job.attempt += 1
     job.solution = solverFill(rng)
     job.g = job.solution.copy()
-    job.target = range[1] + rngInt(rng, range[2] - range[1] + 1) - 1
-    job.order = shuffled(cells, rng)
+    job.target = rng.randInt(range[1], range[2])
+    job.order = cells.shuffle(rng)
     job.pos = 0
     job.clues = CELLS
 end
