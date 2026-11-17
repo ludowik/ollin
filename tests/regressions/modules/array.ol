@@ -228,6 +228,45 @@ var rvKeep = [1, 2, 3]
 assert(rvKeep.copy().reverse().join(",") == "3,2,1" and rvKeep.join(",") == "1,2,3")     ## reverse a copy to keep the order
 assert(array.reverse([4, 5]).join(",") == "5,4")
 
+## shuffle reorders the array ITSELF and returns it, drawing from the engine generator: a seed repeats it, on every platform.
+var shArr = [1, nil, 3, "x", 5, 6, 7, 8]
+var shBack = shArr.shuffle()
+assert(shBack == shArr and #shArr == 8)                       ## the same array, not a copy
+assert(shArr.copy().sort().join(",") == [nil, 1, 3, 5, 6, 7, 8, "x"].join(","), "no element lost or invented")
+math.seed(1)
+assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",") == "1,4,8,2,3,7,6,5")     ## pinned against an independent splitmix64 + Fisher-Yates
+math.seed(42)
+assert(array.shuffle([1, 2, 3, 4, 5, 6, 7, 8]).join(",") == "5,4,3,1,8,7,2,6")
+math.seed(7)
+var shFirst = [1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",")
+math.seed(7)
+assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",") == shFirst)
+assert([].shuffle().len() == 0 and [9].shuffle()[1] == 9)
+math.seed(3)
+var shRand = math.rand()
+math.seed(3)
+var shNone = [].shuffle()
+var shOne = [9].shuffle()
+assert(math.rand() == shRand, "an array of 0 or 1 elements draws nothing")
+var shKept = {k: 1}
+var shObjs = [shKept, shKept, [1]]
+for shI = 1, 500 do
+    shObjs.shuffle()                                          ## a position drawn for itself swaps an element with itself
+end
+assert(shKept.k == 1 and #shObjs == 3 and shObjs.indexOf(shKept) <> nil)                       ## the elements are moved, never copied or destroyed
+
+## Every ordering of three elements turns up, about as often as any other (the seed makes this check repeatable).
+math.seed(2024)
+var shSeen = {}
+for shI = 1, 6000 do
+    var shKey = [1, 2, 3].shuffle().join("")
+    shSeen[shKey] = (shSeen[shKey] or 0) + 1
+end
+assert(#shSeen == 6, "all six orderings appear")
+for shK, shN in shSeen do
+    assert(shN > 850 and shN < 1150, "ordering {shK} came up {shN} times out of 6000")
+end
+
 ## clear empties the array ITSELF and returns it: whoever else holds it sees it empty.
 var clArr = [1, 2, 3]
 var clAlias = clArr

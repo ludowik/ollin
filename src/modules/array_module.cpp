@@ -8,6 +8,7 @@
 // `arr.push(v)` arrives here as (arr, v).
 #include "array_module.h"
 #include "module_utils.h"
+#include "../rng.h"
 #include "../vm.h"
 #include <algorithm>
 #include <exception>
@@ -116,6 +117,16 @@ static int arr_reverse(CallCtx& ctx) {
     arr_check(ctx, 1, "reverse: expected (array)");
     std::vector<Value>& items = ctx.args[0].aptr->items;
     std::reverse(items.begin(), items.end());
+    return ctx.ret(ctx.args[0]);
+}
+
+// Fisher-Yates over the engine generator, so `math.seed` makes a shuffle repeatable. Every ordering is equally
+// likely: `below` is unbiased, which `rand() % n` would not be.
+static int arr_shuffle(CallCtx& ctx) {
+    arr_check(ctx, 1, "shuffle: expected (array)");
+    std::vector<Value>& items = ctx.args[0].aptr->items;
+    for (size_t i = items.size(); i > 1; i--)
+        std::swap(items[i - 1], items[(size_t)g_engine_rng.below(i)]);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -332,6 +343,7 @@ Value make_array_module() {
         .fn("repeat", arr_repeat)
         .fn("concat", arr_concat)
         .fn("reverse", arr_reverse)
+        .fn("shuffle", arr_shuffle)
         .fn("clear", arr_clear)
         .fn("first", arr_first)
         .fn("last", arr_last)

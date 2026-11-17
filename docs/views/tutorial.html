@@ -1381,6 +1381,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
 <tr><td><code>arr.reduce(fn, init)</code></td><td>Folds the array into a single value with <code>fn(accumulator, value, index)</code>, starting from <code>init</code> — which is <strong>required</strong></td></tr>
 <tr><td><code>arr.reverse()</code></td><td>Reverses the order of the elements <strong>in place</strong> and returns the array</td></tr>
+<tr><td><code>arr.shuffle()</code></td><td>Puts the elements in a random order <strong>in place</strong> and returns the array. Every order is equally likely, and <code>math.seed</code> makes the result repeatable, on every platform</td></tr>
 <tr><td><code>arr.clear()</code></td><td>Removes <strong>every</strong> element of the array itself and returns it. Unlike <code>a = []</code>, which puts a new array in the variable, <code>clear</code> empties the array that every other holder shares</td></tr>
 <tr><td><code>arr.sort([cmp])</code></td><td>Sorts the array <strong>in place</strong> and returns it. <code>cmp(a, b)</code> is true when <code>a</code> comes first; without it, by type — <code>nil</code>, then numbers, then strings, then the rest — and by value within each type</td></tr>
 </table>
@@ -1436,7 +1437,7 @@ t.reduce(<span class="kw">func</span>(acc, v)  <span class="kw">return</span> ac
 t.sort()                                <span class="cmt">## t BECOMES [1, 2, 3]</span>
 t.sort(<span class="kw">func</span>(a, b)  <span class="kw">return</span> a &gt; b  <span class="kw">end</span>)         <span class="cmt">## [3, 2, 1], largest first</span></code></pre>
 
-<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> and <code>reverse</code> reorder the array <strong>itself</strong> — they return it as well, so they chain, and that return value is the same array, not a copy. Sort or reverse a copy (<code>t.copy().sort()</code>) if you need to keep the order you had.</div>
+<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code>, <code>reverse</code> and <code>shuffle</code> reorder the array <strong>itself</strong> — they return it as well, so they chain, and that return value is the same array, not a copy. Sort, reverse or shuffle a copy (<code>t.copy().sort()</code>) if you need to keep the order you had.</div>
 
 <div class="callout tip">The function you pass is <strong>your own code</strong>, called once per element (and for <code>sort</code>, once per comparison). It may do anything, including raising an error, which stops the walk and reaches your <code>try</code> — a sort interrupted that way leaves the array in a valid but partly reordered state. Note also that <code>filter</code> reads its answer as a <strong>truth</strong>, so the usual rule applies: <code>0</code>, <code>""</code> and an empty array count as false. <code>join</code>, by contrast, never calls any code of yours.</div>
 
@@ -1624,7 +1625,7 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
     <tr><td><code>math.isNan(x)</code> / <code>math.isInf(x)</code></td><td>function</td><td>Tests for NaN / infinity</td></tr>
     <tr><td><code>math.rand([lo, hi])</code></td><td>function</td><td>A random float in [0, 1) — all 53 bits of a double — or in [lo, hi] when given</td></tr>
     <tr><td><code>math.randInt([lo,] hi)</code></td><td>function</td><td>A random integer in [1, hi], or in [lo, hi], any range an integer can hold</td></tr>
-    <tr><td><code>math.seed(n)</code></td><td>function</td><td>Sets the seed of the random generator: the same seed gives the same numbers, on every platform (<code>Color.random()</code> draws from it too)</td></tr>
+    <tr><td><code>math.seed(n)</code></td><td>function</td><td>Sets the seed of the random generator: the same seed gives the same numbers, on every platform (<code>Color.random()</code> and <code>arr.shuffle()</code> draw from it too)</td></tr>
     <tr><td><code>math.noise(x[, y[, z]])</code></td><td>function</td><td>Fractal Perlin noise (fBm) in 1, 2 or 3 dimensions → a float in [0, 1], continuous and deterministic</td></tr>
     <tr><td><code>math.noiseSeed(n)</code></td><td>function</td><td>Sets the noise seed: the same <code>n</code> gives the same noise</td></tr>
   </tbody>

@@ -1336,6 +1336,7 @@ var am_copy = am_sorted.copy()                    ## a new array with the same e
 am_copy.push(4)
 assert(#am_sorted == 3 and #am_copy == 4)
 assert(am_copy.reverse()[1] == 4 and am_copy[1] == 4)   ## in place
+assert(am_copy.shuffle() == am_copy and #am_copy == 4)  ## in place too, and returned
 assert(am_copy.clear() == am_copy and #am_copy == 0)    ## emptied itself, and returned
 assert([0].repeat(3).join(",") == "0,0,0")        ## the elements, count times over
 

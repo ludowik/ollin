@@ -270,6 +270,9 @@ check_error "array.concat with a nil"            'print([1].concat(nil))'       
 check_error "array.concat with a number last"    'print([1].concat([2], 3))'       "array.concat: argument 3 expected array, got int"
 check_error "array.concat with no array"         'print(array.concat(5))'          "array.concat: expected (array, array...)"
 
+# array.shuffle works on an array, and names itself when given anything else.
+check_error "array.shuffle on a number"          'print(array.shuffle(5))'         "array.shuffle: expected (array)"
+
 # array.join takes a string separator, and says so instead of converting one silently.
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
 
