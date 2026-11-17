@@ -63,3 +63,12 @@ end
 assert(instanceOf(rnA, Random) and classOf(rnA) == Random)
 var rnHolder = {gen: Random(7)}
 assert(rnHolder.gen.randInt(1, 6) >= 1)
+
+## A generator already made keeps working when the script reassigns the global Random: it is recognised by what it is.
+class FixedSeed extends Random
+end
+var rnLate = Random(1)
+var rnChild = FixedSeed(1)
+global Random = nil
+assert(rnLate.randInt(1, 1000) == 567 and rnChild.randInt(1, 1000) == 567)
+assert([1, 2, 3].shuffle(rnLate).len() == 3)

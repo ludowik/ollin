@@ -1,6 +1,5 @@
 #include "random_module.h"
 #include "module_utils.h"
-#include "../vm.h"
 #include <stdexcept>
 #include <string>
 
@@ -34,14 +33,23 @@ Value rng_rand_int(Rng& rng, const Value* args, int argc, const char* fn) {
     return Value(rng.between(lo, hi));
 }
 
-// The global class, reused rather than rebuilt (as color_class does): an instance made from another class is no Random.
-static Value random_class() {
-    Value c = VM::current()->get_global("Random");
-    return c.is_class() ? c : make_random_class();
+static int random_rand(CallCtx& ctx);
+
+// Whether obj comes from the Random class, or from one that extends it: recognised by the class's own `rand` being OUR
+// function, so a script that reassigns the global `Random` does not turn the generators already made into strangers.
+static bool is_random(const Value& obj) {
+    if (!obj.is_map())
+        return false;
+    for (const Value* c = &obj.class_of(); c->is_class(); c = &c->class_of()) {
+        Value fn = c->map_get(Value(std::string("rand")));
+        if (fn.is_builtin() && fn.as_builtin() == random_rand)
+            return true;
+    }
+    return false;
 }
 
 Rng random_load(const Value& obj, const char* fn) {
-    if (!obj.is_instance_of(random_class()))
+    if (!is_random(obj))
         throw std::runtime_error(std::string(fn) + ": expected a Random, got " + obj.type_name());
     Value state = obj.map_get(Value(std::string(k_state_key)));
     if (!state.is_integer())
