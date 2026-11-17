@@ -119,10 +119,15 @@ static int arr_reverse(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// Empties the array ITSELF, so every holder of it sees it empty; the capacity is kept for the next fill.
+// Empties the array ITSELF, so every holder of it sees it empty. A small array keeps its capacity for the next fill; a
+// big one gives it back, like a big map (map.clear): a frame that lives as long as the program would pin it for good.
 static int arr_clear(CallCtx& ctx) {
     arr_check(ctx, 1, "clear: expected (array)");
-    ctx.args[0].aptr->items.clear();
+    std::vector<Value>& items = ctx.args[0].aptr->items;
+    if (items.capacity() > ArrayPool::POOL_MAX_CAP)
+        std::vector<Value>{}.swap(items);
+    else
+        items.clear();
     return ctx.ret(ctx.args[0]);
 }
 

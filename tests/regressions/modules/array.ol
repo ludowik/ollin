@@ -242,3 +242,12 @@ assert(clKept.k == 1)                                  ## what it held is not de
 var clSelf = []
 clSelf.push(clSelf)
 assert(#clSelf.clear() == 0)                           ## an array holding itself
+
+## clear of a big array gives its memory back, as b = [] does (a frame that lives as long as the program would pin it).
+var clBig = []
+for clI = 1, 200000 do
+    clBig.push(clI)
+end
+var clBefore = mem()
+clBig.clear()
+assert(#clBig == 0 and mem() < clBefore - 1000000, "a big array gives its capacity back")

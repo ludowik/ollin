@@ -96,7 +96,8 @@ static int map_copy(CallCtx& ctx) {
 // one and forgotten in the other can't happen — the old two-list form let exactly that compile
 // silently, m.newFn() then just never getting self.
 static const struct { const char* name; Value::BuiltinFn fn; } k_map_fns[] = {
-    {"len", map_len}, {"keys", map_keys}, {"values", map_values}, {"has", map_has}, {"delete", map_delete}, {"copy", map_copy}, {"clear", map_clear},
+    {"len", map_len},       {"keys", map_keys}, {"values", map_values}, {"has", map_has},
+    {"delete", map_delete}, {"copy", map_copy}, {"clear", map_clear},
 };
 
 Value make_map_module() {

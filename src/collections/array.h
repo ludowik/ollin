@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-// The most elements an array can hold: `set` refuses an index beyond it, and so does `repeat`.
+// The ceiling `set` refuses an index beyond, and that `repeat` and `concat` refuse to build past (`push` is not bounded).
 inline constexpr int64_t k_array_max = 16'777'216;
 
 struct Array {
