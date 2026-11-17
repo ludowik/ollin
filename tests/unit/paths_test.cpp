@@ -3,21 +3,13 @@
 // in-memory source registry (filled by the playground, empty on a native run). Plain asserts, no framework:
 // the build target is `unit_tests`, run by tests/check_unit.sh.
 #include "paths.h"
+#include "check.h"
 #include "source_registry.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <vector>
-
-static int s_failures = 0;
-
-static void expect(bool ok, const char* what) {
-    if (ok)
-        return;
-    std::printf("FAIL %s\n", what);
-    s_failures++;
-}
 
 static void expect_eq(const std::string& got, const std::string& want, const char* what) {
     if (got == want)

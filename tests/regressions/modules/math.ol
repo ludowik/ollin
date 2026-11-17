@@ -70,7 +70,8 @@ for mathI = 1, 3000 do
 end
 assert(mathWide > 1500, "two thirds of 1..100000 lie beyond 32767")
 assert(mathThirds[1] > 850 and mathThirds[1] < 1150 and mathThirds[2] > 850 and mathThirds[2] < 1150 and mathThirds[3] > 850 and mathThirds[3] < 1150, "randInt(1, 3) is fair")
-assert(math.randInt(-4611686018427387904, 4611686018427387904) <> nil, "a range wider than 2^62 does not overflow")
+var mathBig = math.randInt(-4611686018427387904, 4611686018427387904)
+assert(mathBig >= -4611686018427387904 and mathBig <= 4611686018427387904, "a range wider than 2^62 stays in range")
 ## noise has a generator of its own: math.seed leaves it alone, and noiseSeed gives it its own reproducible table.
 var mathNoise = math.noise(0.3, 0.7)
 math.seed(99)

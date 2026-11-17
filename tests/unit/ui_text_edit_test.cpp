@@ -1,17 +1,9 @@
 // UNIT test of the editing rules of a ui.textField draft (src/ui_text_edit.h): the limit counts characters, a
 // character leaves whole, and a long text shows its end. Called by the main of paths_test.cpp, which sums the failures.
 #include "ui_text_edit.h"
+#include "check.h"
 
 #include <cstdio>
-
-static int s_failures = 0;
-
-static void expect(bool ok, const char* what) {
-    if (ok)
-        return;
-    std::printf("FAIL %s\n", what);
-    s_failures++;
-}
 
 static void test_append() {
     std::string t;

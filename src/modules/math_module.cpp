@@ -375,10 +375,6 @@ static int math_noise_seed(CallCtx& ctx) {
     return ctx.ret(Value());
 }
 
-void math_reset() {
-    g_engine_rng.seed(rng_clock_seed());
-}
-
 Value make_math_module() {
     noise_init_default();
     return MapBuilder()

@@ -1,17 +1,9 @@
 // UNIT test of the rules of the readout (src/frame_rate.h): which rate the screen gives, when the program falls short
 // of it, the best rate over the last seconds, and when the memory has grown a lot. Called by the main of paths_test.cpp, which sums the failures.
 #include "frame_rate.h"
+#include "check.h"
 
 #include <cstdio>
-
-static int s_failures = 0;
-
-static void expect(bool ok, const char* what) {
-    if (ok)
-        return;
-    std::printf("FAIL %s\n", what);
-    s_failures++;
-}
 
 static void test_display_rate() {
     expect(display_rate_from_best(0.0) == 60.0, "no measure yet: 60");

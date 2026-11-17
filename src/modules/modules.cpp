@@ -1,4 +1,5 @@
 #include "modules.h"
+#include "../rng.h"
 #include "audio_module.h"
 #include "camera_module.h"
 #include "https_module.h"
@@ -16,7 +17,6 @@
 
 Value make_core_module();
 Value make_math_module();
-void math_reset();
 Value make_graphics_module();
 // The `blend` module is defined in the graphics pair (graphics_module holds the enums
 // raylib BlendMode / graphics_stub → nil) and NOT here: modules.cpp compiles
@@ -52,7 +52,7 @@ void gfx_program_reset();
 // (gfx_run, when the frame loop starts) and the fonts' (ollin_run, engine_font_reset: they are no module).
 static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modules[] = {
     { "core",     make_core_module,     nullptr          },
-    { "math",     make_math_module,     math_reset       },   // a program that never names math still draws Color.random afresh
+    { "math",     make_math_module,     nullptr          },
     { "graphics", make_graphics_module, gfx_program_reset },   // fitArea off, the orientation lock released
     { "string",   make_string_module,   nullptr          },
     { "map",      make_map_module,      nullptr          },
@@ -81,6 +81,7 @@ void modules_reset() {
         if (m.reset)
             m.reset();
     }
+    g_engine_rng.seed(rng_clock_seed());   // no module's own: Color.random draws from it whether or not math is named
 }
 
 const std::vector<std::string>& builtin_module_names() {

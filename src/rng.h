@@ -8,6 +8,28 @@
 #include <chrono>
 #include <cstdint>
 
+// The two halves of a * b. A 128-bit integer is a GCC/Clang extension that 32-bit targets (armeabi-v7a, i686) do not
+// have: there the product is put together from four 32-bit ones. Both forms are kept apart so that the unit test can
+// hold the portable one against the wide one.
+inline void rng_mul_portable(uint64_t a, uint64_t b, uint64_t& hi, uint64_t& lo) {
+    const uint64_t mask = 0xFFFFFFFFULL;
+    uint64_t a0 = a & mask, a1 = a >> 32, b0 = b & mask, b1 = b >> 32;
+    uint64_t p00 = a0 * b0, p01 = a0 * b1, p10 = a1 * b0, p11 = a1 * b1;
+    uint64_t mid = (p00 >> 32) + (p01 & mask) + (p10 & mask);
+    hi = p11 + (p01 >> 32) + (p10 >> 32) + (mid >> 32);
+    lo = (mid << 32) | (p00 & mask);
+}
+
+inline void rng_mul_wide(uint64_t a, uint64_t b, uint64_t& hi, uint64_t& lo) {
+#ifdef __SIZEOF_INT128__
+    unsigned __int128 m = (unsigned __int128)a * b;
+    hi = (uint64_t)(m >> 64);
+    lo = (uint64_t)m;
+#else
+    rng_mul_portable(a, b, hi, lo);
+#endif
+}
+
 struct Rng {
     uint64_t state;
 
@@ -40,16 +62,14 @@ struct Rng {
     // favour the small values are thrown away. The division that gives the threshold is only reached when the low half
     // is below n, which happens with probability n / 2^64 : the usual draw costs a multiplication and no division.
     uint64_t below(uint64_t n) {
-        unsigned __int128 m = (unsigned __int128)next() * n;
-        uint64_t low = (uint64_t)m;
+        uint64_t high, low;
+        rng_mul_wide(next(), n, high, low);
         if (low < n) {
             uint64_t threshold = (0 - n) % n;   // 2^64 mod n
-            while (low < threshold) {
-                m = (unsigned __int128)next() * n;
-                low = (uint64_t)m;
-            }
+            while (low < threshold)
+                rng_mul_wide(next(), n, high, low);
         }
-        return (uint64_t)(m >> 64);
+        return high;
     }
 
     // In [lo, hi], lo <= hi, the whole range of int64 included.
@@ -63,11 +83,9 @@ struct Rng {
 
 // A seed taken from the clock, to the nanosecond: two programs started in the same second do not share a sequence.
 inline uint64_t rng_clock_seed() {
-    uint64_t wall = (uint64_t)std::chrono::system_clock::now().time_since_epoch().count();
-    uint64_t steady = (uint64_t)std::chrono::steady_clock::now().time_since_epoch().count();
-    return Rng(wall ^ (steady << 1)).next();
+    return Rng((uint64_t)std::chrono::system_clock::now().time_since_epoch().count()).next();
 }
 
-// The generator of math.rand, math.randInt, colors.random. A namespace-scope inline variable, and not a
+// The generator of math.rand, math.randInt, Color.random. A namespace-scope inline variable, and not a
 // function-local static: no guard to check at each call (cf. the pools, CLAUDE.md).
 inline Rng g_engine_rng{rng_clock_seed()};
