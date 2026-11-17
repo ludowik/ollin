@@ -1,4 +1,5 @@
 #include "module_utils.h"
+#include "random_module.h"
 #include "vm.h"
 #include <iostream>
 #include <vector>
@@ -7,7 +8,6 @@
 #include <stdexcept>
 
 Value make_color_class();
-Value make_random_class();
 
 // Formatting core, shared by interpolation ({expr:spec}) AND printf ({N:spec}). `spec` is a C
 // conversion specification WITHOUT the '%', such as ".3f", "04x" or ">8s". We read the trailing

@@ -17,6 +17,22 @@ static void test_sequence() {
     expect(a.next() != b.next(), "another seed gives another one");
 }
 
+static void test_shuffle() {
+    int a[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    Rng(1).shuffle(a, a + 8);
+    const int expected[8] = {0, 3, 7, 1, 2, 6, 5, 4};   // the same draws as an independent Fisher-Yates from seed 1
+    bool same = true;
+    for (int i = 0; i < 8; i++)
+        same = same && a[i] == expected[i];
+    expect(same, "shuffle gives the Fisher-Yates order of splitmix64 from seed 1");
+    int one[1] = {5};
+    Rng rng(9);
+    uint64_t before = rng.state;
+    rng.shuffle(one, one + 1);
+    rng.shuffle(one, one);
+    expect(one[0] == 5 && rng.state == before, "an empty range or a single element draws nothing");
+}
+
 static void test_unit() {
     Rng rng(7);
     bool inside = true;
@@ -78,6 +94,7 @@ static void test_mul() {
 
 int rng_failures() {
     test_sequence();
+    test_shuffle();
     test_unit();
     test_below();
     test_between();

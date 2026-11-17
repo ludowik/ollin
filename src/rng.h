@@ -7,7 +7,9 @@
 // shuffled by a local one, every sound voice has its own, which is what keeps the audio thread free of shared state, and
 // a script makes its own with the Random class (modules/random_module.cpp).
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 
 // The two halves of a * b. A 128-bit integer is a GCC/Clang extension that 32-bit targets (armeabi-v7a, i686) do not
 // have: there the product is put together from four 32-bit ones. Both forms are kept apart so that the unit test can
@@ -71,6 +73,14 @@ struct Rng {
                 rng_mul_wide(next(), n, high, low);
         }
         return high;
+    }
+
+    // Fisher-Yates over [first, last): every ordering is equally likely, `below` being unbiased, which `rand() % n`
+    // would not be. For a given seed this is the one shuffle of the engine: the Perlin table and array.shuffle.
+    template <class RandomIt>
+    void shuffle(RandomIt first, RandomIt last) {
+        for (size_t i = (size_t)(last - first); i > 1; i--)
+            std::swap(first[i - 1], first[(size_t)below(i)]);
     }
 
     // In [lo, hi], lo <= hi, the whole range of int64 included.

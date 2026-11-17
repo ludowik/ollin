@@ -16,7 +16,10 @@ for rnI = 1, 200 do
     var w = rnB.rand(-2, 2)
     assert(u >= 0 and u < 1 and s >= 0 and s <= 10 and w >= -2 and w <= 2)
 end
-assert(Random(3).randInt(5) >= 1 and Random(3).randInt(5) <= 5)
+for rnI = 1, 200 do
+    var one = rnB.randInt(5)
+    assert(one >= 1 and one <= 5)
+end
 
 ## Two generators of one seed agree; another seed does not; seed() starts the sequence again.
 var rnC = Random(42)
@@ -33,7 +36,6 @@ assert(rnSame and rnDiffers)
 rnC.seed(42)
 rnD.seed(42)
 assert(rnC.randInt(1, 1000000) == rnD.randInt(1, 1000000))
-assert(Random(42).randInt(1, 1000000) == Random(42).randInt(1, 1000000))
 
 ## Independent of the engine's generator, in both directions.
 math.seed(5)
@@ -61,8 +63,25 @@ end
 
 ## A Random is an instance of its class, and the draws leave it usable as a value anywhere.
 assert(instanceOf(rnA, Random) and classOf(rnA) == Random)
-var rnHolder = {gen: Random(7)}
-assert(rnHolder.gen.randInt(1, 6) >= 1)
+var rnHolder = {gen: Random(1)}
+assert(rnHolder.gen.randInt(1, 1000) == 567, "a generator kept in a map goes on as any other")
+
+## A refused call leaves the generator where it was, the engine's and a Random's alike.
+math.seed(2)
+var rnFirst = math.rand()
+math.seed(2)
+try
+    math.rand("x")
+catch e
+end
+assert(math.rand() == rnFirst)
+var rnKept2 = Random(4)
+var rnFirst2 = Random(4).rand()
+try
+    rnKept2.rand("x")
+catch e
+end
+assert(rnKept2.rand() == rnFirst2)
 
 ## A generator already made keeps working when the script reassigns the global Random: it is recognised by what it is.
 class FixedSeed extends Random

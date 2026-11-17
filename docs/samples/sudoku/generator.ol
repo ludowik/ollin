@@ -4,8 +4,9 @@
 ## nearest one is kept when none was right.
 ##
 ## A puzzle only depends on its seed: it draws from a Random of its own, which nothing else touches and which gives the
-## same numbers on every platform, so the same seed gives the same puzzle, which is what the puzzle of the day relies on. It is made by a JOB that advances a little at a
-## time, so that a screen can keep drawing while a hard puzzle is being cut; the steps change nothing in the result.
+## same numbers on every platform, so the same seed gives the same puzzle, which is what the puzzle of the day relies
+## on. It is made by a JOB that advances a little at a time, so that a screen can keep drawing while a hard puzzle is
+## being cut; the steps change nothing in the result.
 
 ## The clues a puzzle of each level is cut down to, as a range the draw picks in: the easy levels stop early, the
 ## hard ones are taken as far as the uniqueness allows.

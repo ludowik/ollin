@@ -41,13 +41,7 @@ static void noise_reseed(uint64_t seed) {
     int p[256];
     for (int i = 0; i < 256; i++)
         p[i] = i;
-    Rng rng(seed);
-    for (int i = 255; i > 0; i--) {
-        int j = (int)rng.below((uint64_t)(i + 1));
-        int tmp = p[i];
-        p[i] = p[j];
-        p[j] = tmp;
-    }
+    Rng(seed).shuffle(p, p + 256);
     for (int i = 0; i < 256; i++) {
         s_perm[i] = p[i];
         s_perm[256 + i] = p[i];

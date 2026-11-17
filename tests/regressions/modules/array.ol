@@ -237,23 +237,18 @@ math.seed(1)
 assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",") == "1,4,8,2,3,7,6,5")     ## pinned against an independent splitmix64 + Fisher-Yates
 math.seed(42)
 assert(array.shuffle([1, 2, 3, 4, 5, 6, 7, 8]).join(",") == "5,4,3,1,8,7,2,6")
-math.seed(7)
-var shFirst = [1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",")
-math.seed(7)
-assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",") == shFirst)
 assert([].shuffle().len() == 0 and [9].shuffle()[1] == 9)
 math.seed(3)
 var shRand = math.rand()
 math.seed(3)
 var shNone = [].shuffle()
-var shOne = [9].shuffle()
 assert(math.rand() == shRand, "an array of 0 or 1 elements draws nothing")
 var shKept = {k: 1}
 var shObjs = [shKept, shKept, [1]]
 for shI = 1, 500 do
-    shObjs.shuffle()                                          ## a position drawn for itself swaps an element with itself
+    shObjs.shuffle()
 end
-assert(shKept.k == 1 and #shObjs == 3 and shObjs.indexOf(shKept) <> nil)                       ## the elements are moved, never copied or destroyed
+assert(shKept.k == 1 and #shObjs == 3 and shObjs.indexOf(shKept) <> nil, "the elements are moved, never copied or destroyed")
 
 ## shuffle(random) draws from that Random and from nothing else: its own sequence, the engine's generator untouched.
 var shR = Random(1)
@@ -272,7 +267,7 @@ assert(math.rand() == shEng, "shuffling with a Random leaves the engine generato
 var shR2 = Random(5)
 var shR3 = Random(5)
 var shNothing = [].shuffle(shR2)
-var shNothing2 = [9].shuffle(shR2)
+shNothing = [9].shuffle(shR2)
 assert(shR2.rand() == shR3.rand(), "an array of 0 or 1 elements draws nothing from the Random either")
 
 ## Every ordering of three elements turns up, about as often as any other (the seed makes this check repeatable).

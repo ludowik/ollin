@@ -9,7 +9,6 @@
 #include "array_module.h"
 #include "module_utils.h"
 #include "random_module.h"
-#include "../rng.h"
 #include "../vm.h"
 #include <algorithm>
 #include <exception>
@@ -121,23 +120,16 @@ static int arr_reverse(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// Fisher-Yates: every ordering is equally likely, `below` being unbiased, which `rand() % n` would not be.
-static void shuffle_items(std::vector<Value>& items, Rng& rng) {
-    for (size_t i = items.size(); i > 1; i--)
-        std::swap(items[i - 1], items[(size_t)rng.below(i)]);
-}
-
 // It draws from the Random given, which keeps its own sequence, or else from the engine's generator: `math.seed` makes
 // a shuffle repeatable.
 static int arr_shuffle(CallCtx& ctx) {
     arr_check(ctx, 1, "shuffle: expected (array[, random])");
     std::vector<Value>& items = ctx.args[0].aptr->items;
     if (ctx.argc >= 2) {
-        Rng rng = random_load(ctx.args[1], "array.shuffle");
-        shuffle_items(items, rng);
-        random_store(ctx.args[1], rng);
+        RandomScope scope(ctx.args[1], "array.shuffle");
+        scope.rng().shuffle(items.begin(), items.end());
     } else {
-        shuffle_items(items, g_engine_rng);
+        g_engine_rng.shuffle(items.begin(), items.end());
     }
     return ctx.ret(ctx.args[0]);
 }
