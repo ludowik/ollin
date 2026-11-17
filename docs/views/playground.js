@@ -153,6 +153,7 @@ const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(grey | r, g, b [, a])'),
+  fn('Random', 'Random([seed]) → generator: rand, randInt, seed'),
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (bytes used)'),
 ]
 

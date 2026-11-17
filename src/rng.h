@@ -4,7 +4,8 @@
 // randInt out of reach, and its sequence differs from one platform to the next.
 //
 // A generator is an INSTANCE that owns its state: the engine's own is g_engine_rng (main thread), the Perlin table is
-// shuffled by a local one, and every sound voice has its own, which is what keeps the audio thread free of shared state.
+// shuffled by a local one, every sound voice has its own, which is what keeps the audio thread free of shared state, and
+// a script makes its own with the Random class (modules/random_module.cpp).
 #include <chrono>
 #include <cstdint>
 

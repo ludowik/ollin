@@ -90,6 +90,15 @@ static inline double num_arg(const Value* args, int argc, int i, const char* fn)
     return num_arg(args, i, fn);
 }
 
+// Integer argument: (int64_t)num_arg is UB — and traps on WASM — when the double is NaN, infinite
+// or out of int64 range. double_fits_int64 (value.h) guards the cast and yields a clear error.
+static inline int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
+    double d = num_arg(args, argc, i, fn);
+    if (!double_fits_int64(d))
+        throw std::runtime_error(std::string(fn) + ": integer argument out of range");
+    return (int64_t)d;
+}
+
 // A number that must be WHOLE and within lo..hi. `what` names it in the message, which spells the range, so a call
 // refused for a fraction and one refused for a size read the same.
 static inline long long whole_arg(const Value* args, int argc, int i, const char* fn, const char* what, long long lo,

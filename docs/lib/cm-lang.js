@@ -15,7 +15,7 @@ export const KEYWORDS = new Set([
   'switch', 'case', 'default', 'enum', 'ref',
 ])
 export const BUILTINS = new Set([
-  'print', 'printf', 'time', 'assert', 'len', 'typeof', 'classOf', 'instanceOf', 'Color',
+  'print', 'printf', 'time', 'assert', 'len', 'typeof', 'classOf', 'instanceOf', 'Color', 'Random',
   'math', 'graphics', 'string', 'map', 'array', 'colors', 'blend', 'window', 'image', 'keyboard', 'mouse', 'data', 'ui',
   'tween', 'camera', 'motion', 'https', 'json',
 ])

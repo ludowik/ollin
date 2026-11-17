@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 Value make_color_class();
+Value make_random_class();
 
 // Formatting core, shared by interpolation ({expr:spec}) AND printf ({N:spec}). `spec` is a C
 // conversion specification WITHOUT the '%', such as ".3f", "04x" or ">8s". We read the trailing
@@ -172,5 +173,6 @@ Value make_core_module() {
         .fn("classOf", core_class_of)
         .fn("instanceOf", core_instance_of)
         .set("Color", make_color_class())
+        .set("Random", make_random_class())
         .done();
 }

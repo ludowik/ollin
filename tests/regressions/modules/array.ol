@@ -255,6 +255,26 @@ for shI = 1, 500 do
 end
 assert(shKept.k == 1 and #shObjs == 3 and shObjs.indexOf(shKept) <> nil)                       ## the elements are moved, never copied or destroyed
 
+## shuffle(random) draws from that Random and from nothing else: its own sequence, the engine's generator untouched.
+var shR = Random(1)
+assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle(shR).join(",") == "1,4,8,2,3,7,6,5", "the same order as math.seed(1)")
+assert(array.shuffle([1, 2, 3, 4, 5, 6, 7, 8], Random(42)).join(",") == "5,4,3,1,8,7,2,6")
+math.seed(7)
+var shE1 = [1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",")
+var shE2 = [1, 2, 3, 4, 5, 6, 7, 8].shuffle().join(",")
+var shR7 = Random(7)
+assert([1, 2, 3, 4, 5, 6, 7, 8].shuffle(shR7).join(",") == shE1 and [1, 2, 3, 4, 5, 6, 7, 8].shuffle(shR7).join(",") == shE2, "a Random goes on from where it stopped")
+math.seed(11)
+var shEng = math.rand()
+math.seed(11)
+var shDrawn = [1, 2, 3, 4].shuffle(Random(3))
+assert(math.rand() == shEng, "shuffling with a Random leaves the engine generator alone")
+var shR2 = Random(5)
+var shR3 = Random(5)
+var shNothing = [].shuffle(shR2)
+var shNothing2 = [9].shuffle(shR2)
+assert(shR2.rand() == shR3.rand(), "an array of 0 or 1 elements draws nothing from the Random either")
+
 ## Every ordering of three elements turns up, about as often as any other (the seed makes this check repeatable).
 math.seed(2024)
 var shSeen = {}

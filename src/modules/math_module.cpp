@@ -1,5 +1,6 @@
 #define _USE_MATH_DEFINES
 #include "module_utils.h"
+#include "random_module.h"
 #include "../rng.h"
 #include <cmath>
 #include <cstdint>
@@ -226,15 +227,6 @@ static int math_approach(CallCtx& ctx) {
     return ctx.ret(num_value(cur + (target - cur) * (1.0 - std::exp(-rate * dt))));
 }
 
-// Integer argument: (int64_t)num_arg is UB — and traps on WASM — when the double is NaN, infinite
-// or out of int64 range. double_fits_int64 (value.h) guards the cast and yields a clear error.
-static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
-    double d = num_arg(args, argc, i, fn);
-    if (!double_fits_int64(d))
-        throw std::runtime_error(std::string(fn) + ": integer argument out of range");
-    return (int64_t)d;
-}
-
 static int math_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -309,34 +301,11 @@ static int math_max(CallCtx& ctx) {
 }
 
 static int math_rand(CallCtx& ctx) {
-    Value* args = ctx.args;
-    int argc = ctx.argc;
-    double r = g_engine_rng.unit();
-    if (argc == 0)
-        return ctx.ret(Value(r));
-    if (argc == 1)
-        return ctx.ret(Value(r * num_arg(args, argc, 0, "math.rand")));
-    double lo = num_arg(args, argc, 0, "math.rand");
-    double hi = num_arg(args, argc, 1, "math.rand");
-    return ctx.ret(Value(lo + r * (hi - lo)));
+    return ctx.ret(rng_rand(g_engine_rng, ctx.args, ctx.argc, "math.rand"));
 }
 
 static int math_rand_int(CallCtx& ctx) {
-    Value* args = ctx.args;
-    int argc = ctx.argc;
-    if (argc == 0)
-        throw std::runtime_error("math.randInt: at least one argument required");
-    if (argc == 1) {
-        int64_t hi = int_arg(args, argc, 0, "math.randInt");
-        if (hi <= 0)
-            throw std::runtime_error("math.randInt: argument must be > 0");
-        return ctx.ret(Value(g_engine_rng.between(1, hi)));
-    }
-    int64_t lo = int_arg(args, argc, 0, "math.randInt");
-    int64_t hi = int_arg(args, argc, 1, "math.randInt");
-    if (lo > hi)
-        throw std::runtime_error("math.randInt: lo must be <= hi");
-    return ctx.ret(Value(g_engine_rng.between(lo, hi)));
+    return ctx.ret(rng_rand_int(g_engine_rng, ctx.args, ctx.argc, "math.randInt"));
 }
 
 // Fractal Perlin noise (fBm) in 1, 2 or 3 dimensions, returning a FLOAT in [0, 1].

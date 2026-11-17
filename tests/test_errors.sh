@@ -271,7 +271,17 @@ check_error "array.concat with a number last"    'print([1].concat([2], 3))'    
 check_error "array.concat with no array"         'print(array.concat(5))'          "array.concat: expected (array, array...)"
 
 # array.shuffle works on an array, and names itself when given anything else.
-check_error "array.shuffle on a number"          'print(array.shuffle(5))'         "array.shuffle: expected (array)"
+check_error "array.shuffle on a number"          'print(array.shuffle(5))'         "array.shuffle: expected (array[, random])"
+check_error "array.shuffle with a number as generator" 'print([1, 2].shuffle(5))'   "array.shuffle: expected a Random, got int"
+check_error "array.shuffle with a map as generator"    'print([1, 2].shuffle({}))'  "array.shuffle: expected a Random, got map"
+
+# Random takes an integer seed, and its draws are checked as math's are.
+check_error "Random with a text seed"            'var r = Random("x")'              "Random: argument 1 expected number, got string"
+check_error "Random with a seed out of range"    'var r = Random(1e30)'             "Random: integer argument out of range"
+check_error "Random.seed without a seed"         'Random(1).seed()'                 "Random.seed: missing argument"
+check_error "Random.randInt without argument"    'print(Random(1).randInt())'       "Random.randInt: at least one argument required"
+check_error "Random.randInt with a bad range"    'print(Random(1).randInt(5, 1))'   "Random.randInt: lo must be <= hi"
+check_error "Random.rand with a text bound"      'print(Random(1).rand("x"))'       "Random.rand: argument 1 expected number, got string"
 
 # array.join takes a string separator, and says so instead of converting one silently.
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"

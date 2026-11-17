@@ -60,6 +60,7 @@ set(OLLIN_SOURCES
     src/modules/core_module.cpp
     src/modules/color_module.cpp
     src/modules/math_module.cpp
+    src/modules/random_module.cpp
     src/modules/string_module.cpp
     src/modules/array_module.cpp
     src/modules/map_module.cpp

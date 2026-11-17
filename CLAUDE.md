@@ -145,7 +145,7 @@ ollin/
 │   ├── compiler.h/.cpp
 │   ├── vm.h/.cpp
 │   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
-│   ├── rng.h          le générateur aléatoire (splitmix64, `Rng`) : hasard du moteur, table du bruit de Perlin, bruit de chaque voix du son
+│   ├── rng.h          le générateur aléatoire (splitmix64, `Rng`) : hasard du moteur, table du bruit de Perlin, bruit de chaque voix du son, et la classe `Random` (modules/random_module.cpp) qui en donne un exemplaire à un script
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── shaders/       lit.vert / lit.frag (la 3D), fxaa.frag (la composition), sdf.frag (le texte) — le GLSL, EMBARQUÉ (cf. « Shaders »)
 │   ├── modules/       modules natifs : core, math, string, color, date, window, mouse, keyboard,

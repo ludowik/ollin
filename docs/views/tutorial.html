@@ -1381,7 +1381,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
 <tr><td><code>arr.reduce(fn, init)</code></td><td>Folds the array into a single value with <code>fn(accumulator, value, index)</code>, starting from <code>init</code> — which is <strong>required</strong></td></tr>
 <tr><td><code>arr.reverse()</code></td><td>Reverses the order of the elements <strong>in place</strong> and returns the array</td></tr>
-<tr><td><code>arr.shuffle()</code></td><td>Puts the elements in a random order <strong>in place</strong> and returns the array. Every order is equally likely, and <code>math.seed</code> makes the result repeatable, on every platform</td></tr>
+<tr><td><code>arr.shuffle([random])</code></td><td>Puts the elements in a random order <strong>in place</strong> and returns the array. Every order is equally likely, and the result is repeatable, on every platform: with <code>math.seed</code>, or by giving a <a href="#class-random"><code>Random</code></a> of your own, which then draws nothing from the shared generator</td></tr>
 <tr><td><code>arr.clear()</code></td><td>Removes <strong>every</strong> element of the array itself and returns it. Unlike <code>a = []</code>, which puts a new array in the variable, <code>clear</code> empties the array that every other holder shares</td></tr>
 <tr><td><code>arr.sort([cmp])</code></td><td>Sorts the array <strong>in place</strong> and returns it. <code>cmp(a, b)</code> is true when <code>a</code> comes first; without it, by type — <code>nil</code>, then numbers, then strings, then the rest — and by value within each type</td></tr>
 </table>
@@ -1646,6 +1646,22 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
     <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))  <span class="cmt">## nearby values, changing smoothly</span>
 <span class="kw">end</span>
 math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## reproducible noise</span></code></pre>
+
+<h3 id="class-random">The <code>Random</code> class</h3>
+<p><code>math.rand</code> and <code>math.seed</code> work on <strong>one</strong> generator shared by the whole program. When something must replay the same numbers whatever else the program draws — a level made from a seed, a puzzle of the day — give it a generator of its own:</p>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>Random([seed])</code></td><td>A new generator. The same seed gives the same numbers as <code>math.seed</code> does, on every platform; without a seed it starts from the clock</td></tr>
+    <tr><td><code>r.rand([lo, hi])</code></td><td>The same as <code>math.rand</code>, drawn from <code>r</code></td></tr>
+    <tr><td><code>r.randInt([lo,] hi)</code></td><td>The same as <code>math.randInt</code>, drawn from <code>r</code></td></tr>
+    <tr><td><code>r.seed(n)</code></td><td>Starts the sequence of <code>r</code> again from the seed <code>n</code></td></tr>
+  </tbody>
+</table>
+<pre><code><span class="kw">var</span> r = <span class="bi">Random</span>(<span class="num">42</span>)
+<span class="bi">print</span>(r.randInt(<span class="num">1</span>, <span class="num">6</span>))          <span class="cmt">## the same die on every run, whatever math.rand does</span>
+<span class="kw">var</span> deck = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>].shuffle(r)   <span class="cmt">## shuffled with r, which goes on from where it stopped</span></code></pre>
+<p>A generator draws from nothing but itself, and nothing but its own methods (and <code>arr.shuffle(r)</code>) draws from it. Its state is the integer field <code>r.state</code>: copying that number to another generator copies the sequence.</p>
 
 <h3 id="module-string">string</h3>
 <p>String handling. Indices start at <strong>1</strong>, as for arrays.</p>
