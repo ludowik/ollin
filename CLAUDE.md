@@ -140,6 +140,7 @@ ollin/
 │   ├── string_table.h internement des chaînes (InternedStr, refcount)
 │   ├── utf8.h         décodage UTF-8 partagé (utf8Count/ByteOffset/Step) — len, string.char/substr par codepoint
 │   ├── closure.h      Upvalue + Closure (inclus en bas de value.h)
+│   ├── coroutine.h/.cpp  le type `Coroutine` (inclus en bas de value.h) ; le code de création, reprise, cession et libération (cf. « Coroutines (implémentation) »)
 │   ├── lexer.h/.cpp
 │   ├── parser.h/.cpp
 │   ├── compiler.h/.cpp
@@ -1592,6 +1593,59 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
 - **Hors périmètre** (à demander explicitement) : `then`, `wait` comme méthode, chemins et
   splines, vitesse globale, délai entre répétitions, rappel par tour.
 
+## Coroutines (implémentation)
+
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Coroutines and yield »). Module `coroutine` (`create`, `resume`,
+> `status`, `running`, `isYieldable`) + mot-clé `yield`.
+
+**Sans pile du processeur, comme Lua** : une coroutine n'a que ce que la VM garde déjà dans des membres — fichier de registres, pile de
+cadres, gestionnaires `try` ouverts, `ip`, `last_results_`, `va_low_`, `max_regs_`, `native_nest_`. Reprendre = **échanger** ces membres
+avec ceux de la VM (`swap_exec_state`, des échanges de pointeurs de vecteurs), suspendre = les rendre. L'échange est SYMÉTRIQUE : pendant
+qu'elle tourne, `Coroutine::st` tient l'état de **celui qui l'a reprise**, ce qui fait une seule fonction pour les deux sens. Même
+comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'exécution ajouté à la VM s'ajoute à `CoState` ET à
+`swap_exec_state`** — rien ne le vérifie ; `CoState` est `friend` de `VM` pour nommer ses types privés (`Frame`, `Handler`).
+
+- **`yield` sort de `run_goto` par une exception C++ `CoroutineYield`** (pas un `runtime_error` : les deux `catch` de `run_goto` la laissent
+  passer). Aucun opcode, aucun test dans les sites d'appel natif : après `invoke_builtin_regs`, `CALL_DYN` et `CALL_METHOD` ne font
+  que `NEXT()`, rien ne dépend de la fin normale de l'appel. À la reprise, les valeurs du `resume` sont écrites dans les cases de
+  résultat du `yield` (`yield_base`/`yield_cap`, relevés dans le `CallCtx`), `last_results_` est posé, et `run_goto(0)` repart à `ip`
+  (son prologue relit `base`/`R` de la pile courante). Une coroutine s'exécute dans un `run_goto` imbriqué de plancher 0 sur SA pile.
+- **Refus à travers un natif** : `native_nest_` compte les `run_goto` qu'un natif a ouverts (`NestGuard` dans `call_value_multi` et
+  `invoke_str`) ; un `yield` n'est permis qu'à zéro (et si l'appel vient du fichier de registres : `ctx.regs_base >= 0`). La pile du
+  processeur de ces `run_goto` ne peut pas être suspendue. Une erreur claire plutôt qu'un plantage.
+- **Chaque coroutine a son fichier de registres de 1024 cases, réservé à la création et jamais réalloué** (même invariant que le
+  principal : `R` de `run_goto` et les upvalues ouvertes y pointent). `grow_regs_slow` lit `max_regs_` (membre échangé avec le
+  fichier) ; le message nomme le plafond, en littéral (`to_string` y déplaçait l'inlining de `run_goto`).
+- **Un upvalue ouvert nomme SON fichier** (`Upvalue::file`) : `GET_UPVAL`/`SET_UPVAL`/`close_upvals` lisent `uv->file[frame_base +
+  reg_idx]`, plus `regs[…]` de la VM, qui est celui de la coroutine qui tourne et pas forcément de celle qui possède la variable
+  (une locale du programme capturée par le corps d'une coroutine, ou une fermeture née dans une coroutine appelée dehors).
+  `coroutine_destroy` **ferme d'abord les upvalues ouvertes** de ses cadres : une fermeture peut survivre à la coroutine et pointerait
+  dans un fichier libéré (figé dans `tests/regressions/modules/coroutine.ol`, vérifié sous valgrind).
+  ⚠ **Résultat négatif mesuré : un pointeur `slot` à la Lua** (`closed ⇔ slot == &val`, `GET_UPVAL` réduit à `*uv->slot`) simplifie le code
+  mais coûte **+2,3 % à +4,7 %** d'instructions (fib, boucle, tableau, flottants) : l'allocation de registres déversait `R`. Le
+  pointeur de fichier garde la forme des gestionnaires (+0,15 % fib, +1,2 % boucle avant le correctif ci-dessous). Ne pas refaire.
+- **`-fira-region=one` sur `vm.cpp` (GCC, CMakeLists.txt)** : l'allocateur de registres par défaut est BISTABLE sur `run_goto` — ajouter
+  ou retirer du code dans un gestionnaire QUELCONQUE, même loin du chemin chaud, fait déverser `R` (un `mov` de la pile dans chaque
+  gestionnaire, repéré en désassemblant les instructions chaudes d'`icount` : `[rbp-N]` au lieu de `r15`). Quatre variantes de
+  placement, de forme (`tmp` + `std::move`), de sortie en ligne n'y changeaient rien ; seule l'option rend le résultat indifférent au
+  contenu des gestionnaires. Avec elle, les dix scripts de `bench/` sont à ±0,6 % d'instructions d'avant les coroutines (`fib` −0,3 %,
+  `closures` −0,5 %), contre +2 à +3,8 % sans. Les relevés de `docs/data/icount-history.json` d'avant ne la portaient pas.
+  Le code des coroutines est dans `coroutine.cpp`, hors de la boucle : le temps de `closures` y avait gagné +7 % sans changement
+  d'instructions tant qu'il vivait dans `vm.cpp` (placement).
+- **Erreurs** : une erreur non rattrapée tue la coroutine (`dead`, upvalues fermées, registres libérés) et se propage au `resume`, rattrapable
+  par `try`. Une valeur LANCÉE sans gestionnaire dans la coroutine part en `OllinThrow` vers le résolveur (qui a peut-être un
+  gestionnaire) ; hors coroutine, un `throw` sans gestionnaire reste « unhandled exception » et ce n'est qu'au `run_goto` du programme
+  que l'`OllinThrow` restant devient une `OllinError` (ligne = celle du `resume`, pas du `throw`).
+- **`yield` est désucré par le parseur** (`yield_expr`, appelée par `expr()` seul) en un `CallExpr` du builtin interne `__yield`, comme `ref` :
+  ni nœud d'AST, ni opcode, ni ligne dans le compilateur. Les valeurs sont **celles de la MÊME ligne** (`starts_value`) : les fins de
+  ligne ne sont pas des jetons, donc après un `yield` nu la ligne suivante est l'instruction suivante. C'est la seule règle du langage
+  où la ligne d'un jeton compte. `yield` est une expression entière, jamais un opérande (`1 + yield` est refusé).
+- **Fuites** : comme les maps, une coroutine qui se référence elle-même (par ses locales) n'est jamais libérée (comptage de références,
+  pas de ramasse-miettes).
+- **Hors périmètre, à demander** : `coroutine.wrap` (un builtin ne porte aucune donnée : il faudrait rendre une valeur coroutine
+  APPELABLE, donc un test de plus dans `call_dyn_common`, chemin chaud), les pseudo-méthodes `co.resume()`/`co.status()`, `for … in` sur
+  une coroutine, la cession à travers `array.map`/`sort`/`__str`, la capacité des registres réglable.
+
 ## Modules `https` et `json` (implémentation)
 
 > API : voir le tutoriel (`docs/views/tutorial.html`, sections « The https module » et « The json module »).
@@ -2561,7 +2615,7 @@ offset 4-7 : uint32_t str_hash  (hash contenu, valide uniquement T_STRING)
 offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Array* aptr; Iterator* iptr; Closure* cptr; Range* rptr; }
 ```
 
-**Ordre des tags = invariant de perf** : tous les types **non ref-comptés** d'abord (0..5, booléen compris), puis le pivot `T_STRING` et tous les **ref-comptés** contigus (6..12). Ainsi `tag < T_STRING` sépare en **un seul test** les valeurs sans gestion mémoire (nil/int/float/function/builtin/bool) de celles à retain/release (`Value::retain()`/`release()`). Tout nouveau type ref-compté doit être ajouté **après** le pivot, tout type non compté **avant**.
+**Ordre des tags = invariant de perf** : tous les types **non ref-comptés** d'abord (0..5, booléen compris), puis le pivot `T_STRING` et tous les **ref-comptés** contigus (6..13). Ainsi `tag < T_STRING` sépare en **un seul test** les valeurs sans gestion mémoire (nil/int/float/function/builtin/bool) de celles à retain/release (`Value::retain()`/`release()`). Tout nouveau type ref-compté doit être ajouté **après** le pivot, tout type non compté **avant**.
 
 | tag        | valeur (uint8_t) | union actif | plage / note        |
 |------------|-----------------|-------------|---------------------|
@@ -2578,6 +2632,7 @@ offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Ar
 | T_CLOSURE  | 10              | cptr (Closure*) | ref-counted, holds func_idx + upvals |
 | T_CLASS    | 11              | mptr (Map*) | ref-counted ; même layout que T_MAP, distinct pour CALL_DYN |
 | T_RANGE    | 12              | rptr (Range*) | ref-counted ; intervalle entier      |
+| T_COROUTINE | 13             | coptr (Coroutine*) | ref-counted ; cf. « Coroutines (implémentation) » |
 
 ## Closures / Upvalues
 
