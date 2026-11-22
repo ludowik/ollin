@@ -1640,6 +1640,14 @@ comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'e
   ni nœud d'AST, ni opcode, ni ligne dans le compilateur. Les valeurs sont **celles de la MÊME ligne** (`starts_value`) : les fins de
   ligne ne sont pas des jetons, donc après un `yield` nu la ligne suivante est l'instruction suivante. C'est la seule règle du langage
   où la ligne d'un jeton compte. `yield` est une expression entière, jamais un opérande (`1 + yield` est refusé).
+- **Toutes les valeurs, quel que soit le cadre appelant** : un builtin n'écrit normalement que `result_cap` valeurs (le budget de registres du
+  cadre, quelques-unes pour une petite fonction) ; `resume` et la reprise d'un `yield` rendent autant de valeurs qu'on leur en donne, donc
+  `VM::result_room`/`make_room` font la place comme une queue `...` (agrandir le fichier, relever les varargs). Sans cela
+  `return coroutine.resume(c)` perdait des valeurs en silence dans une petite fonction (reproduit par la revue).
+- **Imbrication bornée à 100 (`k_max_co_depth`)** : chaque `resume` dans un `resume` est un `run_goto` sur la pile du processeur (~1,3 Ko en
+  natif), que le fichier de registres propre à chaque coroutine ne borne pas — une chaîne sans fin faisait planter le moteur.
+  ⚠ **WASM : la pile C par défaut d'emscripten est de 64 Ko et 30 niveaux la dépassaient (l'onglet plante, sans message)** :
+  `-sSTACK_SIZE=1048576` dans CMakeLists.txt. Mesuré au navigateur : 99 niveaux, puis l'erreur au 101ᵉ, et des rappels de `map` imbriqués.
 - **Fuites** : comme les maps, une coroutine qui se référence elle-même (par ses locales) n'est jamais libérée (comptage de références,
   pas de ramasse-miettes).
 - **Hors périmètre, à demander** : `coroutine.wrap` (un builtin ne porte aucune donnée : il faudrait rendre une valeur coroutine

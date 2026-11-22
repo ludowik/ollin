@@ -28,14 +28,15 @@ int co_resume(CallCtx& ctx) {
     // The arguments are read BEFORE anything runs: the result slots overlap them, and the body may use the register file.
     std::vector<Value> args(ctx.args + 1, ctx.args + ctx.argc);
     Value keep = ctx.args[0]; // the call's own reference to the coroutine may be the last
-    int cap = ctx.result_cap > 0 ? ctx.result_cap : 0;
-    std::vector<Value> out((size_t)std::max(cap, 1));
-    int n = ctx.vm->resume_coroutine(co, args.data(), (int)args.size(), out.data(), cap);
+    std::vector<Value> out;
+    ctx.vm->resume_coroutine(co, args.data(), (int)args.size(), out);
+    int n = (int)out.size();
     if (n == 0) {
         // No value: the slot where the call's result is read must say nil, not what the arguments left in it.
         ctx.set_result(0, Value{});
         return 0;
     }
+    n = ctx.vm->result_room(ctx, n);
     for (int i = 0; i < n; ++i)
         ctx.set_result(i, out[i]);
     return n;

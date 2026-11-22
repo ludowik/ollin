@@ -388,3 +388,39 @@ catch e
     assert(e == "coroutine nesting too deep (max 100)", "a bounded nesting")
 end
 assert(coroutine.running() == nil and coroutine.status(coroutine.create(func() end)) == "suspended", "and the main program is back in charge")
+
+## ── Every value, whatever the frame that asks ─────────────────────────────────────────────────────────────────────────────────
+## The room for the values of a resume (and for those a resume hands to a yield) is made like a `...` tail makes it: a small function
+## with a handful of registers gets all of them, not as many as fit.
+var coSix = coroutine.create(func()
+    yield 1, 2, 3, 4, 5, 6
+    return 1, 2, 3, 4, 5, 6
+end)
+func coTail(c)
+    return coroutine.resume(c)
+end
+assert([coTail(coSix)].join(",") == "1,2,3,4,5,6", "six yielded values reach a return in a small function")
+assert([coTail(coSix)].join(",") == "1,2,3,4,5,6", "and six returned ones")
+func coCount(c)
+    var t = [coroutine.resume(c)]
+    return t.len()
+end
+assert(coCount(coroutine.create(func()
+    yield 1, 2, 3, 4, 5, 6
+end)) == 6, "in an array literal")
+func coAsk()
+    return yield 1, 2, 3
+end
+var coAsker = coroutine.create(func()
+    return coAsk()
+end)
+coroutine.resume(coAsker)
+assert([coroutine.resume(coAsker, 1, 2, 3, 4, 5, 6, 7)].join(",") == "1,2,3,4,5,6,7", "and seven values given to a yield in a small function")
+func coForward(c, ...)
+    return coroutine.resume(c, ...)
+end
+var coEcho = coroutine.create(func(...)
+    var all = [yield ...]
+    return #all
+end)
+assert(coForward(coEcho, 1, 2, 3) == 1 and coForward(coEcho, 7, 8, 9, 10, 11, 12, 13, 14) == 8)

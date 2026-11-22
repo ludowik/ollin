@@ -1541,6 +1541,14 @@ check_error "coroutine.create wants a function" \
     'coroutine.create(3)' \
     "coroutine.create: expected a function"
 
+check_error "arithmetic on an array names its type" \
+    'var a = [1] + 1' \
+    "expected number, got array"
+
+check_error "arithmetic on a coroutine names its type" \
+    'var a = coroutine.create(func() end) + 1' \
+    "expected number, got coroutine"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

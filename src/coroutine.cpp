@@ -58,7 +58,23 @@ Value VM::new_coroutine(const Value& fn) {
     return Value::make_coroutine(co.release());
 }
 
-int VM::resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out, int out_cap) {
+void VM::make_room(int end) {
+    grow_regs((size_t)end);
+    if (end > va_low_)
+        lift_varargs_above(end);
+}
+
+int VM::result_room(CallCtx& ctx, int n) {
+    if (n <= ctx.result_cap)
+        return n;
+    if (ctx.regs_base < 0)
+        return ctx.result_cap > 0 ? ctx.result_cap : 0; // a call that did not come from the register file has no room to make
+    make_room(ctx.regs_base + n);
+    ctx.result_cap = n;
+    return n;
+}
+
+void VM::resume_coroutine(Coroutine* co, const Value* args, int argc, std::vector<Value>& out) {
     if (co->status != Coroutine::SUSPENDED)
         throw std::runtime_error(std::string("cannot resume a ") + Coroutine::status_name(co->status) + " coroutine");
     if (co_depth_ >= k_max_co_depth)
@@ -90,7 +106,6 @@ int VM::resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out,
         if (prev)
             prev->status = Coroutine::RUNNING;
     };
-    int n = 0;
     try {
         if (!co->started) {
             co->started = true;
@@ -101,32 +116,31 @@ int VM::resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out,
             ip = push_frame_copied(fi, argv.data(), argc, std::move(fuv), 0, -1);
         } else {
             // The resume's values are what the pending yield call returns: they go where its results would have.
-            int m = std::min(argc, co->yield_cap);
-            for (int i = 0; i < m; ++i)
+            // Every one of them, however few slots the frame that called yield had: the room is made like a `...` tail makes it.
+            if (argc > co->yield_cap)
+                make_room(co->yield_base + argc);
+            for (int i = 0; i < argc; ++i)
                 regs[(size_t)co->yield_base + i] = argv[i];
-            if (m == 0 && co->yield_cap > 0)
+            if (argc == 0 && co->yield_cap > 0)
                 regs[(size_t)co->yield_base] = Value{};
-            last_results_ = m;
+            last_results_ = argc;
         }
         run_goto(0);
         // The body returned: its values sit at the bottom of the file, last_results_ of them.
-        n = std::min({last_results_, (int)regs.size(), out_cap});
+        int n = std::min(last_results_, (int)regs.size());
         for (int i = 0; i < n; ++i)
-            out[i] = regs[i];
+            out.push_back(regs[i]);
         co->status = Coroutine::DEAD;
         back_to_resumer();
         st.regs.clear();
         st.regs.shrink_to_fit();
         st.handler_stack.clear();
-        return n;
     } catch (const CoroutineYield&) {
-        n = std::min((int)co->xfer.size(), out_cap);
-        for (int i = 0; i < n; ++i)
-            out[i] = std::move(co->xfer[i]);
+        for (Value& v : co->xfer)
+            out.push_back(std::move(v));
         co->xfer.clear();
         co->status = Coroutine::SUSPENDED;
         back_to_resumer();
-        return n;
     } catch (...) {
         // An error the body did not catch: the coroutine is dead, and what its frames still hold is closed before it is freed.
         co->status = Coroutine::DEAD;

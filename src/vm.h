@@ -65,9 +65,13 @@ class VM {
     // A new suspended coroutine whose body is `fn` (a function or a closure).
     Value new_coroutine(const Value& fn);
     // Runs `co` until it yields or returns, handing it `args`: the arguments of its body on the first call, the results of its
-    // pending yield afterwards. Up to out_cap values it yielded or returned land in `out`; returns how many. An error the body
-    // does not catch kills the coroutine and propagates to the caller.
-    int resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out, int out_cap);
+    // pending yield afterwards. Every value it yielded or returned lands in `out`. An error the body does not catch kills the
+    // coroutine and propagates to the caller.
+    void resume_coroutine(Coroutine* co, const Value* args, int argc, std::vector<Value>& out);
+    // Makes room for `n` result values of the builtin call `ctx` describes, and says how many of them may be written. A builtin
+    // that returns as many values as it is given (resume) would otherwise lose the ones that do not fit the register budget of
+    // the frame that called it, which is a few values for a small function: the room is made the way a `...` tail makes it.
+    int result_room(CallCtx& ctx, int n);
     // The builtin __yield: suspends the running coroutine, handing `ctx`'s arguments to its resumer. Never returns.
     [[noreturn]] void yield_current(CallCtx& ctx);
     Coroutine* running_coroutine() const {
@@ -322,6 +326,8 @@ class VM {
     // function does NOT return early on a cheap test, so no hot path may call it unguarded: the
     // guard is va_low_ below, and calling it per frame push cost +23,4 % on fib.
     void lift_varargs_above(int end);
+    // Grows the register file to `end` and lifts the varargs of the live frames out of the way, as push_frame does for a window.
+    void make_room(int end);
 
     // Appends the CURRENT frame's varargs at `dest` — a `...` tail, for a plain call as for a
     // method call — and returns how many were written. Both sites had the same five lines,
@@ -374,12 +380,11 @@ class VM {
         // The SINGLE gate of all arithmetic and ordering comparisons: this is where the
         // boolean stays a type of its own. `true + 1` and `true < false` are therefore refused
         // without any opcode having to know about it.
-        if (v.is_nil())
-            throw std::runtime_error("runtime: expected number, got nil");
-        if (v.is_bool())
-            throw std::runtime_error("runtime: expected number, got boolean");
-        throw std::runtime_error("runtime: expected number, got string");
+        refuse_number(v);
     }
+    // Out of line and never returning: the message names the type, and writing it at every inlined use of as_double is code on the
+    // hot paths for nothing.
+    [[noreturn]] static void refuse_number(const Value& v);
 };
 
 // The result slots are addressed through VM::regs and the index CallCtx carries, never through the

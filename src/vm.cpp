@@ -182,6 +182,15 @@ FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure, const char* n
     throw std::runtime_error(std::string("runtime: a class can only extend a class, got ") + parent.type_name());
 }
 
+[[noreturn, gnu::noinline]] void VM::refuse_number(const Value& v) {
+    if (v.is_nil())
+        throw std::runtime_error("runtime: expected number, got nil");
+    if (v.is_bool())
+        throw std::runtime_error("runtime: expected number, got boolean");
+    // Every other type used to be called a string, an array and a map included.
+    throw std::runtime_error(std::string("runtime: expected number, got ") + v.type_name());
+}
+
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the register obj came from
     Value cls = obj.class_of();
