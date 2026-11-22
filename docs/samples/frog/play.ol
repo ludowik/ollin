@@ -7,7 +7,6 @@ import "state.ol"
 import "sounds.ol"
 
 const DIRS = {up: {dr: 1, dx: 0}, down: {dr: -1, dx: 0}, left: {dr: 0, dx: -CELL}, right: {dr: 0, dx: CELL}}
-const BEST_KEY = "best"
 
 func earn(points)
     var now, extra = addScore(score, points, extraGiven)
@@ -27,15 +26,11 @@ func die(kind)
     frog.deadT = 0.0
     if frog.hop <> nil then
         ## the wreck is where the frog was hit, not where it started the hop
-        var h = frog.hop
-        var p = math.min(h.t / HOP_TIME, 1.0)
-        frog.x = h.fromX + (h.toX - h.fromX) * p
-        if p >= 0.5 then
-            frog.row = h.toRow
-        end
+        frog.x = hopX(frog.hop)
+        frog.row = hopRow(frog.hop)
         frog.hop = nil
     end
-    if kind == "car" or kind == "croc" then
+    if DEATHS[kind].thud then
         play(sndThud)
     else
         play(sndSplash)
@@ -46,12 +41,8 @@ end
 func endLife()
     lives -= 1
     if lives <= 0 then
-        if score > best then
-            best = score
-            data.set(BEST_KEY, best)
-        end
+        saveBest()
         state = "over"
-        frog.dead = "over"
         return
     end
     placeFrog()
@@ -89,11 +80,7 @@ func arriveHome()
         event = nil
     end
     play(sndHome)
-    var all = true
-    for filled in homes do
-        all = all and filled
-    end
-    if all then
+    if not homes.contains(false) then
         earn(SCORE_BOARD)
         lives += 1
         board += 1
@@ -168,11 +155,16 @@ func checkGround(row, x)
     end
 end
 
-func updatePlay(dt)
+## Time goes by on the field: the clock, and the lanes that run whatever the frog does.
+func tickWorld(dt)
     clock += dt
     for lane = 0, 10 do
         laneOff[lane + 1] = advanceLane(laneOff[lane + 1], lane, board, dt)
     end
+end
+
+func updatePlay(dt)
+    tickWorld(dt)
     updateEvent(dt)
     if banner <> nil then
         banner.left -= dt
@@ -182,7 +174,7 @@ func updatePlay(dt)
     end
     if frog.dead <> nil then
         frog.deadT += dt
-        if frog.dead <> "over" and frog.deadT >= DEATH_TIME then
+        if frog.deadT >= DEATH_TIME then
             endLife()
         end
         return
@@ -202,28 +194,38 @@ func updatePlay(dt)
             land()
         else
             ## in the air a frog is only run down: it is over the row it left for the first half of the hop, the other after
-            var h = frog.hop
-            var row = h.fromRow
-            if h.t >= HOP_TIME / 2 then
-                row = h.toRow
-            end
+            var row = hopRow(frog.hop)
             if isRoadRow(row) then
-                checkGround(row, h.fromX + (h.toX - h.fromX) * h.t / HOP_TIME)
+                checkGround(row, hopX(frog.hop))
             end
             return
         end
-        if frog.dead <> nil or state <> "play" then
+        if frog.dead <> nil then
             return
         end
     end
 
-    var lane = laneOfRow(frog.row)
-    if lane <> nil and isRiverRow(frog.row) then
-        frog.x += LANE_DIR[lane + 1] * LANE_SPEED[lane + 1] * speedFactor(board) * dt
+    if isRiverRow(frog.row) then
+        frog.x += laneVelocity(laneOfRow(frog.row), board) * dt
         if not onField(frog.x) then
             die("edge")
             return
         end
     end
     checkGround(frog.row, frog.x)
+end
+
+## One frame, whatever the screen: play, the end screen (whose wreck stays) and the title (whose lanes run).
+func updateFrame(dt)
+    dt = math.min(dt, 0.05)
+    if state == "play" then
+        if not paused then
+            updatePlay(dt)
+        end
+        return
+    end
+    tickWorld(dt)
+    if state == "over" then
+        frog.deadT += dt
+    end
 end

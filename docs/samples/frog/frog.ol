@@ -14,23 +14,19 @@ import "sounds.ol"
 import "sprites.ol"
 import "play.ol"
 import "draw.ol"
-import "../lib/keep.ol"
 
 func setup()
     graphics.canvas(W, H, "Ollin Frog")
     graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
     graphics.viewport(FIELD_W, FIELD_H)
-    best = wholeOr(data.get(BEST_KEY, 0), 0, SCORE_MAX)
+    loadBest()
     buildSprites()
     buildSounds()
-    resetLanes()
-    clearHomes()
-    placeFrog()
-    frog.ready = 0.0
+    resetField()
 end
 
 func start()
-    newGame(math.floor(time() * 1000) % 2147483647 + 1)
+    newGame()
     play(sndStart)
 end
 
@@ -46,6 +42,8 @@ func begin()
     return true
 end
 
+const KEY_DIR = {up: "up", w: "up", down: "down", s: "down", left: "left", a: "left", right: "right", d: "right"}
+
 func keyboard.keypressed(key)
     if key == "space" then
         if not begin() and paused then
@@ -55,14 +53,8 @@ func keyboard.keypressed(key)
         paused = not paused
     elseif key == "m" then
         soundOn = not soundOn
-    elseif key == "up" or key == "w" then
-        tryHop("up")
-    elseif key == "down" or key == "s" then
-        tryHop("down")
-    elseif key == "left" or key == "a" then
-        tryHop("left")
-    elseif key == "right" or key == "d" then
-        tryHop("right")
+    elseif KEY_DIR[key] <> nil then
+        tryHop(KEY_DIR[key])
     end
 end
 
@@ -76,37 +68,11 @@ func mouse.pressed(x, y)
         paused = false
         return
     end
-    var dx = x - (frog.x + CELL / 2)
-    var dy = y - (rowY(frog.row) + CELL / 2)
-    if math.abs(dx) > math.abs(dy) then
-        if dx > 0 then
-            tryHop("right")
-        else
-            tryHop("left")
-        end
-    elseif dy < 0 then
-        tryHop("up")
-    else
-        tryHop("down")
-    end
+    tryHop(tapDirection(x - (frog.x + CELL / 2), y - (rowY(frog.row) + CELL / 2)))
 end
 
 func update(dt)
-    dt = math.min(dt, 0.05)
-    if state == "play" and not paused then
-        updatePlay(dt)
-    elseif state == "over" then
-        frog.deadT += dt
-        clock += dt
-        for lane = 0, 10 do
-            laneOff[lane + 1] = advanceLane(laneOff[lane + 1], lane, board, dt)
-        end
-    elseif state == "title" then
-        clock += dt
-        for lane = 0, 10 do
-            laneOff[lane + 1] = advanceLane(laneOff[lane + 1], lane, board, dt)
-        end
-    end
+    updateFrame(dt)
 end
 
 func draw()

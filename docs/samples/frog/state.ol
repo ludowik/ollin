@@ -2,12 +2,9 @@
 
 import "field.ol"
 import "rules.ol"
+import "../lib/keep.ol"
 
-const HOP_TIME     = 0.14      ## seconds a hop lasts: the frog cannot be steered meanwhile
-const DEATH_TIME   = 1.3       ## how long the wreck is shown before the next frog, or the end
-const EVENT_LIFE   = 6.0       ## how long a fly or a crocodile stays in its home
-const EVENT_GAP    = 9.0       ## seconds between two, at least; the rest is drawn by the game's own Random
-const READY_TIME   = 1.2       ## a new frog is held that long before it can move
+const BEST_KEY     = "best"    ## where the best score is kept between two runs
 
 global state     = "title"     ## "title", "play" or "over"
 global paused    = false
@@ -20,7 +17,7 @@ global clock     = 0.0         ## seconds of play, which the turtles' diving is 
 global timeLeft  = TIME_LIMIT
 global laneOff   = []          ## the offset of each lane's strip, lane 0..10
 global homes     = []          ## whether a frog is in each home
-global frog      = {x: START_X, row: 0, face: "up", hop: nil, dead: nil, deadT: 0.0, ready: 0.0}
+global frog      = nil         ## {x, row, face, hop, dead (how it died), deadT, ready}
 global furthest  = 0           ## the row nearest the homes this frog has reached: a row is only paid for once
 global event     = nil         ## what is in a home now: {kind: "fly" or "crocodile", home, left}
 global eventWait = EVENT_GAP
@@ -47,6 +44,25 @@ func placeFrog()
     timeLeft = TIME_LIMIT
 end
 
+## The best score of earlier runs, and keeping a new one.
+func loadBest()
+    best = wholeOr(data.get(BEST_KEY, 0), 0, SCORE_MAX)
+end
+
+func saveBest()
+    if score > best then
+        best = score
+        data.set(BEST_KEY, best)
+    end
+end
+
+func resetField()
+    resetLanes()
+    clearHomes()
+    placeFrog()
+end
+
+## A new game; without a seed, its own Random starts from the clock.
 func newGame(seed)
     score = 0
     lives = LIVES
@@ -56,9 +72,11 @@ func newGame(seed)
     event = nil
     eventWait = EVENT_GAP
     banner = nil
-    rng = Random(seed)
-    resetLanes()
-    clearHomes()
-    placeFrog()
+    if seed == nil then
+        rng = Random()
+    else
+        rng = Random(seed)
+    end
+    resetField()
     state = "play"
 end

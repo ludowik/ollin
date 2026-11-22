@@ -15,12 +15,12 @@ end
 assert(isRoadRow(5) and not isRoadRow(6) and isRiverRow(7) and not isRiverRow(12))
 
 ## ── What the arcade tables say of the lanes ──────────────────────────────────────────────────────────────────────────────
-assert(#TIERS == 5 and #LANE_TILES == 11 and #LANE_DIR == 11 and #LANE_SPEED == 11 and #LANE_DIVES == 11 and #LANE_PHASES == 11)
+assert(#TIERS == 5 and #LANE_TILES == 11 and #LANE_DIR == 11 and #LANE_SPEED == 11 and #LANE_KIND == 11 and #LANE_PHASES == 11)
 for lane = 0, 10 do
     if lane <> 5 then
         var phases = LANE_PHASES[lane + 1]
         assert(#LANE_TILES[lane + 1] % phases == 0, "lane {lane}: its pictures follow each other the same distance apart")
-        assert((phases == 3) == LANE_DIVES[lane + 1], "only the turtles have poses")
+        assert((phases == 3) == divesIn(lane), "only the turtles have poses")
         assert(#LANE_TILES[lane + 1] // phases >= laneSpec(1, lane).tiles * 2, "a picture holds the tiles of a lane object")
     end
 end
@@ -32,7 +32,7 @@ for tier = 1, 5 do
         if lane <> 5 then
             var spec = laneSpec(tier, lane)
             assert(spec.count >= 1 and spec.len >= 16, "tier {tier} lane {lane} holds objects")
-            assert(spec.tiles * 2 == #LANE_TILES[lane + 1] or LANE_DIVES[lane + 1], "tier {tier} lane {lane}: the table has a picture for every tile")
+            assert(spec.tiles * 2 == #LANE_TILES[lane + 1] or divesIn(lane), "tier {tier} lane {lane}: the table has a picture for every tile")
             assert((spec.count - 1) * spec.period + spec.len <= STRIP, "tier {tier} lane {lane}: the objects fit the strip without touching at the seam")
         end
     end
@@ -41,6 +41,16 @@ for lane = 0, 10 do
     var stands = LANE_DIR[lane + 1] == 0
     assert(stands == (lane == 5), "only the median strip stands still")
 end
+
+## The length of a lane's object is the same on every tier, which is what lets one picture serve them all.
+for lane = 0, 10 do
+    if hasObjects(lane) then
+        for tier = 2, 5 do
+            assert(laneSpec(tier, lane).tiles == laneSpec(1, lane).tiles, "lane {lane}: tier {tier} has objects as long as tier 1")
+        end
+    end
+end
+assert(laneVelocity(1, 1) == -24.0 and laneVelocity(5, 9) == 0.0 and laneVelocity(0, 3) == 28.0 * speedFactor(3), "a lane's velocity is its way, its speed and the board's factor")
 
 ## ── Where the objects are, and the strip that wraps ──────────────────────────────────────────────────────────────────────
 var items = laneItems(1, 0, 0.0)
@@ -102,4 +112,20 @@ s, given = addScore(0, 50, false)
 assert(s == 50 and not given)
 s, given = addScore(SCORE_MAX - 5, 50, true)
 assert(s == SCORE_MAX, "the score stops where a score can be kept")
+
+## ── A hop in the air, a tap, a death ─────────────────────────────────────────────────────────────────────────────────────
+var hop = {t: 0.0, fromX: 40.0, fromRow: 3, toX: 56.0, toRow: 4}
+assert(hopFraction(hop) == 0.0 and hopX(hop) == 40.0 and hopRow(hop) == 3, "a hop starts where it was")
+hop.t = HOP_TIME * 0.25
+assert(math.abs(hopX(hop) - 44.0) < 0.0001 and hopRow(hop) == 3, "a quarter of the way it is still over the row it left")
+hop.t = HOP_TIME * 0.5
+assert(hopRow(hop) == 4, "halfway it is over the row it goes to")
+hop.t = HOP_TIME * 3
+assert(hopFraction(hop) == 1.0 and hopX(hop) == 56.0, "a hop that took longer than it lasts stops at its end")
+assert(tapDirection(10, 3) == "right" and tapDirection(-10, 3) == "left" and tapDirection(2, -9) == "up" and tapDirection(2, 9) == "down", "a tap points along the axis it is further on")
+assert(tapDirection(5, 5) == "down" and tapDirection(5, -5) == "up" and tapDirection(0, 0) == "down", "a tap on a diagonal goes up or down")
+assert(splashFrame(0.0) == 1 and splashFrame(0.2) == 2 and splashFrame(0.44) == 3, "a splash has three pictures")
+for kind in ["car", "croc", "drown", "edge", "wall", "time"] do
+    assert(DEATHS[kind] <> nil, "{kind} is a way to die")
+end
 print("frog rules ok")

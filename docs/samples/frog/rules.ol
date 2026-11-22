@@ -16,8 +16,17 @@ import "arcade.ol"
 const LANE_DIR   = [1, -1, 1, 1, -1, 0, -1, 1, -1, 1, -1]
 ## Pixels per second on the first board; every board after it is a little faster.
 const LANE_SPEED = [28.0, 24.0, 44.0, 20.0, 32.0, 0.0, 28.0, 36.0, 30.0, 52.0, 24.0]
-## The turtles, which are the lanes that dive.
-const LANE_DIVES = [false, true, false, false, true, false, false, false, false, false, false]
+## What each lane carries: logs and turtles in the river, vehicles on the road, nothing on the median strip.
+const LANE_KIND  = ["log", "turtle", "log", "log", "turtle", "none", "truck", "car", "car", "car", "car"]
+
+## The turtles are the lanes that dive.
+func divesIn(lane)
+    return LANE_KIND[lane + 1] == "turtle"
+end
+
+func hasObjects(lane)
+    return LANE_KIND[lane + 1] <> "none"
+end
 
 const SPEED_PER_BOARD = 0.1
 const SPEED_MAX       = 2.2
@@ -39,25 +48,45 @@ const EXTRA_AT    = 20000      ## an extra frog the first time the score gets he
 const SCORE_MAX   = 999999999
 const LIVES       = 3
 const TIME_LIMIT  = 30.0
+const TIME_LOW    = 8.0        ## the clock is shown in alarm colours under this
+
+const HOP_TIME    = 0.14       ## seconds a hop lasts: the frog cannot be steered meanwhile
+const DEATH_TIME  = 1.3        ## how long the wreck is shown before the next frog, or the end
+const READY_TIME  = 1.2        ## a new frog is held that long before it can move
+const EVENT_LIFE  = 6.0        ## how long a fly or a crocodile stays in its home
+const EVENT_GAP   = 9.0        ## seconds between two, at least; the rest is drawn by the game's own Random
+
+## How a frog dies: whether the sound is a thud (run over, eaten) or a splash, and whether it is shown as a splash of bubbles
+## (SPLASH_STEP seconds for each of the three pictures) before the skull.
+const DEATHS = {
+    car:   {thud: true,  splash: false},
+    croc:  {thud: true,  splash: false},
+    drown: {thud: false, splash: true},
+    edge:  {thud: false, splash: true},
+    wall:  {thud: false, splash: true},
+    time:  {thud: false, splash: false}
+}
+const SPLASH_STEP = 0.15
+const SPLASH_TIME = 0.45
 
 func wrapTo(v, size)
     return v - size * math.floor(v / size)
 end
 
 func isRoadRow(row)
-    return row >= 1 and row <= 5
+    return row > ROW_START and row < ROW_MEDIAN
 end
 
 func isRiverRow(row)
-    return row >= 7 and row <= 11
+    return row > ROW_MEDIAN and row < ROW_HOMES
 end
 
 ## The lane of a row, or nil for the start strip, the median strip and the homes.
 func laneOfRow(row)
-    if row < 1 or row > 11 or row == ROW_MEDIAN then
+    if not isRoadRow(row) and not isRiverRow(row) then
         return nil
     end
-    return 11 - row
+    return ROW_HOMES - 1 - row
 end
 
 func tierOfBoard(board)
@@ -68,17 +97,36 @@ func speedFactor(board)
     return math.min(1.0 + SPEED_PER_BOARD * (board - 1), SPEED_MAX)
 end
 
-## What a lane is made of on a board: the length of an object, the period of the strip (an object and the gap after it) and
-## how many objects there are. A lane is numbered 0..10, a tier 1..5 (a board's tier comes round every five boards).
+## What a lane is made of on each tier: the length of an object, the period of the strip (an object and the gap after it) and
+## how many objects there are, worked out once.
+func buildSpecs()
+    var out = []
+    for tier = 1, #TIERS do
+        var lanes = []
+        for t in TIERS[tier] do
+            var rows = t[2]
+            lanes.push({len: rows * TILE, period: (rows + t[1] // (STRIP // TILE)) * TILE, count: t[3], tiles: rows})
+        end
+        out.push(lanes)
+    end
+    return out
+end
+
+const SPECS = buildSpecs()
+
+## A lane is numbered 0..10, a tier 1..5 (a board's tier comes round every five boards).
 func laneSpec(tier, lane)
-    var t = TIERS[tier][lane + 1]
-    var rows = t[2]
-    return {len: rows * TILE, period: (rows + t[1] // 32) * TILE, count: t[3], tiles: rows}
+    return SPECS[tier][lane + 1]
+end
+
+## How fast a lane's strip runs on a board, in pixels per second, and which way (negative to the left).
+func laneVelocity(lane, board)
+    return LANE_DIR[lane + 1] * LANE_SPEED[lane + 1] * speedFactor(board)
 end
 
 ## The offset of a lane's strip, advanced by dt seconds on a board.
 func advanceLane(pos, lane, board, dt)
-    return wrapTo(pos + LANE_DIR[lane + 1] * LANE_SPEED[lane + 1] * speedFactor(board) * dt, STRIP)
+    return wrapTo(pos + laneVelocity(lane, board) * dt, STRIP)
 end
 
 ## 0 a group of turtles on the surface, 1 and 2 sinking or coming up, 3 under water. Only every other group dives, and they
@@ -135,7 +183,7 @@ func riverSupport(tier, lane, pos, t, x)
     var mid = x + CELL / 2
     for it in laneItems(tier, lane, pos) do
         if mid >= it.x0 and mid <= it.x1 then
-            if LANE_DIVES[lane + 1] and turtleFrame(t, it.group) == 3 then
+            if divesIn(lane) and turtleFrame(t, it.group) == 3 then
                 return nil
             end
             return it
@@ -144,7 +192,7 @@ func riverSupport(tier, lane, pos, t, x)
     return nil
 end
 
-## A frog the river carries goes where the lane goes. Whether it is still inside the field.
+## Whether a cell whose left edge is at x is still inside the field.
 func onField(x)
     return x >= 0 and x + CELL <= FIELD_W
 end
@@ -152,15 +200,48 @@ end
 ## The cell, from 1 to 5, a frog arriving at x is in, or nil when it is against a wall.
 func homeAt(x)
     for h = 1, HOMES do
-        if math.abs(x - (HOME_X0 + (h - 1) * HOME_STEP)) <= HOME_REACH then
+        if math.abs(x - homeX(h)) <= HOME_REACH then
             return h
         end
     end
     return nil
 end
 
-func homeX(h)
-    return HOME_X0 + (h - 1) * HOME_STEP
+## Where a hop has taken the frog: the share of it done, and the x and the row it is over — the row it left for the first half of
+## the hop, the one it is going to for the second.
+func hopFraction(hop)
+    return math.min(hop.t / HOP_TIME, 1.0)
+end
+
+func hopX(hop)
+    return hop.fromX + (hop.toX - hop.fromX) * hopFraction(hop)
+end
+
+func hopRow(hop)
+    if hopFraction(hop) >= 0.5 then
+        return hop.toRow
+    end
+    return hop.fromRow
+end
+
+## Which of the three pictures of a splash is shown t seconds after the frog went in the water.
+func splashFrame(t)
+    return 1 + math.floor(t / SPLASH_STEP)
+end
+
+## The way a tap at (dx, dy) from the middle of the frog points: the axis it is further along, the side it is on. A tap exactly
+## on a diagonal goes up or down.
+func tapDirection(dx, dy)
+    if math.abs(dx) > math.abs(dy) then
+        if dx > 0 then
+            return "right"
+        end
+        return "left"
+    end
+    if dy < 0 then
+        return "up"
+    end
+    return "down"
 end
 
 ## What a frog is given for arriving home with `left` seconds on the clock, `fly` saying it ate the fly.

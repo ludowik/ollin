@@ -11,6 +11,8 @@ import "rules.ol"
 global laneImgs = []           ## per lane, its object's picture: one for a log or a car, the three poses of swimming for turtles
 global frogImgs = {}           ## the frog, by the way it faces and then by "rest" or "hop"
 global pics = {}               ## the other sprites, by name
+global splashImgs = []         ## the three pictures of a splash, in the order they follow each other
+global titleImgs = []          ## the four letters of the title
 global glyphs = {}             ## the letters, the digits and the dash, one picture each
 
 const CLEAR = Color(0, 0, 0, 0)
@@ -35,26 +37,14 @@ func rowsOf(s, w, h)
     return rows
 end
 
-## The same rows turned: "cw" a quarter turn clockwise, "ccw" counter-clockwise, "half" half a turn.
-func turnRows(rows, how)
+## The same rows turned a quarter clockwise.
+func turnRows(rows)
     var size = #rows
     var out = []
     for y = 0, size - 1 do
         var line = []
         for x = 0, size - 1 do
-            var sx = x
-            var sy = y
-            if how == "cw" then
-                sx = y
-                sy = size - 1 - x
-            elseif how == "ccw" then
-                sx = size - 1 - y
-                sy = x
-            else
-                sx = size - 1 - x
-                sy = size - 1 - y
-            end
-            line.push(rows[sy + 1].char(sx + 1))
+            line.push(rows[size - x].char(y + 1))
         end
         out.push(line.join(""))
     end
@@ -85,9 +75,9 @@ func buildSprites()
     laneImgs = []
     for lane = 0, 10 do
         var imgs = []
-        if lane <> 5 then
+        if hasObjects(lane) then
             var palette = PALETTE
-            if lane == 0 or lane == 2 or lane == 3 then
+            if LANE_KIND[lane + 1] == "log" then
                 palette = LOG_PALETTE
             end
             for phase = 0, LANE_PHASES[lane + 1] - 1 do
@@ -102,14 +92,17 @@ func buildSprites()
         pics[name] = image.fromPattern(rowsOf(SPRITES[code + 1], CELL, CELL), PALETTE)
     end
 
-    ## The frog faces up as it is drawn; the other ways are the picture turned.
+    splashImgs = [pics.splash1, pics.splash2, pics.splash3]
+    titleImgs = [pics.titleF, pics.titleR, pics.titleO, pics.titleG]
+
+    ## The frog faces up as it is drawn; the other ways are the picture turned a quarter at a time.
     frogImgs = {}
-    for face, how in {up: "none", right: "cw", down: "half", left: "ccw"} do
+    for face, turns in {up: 0, right: 1, down: 2, left: 3} do
         var rest = rowsOf(SPRITES[SPRITE_CODES.frog + 1], CELL, CELL)
         var hop = rowsOf(SPRITES[SPRITE_CODES.hop + 1], CELL, CELL)
-        if how <> "none" then
-            rest = turnRows(rest, how)
-            hop = turnRows(hop, how)
+        for t = 1, turns do
+            rest = turnRows(rest)
+            hop = turnRows(hop)
         end
         frogImgs[face] = {rest: image.fromPattern(rest, PALETTE), hop: image.fromPattern(hop, PALETTE)}
     end

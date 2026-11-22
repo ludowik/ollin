@@ -15,7 +15,7 @@ end
 ## Runs the game for a time in steps of a twentieth of a second.
 func run(seconds)
     for i = 1, math.floor(seconds / 0.05 + 0.5) do
-        updatePlay(0.05)
+        updateFrame(0.05)
     end
 end
 
@@ -196,4 +196,20 @@ homes = [true, true, true, true, false]
 eventWait = 0.0
 updateEvent(0.05)
 assert(event.home == 5, "only an empty home is chosen")
+## ── The screens around a game: the lanes run on the title and under the end screen, and a pause stops them ─────────────────
+state = "title"
+var before = laneOff[1]
+updateFrame(0.05)
+assert(laneOff[1] <> before, "the lanes run behind the title")
+state = "over"
+frog.deadT = 0.0
+updateFrame(0.05)
+assert(frog.deadT == 0.05, "the wreck stays under the end screen")
+fresh()
+paused = true
+before = laneOff[1]
+updateFrame(0.05)
+assert(laneOff[1] == before, "nothing moves while the game is paused")
+paused = false
+
 print("frog play ok")

@@ -53,9 +53,15 @@ def plain_text(html_text):
     return re.sub(r"<[^>]+>", "\n", html_text)
 
 
-def hex_lines(text, pattern):
+# A line of a hex dump: an address, a colon and up to sixteen bytes, and nothing else — a line of the disassembly that has
+# its mnemonic after the bytes does not match.
+HEX_LINE = r"^([0-9A-F]{4}): ((?:[0-9A-F]{2} ?){1,16})$"
+
+
+def hex_lines(html_text):
+    text = plain_text(html_text)
     out = {}
-    for m in re.finditer(pattern, text, flags=re.M):
+    for m in re.finditer(HEX_LINE, text, flags=re.M):
         base = int(m.group(1), 16)
         for i, b in enumerate(m.group(2).split()):
             out.setdefault(base + i, int(b, 16))
@@ -63,16 +69,11 @@ def hex_lines(text, pattern):
 
 
 def read_graphics_rom(html_text):
-    rom = hex_lines(plain_text(html_text), r"^([0-9A-F]{4}): ((?:[0-9A-F]{2} ?){1,16})$")
+    rom = hex_lines(html_text)
     missing = [a for a in range(0x1000) if a not in rom]
     if missing:
         raise SystemExit("the page does not give the whole ROM: %d bytes missing, first at %04X" % (len(missing), missing[0]))
     return rom
-
-
-def read_code_data(html_text):
-    # The data lines of the disassembly are bare hex; a code line has its mnemonic after the bytes.
-    return hex_lines(plain_text(html_text), r"^([0-9A-F]{4}): ((?:[0-9A-F]{2} ?){1,16})$")
 
 
 def stored_tile(rom, n):
@@ -191,7 +192,7 @@ def main():
     else:
         gfx, code = fetch("GFX.html"), fetch("Code.html")
     write_tiles(read_graphics_rom(gfx))
-    write_lanes(read_code_data(code))
+    write_lanes(hex_lines(code))
 
 
 if __name__ == "__main__":

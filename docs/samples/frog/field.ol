@@ -28,3 +28,8 @@ const HOME_REACH = 7.0
 func rowY(row)
     return ROW_TOP_Y + (ROW_HOMES - row) * CELL
 end
+
+## The left edge of the h-th home, from 1 to HOMES.
+func homeX(h)
+    return HOME_X0 + (h - 1) * HOME_STEP
+end

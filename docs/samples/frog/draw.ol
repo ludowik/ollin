@@ -58,24 +58,24 @@ end
 ## The objects of every lane, in the picture the arcade tables give them.
 func drawLanes()
     var tier = tierOfBoard(board)
+    var pose = SWIM[math.floor(clock * 4) % 4 + 1]
     for lane = 0, 10 do
-        if lane <> 5 then
-            var y = rowY(11 - lane)
+        if hasObjects(lane) then
+            var y = rowY(ROW_HOMES - 1 - lane)
+            var dives = divesIn(lane)
             for it in laneItems(tier, lane, laneOff[lane + 1]) do
                 var frame = 0
-                if LANE_DIVES[lane + 1] then
+                if dives then
                     frame = turtleFrame(clock, it.group)
                 end
+                var x = math.floor(it.x0 + 0.5)
                 if frame == 0 then
-                    var pose = 0
-                    if LANE_DIVES[lane + 1] then
-                        pose = SWIM[math.floor(clock * 4) % 4 + 1]
-                    end
-                    graphics.sprite(laneImgs[lane + 1][pose + 1], math.floor(it.x0 + 0.5), y, it.x1 - it.x0, CELL)
+                    var imgs = laneImgs[lane + 1]
+                    graphics.sprite(imgs[(dives and pose or 0) + 1], x, y, it.x1 - it.x0, CELL)
                 else
                     ## a group that dives is a ring of bubbles for each turtle, the board's own picture of something sinking
                     for k = 0, (it.x1 - it.x0) // CELL - 1 do
-                        graphics.sprite(pics["splash{frame}"], math.floor(it.x0 + 0.5) + k * CELL, y, CELL, CELL)
+                        graphics.sprite(splashImgs[frame], x + k * CELL, y, CELL, CELL)
                     end
                 end
             end
@@ -102,22 +102,18 @@ func drawHomes()
 end
 
 func drawFrog()
-    if frog.dead == "over" then
-        graphics.sprite(pics.skull, math.floor(frog.x + 0.5), rowY(frog.row), CELL, CELL)
-        return
-    end
     var x = frog.x
     var y = rowY(frog.row)
     var img = frogImgs[frog.face].rest
     if frog.hop <> nil then
-        var p = frog.hop.t / HOP_TIME
-        x = frog.hop.fromX + (frog.hop.toX - frog.hop.fromX) * p
+        var p = hopFraction(frog.hop)
+        x = hopX(frog.hop)
         y = rowY(frog.hop.fromRow) + (rowY(frog.hop.toRow) - rowY(frog.hop.fromRow)) * p
         img = frogImgs[frog.face].hop
     end
     if frog.dead <> nil then
-        if (frog.dead == "drown" or frog.dead == "edge" or frog.dead == "wall") and frog.deadT < 0.45 then
-            img = pics["splash{1 + math.floor(frog.deadT / 0.15)}"]
+        if DEATHS[frog.dead].splash and frog.deadT < SPLASH_TIME then
+            img = splashImgs[splashFrame(frog.deadT)]
         else
             img = pics.skull
         end
@@ -140,7 +136,7 @@ func drawHud()
     drawText("TIME", 120, FIELD_H - 12, YELLOW)
     var w = math.floor(timeLeft / TIME_LIMIT * 64)
     var col = GREEN
-    if timeLeft < 8 then
+    if timeLeft < TIME_LOW then
         col = BAR_LOW
     end
     block(col, 152, FIELD_H - 11, math.max(w, 0), 6)
@@ -170,9 +166,8 @@ func drawTitle()
     drawLanes()
     drawHud()
     block(BLACK, 8, 88, FIELD_W - 16, 84)
-    var letters = [pics.titleF, pics.titleR, pics.titleO, pics.titleG]
     for i = 1, 4 do
-        graphics.sprite(letters[i], 80 + (i - 1) * 16, 100, CELL, CELL)
+        graphics.sprite(titleImgs[i], 80 + (i - 1) * 16, 100, CELL, CELL)
     end
     drawTextCentre("PRESS SPACE OR TAP", 132, WHITE)
     drawTextCentre("ARROWS OR TAP THE SIDE", 148, YELLOW)
