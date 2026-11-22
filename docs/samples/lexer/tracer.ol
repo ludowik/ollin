@@ -27,7 +27,7 @@ const KEYWORDS = {
     "else": "ELSE", "elseif": "ELSEIF", "func": "FUNC", "return": "RETURN", "nil": "NIL",
     "or": "OR", "and": "AND", "not": "NOT", "for": "FOR", "in": "IN", "import": "IMPORT",
     "as": "AS", "class": "CLASS", "extends": "EXTENDS", "static": "STATIC", "switch": "SWITCH",
-    "case": "CASE", "enum": "ENUM", "ref": "REF"
+    "case": "CASE", "enum": "ENUM", "ref": "REF", "yield": "YIELD"
 }
 
 ## The token types of the keywords, to ask whether a type is one.

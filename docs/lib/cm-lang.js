@@ -12,12 +12,12 @@ export const KEYWORDS = new Set([
   'var', 'global', 'const', 'while', 'do', 'for', 'in', 'if', 'then', 'elseif', 'end',
   'break', 'true', 'false', 'nil', 'try', 'catch', 'throw', 'else', 'func', 'return',
   'import', 'as', 'or', 'and', 'not', 'class', 'extends', 'static', 'super', 'self',
-  'switch', 'case', 'default', 'enum', 'ref',
+  'switch', 'case', 'default', 'enum', 'ref', 'yield',
 ])
 export const BUILTINS = new Set([
   'print', 'printf', 'time', 'assert', 'len', 'typeof', 'classOf', 'instanceOf', 'Color', 'Random',
   'math', 'graphics', 'string', 'map', 'array', 'colors', 'blend', 'window', 'image', 'keyboard', 'mouse', 'data', 'ui',
-  'tween', 'camera', 'motion', 'https', 'json',
+  'tween', 'camera', 'motion', 'https', 'json', 'coroutine',
 ])
 
 export const ollinLang = StreamLanguage.define({

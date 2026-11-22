@@ -211,7 +211,20 @@ multiAssign    = lvalue { "," lvalue } "=" expr { "," expr } NL ;
                     return values over the targets, as in a declaration *)
 exprStmt       = expr NL ;
 
-expr           = logical ;
+expr           = yieldExpr | logical ;
+yieldExpr      = "yield" [ expr { "," expr } ] ;
+                 (* SUSPENDS THE RUNNING COROUTINE and gives back to whoever resumed it the values that follow, if any. A bare
+                    `yield` is the common case: it pauses, and the coroutine goes on from there at the next resume. *)
+                 (* The values are the ones on the SAME LINE as the keyword. Newlines are not tokens in this language, so after a
+                    bare `yield` the next line is the next statement, and reading it as a value would swallow code. This is the
+                    one place where the line a token is on matters. *)
+                 (* It is an expression: `var x = yield a` and `var a, b = yield` give what the next resume passes, as the
+                    results of a call do. It sits at the top of the grammar, as the whole of an expression (a statement, the
+                    right-hand side of a declaration or an assignment, an argument, a parenthesised `(yield)`), and not as an
+                    operand: `1 + yield` is refused. *)
+                 (* Outside a coroutine, or under a native function that calls back into Ollin (array.map, sort, a `__str`),
+                    it is an error. It is DESUGARED by the parser into a call of the internal builtin __yield: like `ref`, no
+                    opcode of its own. The coroutines are made and resumed by the `coroutine` module. *)
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
              (* "and" and "or" SHORT-CIRCUIT and return a VALUE:

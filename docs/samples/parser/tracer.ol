@@ -1271,10 +1271,11 @@ class ParseTracer
         self.enter("expr")
         self.run("expr", 2, "if (depth_ >= 256)")
         self.run("expr", 4, "DepthGuard guard(depth_);")
-        self.run("expr", 5, "return binary_level(0);",
+        self.run("expr", 5, "if (check(TokenType::YIELD))")
+        self.run("expr", 7, "return binary_level(0);",
                  {note: "An expression starts at level 0, the loosest, and goes down level by level to the tightest before it comes back up."})
         var e = self.binaryLevel(0)
-        self.run("expr", 5, "return binary_level(0);", {ret: e})
+        self.run("expr", 7, "return binary_level(0);", {ret: e})
         self.leave()
         return e
     end

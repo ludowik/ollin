@@ -592,6 +592,8 @@ std::unique_ptr<Expr> Parser::expr() {
     if (depth_ >= 256)
         fail("nesting too deep");
     DepthGuard guard(depth_);
+    if (check(TokenType::YIELD))
+        return yield_expr();
     return binary_level(0);
 }
 
@@ -748,6 +750,49 @@ static std::unique_ptr<Expr> fold_path(const std::vector<std::string>& path, siz
 // validate — a map with get/set is not necessarily a reference, the `data` module has some too.
 static const char* REF_PARAM = "__ref_v"; // the setter's parameter name, which must not
                                           // must NEVER collide with the target (`ref v`)
+
+// Whether a token can BEGIN an expression: what `yield` looks at to tell its values from the statement that follows.
+static bool starts_value(TokenType t) {
+    switch (t) {
+    case TokenType::NUMBER:
+    case TokenType::STRING:
+    case TokenType::INTERP_START:
+    case TokenType::IDENTIFIER:
+    case TokenType::TRUE:
+    case TokenType::FALSE:
+    case TokenType::NIL:
+    case TokenType::FUNC:
+    case TokenType::LPAREN:
+    case TokenType::LBRACKET:
+    case TokenType::LBRACE:
+    case TokenType::MINUS:
+    case TokenType::NOT:
+    case TokenType::TILDE:
+    case TokenType::HASH:
+    case TokenType::REF:
+    case TokenType::YIELD:
+    case TokenType::DOT_DOT_DOT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// `yield` and `yield a, b`: suspends the running coroutine, desugared right here into a call of the internal builtin __yield
+// (like `ref`, there is no node, no opcode and nothing in the compiler or the VM for it). The values are the ones on the SAME
+// line: newlines are not tokens, so after a bare `yield` the next line is the next statement, and reading it as a value
+// would swallow code (`yield` then `print(x)` below it). A bare `yield` is the common case and the default.
+std::unique_ptr<Expr> Parser::yield_expr() {
+    int line = peek().line;
+    advance(); // YIELD
+    auto call = std::make_unique<CallExpr>();
+    call->callee = "__yield";
+    call->line = line;
+    call->file_idx = current_file_idx_;
+    if (peek().line == line && starts_value(peek().type))
+        parse_expr_list(call->args);
+    return call;
+}
 
 std::unique_ptr<Expr> Parser::ref_expr() {
     int line = peek().line;

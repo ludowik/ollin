@@ -1498,6 +1498,49 @@ check_error "ref at the end of the file" \
     'var a = ref' \
     "ref expects a variable name, not end of file"
 
+check_error "yield is not an operand" \
+    'var x = 1 + yield' \
+    "unexpected token 'yield'"
+
+check_error "yield outside a coroutine" \
+    'yield' \
+    "yield outside a coroutine"
+
+check_error "an error inside a coroutine is reported where it happened" \
+    'var co = coroutine.create(func()
+    var t = nil
+    return t.x.y
+end)
+coroutine.resume(co)' \
+    ":3: cannot index nil with field 'x'"
+
+check_error "a value thrown out of a coroutine with no handler anywhere" \
+    'var co = coroutine.create(func()
+    throw {code: 1}
+end)
+coroutine.resume(co)' \
+    "unhandled exception: {map}"
+
+check_error "a finished coroutine cannot be resumed" \
+    'var co = coroutine.create(func()
+end)
+coroutine.resume(co)
+coroutine.resume(co)' \
+    "cannot resume a dead coroutine"
+
+check_error "a yield cannot cross a native function" \
+    'var co = coroutine.create(func()
+    return [1].map(func(x)
+        yield
+    end)
+end)
+coroutine.resume(co)' \
+    "cannot yield across a native call"
+
+check_error "coroutine.create wants a function" \
+    'coroutine.create(3)' \
+    "coroutine.create: expected a function"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

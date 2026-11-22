@@ -3,7 +3,7 @@
 ## one starts. A ¤ stands for a double quote, and tracer.ol puts the quotes back.
 
 const CPP_SOURCE = {
-    "skip_whitespace": {first: 82, lines: [
+    "skip_whitespace": {first: 83, lines: [
         "void Lexer::skip_whitespace() \{",
         "    while (true) \{",
         "        char c = peek();",
@@ -13,7 +13,7 @@ const CPP_SOURCE = {
         "    }",
         "}"
     ]},
-    "number": {first: 91, lines: [
+    "number": {first: 92, lines: [
         "Token Lexer::number(bool leading_dot) \{",
         "    int start = pos - 1;",
         "    std::string digits;",
@@ -114,7 +114,7 @@ const CPP_SOURCE = {
         "    return \{TokenType::NUMBER, digits, line};",
         "}"
     ]},
-    "interp_string": {first: 206, lines: [
+    "interp_string": {first: 207, lines: [
         "void Lexer::interp_string(std::vector<Token>& out) \{",
         "    int str_line = line;",
         "    std::string literal;",
@@ -217,7 +217,7 @@ const CPP_SOURCE = {
         "    emit(out, \{has_interp ? TokenType::INTERP_END : TokenType::STRING, literal, str_line});",
         "}"
     ]},
-    "identifier": {first: 308, lines: [
+    "identifier": {first: 309, lines: [
         "Token Lexer::identifier() \{",
         "    int start = pos - 1;",
         "    while (is_alnum(peek()) || peek() == '_')",
@@ -227,13 +227,13 @@ const CPP_SOURCE = {
         "    return \{it != s_keywords.end() ? it->second : TokenType::IDENTIFIER, lex, line};",
         "}"
     ]},
-    "comment": {first: 321, lines: [
+    "comment": {first: 322, lines: [
         "void Lexer::comment() \{",
         "    while (!at_end() && peek() != '\n')",
         "        advance();",
         "}"
     ]},
-    "block_comment": {first: 326, lines: [
+    "block_comment": {first: 327, lines: [
         "void Lexer::block_comment() \{",
         "    int hashes = 0;",
         "    while (!at_end()) \{",
@@ -247,7 +247,7 @@ const CPP_SOURCE = {
         "    fail(¤unterminated block comment¤, line);",
         "}"
     ]},
-    "tokenize": {first: 339, lines: [
+    "tokenize": {first: 340, lines: [
         "std::vector<Token> Lexer::tokenize() \{",
         "    std::vector<Token> tokens;",
         "    tokens.reserve(src.size() / 4 + 8); // a prudent estimate: it only avoids reallocations",

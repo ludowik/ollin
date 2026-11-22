@@ -38,6 +38,7 @@ static const robin_hood::unordered_map<std::string, TokenType> s_keywords = {
     {"extends", TokenType::EXTENDS}, {"static", TokenType::STATIC},
     {"switch", TokenType::SWITCH},   {"case", TokenType::CASE},
     {"enum", TokenType::ENUM},       {"ref", TokenType::REF},
+    {"yield", TokenType::YIELD},
 };
 
 bool is_keyword_type(TokenType t) {

@@ -1437,6 +1437,37 @@ var refStock = ref refTarget
 refStock.set(7)
 assert(refTarget == 7)
 
+## ── 27b. yield (suspending a coroutine) ───────────────────────────────────────
+## [grammar: yieldExpr]
+## A bare `yield` pauses the running coroutine; values on the same line are handed to the resumer; as an expression it is
+## what the next resume passes back.
+var yieldLog = []
+var yieldCo = coroutine.create(func(first)
+    yieldLog.push(first)
+    yield                        ## a bare yield
+    var got = yield first + 1    ## values after it, and what the next resume gives back
+    yieldLog.push(got)
+    var a, b = yield 10, 20
+    yieldLog.push(a + b)
+    yield
+    return "done"
+end)
+assert(coroutine.resume(yieldCo, 5) == nil)
+assert(coroutine.resume(yieldCo) == 6)
+var yieldA, yieldB = coroutine.resume(yieldCo, "back")
+assert(yieldA == 10 and yieldB == 20 and yieldLog.join(",") == "5,back")
+assert(coroutine.resume(yieldCo, 1, 2) == nil and yieldLog[3] == 3)
+assert(coroutine.resume(yieldCo) == "done" and coroutine.status(yieldCo) == "dead")
+## `yield` is not an operand, and the line decides what follows it
+var yieldLine = coroutine.create(func()
+    yield
+    yieldLog.push("next statement")
+end)
+coroutine.resume(yieldLine)
+assert(#yieldLog == 3, "the line after a bare yield is not its value")
+coroutine.resume(yieldLine)
+assert(yieldLog[4] == "next statement")
+
 ## ── 28. The ui module (widgets drawn by the engine) ──────────────────────────
 ## Buttons and checkboxes, stacked in the top-right corner of the drawing area.
 ## A widget is declared ONCE; the engine draws it and tests it on every frame.

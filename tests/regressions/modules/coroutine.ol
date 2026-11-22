@@ -1,10 +1,10 @@
-## Coroutines: functions that suspend in the middle of their body and resume where they stopped, with __yield and the `coroutine`
+## Coroutines: functions that suspend in the middle of their body and resume where they stopped, with `yield` and the `coroutine`
 ## module. The state model is in src/coroutine.h; these are the behaviours a script can see.
 
 ## ── The basics ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 var coBasic = coroutine.create(func()
-    __yield()
-    __yield()
+    yield
+    yield
     return "end"
 end)
 assert(typeof(coBasic) == "coroutine" and coroutine.status(coBasic) == "suspended", "a new coroutine is suspended")
@@ -18,8 +18,8 @@ assert(not not coBasic, "a coroutine is true")
 
 ## ── Values in both directions ────────────────────────────────────────────────────────────────────────────────────────────────
 var coTalk = coroutine.create(func(a, b)
-    var x = __yield(a + b)
-    var y, z = __yield(x * 2)
+    var x = yield a + b
+    var y, z = yield x * 2
     return y, z, "last"
 end)
 assert(coroutine.resume(coTalk, 1, 2) == 3, "the first resume's values are the body's arguments, a yield hands its values out")
@@ -27,7 +27,7 @@ assert(coroutine.resume(coTalk, 10) == 20, "the next resume's values are what th
 var coA, coB, coC = coroutine.resume(coTalk, "p", "q")
 assert(coA == "p" and coB == "q" and coC == "last", "several values go both ways")
 var coMany = coroutine.create(func(...)
-    var first, second = __yield(1, 2, 3)
+    var first, second = yield 1, 2, 3
     return first, second
 end)
 var coP, coQ, coR = coroutine.resume(coMany, "a")
@@ -41,7 +41,7 @@ func coFibonacci(n)
         var a = 0
         var b = 1
         for i = 1, n do
-            __yield(a)
+            yield a
             a, b = b, a + b
         end
     end)
@@ -59,7 +59,7 @@ assert(coSeq.join(",") == "0,1,1,2,3,5,8,13,21,34", "a generator written as a lo
 ## ── A yield may be anywhere in the calls the body makes ─────────────────────────────────────────────────────────────────────
 func coDeep(n)
     if n == 0 then
-        __yield("bottom")
+        yield "bottom"
         return 0
     end
     return coDeep(n - 1) + 1
@@ -76,7 +76,7 @@ class CoWalker
     end
     func step()
         self.n += 1
-        __yield(self.n)
+        yield self.n
     end
 end
 var coWalker = CoWalker()
@@ -110,7 +110,7 @@ var coInner = nil
 var coNormal = ""
 coInner = coroutine.create(func()
     coNormal = coroutine.status(coOuter)
-    __yield()
+    yield
 end)
 coOuter = coroutine.create(func()
     coroutine.resume(coInner)
@@ -119,7 +119,7 @@ coroutine.resume(coOuter)
 assert(coNormal == "normal", "a coroutine that resumed another is normal while that one runs")
 assert(coroutine.status(coInner) == "suspended" and coroutine.status(coOuter) == "dead")
 try
-    __yield()
+    yield
     assert(false)
 catch e
     assert(e == "yield outside a coroutine")
@@ -136,7 +136,7 @@ assert(coRunning == coMe and coYieldable, "running() names the coroutine that ru
 
 ## ── Errors ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 var coBoom = coroutine.create(func()
-    __yield(1)
+    yield 1
     assert(false, "boom")
 end)
 coroutine.resume(coBoom)
@@ -159,10 +159,10 @@ end
 ## A try inside the body survives a yield.
 var coSafe = coroutine.create(func()
     try
-        __yield("inside")
+        yield "inside"
         throw "late"
     catch e
-        __yield("caught " + e)
+        yield "caught " + e
     end
     return "after"
 end)
@@ -173,7 +173,7 @@ assert(coroutine.resume(coSafe) == "after")
 ## A yield cannot cross a native function.
 var coNative = coroutine.create(func()
     return [1, 2].map(func(x)
-        __yield(x)
+        yield x
         return x
     end)
 end)
@@ -204,7 +204,7 @@ end
 var coCounter = 0
 var coBump = coroutine.create(func()
     coCounter += 1
-    __yield()
+    yield
     coCounter += 10
 end)
 coroutine.resume(coBump)
@@ -225,7 +225,7 @@ var coShare = coroutine.create(func()
             n = v
         end
     }
-    __yield()
+    yield
     n += 100
     return n
 end)
@@ -244,7 +244,7 @@ func coMakeAndDrop()
         coKept = func()
             return secret
         end
-        __yield()
+        yield
         secret = "never"
     end)
     coroutine.resume(co)
@@ -253,7 +253,7 @@ coMakeAndDrop()
 assert(coKept() == "kept", "the variable survives the coroutine that was dropped suspended")
 var coAfter = coroutine.create(func()
     var other = "other"
-    __yield()
+    yield
 end)
 coroutine.resume(coAfter)
 assert(coKept() == "kept", "and is not overwritten by what lives in the memory that was freed")
@@ -265,7 +265,7 @@ var coLoop = coroutine.create(func()
         coFuncs.push(func()
             return i
         end)
-        __yield()
+        yield
     end
 end)
 while coroutine.status(coLoop) == "suspended" do
@@ -276,10 +276,10 @@ assert(coFuncs[1]() == 1 and coFuncs[2]() == 2 and coFuncs[3]() == 3, "each turn
 ## Iteration state lives in the registers too.
 var coIter = coroutine.create(func()
     for k, v in [10, 20, 30] do
-        __yield(k + v)
+        yield k + v
     end
     for key, val in {a: 1} do
-        __yield(key + val)
+        yield key + val
     end
 end)
 var coOut = []
@@ -299,7 +299,7 @@ for i = 1, 500 do
         var total = 0
         for round = 1, 3 do
             total += id
-            __yield(total)
+            yield total
         end
         return total
     end))
@@ -318,8 +318,8 @@ var coBefore = mem()
 for i = 1, 20000 do
     var co = coroutine.create(func()
         var list = [1, 2, 3]
-        __yield(list)
-        __yield(list)
+        yield list
+        yield list
     end)
     coroutine.resume(co)
     if i % 2 == 0 then
@@ -357,14 +357,14 @@ var coPong = nil
 var coLog = []
 coPong = coroutine.create(func()
     coLog.push("pong1")
-    __yield()
+    yield
     coLog.push("pong2")
 end)
 coPing = coroutine.create(func()
     coLog.push("ping1")
     coroutine.resume(coPong)
     coLog.push("ping2")
-    __yield()
+    yield
     coroutine.resume(coPong)
     coLog.push("ping3")
 end)

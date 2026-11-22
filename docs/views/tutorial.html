@@ -433,6 +433,8 @@ pre:hover .code-actions,
   <a href="#arrays">Arrays</a>
   <div class="section-label">Error handling</div>
   <a href="#try">Try / Catch</a>
+  <div class="section-label">Coroutines</div>
+  <a href="#coroutines">Coroutines and yield</a>
   <div class="section-label">Builtins</div>
   <a href="#builtins">Built-in functions</a>
   <a href="#stdlib">Modules built-in</a>
@@ -1479,6 +1481,78 @@ t.sort(<span class="kw">func</span>(a, b)  <span class="kw">return</span> a &gt;
 <span class="kw">catch</span> err
     <span class="bi">print</span>(err)
 <span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Coroutines ─────────────────────────────────────────────────────────── -->
+<section id="coroutines">
+<h2>Coroutines and <code>yield</code></h2>
+<p>A <strong>coroutine</strong> is a function that can be <em>suspended</em> in the middle of its body and <em>resumed</em> later, exactly where it stopped, with its variables as they were. It is how a long piece of work is written as one straight sequence — wait a frame, move, wait again — instead of a state machine kept by hand, and how a <strong>generator</strong> hands out its values one at a time.</p>
+
+<pre><code><span class="kw">var</span> boss = <span class="bi">coroutine</span>.create(<span class="kw">func</span>()
+    moveTo(<span class="num">100</span>, <span class="num">50</span>)
+    <span class="kw">yield</span>                  <span class="cmt">## pause: the program goes on, the boss waits here</span>
+    fire()
+    <span class="kw">yield</span>
+    retreat()
+<span class="kw">end</span>)
+
+<span class="kw">func</span> <span class="fn">update</span>(dt)
+    <span class="kw">if</span> <span class="bi">coroutine</span>.status(boss) == <span class="str">"suspended"</span> <span class="kw">then</span>
+        <span class="bi">coroutine</span>.resume(boss)      <span class="cmt">## one step of the boss per frame</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+
+<h3><code>yield</code></h3>
+<p><code>yield</code> on its own <strong>pauses the running coroutine</strong>: you never say which one, it is always the one that runs. It can be anywhere in the body — in a loop, under a <code>try</code>, or in a function the body calls, however deep. The values written after it <strong>on the same line</strong> are handed to whoever resumed the coroutine:</p>
+<pre><code><span class="kw">yield</span>                     <span class="cmt">## pause</span>
+<span class="kw">yield</span> score, lives         <span class="cmt">## pause, and hand back two values</span>
+<span class="kw">var</span> cmd = <span class="kw">yield</span> pos       <span class="cmt">## and what the next resume passes in comes back here</span></code></pre>
+<div class="callout warn">The values must be on the <strong>same line</strong> as <code>yield</code>. Newlines carry no meaning elsewhere in the language, so this is how a bare <code>yield</code> followed by a statement on the next line is told from <code>yield</code> with a value: the next line is never swallowed. <code>yield</code> is a whole expression, not an operand — <code>1 + yield</code> is refused.</div>
+
+<h3>The <code>coroutine</code> module</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>coroutine.create(f)</code></td><td>A new <strong>suspended</strong> coroutine whose body is the function <code>f</code>. Nothing runs yet</td></tr>
+    <tr><td><code>coroutine.resume(co, ...)</code></td><td>Runs <code>co</code> until it yields or finishes, and returns the values it yielded or returned. The values after <code>co</code> are the <strong>arguments of the body</strong> the first time, and <strong>what the pending <code>yield</code> returns</strong> afterwards (nil for what is missing)</td></tr>
+    <tr><td><code>coroutine.status(co)</code></td><td><code>"suspended"</code> (not started, or paused), <code>"running"</code>, <code>"normal"</code> (it resumed another coroutine that has not finished) or <code>"dead"</code> (finished, or killed by an error)</td></tr>
+    <tr><td><code>coroutine.running()</code></td><td>The coroutine that runs this call, or <code>nil</code> in the main program</td></tr>
+    <tr><td><code>coroutine.isYieldable()</code></td><td>Whether a <code>yield</code> here would work</td></tr>
+  </tbody>
+</table>
+<p><code>typeof(co)</code> is <code>"coroutine"</code>. A coroutine is its own map key and equals only itself.</p>
+
+<h3>A generator</h3>
+<pre><code><span class="kw">func</span> <span class="fn">countdown</span>(n)
+    <span class="kw">return</span> <span class="bi">coroutine</span>.create(<span class="kw">func</span>()
+        <span class="kw">for</span> i = n, <span class="num">1</span>, <span class="num">-1</span> <span class="kw">do</span>
+            <span class="kw">yield</span> i
+        <span class="kw">end</span>
+    <span class="kw">end</span>)
+<span class="kw">end</span>
+
+<span class="kw">var</span> c = countdown(<span class="num">3</span>)
+<span class="bi">print</span>(<span class="bi">coroutine</span>.resume(c))    <span class="cmt">## 3</span>
+<span class="bi">print</span>(<span class="bi">coroutine</span>.resume(c))    <span class="cmt">## 2</span>
+<span class="bi">print</span>(<span class="bi">coroutine</span>.resume(c))    <span class="cmt">## 1</span>
+<span class="bi">coroutine</span>.resume(c)           <span class="cmt">## the loop ends: the coroutine is dead</span>
+<span class="bi">print</span>(<span class="bi">coroutine</span>.status(c))    <span class="cmt">## dead</span></code></pre>
+
+<h3>Errors</h3>
+<p>An error the body does not catch <strong>kills</strong> the coroutine and <strong>propagates to whoever resumed it</strong>, who can catch it with <code>try</code> like any other error. A <code>try</code> <em>inside</em> the body keeps working across a <code>yield</code>. Resuming a dead or a running coroutine is an error: <code>cannot resume a dead coroutine</code>.</p>
+<pre><code><span class="kw">try</span>
+    <span class="bi">coroutine</span>.resume(boss)
+<span class="kw">catch</span> err
+    <span class="bi">print</span>(<span class="str">"the boss failed: "</span> + err)
+<span class="kw">end</span></code></pre>
+
+<h3>What a coroutine cannot do</h3>
+<ul>
+  <li><strong>Yield across a native function that calls back into Ollin</strong> — a callback given to <code>array.map</code>, <code>filter</code>, <code>sort</code>, a <code>__str</code> method: <code>cannot yield across a native call</code>. Use a plain loop in the body instead.</li>
+  <li><strong>Yield outside a coroutine</strong>: <code>yield outside a coroutine</code>.</li>
+  <li><strong>Recurse without end</strong>: each coroutine has its own small stack (1024 registers, against 4096 for the program), and a body that needs more is refused with <code>stack overflow in a coroutine</code>.</li>
+</ul>
+<div class="callout tip">A coroutine costs 16 KB of registers, allocated when it is created. A game that keeps a few hundred is fine; a script that creates thousands at once should let them finish — or drop them — as it goes. A suspended coroutine nobody refers to any more is freed, its variables included, except those a closure still holds.</div>
 </section>
 
 <!-- ── Builtins ───────────────────────────────────────────────────────────── -->

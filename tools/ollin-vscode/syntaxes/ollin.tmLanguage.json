@@ -28,11 +28,11 @@
         },
         "keyword": {
             "name": "keyword.control.ollin",
-            "match": "\\b(var|global|const|while|do|for|in|if|then|elseif|end|break|true|false|nil|try|catch|throw|else|func|return|import|as|or|and|not|class|extends|static|super|self|switch|case|enum|ref)\\b"
+            "match": "\\b(var|global|const|while|do|for|in|if|then|elseif|end|break|true|false|nil|try|catch|throw|else|func|return|import|as|or|and|not|class|extends|static|super|self|switch|case|enum|ref|yield)\\b"
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
-            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|classOf|instanceOf|Color|Random|math|graphics|string|map|array|colors|window|mouse|keyboard|image|data|ui|tween|camera|blend|audio|sound|touch|motion|date|https|json)\\b"
+            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|classOf|instanceOf|Color|Random|math|graphics|string|map|array|colors|window|mouse|keyboard|image|data|ui|tween|camera|blend|audio|sound|touch|motion|date|https|json|coroutine)\\b"
         },
         "number": {
             "name": "constant.numeric.ollin",

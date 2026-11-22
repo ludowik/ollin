@@ -424,10 +424,12 @@ const PARSER_CPP_SOURCE = {
         "    if (depth_ >= 256)",
         "        fail(¤nesting too deep¤);",
         "    DepthGuard guard(depth_);",
+        "    if (check(TokenType::YIELD))",
+        "        return yield_expr();",
         "    return binary_level(0);",
         "}"
     ]},
-    "binary_level": {first: 630, lines: [
+    "binary_level": {first: 632, lines: [
         "std::unique_ptr<Expr> Parser::binary_level(int level) \{",
         "    if (level == CMP_LEVEL)",
         "        return comparison();",
@@ -447,7 +449,7 @@ const PARSER_CPP_SOURCE = {
         "    }",
         "}"
     ]},
-    "comparison": {first: 697, lines: [
+    "comparison": {first: 699, lines: [
         "std::unique_ptr<Expr> Parser::comparison() \{",
         "    auto first = binary_level(CMP_LEVEL + 1);",
         "    if (!is_cmp_token(peek().type))",
@@ -471,7 +473,7 @@ const PARSER_CPP_SOURCE = {
         "    return chain;",
         "}"
     ]},
-    "unary": {first: 830, lines: [
+    "unary": {first: 875, lines: [
         "std::unique_ptr<Expr> Parser::unary() \{",
         "    if (check(TokenType::MINUS)) \{",
         "        advance();",
@@ -496,7 +498,7 @@ const PARSER_CPP_SOURCE = {
         "    return power();",
         "}"
     ]},
-    "power": {first: 854, lines: [
+    "power": {first: 899, lines: [
         "std::unique_ptr<Expr> Parser::power() \{",
         "    auto left = primary();",
         "    if (!check(TokenType::CARET))",
@@ -506,7 +508,7 @@ const PARSER_CPP_SOURCE = {
         "    return std::make_unique<BinaryExpr>('p', std::move(left), unary());",
         "}"
     ]},
-    "parse_postfix": {first: 863, lines: [
+    "parse_postfix": {first: 908, lines: [
         "std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) \{",
         "    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) || at_optional_call()) \{",
         "        if (check(TokenType::LBRACKET)) \{",
@@ -555,7 +557,7 @@ const PARSER_CPP_SOURCE = {
         "    return base;",
         "}"
     ]},
-    "primary": {first: 966, lines: [
+    "primary": {first: 1011, lines: [
         "std::unique_ptr<Expr> Parser::primary() \{",
         "    if (check(TokenType::NUMBER)) \{",
         "        Token tok = advance();",
