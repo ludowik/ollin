@@ -21,24 +21,22 @@ int co_create(CallCtx& ctx) {
     return ctx.ret(ctx.vm->new_coroutine(ctx.args[0]));
 }
 
-// coroutine.resume(co, ...): runs it until it yields or returns, and gives back the values it yielded or returned. The values
+// coroutine.resume(co, ...): runs it until it yields or finishes, and gives back the values it yielded or returned. The values
 // after `co` are the body's arguments the first time and what the pending yield returns afterwards.
 int co_resume(CallCtx& ctx) {
-    Coroutine* co = coroutine_arg(ctx, 0, "coroutine.resume");
-    // The arguments are read BEFORE anything runs: the result slots overlap them, and the body may use the register file.
-    std::vector<Value> args(ctx.args + 1, ctx.args + ctx.argc);
-    Value keep = ctx.args[0]; // the call's own reference to the coroutine may be the last
-    std::vector<Value> out;
-    ctx.vm->resume_coroutine(co, args.data(), (int)args.size(), out);
+    coroutine_arg(ctx, 0, "coroutine.resume");
+    Value keep = ctx.args[0]; // the result slots below overwrite the call's own reference, which may be the last: the values live in the coroutine
+    std::vector<Value>& out = ctx.vm->resume_coroutine(keep, ctx.args + 1, ctx.argc - 1);
     int n = (int)out.size();
     if (n == 0) {
         // No value: the slot where the call's result is read must say nil, not what the arguments left in it.
         ctx.set_result(0, Value{});
         return 0;
     }
-    n = ctx.vm->result_room(ctx, n);
+    n = ctx.reserve_results(n);
     for (int i = 0; i < n; ++i)
         ctx.set_result(i, out[i]);
+    out.clear();
     return n;
 }
 
@@ -53,13 +51,12 @@ int co_running(CallCtx& ctx) {
     Coroutine* co = ctx.vm->running_coroutine();
     if (!co)
         return ctx.ret(Value{});
-    ++co->refcount;
-    return ctx.ret(Value::make_coroutine(co));
+    return ctx.ret(coroutine_value(co));
 }
 
 // coroutine.isYieldable(): whether a yield here would work.
 int co_is_yieldable(CallCtx& ctx) {
-    return ctx.ret(Value::make_bool(ctx.vm->can_yield()));
+    return ctx.ret(Value::make_bool(ctx.vm->can_yield(ctx)));
 }
 
 } // namespace

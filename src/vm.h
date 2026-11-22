@@ -64,23 +64,20 @@ class VM {
     // ── Coroutines (coroutine.h) ──
     // A new suspended coroutine whose body is `fn` (a function or a closure).
     Value new_coroutine(const Value& fn);
-    // Runs `co` until it yields or returns, handing it `args`: the arguments of its body on the first call, the results of its
-    // pending yield afterwards. Every value it yielded or returned lands in `out`. An error the body does not catch kills the
-    // coroutine and propagates to the caller.
-    void resume_coroutine(Coroutine* co, const Value* args, int argc, std::vector<Value>& out);
-    // Makes room for `n` result values of the builtin call `ctx` describes, and says how many of them may be written. A builtin
-    // that returns as many values as it is given (resume) would otherwise lose the ones that do not fit the register budget of
-    // the frame that called it, which is a few values for a small function: the room is made the way a `...` tail makes it.
-    int result_room(CallCtx& ctx, int n);
+    // Runs the coroutine `co` until it yields or returns, handing it `args`: the arguments of its body on the first call, the results
+    // of its pending yield afterwards. `args` is read before the coroutine runs and left alone: it may point into the caller's own
+    // register file, which nothing touches meanwhile. Returns the values it yielded or returned — its `xfer`, valid until the next
+    // resume, which the caller reads and clears. An error the body does not catch kills the coroutine and propagates.
+    std::vector<Value>& resume_coroutine(const Value& co, const Value* args, int argc);
     // The builtin __yield: suspends the running coroutine, handing `ctx`'s arguments to its resumer. Never returns.
     [[noreturn]] void yield_current(CallCtx& ctx);
     Coroutine* running_coroutine() const {
         return current_co_;
     }
-    // Whether a yield made now would succeed: inside a coroutine, with no native frame (array.map, sort, __str…) between
-    // the yield and the resume.
-    bool can_yield() const {
-        return current_co_ != nullptr && native_nest_ == 0;
+    // Whether the call `ctx` describes may yield: inside a coroutine, with no native frame (array.map, sort, __str…) between
+    // the yield and the resume, and a call that came from the register file (regs_base < 0 is a native caller's).
+    bool can_yield(const CallCtx& ctx) const {
+        return current_co_ != nullptr && native_nest_ == 0 && ctx.regs_base >= 0;
     }
     Value get_global(const std::string& name) const; // returns nil if not found
     void set_global(const std::string& name, const Value& value);
@@ -346,31 +343,38 @@ class VM {
     static constexpr int k_no_varargs = 1 << 30;
     int va_low_ = k_no_varargs;
 
-    // The register file's capacity: k_max_regs for the program, a coroutine's own (smaller) for the coroutine that runs.
-    // Swapped with the file it describes.
-    size_t max_regs_ = k_max_regs;
+    // A coroutine's register file: 16 bytes a register, reserved once because a file never moves (run_goto keeps a pointer into it,
+    // and so does every open upvalue). A body that needs more is refused, not grown. The program's own is k_max_regs.
+    static constexpr size_t k_coroutine_regs = 1024;
     // How many run_goto invocations a native function has opened since the coroutine (or the program) started running: a yield is
-    // refused unless it is zero, because the C++ stack of those invocations cannot be suspended. Swapped with the coroutine.
+    // refused unless it is zero, because the C++ stack of those invocations cannot be suspended. Each coroutine starts at zero.
     int native_nest_ = 0;
     Coroutine* current_co_ = nullptr; // the coroutine that runs, nil for the main program
     // How many coroutines are being resumed one inside another. Each level is a run_goto on the processor's stack, which no register
     // file bounds (every coroutine has its own), so a body that resumes a coroutine that resumes a coroutine… would end in a crash.
+    // ⚠ The WASM stack (-sSTACK_SIZE in CMakeLists.txt) is sized for this limit: raise one and the other.
     int co_depth_ = 0;
     static constexpr int k_max_co_depth = 100;
     // Exchanges the execution state — registers, frames, handlers, ip and what goes with them — with `s`.
     void swap_exec_state(CoState& s);
-    // Counts a native frame that runs Ollin code (call_value_multi, invoke_str) for as long as it lives.
-    struct NestGuard {
-        VM& vm;
-        explicit NestGuard(VM& v) : vm(v) {
-            ++vm.native_nest_;
+    // Counts up for as long as it lives: native_nest_ and co_depth_.
+    struct ScopedInc {
+        int& n;
+        explicit ScopedInc(int& v) : n(v) {
+            ++n;
         }
-        ~NestGuard() {
-            --vm.native_nest_;
+        ~ScopedInc() {
+            --n;
         }
-        NestGuard(const NestGuard&) = delete;
-        NestGuard& operator=(const NestGuard&) = delete;
+        ScopedInc(const ScopedInc&) = delete;
+        ScopedInc& operator=(const ScopedInc&) = delete;
     };
+    // THE way a native function runs Ollin code: the one place that counts the C++ frame a coroutine cannot yield across. Every
+    // re-entry of run_goto from native code goes through here (call_value_multi, invoke_str).
+    void run_nested(size_t stop_depth) {
+        ScopedInc nest(native_nest_);
+        run_goto(stop_depth);
+    }
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())
@@ -407,17 +411,27 @@ inline void CallCtx::set_result(int i, const Value& v) {
 }
 
 // What a coroutine keeps of the VM while it is not running (see coroutine.h). One member per piece of execution state that
-// VM::swap_exec_state exchanges; a new piece of that state has to be added to both.
+// VM::swap_exec_state exchanges; a new piece of that state has to be added to both. (`last_results_` and `native_nest_` are not
+// among them: the first is rewritten by the builtin call that returns, the second is zero in a suspended coroutine.)
 struct CoState {
     std::vector<Value> regs;
     std::vector<VM::Frame> call_stack;
     std::vector<VM::Handler> handler_stack;
     uint32_t ip = 0;
-    int last_results = 1;
     int va_low = VM::k_no_varargs;
-    size_t max_regs = 0;
-    int native_nest = 0;
 
     // Closes, and lets go of, the open upvalues of every frame: the registers they point into are about to be freed.
     void close_all_upvalues();
+    // Lets go of the whole state, upvalues first: a coroutine that is dead, or freed.
+    void discard();
 };
+
+inline int CallCtx::reserve_results(int n) {
+    if (n <= result_cap)
+        return n;
+    if (regs_base < 0)
+        return result_cap > 0 ? result_cap : 0; // a call that did not come from the register file has no room to make
+    vm->make_room(regs_base + n);
+    result_cap = n;
+    return n;
+}

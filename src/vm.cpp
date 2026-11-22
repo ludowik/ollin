@@ -104,11 +104,12 @@ OLLIN_NOIPA bool VM::has_class_link(const Value& v) {
 
 // Grows the register file to exactly `needed`, up to k_max_regs: the capacity was reserved by execute, so nothing moves.
 void VM::grow_regs_slow(size_t needed) {
-    static_assert(k_max_regs == 4096, "the message below names the limit");
-    if (needed > max_regs_) {
-        // (writing the limit with std::to_string(k_max_regs) moved run_goto's inlining: +0.3 % on fib)
-        if (current_co_)
+    static_assert(k_max_regs == 4096 && k_coroutine_regs == 1024, "the messages below name the limits");
+    // (writing a limit with std::to_string moved run_goto's inlining: +0.3 % on fib)
+    if (current_co_) {
+        if (needed > k_coroutine_regs)
             throw std::runtime_error("runtime: stack overflow in a coroutine (max 1024 registers)");
+    } else if (needed > k_max_regs) {
         throw std::runtime_error("runtime: stack overflow (max 4096 registers)");
     }
     regs.resize(needed);
@@ -174,8 +175,6 @@ static std::string str_result_text(const Value& v) {
 // lets every site share the one resolution instead of a copy of its own.
 static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
 static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
-FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure, const char* not_callable);
-
 // Refusing a parent that is no class is what lets every reader of the chain trust it. Out of line and never returning, so
 // that the check in NEW_CLASS costs run_goto a compare and a call it never makes.
 [[noreturn, gnu::noinline]] static void refuse_parent(const Value& parent) {
@@ -212,10 +211,7 @@ std::string VM::invoke_str(Value obj) { // by value: the call may overwrite the 
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, &obj, 1, std::move(frame_upvals), 0, -1); // self is the first argument
-    {
-        NestGuard nest(*this);
-        run_goto(call_stack.size() - 1);
-    }
+    run_nested(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base)
         result = str_result_text(regs[call_base]);
@@ -474,7 +470,7 @@ void VM::close_upvals() {
         return;
     for (auto* uv : *ouv) {
         if (!uv->closed) {
-            uv->val = uv->file[uv->frame_base + uv->reg_idx];
+            uv->val = regs[uv->frame_base + uv->reg_idx];
             uv->closed = true;
         }
         if (--uv->refcount == 0)
@@ -497,7 +493,7 @@ void VM::close_upvals_above(int threshold) {
             continue;
         }
         if (!uv->closed) {
-            uv->val = uv->file[uv->frame_base + uv->reg_idx];
+            uv->val = regs[uv->frame_base + uv->reg_idx];
             uv->closed = true;
         }
         if (--uv->refcount == 0)
@@ -507,8 +503,7 @@ void VM::close_upvals_above(int threshold) {
 }
 
 // Resolves a function value to func_idx, plus the closure to hold while it runs when it captured upvalues.
-FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure,
-                                const char* not_callable) {
+FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure, const char* not_callable) {
     if (fv.is_func_val()) {
         // The value carries its index in an int64 union field while FuncIdx is one instruction
         // field wide: the narrowing is safe only because Chunk::add_func refuses past the ceiling,
@@ -692,10 +687,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, args, argc, std::move(frame_upvals), saved_ip, -1);
-    {
-        NestGuard nest(*this);
-        run_goto(call_stack.size() - 1);
-    }
+    run_nested(call_stack.size() - 1);
     // f's return values sit in regs[call_base..], and last_results_ says how many.
     int avail = (int)regs.size() - call_base;
     int n = last_results_ < avail ? last_results_ : avail;

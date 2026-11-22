@@ -16,18 +16,18 @@ struct Coroutine {
     int refcount = 1;
     enum Status : uint8_t { SUSPENDED, RUNNING, NORMAL, DEAD };
     Status status = SUSPENDED;
-    bool started = false; // the body has been entered: the next resume continues instead of starting
-    Value fn;             // the body, until it is first resumed
+    Value fn; // the body, until the coroutine is first resumed: nil from then on, which is how a resume tells a start from a continuation
     std::unique_ptr<CoState> st;
 
-    // What passes between a resume and a yield, on the side of the coroutine: `xfer` holds the values a yield hands to the
-    // resumer; the next resume writes ITS values where the yield call would have put its results.
+    // What passes between a resume and a yield, on the side of the coroutine: `xfer` holds the values a resume hands back to its
+    // caller, the ones the coroutine yielded or returned (it keeps its capacity from one resume to the next); the next resume writes
+    // ITS values where the yield call would have put its results.
     std::vector<Value> xfer;
     int yield_base = -1; // index in the coroutine's register file of the first result slot of the pending yield
     int yield_cap = 0;   // how many result slots that call may write
 
     Coroutine();
-    ~Coroutine(); // out of line: CoState is incomplete here, and the upvalues of a suspended frame must be closed
+    ~Coroutine(); // out of line: CoState is incomplete here. It lets go of the state, closing the upvalues of the frames first
 
     Coroutine(const Coroutine&) = delete;
     Coroutine& operator=(const Coroutine&) = delete;
@@ -48,3 +48,9 @@ struct Coroutine {
 
 // Called when the last reference goes (Value::release_cold).
 void coroutine_destroy(Coroutine* co);
+
+// A new reference to a coroutine, as a value.
+inline Value coroutine_value(Coroutine* co) {
+    ++co->refcount;
+    return Value::make_coroutine(co);
+}

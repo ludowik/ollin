@@ -120,7 +120,8 @@ if(EMSCRIPTEN)
         -sNO_EXIT_RUNTIME=1
         # The C stack of the program: emscripten's default is 64 KB, which a chain of coroutines each resuming the next overran
         # at about 30 levels (the tab crashed, with no message) — each level is a run_goto and a resume on this stack. A megabyte
-        # holds the 100 levels the engine allows with room to spare, and counts inside INITIAL_MEMORY.
+        # holds the 100 levels the engine allows (k_max_co_depth in vm.h: raise one and the other) with room to spare, and counts inside
+        # INITIAL_MEMORY.
         -sSTACK_SIZE=1048576
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3

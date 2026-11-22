@@ -55,6 +55,17 @@ inline UpvaluePool& upvalue_pool() {
     return s_upvalue_pool;
 }
 
+// Closes an upvalue if it is open — its value moves from the register it names into its own — and lets go of one reference to it.
+// For the cold paths (a coroutine's frames being freed); the hot ones (VM::close_upvals) spell it out.
+inline void close_and_release(Upvalue* uv) {
+    if (!uv->closed) {
+        uv->val = uv->file[uv->frame_base + uv->reg_idx];
+        uv->closed = true;
+    }
+    if (--uv->refcount == 0)
+        upvalue_pool().release(uv);
+}
+
 struct Closure {
     int refcount = 1;
     FuncIdx func_idx;

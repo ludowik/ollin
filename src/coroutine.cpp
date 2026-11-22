@@ -7,34 +7,34 @@
 // swap of the VM's execution state, is in coroutine.h. In a file of its own so that the hot loop's translation unit (vm.cpp) does not
 // carry it: the code of the loop is sensitive to everything compiled next to it (see the note on -fira-region in CMakeLists.txt).
 
-// A coroutine's register file: 16 bytes a register, reserved once because a file never moves (run_goto keeps a pointer into it, and
-// so does every open upvalue). A body that needs more is refused, not grown.
-static constexpr size_t k_coroutine_regs = 1024;
-
 Coroutine::Coroutine() = default;
-Coroutine::~Coroutine() = default;
+
+Coroutine::~Coroutine() {
+    // A closure made inside a suspended coroutine may outlive it, and its upvalues still point into the register file that goes now.
+    if (st)
+        st->discard();
+}
+
+void coroutine_destroy(Coroutine* co) {
+    delete co;
+}
 
 void CoState::close_all_upvalues() {
     for (VM::Frame& fr : call_stack) {
         if (!fr.open_upvals)
             continue;
-        for (auto* uv : *fr.open_upvals) {
-            if (!uv->closed) {
-                uv->val = uv->file[uv->frame_base + uv->reg_idx];
-                uv->closed = true;
-            }
-            if (--uv->refcount == 0)
-                upvalue_pool().release(uv);
-        }
+        for (auto* uv : *fr.open_upvals)
+            close_and_release(uv);
         fr.open_upvals->clear();
     }
 }
 
-void coroutine_destroy(Coroutine* co) {
-    // A closure made inside a suspended coroutine may outlive it, and its upvalues still point into the register file that goes now.
-    if (co->st)
-        co->st->close_all_upvalues();
-    delete co;
+void CoState::discard() {
+    close_all_upvalues();
+    call_stack.clear();
+    handler_stack.clear();
+    regs.clear();
+    regs.shrink_to_fit();
 }
 
 void VM::swap_exec_state(CoState& s) {
@@ -42,10 +42,7 @@ void VM::swap_exec_state(CoState& s) {
     std::swap(call_stack, s.call_stack);
     std::swap(handler_stack, s.handler_stack);
     std::swap(ip, s.ip);
-    std::swap(last_results_, s.last_results);
     std::swap(va_low_, s.va_low);
-    std::swap(max_regs_, s.max_regs);
-    std::swap(native_nest_, s.native_nest);
 }
 
 Value VM::new_coroutine(const Value& fn) {
@@ -53,8 +50,7 @@ Value VM::new_coroutine(const Value& fn) {
         throw std::runtime_error("coroutine.create: expected a function");
     std::unique_ptr<Coroutine> co(new Coroutine());
     co->fn = fn;
-    co->st = std::make_unique<CoState>();
-    co->st->max_regs = k_coroutine_regs; // the register file itself is reserved when the coroutine first runs: one never run costs nothing
+    co->st = std::make_unique<CoState>(); // the register file itself is reserved when the coroutine first runs: one never run costs nothing
     return Value::make_coroutine(co.release());
 }
 
@@ -64,102 +60,72 @@ void VM::make_room(int end) {
         lift_varargs_above(end);
 }
 
-int VM::result_room(CallCtx& ctx, int n) {
-    if (n <= ctx.result_cap)
-        return n;
-    if (ctx.regs_base < 0)
-        return ctx.result_cap > 0 ? ctx.result_cap : 0; // a call that did not come from the register file has no room to make
-    make_room(ctx.regs_base + n);
-    ctx.result_cap = n;
-    return n;
-}
-
-void VM::resume_coroutine(Coroutine* co, const Value* args, int argc, std::vector<Value>& out) {
+std::vector<Value>& VM::resume_coroutine(const Value& co_value, const Value* args, int argc) {
+    Coroutine* co = co_value.coptr;
     if (co->status != Coroutine::SUSPENDED)
         throw std::runtime_error(std::string("cannot resume a ") + Coroutine::status_name(co->status) + " coroutine");
     if (co_depth_ >= k_max_co_depth)
         throw std::runtime_error("coroutine nesting too deep (max 100)");
-    struct DepthGuard {
-        int& depth;
-        explicit DepthGuard(int& d) : depth(d) {
-            ++depth;
-        }
-        ~DepthGuard() {
-            --depth;
-        }
-    } depth_guard(co_depth_);
-    // The caller's arguments live in the register file that is about to be swapped out, and its own reference may be the
-    // only one: copies keep them, and so does `hold`, for as long as the coroutine runs.
-    std::vector<Value> argv(args, args + argc);
-    ++co->refcount;
-    Value hold = Value::make_coroutine(co);
+    ScopedInc depth(co_depth_);
+    Value hold = co_value; // the coroutine runs to its next yield even if the caller's own reference was the last
     Coroutine* prev = current_co_;
     if (prev)
         prev->status = Coroutine::NORMAL;
     co->status = Coroutine::RUNNING;
     current_co_ = co;
+    const int saved_nest = native_nest_;
+    native_nest_ = 0;
     CoState& st = *co->st;
     swap_exec_state(st); // the coroutine's state is the VM's now, and st holds the resumer's
-    auto back_to_resumer = [&] {
+    auto leave = [&](Coroutine::Status status) {
+        co->status = status;
         swap_exec_state(st); // st holds the coroutine's state again, the VM the resumer's
+        native_nest_ = saved_nest;
         current_co_ = prev;
         if (prev)
             prev->status = Coroutine::RUNNING;
+        if (status == Coroutine::DEAD)
+            st.discard(); // a body that failed leaves frames with open upvalues, which are closed before the registers go
     };
     try {
-        if (!co->started) {
-            co->started = true;
+        if (!co->fn.is_nil()) {
             regs.reserve(k_coroutine_regs); // this is the coroutine's own file now; it is never reallocated after this
             ClosureRef fuv;
             FuncIdx fi = resolve_func_val(co->fn, fuv, "runtime: call on non-function value");
             co->fn = Value{};
-            ip = push_frame_copied(fi, argv.data(), argc, std::move(fuv), 0, -1);
+            ip = push_frame_copied(fi, args, argc, std::move(fuv), 0, -1);
         } else {
-            // The resume's values are what the pending yield call returns: they go where its results would have.
-            // Every one of them, however few slots the frame that called yield had: the room is made like a `...` tail makes it.
+            // The resume's values are what the pending yield call returns: they go where its results would have. Every one of
+            // them, however few slots the frame that called yield had: the room is made like a `...` tail makes it.
             if (argc > co->yield_cap)
                 make_room(co->yield_base + argc);
             for (int i = 0; i < argc; ++i)
-                regs[(size_t)co->yield_base + i] = argv[i];
+                regs[(size_t)co->yield_base + i] = args[i];
             if (argc == 0 && co->yield_cap > 0)
                 regs[(size_t)co->yield_base] = Value{};
             last_results_ = argc;
         }
         run_goto(0);
         // The body returned: its values sit at the bottom of the file, last_results_ of them.
-        int n = std::min(last_results_, (int)regs.size());
-        for (int i = 0; i < n; ++i)
-            out.push_back(regs[i]);
-        co->status = Coroutine::DEAD;
-        back_to_resumer();
-        st.regs.clear();
-        st.regs.shrink_to_fit();
-        st.handler_stack.clear();
-    } catch (const CoroutineYield&) {
-        for (Value& v : co->xfer)
-            out.push_back(std::move(v));
         co->xfer.clear();
-        co->status = Coroutine::SUSPENDED;
-        back_to_resumer();
+        const int n = std::min(last_results_, (int)regs.size());
+        for (int i = 0; i < n; ++i)
+            co->xfer.push_back(regs[i]);
+        leave(Coroutine::DEAD);
+    } catch (const CoroutineYield&) {
+        leave(Coroutine::SUSPENDED); // the values it yielded are in xfer already
     } catch (...) {
-        // An error the body did not catch: the coroutine is dead, and what its frames still hold is closed before it is freed.
-        co->status = Coroutine::DEAD;
-        back_to_resumer();
-        st.close_all_upvalues();
-        st.regs.clear();
-        st.regs.shrink_to_fit();
-        st.call_stack.clear();
-        st.handler_stack.clear();
+        leave(Coroutine::DEAD);
         throw;
     }
+    return co->xfer;
 }
 
 void VM::yield_current(CallCtx& ctx) {
     if (!current_co_)
         throw std::runtime_error("yield outside a coroutine");
     // A native function (array.map, sort, __str…) that called Ollin code has a C++ frame in the way, which cannot be suspended.
-    // A call that did not come from the register file (regs_base < 0) is such a call too.
-    if (native_nest_ != 0 || ctx.regs_base < 0)
+    if (!can_yield(ctx))
         throw std::runtime_error("cannot yield across a native call (array.map, sort, __str…)");
     Coroutine* co = current_co_;
     co->yield_base = ctx.regs_base;

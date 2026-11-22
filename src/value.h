@@ -61,6 +61,10 @@ struct CallCtx {
     int ret(const Value& v);
     // Writes the i-th return value, clamped to result_cap. Follow with `return n;`.
     void set_result(int i, const Value& v);
+    // Makes room for `n` result values and says how many may be written. A builtin that returns as many values as it is given
+    // (coroutine.resume) would otherwise lose those that do not fit the register budget of the frame that called it — a few
+    // values for a small function. The room is made the way a `...` tail makes it: the file grows, the varargs are lifted.
+    int reserve_results(int n);
 };
 
 struct Value {
