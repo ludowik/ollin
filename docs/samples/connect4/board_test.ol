@@ -128,6 +128,11 @@ for game = 1, 400 do
         var who = toMove(b)
         naiveDrop(g, col, who)
         drop(b, col)
+        var scan = 0
+        for c in openColumns(b) do
+            scan = scan | (1 << b.next[c])
+        end
+        assert(playableCells(b) == scan, "game {game}, move {b.count}: the squares to play, by addition and by a scan of the columns")
         var expected = naiveWinner(g)
         assert(winner(b) == expected, "game {game}, move {b.count}: the bits say {winner(b)}, the scan says {expected}")
         assert(justWon(b) == (expected <> 0), "game {game}, move {b.count}: justWon disagrees")
@@ -159,6 +164,14 @@ while b.count > 0 do
     undo(b)
 end
 assert(b.mine[1] == 0 and b.mine[2] == 0 and b.next.join(",") == newBoard().next.join(",") and #b.moves == 0, "everything taken back is an empty grid")
+
+## place and lift are drop and undo without the history
+b = play([4, 4, 3])
+var kept = [b.mine[1], b.mine[2], b.count, b.next.join(","), b.moves.join(",")]
+place(b, 3)
+assert(b.count == 4 and cellAt(b, 3, 1) == 2 and b.moves.join(",") == "4,4,3", "a disc is placed, and moves does not know")
+lift(b, 3)
+assert([b.mine[1], b.mine[2], b.count, b.next.join(","), b.moves.join(",")].join(" ") == kept.join(" "), "and lifted, the grid is as it was")
 
 ## ── A full grid with no line ─────────────────────────────────────────────────────────────────────────────────────────────
 b = play(DRAW)

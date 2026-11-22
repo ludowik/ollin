@@ -44,12 +44,16 @@ func positional(b)
 end
 
 ## What a position is worth to the player to move when the search stops: the positions of the discs, and the threats each side holds.
-func evaluate(b, bal)
+## `mineThreats` is threatCells of the player to move when the caller has it already.
+func evaluate(b, bal, mineThreats = nil)
     var who = toMove(b)
     var mine = b.mine[who]
     var theirs = b.mine[3 - who]
     var empty = BOARD_MASK & ~(mine | theirs)
-    return bal + THREAT * (countBits(threatCells(mine) & empty) - countBits(threatCells(theirs) & empty))
+    if mineThreats == nil then
+        mineThreats = threatCells(mine)
+    end
+    return bal + THREAT * (countBits(mineThreats & empty) - countBits(threatCells(theirs) & empty))
 end
 
 leaf = evaluate
@@ -61,8 +65,9 @@ func checkpoint()
 end
 
 ## The value of the position for the player to move, looking `depth` moves ahead, between alpha and beta. `bal` is the positional
-## balance for the player to move (see positional), `ply` how many moves have been made since the search began.
-func negamax(b, depth, alpha, beta, bal, ply)
+## balance for the player to move (see positional), `ply` how many moves have been made since the search began. `mineThreats` is
+## threatCells of the player to move: the move that led here changed only the other side's discs, so the parent has it already.
+func negamax(b, depth, alpha, beta, bal, ply, mineThreats = nil)
     nodes += 1
     if nodes % SLICE == 0 then
         checkpoint()
@@ -71,14 +76,18 @@ func negamax(b, depth, alpha, beta, bal, ply)
         return 0
     end
     if depth == 0 then
-        return leaf(b, bal)
+        return leaf(b, bal, mineThreats)
     end
     var who = toMove(b)
     var playable = playableCells(b)
-    if (threatCells(b.mine[who]) & playable) <> 0 then
+    if mineThreats == nil then
+        mineThreats = threatCells(b.mine[who])
+    end
+    if (mineThreats & playable) <> 0 then
         return WIN - ply
     end
-    var danger = threatCells(b.mine[3 - who]) & playable
+    var theirThreats = threatCells(b.mine[3 - who])
+    var danger = theirThreats & playable
     var forced = 0
     if danger <> 0 and depth >= 2 then
         if (danger & (danger - 1)) <> 0 then
@@ -93,9 +102,9 @@ func negamax(b, depth, alpha, beta, bal, ply)
     var best = -INFINITY
     for col in CENTRE_FIRST do
         if (forced == 0 or col == forced) and b.next[col] < COLUMN_TOP[col] then
-            drop(b, col)
-            var v = -negamax(b, depth - 1, -beta, -alpha, -(bal + COLUMN_WEIGHT[col]), ply + 1)
-            undo(b)
+            place(b, col)
+            var v = -negamax(b, depth - 1, -beta, -alpha, -(bal + COLUMN_WEIGHT[col]), ply + 1, theirThreats)
+            lift(b, col)
             if v > best then
                 best = v
             end

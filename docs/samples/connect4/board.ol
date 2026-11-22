@@ -78,12 +78,26 @@ func toMove(b)
     return b.count % 2 + 1
 end
 
-## Drops a disc of the player to move in column `col`, which must be open.
-func drop(b, col)
+## Puts a disc of the player to move in column `col`, which must be open, and takes it back: the grid without its history. A
+## search that goes up and down a million times uses these, and leaves `moves` alone — so while it runs `moves` does not say how
+## the grid got there, and only drop and undo keep it.
+func place(b, col)
     var who = toMove(b)
     b.mine[who] = b.mine[who] | (1 << b.next[col])
     b.next[col] += 1
     b.count += 1
+end
+
+func lift(b, col)
+    b.count -= 1
+    b.next[col] -= 1
+    var who = toMove(b)
+    b.mine[who] = b.mine[who] ~ (1 << b.next[col])
+end
+
+## Drops a disc of the player to move in column `col`, which must be open.
+func drop(b, col)
+    place(b, col)
     b.moves.push(col)
 end
 
@@ -93,10 +107,7 @@ func undo(b)
         return nil
     end
     var col = b.moves.pop()
-    b.count -= 1
-    b.next[col] -= 1
-    var who = toMove(b)
-    b.mine[who] = b.mine[who] ~ (1 << b.next[col])
+    lift(b, col)
     return col
 end
 
@@ -141,15 +152,20 @@ func openColumns(b)
     return list
 end
 
-## The squares a disc can be dropped on now, one per open column.
-func playableCells(b)
+func makeFeet()
     var m = 0
     for col = 1, COLS do
-        if b.next[col] < COLUMN_TOP[col] then
-            m = m | (1 << b.next[col])
-        end
+        m = m | (1 << ((col - 1) * STRIDE))
     end
     return m
+end
+
+const FEET = makeFeet()                 ## the bit of the lowest square of every column
+
+## The squares a disc can be dropped on now, one per open column: adding one at the foot of a column carries up through its discs to
+## the first free square, and into the guard bit, which BOARD_MASK drops, when the column is full.
+func playableCells(b)
+    return ((b.mine[1] | b.mine[2]) + FEET) & BOARD_MASK
 end
 
 func countBits(m)
@@ -166,9 +182,9 @@ end
 func threatsAlong(p, s)
     var a = p << s
     var c = p >> s
-    var d = p >> 2 * s
-    var e = p << 2 * s
-    return (a & e & (p << 3 * s)) | (c & d & (p >> 3 * s)) | (a & c & d) | (a & e & c)
+    var ab = a & (p << 2 * s)
+    var cd = c & (p >> 2 * s)
+    return (ab & ((p << 3 * s) | c)) | (cd & ((p >> 3 * s) | a))
 end
 
 ## Every square where a disc would give `p` four in a row, empty or not.
