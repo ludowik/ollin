@@ -16,7 +16,8 @@ import "play.ol"
 import "draw.ol"
 
 func setup()
-    graphics.canvas(FIELD_W, FIELD_H, "Ollin Frog")
+    graphics.canvas(W, H, "Ollin Frog")
+    graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
     graphics.viewport(FIELD_W, FIELD_H)
     var kept = data.get(BEST_KEY, 0)
     if typeof(kept) == "int" and kept >= 0 and kept <= 999999999 then
