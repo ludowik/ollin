@@ -34,7 +34,13 @@ struct OllinThrow {
     Value value;
 };
 
+// Thrown by a yield to leave run_goto: all of a coroutine's state is in VM members, so there is nothing for the unwinding to
+// lose, and it costs nothing on the paths that do not yield. NOT a runtime_error, so run_goto's two catch clauses let it through.
+struct CoroutineYield {};
+
 class VM {
+    // The saved state of a coroutine is made of the VM's private types.
+    friend struct CoState;
     // CallCtx writes its return values into regs through the index it carries, the pointer it was
     // handed being invalidated by any call that grows the register file.
     friend struct CallCtx;
@@ -51,6 +57,23 @@ class VM {
     // Like call_value, but collects up to out_cap return values (native->Ollin multi-return);
     // returns how many were actually written to out.
     int call_value_multi(const Value& fn, const Value* args, int argc, Value* out, int out_cap);
+    // ── Coroutines (coroutine.h) ──
+    // A new suspended coroutine whose body is `fn` (a function or a closure).
+    Value new_coroutine(const Value& fn);
+    // Runs `co` until it yields or returns, handing it `args`: the arguments of its body on the first call, the results of its
+    // pending yield afterwards. Up to out_cap values it yielded or returned land in `out`; returns how many. An error the body
+    // does not catch kills the coroutine and propagates to the caller.
+    int resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out, int out_cap);
+    // The builtin __yield: suspends the running coroutine, handing `ctx`'s arguments to its resumer. Never returns.
+    [[noreturn]] void yield_current(CallCtx& ctx);
+    Coroutine* running_coroutine() const {
+        return current_co_;
+    }
+    // Whether a yield made now would succeed: inside a coroutine, with no native frame (array.map, sort, __str…) between
+    // the yield and the resume.
+    bool can_yield() const {
+        return current_co_ != nullptr && native_nest_ == 0;
+    }
     Value get_global(const std::string& name) const; // returns nil if not found
     void set_global(const std::string& name, const Value& value);
     // Runs after execute(): calls setup() once, then starts the render loop through
@@ -313,6 +336,28 @@ class VM {
     static constexpr int k_no_varargs = 1 << 30;
     int va_low_ = k_no_varargs;
 
+    // The register file's capacity: k_max_regs for the program, a coroutine's own (smaller) for the coroutine that runs.
+    // Swapped with the file it describes.
+    size_t max_regs_ = k_max_regs;
+    // How many run_goto invocations a native function has opened since the coroutine (or the program) started running: a yield is
+    // refused unless it is zero, because the C++ stack of those invocations cannot be suspended. Swapped with the coroutine.
+    int native_nest_ = 0;
+    Coroutine* current_co_ = nullptr; // the coroutine that runs, nil for the main program
+    // Exchanges the execution state — registers, frames, handlers, ip and what goes with them — with `s`.
+    void swap_exec_state(CoState& s);
+    // Counts a native frame that runs Ollin code (call_value_multi, invoke_str) for as long as it lives.
+    struct NestGuard {
+        VM& vm;
+        explicit NestGuard(VM& v) : vm(v) {
+            ++vm.native_nest_;
+        }
+        ~NestGuard() {
+            --vm.native_nest_;
+        }
+        NestGuard(const NestGuard&) = delete;
+        NestGuard& operator=(const NestGuard&) = delete;
+    };
+
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())
             return (double)v.as_int();
@@ -347,3 +392,19 @@ inline void CallCtx::set_result(int i, const Value& v) {
     else
         args[i] = v;
 }
+
+// What a coroutine keeps of the VM while it is not running (see coroutine.h). One member per piece of execution state that
+// VM::swap_exec_state exchanges; a new piece of that state has to be added to both.
+struct CoState {
+    std::vector<Value> regs;
+    std::vector<VM::Frame> call_stack;
+    std::vector<VM::Handler> handler_stack;
+    uint32_t ip = 0;
+    int last_results = 1;
+    int va_low = VM::k_no_varargs;
+    size_t max_regs = 0;
+    int native_nest = 0;
+
+    // Closes, and lets go of, the open upvalues of every frame: the registers they point into are about to be freed.
+    void close_all_upvalues();
+};

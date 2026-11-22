@@ -164,11 +164,18 @@ static int core_instance_of(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(found));
 }
 
+// __yield(...) is INTERNAL like __fmt: the parser turns the `yield` keyword into a call of it. It suspends the running coroutine,
+// handing its arguments to whoever resumed it; what the next resume passes comes back as its results.
+static int core_yield(CallCtx& ctx) {
+    ctx.vm->yield_current(ctx);
+}
+
 Value make_core_module() {
     return MapBuilder()
         .fn("print", core_print)
         .fn("printf", core_printf)
         .fn("__fmt", core_fmt)   // internal: the desugaring of {expr:spec}
+        .fn("__yield", core_yield) // internal: the desugaring of `yield`
         .fn("typeof", core_typeof)
         .fn("classOf", core_class_of)
         .fn("instanceOf", core_instance_of)

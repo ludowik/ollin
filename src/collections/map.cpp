@@ -39,6 +39,8 @@ std::size_t ValueHash::other(const Value& v) noexcept {
         return std::hash<void*>{}((void*)v.mptr);
     case Value::T_RANGE:
         return std::hash<void*>{}((void*)v.rptr);
+    case Value::T_COROUTINE:
+        return std::hash<void*>{}((void*)v.coptr);
     default:
         return 0;
     }
@@ -71,6 +73,8 @@ bool ValueEqual::other(const Value& a, const Value& b) noexcept {
             return a.mptr == b.mptr;
         case Value::T_RANGE:
             return a.rptr == b.rptr;
+        case Value::T_COROUTINE:
+            return a.coptr == b.coptr;
         default:
             return false;
         }

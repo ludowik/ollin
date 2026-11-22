@@ -39,6 +39,7 @@ Value make_motion_module();
 Value make_date_module();
 Value make_json_module();
 Value make_https_module();
+Value make_coroutine_module();
 
 // graphics_internal.h pulls in raylib, which this file compiles without: the one function it needs is declared here
 // (graphics_module.cpp, or graphics_stub.cpp without a window).
@@ -73,6 +74,7 @@ static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modu
     { "motion",   make_motion_module,   motion_reset     },   // a program asks for the sensors itself
     { "date",     make_date_module,     nullptr          },
     { "json",     make_json_module,     nullptr          },
+    { "coroutine", make_coroutine_module, nullptr         },
     { "https",    make_https_module,    https_reset      },   // an answer still on its way would reach the wrong program
 };
 
@@ -95,7 +97,7 @@ const std::vector<std::string>& builtin_module_names() {
 }
 
 const std::vector<std::string>& builtin_func_names() {
-    static const std::vector<std::string> names = {"print", "printf", "__fmt", "typeof", "classOf", "instanceOf", "assert",
+    static const std::vector<std::string> names = {"print", "printf", "__fmt", "__yield", "typeof", "classOf", "instanceOf", "assert",
                                                    "time", "cpuTime", "mem", "Color", "Random", "len"};
     return names;
 }

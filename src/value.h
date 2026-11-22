@@ -35,6 +35,7 @@ struct Array;
 struct Range;
 struct Iterator;
 struct Closure;
+struct Coroutine;
 struct Value;
 class VM;
 // Call context of a builtin, on the Lua model: the builtin writes its return values into the
@@ -75,6 +76,7 @@ struct Value {
         Iterator* iptr;
         Closure* cptr;
         Range* rptr;
+        Coroutine* coptr;
     };
 
     // Tag order is a PERFORMANCE INVARIANT: every NON ref-counted type first, then the
@@ -94,6 +96,7 @@ struct Value {
     static constexpr uint8_t T_CLOSURE = 10;
     static constexpr uint8_t T_CLASS = 11;  // a class prototype, reusing Map*
     static constexpr uint8_t T_RANGE = 12;  // range [a;b] (Range*, ref-counted)
+    static constexpr uint8_t T_COROUTINE = 13; // a suspendable function (Coroutine*, ref-counted; see coroutine.h)
 
   private:
     explicit Value(Map* p) : tag(T_MAP), str_hash(0), mptr(p) {
@@ -105,6 +108,8 @@ struct Value {
     explicit Value(Closure* p) : tag(T_CLOSURE), str_hash(0), cptr(p) {
     }
     explicit Value(Range* p) : tag(T_RANGE), str_hash(0), rptr(p) {
+    }
+    explicit Value(Coroutine* p) : tag(T_COROUTINE), str_hash(0), coptr(p) {
     }
     // Builds a boolean DIRECTLY, in the initializer list rather than by assigning afterwards:
     // comparisons produce one per test, on the hottest path of the VM. The tag type keeps this
@@ -181,6 +186,9 @@ struct Value {
     bool is_range() const {
         return tag == T_RANGE;
     }
+    bool is_coroutine() const {
+        return tag == T_COROUTINE;
+    }
     bool is_callable() const {
         return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS;
     }
@@ -204,6 +212,10 @@ struct Value {
         return v;
     }
     static Value make_closure(Closure* p) {
+        return Value(p);
+    }
+    // Takes the reference the pointer already carries (a fresh coroutine has refcount 1).
+    static Value make_coroutine(Coroutine* p) {
         return Value(p);
     }
     // An EXPLICIT factory rather than a `Value(bool)` constructor: with `Value(int64_t)` and
@@ -291,6 +303,7 @@ struct Value {
 #include "collections/range.h"
 
 #include "closure.h"
+#include "coroutine.h"
 
 // Inline Value implementations: they need Map, Array and Iterator to be complete types.
 
@@ -393,6 +406,8 @@ inline const char* Value::type_name() const {
         return "class";
     case T_RANGE:
         return "range";
+    case T_COROUTINE:
+        return "coroutine";
     default:
         return "unknown";
     }
@@ -444,6 +459,12 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
             delete rp;
         break;
     }
+    case T_COROUTINE: {
+        Coroutine* cop = coptr;
+        if (--cop->refcount == 0)
+            coroutine_destroy(cop);
+        break;
+    }
     default:
         break; // defensive: only tags >= T_STRING reach here
     }
@@ -474,6 +495,9 @@ inline void Value::retain() const noexcept {
         break;
     case T_RANGE:
         rptr->refcount++;
+        break;
+    case T_COROUTINE:
+        coptr->refcount++;
         break;
     default:
         break; // defensive: only tags >= T_STRING reach here
