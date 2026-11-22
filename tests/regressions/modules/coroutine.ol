@@ -372,3 +372,19 @@ coroutine.resume(coPing)
 coLog.push("main")
 coroutine.resume(coPing)
 assert(coLog.join(",") == "ping1,pong1,ping2,main,pong2,ping3", "coroutines nest, and each goes on from its own yield")
+
+## Each coroutine that resumes another is a level of the processor's stack, which no register file bounds: the nesting is limited, and
+## the error travels up through the coroutines it kills (it used to be a crash).
+func coNest(n)
+    var co = coroutine.create(func()
+        return coNest(n + 1)
+    end)
+    return coroutine.resume(co)
+end
+try
+    coNest(0)
+    assert(false)
+catch e
+    assert(e == "coroutine nesting too deep (max 100)", "a bounded nesting")
+end
+assert(coroutine.running() == nil and coroutine.status(coroutine.create(func() end)) == "suspended", "and the main program is back in charge")

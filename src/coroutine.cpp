@@ -54,14 +54,24 @@ Value VM::new_coroutine(const Value& fn) {
     std::unique_ptr<Coroutine> co(new Coroutine());
     co->fn = fn;
     co->st = std::make_unique<CoState>();
-    co->st->regs.reserve(k_coroutine_regs);
-    co->st->max_regs = k_coroutine_regs;
+    co->st->max_regs = k_coroutine_regs; // the register file itself is reserved when the coroutine first runs: one never run costs nothing
     return Value::make_coroutine(co.release());
 }
 
 int VM::resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out, int out_cap) {
     if (co->status != Coroutine::SUSPENDED)
         throw std::runtime_error(std::string("cannot resume a ") + Coroutine::status_name(co->status) + " coroutine");
+    if (co_depth_ >= k_max_co_depth)
+        throw std::runtime_error("coroutine nesting too deep (max 100)");
+    struct DepthGuard {
+        int& depth;
+        explicit DepthGuard(int& d) : depth(d) {
+            ++depth;
+        }
+        ~DepthGuard() {
+            --depth;
+        }
+    } depth_guard(co_depth_);
     // The caller's arguments live in the register file that is about to be swapped out, and its own reference may be the
     // only one: copies keep them, and so does `hold`, for as long as the coroutine runs.
     std::vector<Value> argv(args, args + argc);
@@ -84,6 +94,7 @@ int VM::resume_coroutine(Coroutine* co, const Value* args, int argc, Value* out,
     try {
         if (!co->started) {
             co->started = true;
+            regs.reserve(k_coroutine_regs); // this is the coroutine's own file now; it is never reallocated after this
             ClosureRef fuv;
             FuncIdx fi = resolve_func_val(co->fn, fuv, "runtime: call on non-function value");
             co->fn = Value{};

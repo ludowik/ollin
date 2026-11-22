@@ -347,6 +347,10 @@ class VM {
     // refused unless it is zero, because the C++ stack of those invocations cannot be suspended. Swapped with the coroutine.
     int native_nest_ = 0;
     Coroutine* current_co_ = nullptr; // the coroutine that runs, nil for the main program
+    // How many coroutines are being resumed one inside another. Each level is a run_goto on the processor's stack, which no register
+    // file bounds (every coroutine has its own), so a body that resumes a coroutine that resumes a coroutine… would end in a crash.
+    int co_depth_ = 0;
+    static constexpr int k_max_co_depth = 100;
     // Exchanges the execution state — registers, frames, handlers, ip and what goes with them — with `s`.
     void swap_exec_state(CoState& s);
     // Counts a native frame that runs Ollin code (call_value_multi, invoke_str) for as long as it lives.
