@@ -11,7 +11,8 @@ The arcade game of 1981 in which a frog crosses a road and a river to fill five 
   skull, the letters of the title and of the header — 256 tiles of 8 x 8 and 64 sprites of 16 x 16;
 - the lanes: eleven rows (five of river, the median strip, five of road), the picture each one is made of, the length of its
   objects, the gap after them and how many of them a lane holds, for each of the five difficulty tiers (the board's tier
-  comes round every five boards), and the way each lane runs;
+  comes round every five boards); the turtles' three poses of swimming; the way each lane runs, which was read by hand from
+  the routine of the program that moves the lanes and is written in `rules.ol`;
 - the geometry: the field is the arcade's 224 x 256, a row is 16 pixels, the homes are five and 48 pixels apart;
 - what the program's tables say of the rules and that the page names: three frogs, the extra frog at 20 000 points (and one
   more for a board completed), a row of progress paid once, a board completed worth 1 000.
@@ -19,7 +20,8 @@ The arcade game of 1981 in which a frog crosses a road and a river to fill five 
 **Ours, set by playing**, because the program's code is not readable that far:
 
 - the SPEEDS of the lanes (`LANE_SPEED` in `rules.ol`) and the rise of 10 % at each board;
-- the diving of the turtles: which groups dive, and when;
+- the diving of the turtles: which groups dive, and when (the program draws a sinking turtle as a ring of bubbles, and so does
+  this one);
 - the clock (30 seconds a frog) and the points for the time left, for a home and for the fly;
 - when the fly and the crocodile turn up, and for how long;
 - the COLOURS: the colour PROM of the board is not part of the pages, so each picture's four colours are chosen in

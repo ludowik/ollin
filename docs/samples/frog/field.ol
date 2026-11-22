@@ -17,7 +17,6 @@ const ROW_TOP_Y  = 32          ## the y of the row of the homes; the rows below 
 
 ## Where the frog stands when it starts a life, and the left edge of the cells it can reach: x = 8 + 16 * column.
 const COLUMN_X0  = 8
-const COLUMNS    = 13
 const START_X    = 104
 
 ## The five homes, 48 pixels apart; a frog that arrives within HOME_REACH pixels of one is in it.

@@ -16,6 +16,8 @@ const YELLOW  = Color(1.0, 0.85, 0.1)
 const GREEN   = Color(0.2, 0.85, 0.3)
 const BAR_LOW = Color(0.95, 0.25, 0.15)
 
+const SWIM = [0, 1, 2, 1]                      ## the poses of a swimming turtle, in the order its legs move
+
 func block(col, x, y, w, h)
     graphics.noStroke()
     graphics.fill(col)
@@ -60,12 +62,21 @@ func drawLanes()
         if lane <> 5 then
             var y = rowY(11 - lane)
             for it in laneItems(tier, lane, laneOff[lane + 1]) do
-                var phase = 0
+                var frame = 0
                 if LANE_DIVES[lane + 1] then
-                    phase = turtleFrame(clock, it.group)
+                    frame = turtleFrame(clock, it.group)
                 end
-                if phase < 3 then
-                    graphics.sprite(laneImgs[lane + 1][phase + 1], math.floor(it.x0 + 0.5), y, it.x1 - it.x0, CELL)
+                if frame == 0 then
+                    var pose = 0
+                    if LANE_DIVES[lane + 1] then
+                        pose = SWIM[math.floor(clock * 4) % 4 + 1]
+                    end
+                    graphics.sprite(laneImgs[lane + 1][pose + 1], math.floor(it.x0 + 0.5), y, it.x1 - it.x0, CELL)
+                else
+                    ## a group that dives is a ring of bubbles for each turtle, the board's own picture of something sinking
+                    for k = 0, (it.x1 - it.x0) // CELL - 1 do
+                        graphics.sprite(pics["splash{frame}"], math.floor(it.x0 + 0.5) + k * CELL, y, CELL, CELL)
+                    end
                 end
             end
         end
@@ -122,7 +133,7 @@ func drawHud()
     drawText("1UP", 24, 8, WHITE)
     drawText("HI-SCORE", 88, 8, WHITE)
     drawTextRight("{score}", 56, 18, RED)
-    drawTextRight("{best}", 136, 18, RED)
+    drawTextRight("{math.max(best, score)}", 136, 18, RED)
     for i = 1, math.max(lives - 1, 0) do
         graphics.sprite(pics.frog, 2 + (i - 1) * 9, FIELD_H - 12, 8, 8)
     end

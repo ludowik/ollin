@@ -6,7 +6,6 @@ global sndSplash = nil
 global sndThud   = nil
 global sndHome   = nil
 global sndExtra  = nil
-global sndTime   = nil
 global sndStart  = nil
 global soundOn   = true
 
@@ -28,7 +27,6 @@ func buildSounds()
         var f = 660 + 330 * math.floor(t * 12)
         return math.sin(t * 6.28318 * f) * math.exp(-t * 2.5)
     end).volume(0.18)
-    sndTime = sound.tone(196, 0.12, "square").envelope(0.005, 0.03, 0.6, 0.05).volume(0.14)
     sndStart = sound.generate(0.5, func(t)
         var f = 330 + 110 * math.floor(t * 8)
         return math.sin(t * 6.28318 * f) * math.exp(-t * 3)

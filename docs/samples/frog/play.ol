@@ -25,7 +25,16 @@ func die(kind)
     end
     frog.dead = kind
     frog.deadT = 0.0
-    frog.hop = nil
+    if frog.hop <> nil then
+        ## the wreck is where the frog was hit, not where it started the hop
+        var h = frog.hop
+        var p = math.min(h.t / HOP_TIME, 1.0)
+        frog.x = h.fromX + (h.toX - h.fromX) * p
+        if p >= 0.5 then
+            frog.row = h.toRow
+        end
+        frog.hop = nil
+    end
     if kind == "car" or kind == "croc" then
         play(sndThud)
     else
@@ -103,7 +112,9 @@ func land()
     frog.hop = nil
     if frog.row > furthest then
         furthest = frog.row
-        earn(SCORE_HOP)
+        if frog.row < ROW_HOMES then
+            earn(SCORE_HOP)       ## the homes pay for themselves, and only to a frog that gets in
+        end
     end
     if frog.row == ROW_HOMES then
         arriveHome()

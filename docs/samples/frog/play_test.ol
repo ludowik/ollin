@@ -88,6 +88,14 @@ tryHop("up")
 run(HOP_TIME + 0.05)
 assert(frog.row == 9, "a hop from a log lands on the next row of the river")
 
+## A frog hit in the air is where it was hit, not where it started the hop.
+fresh()
+frog.row = 4
+frog.x = 20
+tryHop("up")
+run(0.1)
+assert(frog.dead == "car" and frog.row == 5 and frog.hop == nil and frog.x > 20 - 0.1 and frog.x < 20.1 + 0.1, "the wreck is on the row of the truck")
+
 ## ── The clock ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 fresh()
 timeLeft = 0.04
@@ -109,14 +117,14 @@ end
 
 atHome(3)
 assert(homes[3] and not homes[2] and frog.row == ROW_START and frog.dead == nil, "a frog that gets home is in it, and the next one starts")
-assert(score >= SCORE_HOP + SCORE_HOME + SCORE_SECOND * 28, "and is paid for the time it has left")
+assert(score >= SCORE_HOME + SCORE_SECOND * 28 and score < SCORE_HOME + SCORE_SECOND * 31, "and is paid for the time it has left, and not for the last row too")
 assert(timeLeft > TIME_LIMIT - 0.2, "the clock starts again")
 fresh()
 frog.row = 11
 frog.x = 80
 tryHop("up")
 run(HOP_TIME + 0.05)
-assert(frog.dead == "wall", "a frog that arrives between two homes is against the wall")
+assert(frog.dead == "wall" and score == 0, "a frog that arrives between two homes is against the wall, and is paid nothing for the row")
 fresh()
 homes[3] = true
 frog.row = 11

@@ -107,20 +107,23 @@ def bytes_at(data, start, count):
     return out
 
 
-# The tables of tile pairs the eleven lanes copy from, as (first address, number of bytes); the lane in the middle
-# (the median strip) has none. The addresses are those the program loads for each lane (renderFrogAnimArm0..10).
+# The tables of tile pairs the eleven lanes copy from, as (first address, number of bytes, number of phases); the lane in
+# the middle (the median strip) has none. The addresses are those the program loads for each lane (renderFrogAnimArm0..10).
+# A turtle table holds three pictures of its turtles one after the other, the same distance apart whatever a lane object
+# takes of each: the table of lane 4 holds five turtles per phase (20 bytes) of which a tier uses the first three, and ends
+# with four blank tiles.
 LANE_SOURCES = [
-    (0x1403, 16),   # lane 0, river: a log
-    (0x1423, 24),   # lane 1, river: turtles, in their three phases of diving
-    (0x143B, 24),   # lane 2, river: a long log
-    (0x1453, 12),   # lane 3, river: a short log
-    (0x145F, 36),   # lane 4, river: turtles, in their three phases of diving
-    None,           # lane 5: the median strip
-    (0x149F, 8),    # lane 6, road: a truck
-    (0x14A7, 4),    # lane 7, road: a car
-    (0x14AB, 4),    # lane 8, road: a car
-    (0x14AF, 4),    # lane 9, road: a car
-    (0x14B3, 4),    # lane 10, road: a car
+    (0x1403, 16, 1),   # lane 0, river: a log
+    (0x1423, 24, 3),   # lane 1, river: turtles, in their three poses of swimming
+    (0x143B, 24, 1),   # lane 2, river: a long log
+    (0x1453, 12, 1),   # lane 3, river: a short log
+    (0x145F, 60, 3),   # lane 4, river: turtles, in their three poses of swimming
+    None,              # lane 5: the median strip
+    (0x149F, 8, 1),    # lane 6, road: a truck
+    (0x14A7, 4, 1),    # lane 7, road: a car
+    (0x14AB, 4, 1),    # lane 8, road: a car
+    (0x14AF, 4, 1),    # lane 9, road: a car
+    (0x14B3, 4, 1),    # lane 10, road: a car
 ]
 TIER_POINTERS = 0x2260   # five little-endian pointers to the blocks of 33 bytes
 
@@ -149,6 +152,7 @@ def write_lanes(code):
     sources = []
     for entry in LANE_SOURCES:
         sources.append(None if entry is None else bytes_at(code, entry[0], entry[1]))
+    phases = [1 if entry is None else entry[2] for entry in LANE_SOURCES]
     pointers = bytes_at(code, TIER_POINTERS, 10)
     tiers = []
     for k in range(5):
@@ -161,13 +165,15 @@ def write_lanes(code):
         f.write("## " + BASE + "Code.html. Do not edit by hand.\n")
         f.write("##\n")
         f.write("## LANE_TILES: for each of the eleven lanes (the river from the top, the median strip, the road) the tile codes of one\n")
-        f.write("## object, two per row (nil for the median strip). TIERS: for each of the five difficulty tiers and each lane, the\n")
+        f.write("## object, two per row (nil for the median strip), and LANE_PHASES how many pictures of it follow each other (the three\n")
+        f.write("## poses of swimming of the turtles). TIERS: for each of the five difficulty tiers and each lane, the\n")
         f.write("## three bytes [stride, rows, count] — the gap after an object (stride / 32 tiles), its length in tiles and how many\n")
         f.write("## of them the lane holds.\n\n")
         f.write("const LANE_TILES = [\n")
         for i, s in enumerate(sources):
             f.write("    %s%s\n" % ("nil" if s is None else "[" + ", ".join(str(v) for v in s) + "]", "," if i < 10 else ""))
         f.write("]\n\n")
+        f.write("const LANE_PHASES = [" + ", ".join(str(n) for n in phases) + "]\n\n")
         f.write("const TIERS = [\n")
         for k, tier in enumerate(tiers):
             f.write("    [" + ", ".join("[%d, %d, %d]" % tuple(t) for t in tier) + "]%s\n" % ("," if k < 4 else ""))

@@ -15,7 +15,15 @@ end
 assert(isRoadRow(5) and not isRoadRow(6) and isRiverRow(7) and not isRiverRow(12))
 
 ## ── What the arcade tables say of the lanes ──────────────────────────────────────────────────────────────────────────────
-assert(#TIERS == 5 and #LANE_TILES == 11 and #LANE_DIR == 11 and #LANE_SPEED == 11 and #LANE_DIVES == 11)
+assert(#TIERS == 5 and #LANE_TILES == 11 and #LANE_DIR == 11 and #LANE_SPEED == 11 and #LANE_DIVES == 11 and #LANE_PHASES == 11)
+for lane = 0, 10 do
+    if lane <> 5 then
+        var phases = LANE_PHASES[lane + 1]
+        assert(#LANE_TILES[lane + 1] % phases == 0, "lane {lane}: its pictures follow each other the same distance apart")
+        assert((phases == 3) == LANE_DIVES[lane + 1], "only the turtles have poses")
+        assert(#LANE_TILES[lane + 1] // phases >= laneSpec(1, lane).tiles * 2, "a picture holds the tiles of a lane object")
+    end
+end
 assert(laneSpec(1, 0).len == 64 and laneSpec(1, 0).period == 88 and laneSpec(1, 0).count == 3, "a log of eight tiles, three to a lane")
 assert(laneSpec(1, 6).len == 32 and laneSpec(1, 7).len == 16, "a truck is four tiles long and a car two")
 assert(laneSpec(5, 0).count == 1 and laneSpec(5, 8).count == 5, "the fifth tier has one log in lane 0 and five cars in lane 8")
@@ -83,7 +91,6 @@ assert(homeX(1) == 8 and homeX(3) == 104 and homeX(5) == 200, "five homes 48 pix
 assert(homeAt(104) == 3 and homeAt(60) == 2 and homeAt(111) == 3, "a frog within a few pixels of a home is in it")
 assert(homeAt(80) == nil and homeAt(130) == nil, "between two homes it is against the wall")
 assert(homeAt(START_X) == 3, "the frog starts under the middle home")
-assert(nearestColumn(8) == 0 and nearestColumn(103) == 6 and nearestColumn(200) == 12 and nearestColumn(-50) == 0 and nearestColumn(300) == 12, "the grid cell a carried frog comes back to")
 
 ## ── The score ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 assert(homeScore(12.7, false) == 170 and homeScore(0.0, false) == 50 and homeScore(12.7, true) == 370, "a home is worth more the sooner it is reached")
@@ -93,4 +100,6 @@ s, given = addScore(20000, 50, true)
 assert(s == 20050 and not given, "and only once")
 s, given = addScore(0, 50, false)
 assert(s == 50 and not given)
+s, given = addScore(SCORE_MAX - 5, 50, true)
+assert(s == SCORE_MAX, "the score stops where a score can be kept")
 print("frog rules ok")

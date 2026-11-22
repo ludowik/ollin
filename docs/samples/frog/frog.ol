@@ -14,15 +14,13 @@ import "sounds.ol"
 import "sprites.ol"
 import "play.ol"
 import "draw.ol"
+import "../lib/keep.ol"
 
 func setup()
     graphics.canvas(W, H, "Ollin Frog")
     graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
     graphics.viewport(FIELD_W, FIELD_H)
-    var kept = data.get(BEST_KEY, 0)
-    if typeof(kept) == "int" and kept >= 0 and kept <= 999999999 then
-        best = kept
-    end
+    best = wholeOr(data.get(BEST_KEY, 0), 0, SCORE_MAX)
     buildSprites()
     buildSounds()
     resetLanes()
@@ -104,7 +102,6 @@ func update(dt)
             laneOff[lane + 1] = advanceLane(laneOff[lane + 1], lane, board, dt)
         end
     elseif state == "title" then
-        demo += dt
         clock += dt
         for lane = 0, 10 do
             laneOff[lane + 1] = advanceLane(laneOff[lane + 1], lane, board, dt)

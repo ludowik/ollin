@@ -25,7 +25,6 @@ global furthest  = 0           ## the row nearest the homes this frog has reache
 global event     = nil         ## what is in a home now: {kind: "fly" or "crocodile", home, left}
 global eventWait = EVENT_GAP
 global rng       = nil
-global demo      = 0.0         ## the clock of the title screen
 global banner    = nil         ## a short message over the field: {text, left}
 
 func resetLanes()

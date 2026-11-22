@@ -4,13 +4,15 @@
 ## all worked out from a lane's offset and the time.
 ##
 ## What comes from the arcade game's own tables: the picture of every lane object, how many tiles long it is, the gap that
-## follows it, how many there are in a lane, and the way each lane runs. The SPEEDS, the turtles' diving, the timer and the
-## points are ours, set by playing: the program's code is not readable that far (see README.md).
+## follows it and how many there are in a lane. The way each lane runs was read by hand from the routine that moves them.
+## The SPEEDS, the turtles' diving, the timer and the points are ours, set by playing: the program's code is not readable
+## that far (see README.md).
 
 import "field.ol"
 import "arcade.ol"
 
-## The way each lane runs, from the top of the river: 1 to the right, -1 to the left, 0 for the median strip.
+## The way each lane runs, from the top of the river (read from the arcade routine that moves the eleven lane objects):
+## 1 to the right, -1 to the left, 0 for the median strip.
 const LANE_DIR   = [1, -1, 1, 1, -1, 0, -1, 1, -1, 1, -1]
 ## Pixels per second on the first board; every board after it is a little faster.
 const LANE_SPEED = [28.0, 24.0, 44.0, 20.0, 32.0, 0.0, 28.0, 36.0, 30.0, 52.0, 24.0]
@@ -34,6 +36,7 @@ const SCORE_FLY   = 200
 const SCORE_BOARD = 1000
 const SCORE_SECOND = 10        ## per second left on the clock, when a frog gets home
 const EXTRA_AT    = 20000      ## an extra frog the first time the score gets here
+const SCORE_MAX   = 999999999
 const LIVES       = 3
 const TIME_LIMIT  = 30.0
 
@@ -160,12 +163,6 @@ func homeX(h)
     return HOME_X0 + (h - 1) * HOME_STEP
 end
 
-## The cell of the grid nearest to x, which a frog that has been carried comes back to when it hops sideways.
-func nearestColumn(x)
-    var c = math.floor((x - COLUMN_X0) / CELL + 0.5)
-    return math.clamp(c, 0, COLUMNS - 1)
-end
-
 ## What a frog is given for arriving home with `left` seconds on the clock, `fly` saying it ate the fly.
 func homeScore(left, fly)
     var s = SCORE_HOME + SCORE_SECOND * math.floor(left)
@@ -177,7 +174,7 @@ end
 
 ## The score after earning `points`, and whether it earned the extra frog (only the first time it gets to EXTRA_AT).
 func addScore(score, points, extraGiven)
-    var now = score + points
+    var now = math.min(score + points, SCORE_MAX)
     if not extraGiven and now >= EXTRA_AT then
         return now, true
     end

@@ -8,7 +8,7 @@ import "arcade.ol"
 import "field.ol"
 import "rules.ol"
 
-global laneImgs = []           ## per lane, its object's picture: one for a log or a car, three phases for turtles
+global laneImgs = []           ## per lane, its object's picture: one for a log or a car, the three poses of swimming for turtles
 global frogImgs = {}           ## the frog, by the way it faces and then by "rest" or "hop"
 global pics = {}               ## the other sprites, by name
 global glyphs = {}             ## the letters, the digits and the dash, one picture each
@@ -62,12 +62,13 @@ func turnRows(rows, how)
 end
 
 ## The picture of a lane's object: its tiles in pairs, the first pair at the right-hand end (the arcade draws its strips
-## that way round), a pair being the 8 pixels of one tile above the 8 of the other. `phase` picks one of the three pictures
-## a turtle has.
+## that way round), a pair being the 8 pixels of one tile above the 8 of the other. `phase` picks one of the poses of
+## swimming a turtle has: the pictures follow each other in the table a fixed distance apart, which is more than the tiles a
+## group of turtles takes of each.
 func laneRows(lane, phase)
     var rows = laneSpec(1, lane).tiles
     var codes = LANE_TILES[lane + 1]
-    var base = phase * rows * 2
+    var base = phase * (#codes // LANE_PHASES[lane + 1])
     var out = []
     for y = 0, CELL - 1 do
         var line = []
@@ -89,11 +90,7 @@ func buildSprites()
             if lane == 0 or lane == 2 or lane == 3 then
                 palette = LOG_PALETTE
             end
-            var phases = 1
-            if LANE_DIVES[lane + 1] then
-                phases = 3
-            end
-            for phase = 0, phases - 1 do
+            for phase = 0, LANE_PHASES[lane + 1] - 1 do
                 imgs.push(image.fromPattern(laneRows(lane, phase), palette))
             end
         end
