@@ -121,6 +121,18 @@ func pressButton(name)
     end
 end
 
+## A finger landing on the buttons while another is already down. The first finger also emulates the mouse, which has already
+## dealt with it (a tap on an arrow that resumes a paused game must not hop as well), so only a later finger is read as a touch.
+func touchPress(count, x, y)
+    if count < 2 then
+        return
+    end
+    var name = buttonAt(x, y)
+    if name <> nil and DIRS[name] <> nil then
+        tryHop(name)
+    end
+end
+
 ## A fly or a crocodile in one of the homes that is still empty, from time to time.
 func updateEvent(dt)
     if event <> nil then

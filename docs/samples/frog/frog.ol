@@ -57,8 +57,8 @@ func keyboard.keypressed(key)
 end
 
 ## The buttons under the field. A tap starts a game from the title and the end screen, resumes a paused one, and otherwise
-## presses the button it is on. A single finger also emulates the mouse, so it is the one path for the first finger; a second
-## finger arrives only as a touch, which hops (a hop is ignored while one is on, so the first finger's two calls are one).
+## presses the button it is on. A single finger also emulates the mouse, so that is the path of the first finger; a second
+## finger arrives only as a touch (touchPress).
 func mouse.pressed(x, y)
     if begin() then
         return
@@ -74,10 +74,7 @@ func mouse.pressed(x, y)
 end
 
 func touch.began(id, x, y)
-    var name = buttonAt(x, y)
-    if name <> nil and DIRS[name] <> nil then
-        tryHop(name)
-    end
+    touchPress(touch.count(), x, y)
 end
 
 func update(dt)
