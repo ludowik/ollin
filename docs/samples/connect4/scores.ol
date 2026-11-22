@@ -8,7 +8,7 @@ import "../lib/keep.ol"
 const SCORES_KEY = "connect4.scores"
 const SCORES_VERSION = 1
 const COUNT_MAX = 1000000
-const MOVES_MAX = 21            ## the most moves one player makes in a game
+const MOVES_MAX = (CELLS + 1) // 2   ## the most moves one player makes in a game
 
 const SCORE_RANGES = {
     wins: [0, COUNT_MAX], losses: [0, COUNT_MAX], draws: [0, COUNT_MAX], streak: [0, COUNT_MAX], bestStreak: [0, COUNT_MAX],
@@ -69,9 +69,4 @@ func recordResult(level, result, humanMoves)
         s.streak = 0
     end
     saveScores()
-end
-
-func gamesPlayed(level)
-    var s = scores[level]
-    return s.wins + s.losses + s.draws
 end

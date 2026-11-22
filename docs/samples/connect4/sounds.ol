@@ -6,7 +6,6 @@ global sndWin    = nil
 global sndLose   = nil
 global sndDraw   = nil
 global sndClick  = nil
-global soundOn   = true
 
 func buildSounds()
     sndDrop = sound.tone(300, 0.05, "triangle").envelope(0.002, 0.02, 0.4, 0.02).volume(0.12)
@@ -26,9 +25,9 @@ func buildSounds()
     sndClick = sound.tone(640, 0.04, "square").envelope(0.002, 0.01, 0.4, 0.015).volume(0.1)
 end
 
-## Plays a buffer unless the sound is off.
+## Plays a buffer; the tests, which build none, play nothing.
 func playSound(snd)
-    if soundOn and snd <> nil then
+    if snd <> nil then
         snd.play()
     end
 end

@@ -62,9 +62,7 @@ func touch.ended(id, x, y)
 end
 
 func update(dt)
-    if pointer <> nil and touch.count() == 0 and not mouse.isDown() then
-        pointer = nil               ## a lift that was never seen must not leave the screen deaf to the next touch
-    end
+    releaseLostPointer(touch.count(), mouse.isDown())
     updateFrame(dt)
 end
 

@@ -2,6 +2,7 @@
 ## top and the buttons fill the strip under it.
 
 import "field.ol"
+import "../lib/area.ol"
 
 ## Under the field the viewport holds a strip for the buttons. Its height follows the shape of the area the program is shown in, so
 ## that a tall phone screen is filled — the field stays at the top and the buttons grow — within these bounds.
@@ -10,7 +11,7 @@ const PAD_MAX = 200
 
 ## The height of the viewport for an area of w x h pixels: as tall as the area's shape asks, so that nothing is left over.
 func viewHeight(w, h)
-    return math.floor(math.clamp(FIELD_W * h / w, FIELD_H + PAD_MIN, FIELD_H + PAD_MAX))
+    return fitHeight(FIELD_W, w, h, FIELD_H + PAD_MIN, FIELD_H + PAD_MAX)
 end
 
 ## The buttons in a viewport of FIELD_W x viewH pixels: the four ways on the right as a cross, under the right thumb, and pause

@@ -18,13 +18,20 @@ global fall = nil           ## the disc in the air: {col, row, who, t, dur}
 global outcome = nil        ## how the game ended: {winner (1, 2, or 0 for a draw), cells (the four, or none)}
 global hover = 4            ## the column the next disc is aimed at
 global rng = nil
-global clock = 0.0          ## seconds since the program began, for what blinks
 global resumable = nil      ## a game in progress that was kept, which the title can go on with
 global viewH = VIEW_MIN    ## the height of the field: it follows the shape of the area
-global pointer = nil        ## the finger or the mouse that is down: {id, aiming}
 
 func levelName()
     return LEVELS[levelIdx].name
+end
+
+## Where everything is on the screen of a game and on the title, for the field the area has now (layout.ol).
+func playLay()
+    return playLayout(viewH)
+end
+
+func titleLay()
+    return titleLayout(viewH, #LEVELS, resumable <> nil)
 end
 
 ## The result for the human, "win", "loss" or "draw", of a game that ended with `winner`.
@@ -37,12 +44,9 @@ func resultFor(winner)
     return "loss"
 end
 
-## How many discs the human has put in the grid.
+## How many discs the human has put in the grid: the first player has put one more than the second when the count is odd.
 func humanDiscs()
-    if human == 1 then
-        return (game.count + 1) // 2
-    end
-    return game.count // 2
+    return (game.count + 2 - human) // 2
 end
 
 func humansTurn()
@@ -51,9 +55,5 @@ end
 
 ## Whether a move can be taken back now. When the computer opens, its opening disc is not the human's to take back.
 func canUndo()
-    var floor = 0
-    if human == 2 then
-        floor = 1
-    end
-    return state == "play" and fall == nil and game.count > floor
+    return state == "play" and fall == nil and game.count > human - 1
 end

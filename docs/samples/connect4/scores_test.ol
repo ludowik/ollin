@@ -3,6 +3,11 @@
 
 import "scores.ol"
 
+func gamesPlayed(level)
+    var s = scores[level]
+    return s.wins + s.losses + s.draws
+end
+
 func reset()
     data.delete(SCORES_KEY)
     scores = freshScores()

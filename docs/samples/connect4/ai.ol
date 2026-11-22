@@ -8,11 +8,15 @@ import "board.ol"
 
 const WIN = 100000              ## a won game; a quicker win is worth more, a slower loss less
 const INFINITY = 1000000
-const SLICE = 500               ## nodes between two yields: a few milliseconds, even where the machine is slow
+const SLICE = 500               ## nodes between two yields: a few milliseconds, even where the machine is slow (play.ol gives the search
+                                ## THINK_BUDGET a frame, and a turn goes on to the next yield, so it runs about one slice past it)
 const THREAT = 12               ## what a threat — an empty cell that would complete four — counts for in the evaluation
 
 ## What a disc in each column is worth by where it is: the middle is part of more lines than the edge.
 const COLUMN_WEIGHT = [1, 2, 3, 4, 3, 2, 1]
+
+## The order the columns are tried in, the best weight first: a search that meets the good moves first cuts off more.
+const CENTRE_FIRST = [4, 3, 5, 2, 6, 1, 7]
 
 ## The levels. The depth is how many moves ahead the search looks; `blunder` the chance that the computer plays a column at random
 ## instead of the one it found, which is what makes a level beatable without making it play stupidly in between.
@@ -22,53 +26,8 @@ const LEVELS = [
     {name: "Hard",   depth: 9, blunder: 0.0}
 ]
 
-func makeBoardMask()
-    var mask = 0
-    for col = 1, COLS do
-        mask = mask | (((1 << ROWS) - 1) << ((col - 1) * STRIDE))
-    end
-    return mask
-end
-
-const BOARD_MASK = makeBoardMask()      ## the bits that are cells, not guards
-
 global nodes = 0                ## how many positions the last search looked at
 global leaf = nil               ## what is worth a position when the search stops looking: set below, and replaced by a test
-
-func countBits(m)
-    var n = 0
-    while m <> 0 do
-        m = m & (m - 1)
-        n += 1
-    end
-    return n
-end
-
-## The cells where a disc would complete four for the owner of `p`, along one direction (`s` is the distance in bits between two
-## neighbours): the cell has three discs of `p` in a window with it, in each of the four places it can have in the window.
-func threatsAlong(p, s)
-    var a = p << s
-    var b = p << 2 * s
-    var c = p >> s
-    var d = p >> 2 * s
-    return (a & b & (p << 3 * s)) | (c & d & (p >> 3 * s)) | (a & c & d) | (a & b & c)
-end
-
-## Every cell where a disc would give `p` four in a row, empty or not.
-func threatCells(p)
-    return threatsAlong(p, 1) | threatsAlong(p, STRIDE) | threatsAlong(p, STRIDE + 1) | threatsAlong(p, STRIDE - 1)
-end
-
-## The cells a disc can be dropped on now, one per open column.
-func playableCells(b)
-    var m = 0
-    for col = 1, COLS do
-        if b.next[col] < col * STRIDE - 1 then
-            m = m | (1 << b.next[col])
-        end
-    end
-    return m
-end
 
 ## How much the player to move is ahead by the positions of the discs alone: the weight of the columns, for them minus for the other.
 func positional(b)
@@ -121,32 +80,30 @@ func negamax(b, depth, alpha, beta, bal, ply)
     end
     var danger = threatCells(b.mine[3 - who]) & playable
     var forced = 0
-    if danger <> 0 then
-        if (danger & (danger - 1)) <> 0 and depth >= 2 then
-            return -(WIN - ply - 1)       ## two cells to block, and only one disc to block with: the other side wins next move
+    if danger <> 0 and depth >= 2 then
+        if (danger & (danger - 1)) <> 0 then
+            return -(WIN - ply - 1)       ## two squares to block, and only one disc to block with: the other side wins next move
         end
-        if depth >= 2 then
-            for col = 1, COLS do
-                if (1 << b.next[col]) == danger then
-                    forced = col
-                end
+        for col = 1, COLS do
+            if (1 << b.next[col]) == danger then
+                forced = col
             end
         end
     end
     var best = -INFINITY
     for col in CENTRE_FIRST do
-        if (forced == 0 or col == forced) and b.next[col] < col * STRIDE - 1 then
+        if (forced == 0 or col == forced) and b.next[col] < COLUMN_TOP[col] then
             drop(b, col)
             var v = -negamax(b, depth - 1, -beta, -alpha, -(bal + COLUMN_WEIGHT[col]), ply + 1)
             undo(b)
             if v > best then
                 best = v
-                if v > alpha then
-                    alpha = v
-                    if alpha >= beta then
-                        break
-                    end
-                end
+            end
+            if best > alpha then
+                alpha = best
+            end
+            if alpha >= beta then
+                break
             end
         end
     end
@@ -159,7 +116,10 @@ func bestColumn(b, depth, rng)
     var bal = positional(b)
     var best = -INFINITY
     var ties = []
-    for col in openColumns(b) do
+    for col in CENTRE_FIRST do
+        if not isOpen(b, col) then
+            continue
+        end
         drop(b, col)
         var v = WIN
         if not justWon(b) then

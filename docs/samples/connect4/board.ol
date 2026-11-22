@@ -10,9 +10,44 @@ const ROWS = 6
 const CELLS = COLS * ROWS
 const STRIDE = ROWS + 1
 
-## The order the columns are tried in, centre first: a disc in the middle is part of more lines, and a search that meets the
-## good moves first cuts off more.
-const CENTRE_FIRST = [4, 3, 5, 2, 6, 1, 7]
+## The four ways a line can run, as a step of {columns, rows}: across, up, and the two diagonals. Every rule that looks at lines
+## takes them from here: in bits, a step is the distance between two neighbours of a line (LINE_SHIFTS).
+const DIRECTIONS = [[1, 0], [0, 1], [1, 1], [1, -1]]
+
+func lineShifts()
+    var shifts = []
+    for dir in DIRECTIONS do
+        shifts.push(dir[1] * STRIDE + dir[2])
+    end
+    return shifts
+end
+
+const LINE_SHIFTS = lineShifts()
+const SHIFT_A = LINE_SHIFTS[1]          ## the four, named, for the loops that run a million times and must not iterate a list
+const SHIFT_B = LINE_SHIFTS[2]
+const SHIFT_C = LINE_SHIFTS[3]
+const SHIFT_D = LINE_SHIFTS[4]
+
+func makeBoardMask()
+    var mask = 0
+    for col = 1, COLS do
+        mask = mask | (((1 << ROWS) - 1) << ((col - 1) * STRIDE))
+    end
+    return mask
+end
+
+const BOARD_MASK = makeBoardMask()      ## the bits that are squares, not guards
+
+## The first bit of a column that is no square — its guard: a disc goes in while the next bit of the column is below it.
+func makeColumnTops()
+    var tops = []
+    for col = 1, COLS do
+        tops.push(col * STRIDE - 1)
+    end
+    return tops
+end
+
+const COLUMN_TOP = makeColumnTops()
 
 ## An empty grid. `mine` holds the discs of player 1 (who moves first) and of player 2; `next` the index of the bit a disc
 ## dropped in each column takes; `moves` the columns played, in order, which is also how a game is undone and saved.
@@ -24,8 +59,18 @@ func newBoard()
     return {mine: [0, 0], next: next, count: 0, moves: []}
 end
 
+## Whether column `col` (1 to COLS) has a free square.
+func isOpen(b, col)
+    return b.next[col] < COLUMN_TOP[col]
+end
+
 func canDrop(b, col)
-    return typeof(col) == "int" and col >= 1 and col <= COLS and b.next[col] < col * STRIDE - 1
+    return typeof(col) == "int" and col >= 1 and col <= COLS and isOpen(b, col)
+end
+
+## How many discs are in a column.
+func heightOf(b, col)
+    return b.next[col] - (col - 1) * STRIDE
 end
 
 ## The player whose turn it is, 1 or 2.
@@ -35,7 +80,7 @@ end
 
 ## Drops a disc of the player to move in column `col`, which must be open.
 func drop(b, col)
-    var who = b.count % 2 + 1
+    var who = toMove(b)
     b.mine[who] = b.mine[who] | (1 << b.next[col])
     b.next[col] += 1
     b.count += 1
@@ -50,27 +95,20 @@ func undo(b)
     var col = b.moves.pop()
     b.count -= 1
     b.next[col] -= 1
-    var who = b.count % 2 + 1
+    var who = toMove(b)
     b.mine[who] = b.mine[who] ~ (1 << b.next[col])
     return col
 end
 
-## Whether a set of discs holds four in a row: across, up, and the two diagonals.
+## Whether a set of discs holds four in a row.
 func hasFour(bits)
-    var m = bits & (bits >> STRIDE)
-    if (m & (m >> 2 * STRIDE)) <> 0 then
-        return true
+    for s in LINE_SHIFTS do
+        var m = bits & (bits >> s)
+        if (m & (m >> 2 * s)) <> 0 then
+            return true
+        end
     end
-    m = bits & (bits >> 1)
-    if (m & (m >> 2)) <> 0 then
-        return true
-    end
-    m = bits & (bits >> STRIDE + 1)
-    if (m & (m >> 2 * (STRIDE + 1))) <> 0 then
-        return true
-    end
-    m = bits & (bits >> STRIDE - 1)
-    return (m & (m >> 2 * (STRIDE - 1))) <> 0
+    return false
 end
 
 ## Whether the disc just played completed a line: only the player who moved last can have, so the other's discs are not looked at.
@@ -92,15 +130,50 @@ func isFull(b)
     return b.count == CELLS
 end
 
-## The columns that are still open, centre first.
+## The columns that are still open, from the left.
 func openColumns(b)
     var list = []
-    for col in CENTRE_FIRST do
-        if b.next[col] < col * STRIDE - 1 then
+    for col = 1, COLS do
+        if isOpen(b, col) then
             list.push(col)
         end
     end
     return list
+end
+
+## The squares a disc can be dropped on now, one per open column.
+func playableCells(b)
+    var m = 0
+    for col = 1, COLS do
+        if b.next[col] < COLUMN_TOP[col] then
+            m = m | (1 << b.next[col])
+        end
+    end
+    return m
+end
+
+func countBits(m)
+    var n = 0
+    while m <> 0 do
+        m = m & (m - 1)
+        n += 1
+    end
+    return n
+end
+
+## The squares where a disc would complete four for the owner of `p`, along one direction (`s` is the distance in bits between two
+## neighbours): the square has three discs of `p` in a window with it, in each of the four places it can have in the window.
+func threatsAlong(p, s)
+    var a = p << s
+    var c = p >> s
+    var d = p >> 2 * s
+    var e = p << 2 * s
+    return (a & e & (p << 3 * s)) | (c & d & (p >> 3 * s)) | (a & c & d) | (a & e & c)
+end
+
+## Every square where a disc would give `p` four in a row, empty or not.
+func threatCells(p)
+    return threatsAlong(p, SHIFT_A) | threatsAlong(p, SHIFT_B) | threatsAlong(p, SHIFT_C) | threatsAlong(p, SHIFT_D)
 end
 
 ## Who owns a cell: 1, 2, or 0 when it is empty.
@@ -122,7 +195,7 @@ func winningCells(b)
             if who == 0 then
                 continue
             end
-            for dir in [[1, 0], [0, 1], [1, 1], [1, -1]] do
+            for dir in DIRECTIONS do
                 var cells = [{col: col, row: row}]
                 var c = col
                 var r = row

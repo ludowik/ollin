@@ -32,10 +32,6 @@ func colourName(player)
     return "yellow"
 end
 
-func shade(c, k)
-    return Color(c.r * k, c.g * k, c.b * k)
-end
-
 ## A text at x, y, in the anchor `h` ("left", "center" or "right"), its middle on y.
 func label(str, x, y, size, col, h)
     gfx.push()
@@ -83,7 +79,6 @@ end
 ## The grid: the blue panel, a hole for every square, and the discs in them.
 func drawBoard(lay)
     var p = lay.panel
-    gfx.segments(24)
     gfx.noStroke()
     gfx.fill(PANEL_LO)
     gfx.rect(p.x, p.y + 4, p.w, p.h, 16)
@@ -96,7 +91,7 @@ func drawBoard(lay)
         end
     end
     for col = 1, COLS do
-        for row = 0, game.next[col] - (col - 1) * STRIDE - 1 do
+        for row = 0, heightOf(game, col) - 1 do
             if fall == nil or col <> fall.col or row <> fall.row then
                 drawDisc(cellX(col), cellY(lay, row), cellAt(game, col, row), 1.0)
             end
@@ -108,7 +103,7 @@ func drawBoard(lay)
         drawDisc(cellX(fall.col), y, fall.who, 1.0)
     end
     if outcome <> nil and fall == nil then
-        var pulse = 0.55 + 0.45 * math.sin(clock * 7)
+        var pulse = 0.55 + 0.45 * math.sin(elapsedTime * 7)
         gfx.noFill()
         gfx.stroke(Color(1, 1, 1, pulse))
         gfx.strokeSize(4)
@@ -126,31 +121,31 @@ func drawAim(lay)
     end
     gfx.noStroke()
     gfx.fill(Color(1, 1, 1, 0.07))
-    gfx.rect(BOARD_X + (hover - 1) * CELL, lay.panel.y, CELL, lay.panel.h, 10)
+    gfx.rect(cellX(hover) - CELL / 2, lay.panel.y, CELL, lay.panel.h, 10)
     drawDisc(cellX(hover), lay.aimY, human, 0.85)
 end
 
 func dots()
-    return ["", ".", "..", "..."][math.floor(clock * 3) % 4 + 1]
+    return ["", ".", "..", "..."][math.floor(elapsedTime * 3) % 4 + 1]
 end
 
 ## What is said under the grid: whose move it is, or how the game ended.
 func statusText()
-    if outcome <> nil and state == "over" then
-        if outcome.winner == 0 then
+    if state == "over" then
+        if outcome.result == "draw" then
             return "A draw", TEXT
-        elseif outcome.winner == human then
+        elseif outcome.result == "win" then
             return "You win!", discColour(human)
         end
         return "The computer wins", discColour(computer)
     end
-    if state == "play" and toMove(game) == computer and outcome == nil then
+    if outcome <> nil then
+        return "", TEXT                    ## the disc that ended the game is still falling
+    end
+    if toMove(game) == computer then
         return "Thinking" + dots(), DIM
     end
-    if state == "play" and outcome == nil then
-        return "Your move", discColour(human)
-    end
-    return "", TEXT
+    return "Your move", discColour(human)
 end
 
 func drawPlay()
@@ -177,20 +172,8 @@ func drawTitle()
     end
     label("Connect Four", VIEW_W / 2, lay.titleY, 38, TEXT, "center")
     label("Four in a row against the computer", VIEW_W / 2, lay.subtitleY, 16, DIM, "center")
-    gfx.segments(24)
-    gfx.noStroke()
     for i, r in lay.levels do
-        gfx.strokeSize(2)
-        if i == levelIdx then
-            gfx.fill(PANEL)
-            gfx.stroke(TEXT)
-        else
-            gfx.fill(KEY_FILL)
-            gfx.stroke(KEY_EDGE)
-        end
-        gfx.rect(r.x, r.y, r.w, r.h, 12)
-        gfx.noStroke()
-        label(LEVELS[i].name, r.x + r.w / 2, r.y + r.h / 2, 20, TEXT, "center")
+        drawButton(r, LEVELS[i].name, true, i == levelIdx)
     end
     if humanFirst then
         drawButton(lay.first, "You play first", true, false)
@@ -213,7 +196,7 @@ func drawScores(r)
     gfx.fill(KEY_OFF)
     gfx.rect(r.x, r.y, r.w, r.h, 12)
     var mid = r.x + r.w / 2
-    label("{LEVELS[levelIdx].name} level", mid, r.y + 22, 16, DIM, "center")
+    label("{levelName()} level", mid, r.y + 22, 16, DIM, "center")
     label("Won {s.wins}    Lost {s.losses}    Drawn {s.draws}", mid, r.y + 54, 20, TEXT, "center")
     var fastest = "none yet"
     if s.fastest > 0 then
@@ -224,6 +207,7 @@ end
 
 func drawScreen()
     gfx.clear(BG)
+    gfx.segments(24)                       ## the corners and the discs are small: the default 64 segments each would be thousands of triangles
     if state == "title" then
         drawTitle()
     else

@@ -18,6 +18,12 @@ func rectAt(list, x, y)
     return nil
 end
 
+## The height of a field `fieldW` wide for an area of w x h pixels: as tall as the shape of the area asks, within `low` and `high`, so that
+## a tall screen is filled and a wide one is not stretched.
+func fitHeight(fieldW, w, h, low, high)
+    return math.floor(math.clamp(fieldW * h / w, low, high))
+end
+
 ## True when W or H differ from the area `cache` (a map with w and h) was laid out for, which it then remembers: what depends
 ## on the area alone is computed again only then.
 func areaChanged(cache)

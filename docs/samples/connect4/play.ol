@@ -57,14 +57,14 @@ end
 
 ## The game ended with `winner` (1, 2, or 0 for a draw): it is worth what it is worth at once, and the screen follows when the disc lands.
 func endGame(winner)
-    outcome = {winner: winner, cells: winningCells(game)}
-    recordResult(levelIdx, resultFor(winner), humanDiscs())
+    outcome = {winner: winner, result: resultFor(winner), cells: winningCells(game)}
+    recordResult(levelIdx, outcome.result, humanDiscs())
     forgetGame()
 end
 
 ## Drops a disc for whoever's turn it is, in a column that is open.
 func place(col)
-    var row = game.next[col] - (col - 1) * STRIDE
+    var row = heightOf(game, col)
     fall = {col: col, row: row, who: toMove(game), t: 0.0, dur: FALL_BASE + FALL_PER_ROW * (ROWS - 1 - row)}
     drop(game, col)
     playSound(sndDrop)
@@ -100,13 +100,7 @@ func land()
         return
     end
     state = "over"
-    if outcome.winner == 0 then
-        playSound(sndDraw)
-    elseif outcome.winner == human then
-        playSound(sndWin)
-    else
-        playSound(sndLose)
-    end
+    playSound({win: sndWin, loss: sndLose, draw: sndDraw}[outcome.result])
 end
 
 func think(dt)
@@ -124,7 +118,6 @@ end
 
 ## One frame of `dt` seconds.
 func updateFrame(dt)
-    clock += dt
     if state == "title" then
         return
     end

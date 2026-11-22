@@ -35,12 +35,12 @@ for viewH = VIEW_MIN, VIEW_MAX, 50 do
     assert(cellY(lay, 0) > cellY(lay, ROWS - 1) and cellX(1) < cellX(COLS), "row 0 is at the bottom, column 1 on the left")
     ## which column a point is over
     for col = 1, COLS do
-        assert(columnAt(lay, cellX(col)) == col, "{viewH}: the middle of column {col}")
-        assert(columnAt(lay, cellX(col) - CELL / 2 + 1) == col and columnAt(lay, cellX(col) + CELL / 2 - 1) == col, "{viewH}: and its edges")
+        assert(columnAt(cellX(col)) == col, "{viewH}: the middle of column {col}")
+        assert(columnAt(cellX(col) - CELL / 2 + 1) == col and columnAt(cellX(col) + CELL / 2 - 1) == col, "{viewH}: and its edges")
         assert(inBoardZone(lay, cellX(col), lay.aimY) and inBoardZone(lay, cellX(col), cellY(lay, 0)), "{viewH}: above and in the grid is the board zone")
     end
-    assert(columnAt(lay, 3) == nil and columnAt(lay, VIEW_W - 3) == nil, "{viewH}: past the grid there is no column")
-    assert(columnAt(lay, lay.panel.x + 2) == 1 and columnAt(lay, lay.panel.x + lay.panel.w - 2) == COLS, "{viewH}: the blue border belongs to the column next to it")
+    assert(columnAt(3) == nil and columnAt(VIEW_W - 3) == nil, "{viewH}: past the grid there is no column")
+    assert(columnAt(lay.panel.x + 2) == 1 and columnAt(lay.panel.x + lay.panel.w - 2) == COLS, "{viewH}: the blue border belongs to the column next to it")
     assert(not inBoardZone(lay, cellX(4), lay.headerY + 5) and not inBoardZone(lay, cellX(4), lay.left.y + 5), "{viewH}: the header and the buttons are not the board")
     assert(rectAt([lay.left, lay.right], lay.left.x + 5, lay.left.y + 5) == lay.left and rectAt([lay.left, lay.right], lay.right.x + 5, lay.right.y + 5) == lay.right)
 end

@@ -22,7 +22,7 @@ func comesBack(t)
 end
 
 func good(moves)
-    return {v: GAME_VERSION, state: "play", level: 2, human: 1, moves: moves}
+    return {v: GAME_VERSION, level: 2, human: 1, moves: moves}
 end
 
 ## ── What is kept ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ levelIdx = 3
 human = 2
 saveGame()
 var t = data.get(GAME_KEY)
-assert(t.v == GAME_VERSION and t.state == "play" and t.level == 3 and t.human == 2 and t.moves.join(",") == "4,3,4", "the list of columns, the level, and who plays first")
+assert(t.v == GAME_VERSION and t.level == 3 and t.human == 2 and t.moves.join(",") == "4,3,4", "the list of columns, the level, and who plays first")
 assert(resumable.moves.join(",") == "4,3,4" and resumable.level == 3)
 assert(gameSaveValid(t), "what is kept can be gone on with")
 
@@ -65,7 +65,7 @@ for i = 1, CELLS - 1 do
     almost.push(DRAW[i])
 end
 assert(comesBack(good(almost)), "a grid with one cell left is a game")
-assert(comesBack({v: GAME_VERSION, state: "play", level: 1, human: 2, moves: [4]}) and resumable.human == 2 and resumable.level == 1)
+assert(comesBack({v: GAME_VERSION, level: 1, human: 2, moves: [4]}) and resumable.human == 2 and resumable.level == 1)
 
 ## ── What is not ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 func refused(t, why)
@@ -91,17 +91,15 @@ for i = 1, CELLS do
     long.push(4)
 end
 refused(good(long), "a list longer than a game")
-refused({v: GAME_VERSION + 1, state: "play", level: 2, human: 1, moves: [4]}, "another version")
-refused({state: "play", level: 2, human: 1, moves: [4]}, "no version")
-refused({v: GAME_VERSION, state: "over", level: 2, human: 1, moves: [4]}, "a screen that is not a game")
-refused({v: GAME_VERSION, level: 2, human: 1, moves: [4]}, "no screen")
-refused({v: GAME_VERSION, state: "play", level: 0, human: 1, moves: [4]}, "level 0")
-refused({v: GAME_VERSION, state: "play", level: #LEVELS + 1, human: 1, moves: [4]}, "a level that does not exist")
-refused({v: GAME_VERSION, state: "play", level: 1.5, human: 1, moves: [4]}, "a level that is not whole")
-refused({v: GAME_VERSION, state: "play", level: "2", human: 1, moves: [4]}, "a level that is a text")
-refused({v: GAME_VERSION, state: "play", level: 2, human: 3, moves: [4]}, "a third player")
-refused({v: GAME_VERSION, state: "play", level: 2, human: 0, moves: [4]}, "player 0")
-refused({v: GAME_VERSION, state: "play", level: 2, moves: [4]}, "no player")
+refused({v: GAME_VERSION + 1, level: 2, human: 1, moves: [4]}, "another version")
+refused({level: 2, human: 1, moves: [4]}, "no version")
+refused({v: GAME_VERSION, level: 0, human: 1, moves: [4]}, "level 0")
+refused({v: GAME_VERSION, level: #LEVELS + 1, human: 1, moves: [4]}, "a level that does not exist")
+refused({v: GAME_VERSION, level: 1.5, human: 1, moves: [4]}, "a level that is not whole")
+refused({v: GAME_VERSION, level: "2", human: 1, moves: [4]}, "a level that is a text")
+refused({v: GAME_VERSION, level: 2, human: 3, moves: [4]}, "a third player")
+refused({v: GAME_VERSION, level: 2, human: 0, moves: [4]}, "player 0")
+refused({v: GAME_VERSION, level: 2, moves: [4]}, "no player")
 refused("a save", "a text")
 refused(12, "a number")
 refused([4, 3], "an array")

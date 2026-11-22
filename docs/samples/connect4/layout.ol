@@ -21,7 +21,7 @@ const MARGIN = 24
 
 ## The height of the field for an area of w x h pixels: as tall as its shape asks, within bounds.
 func viewHeight(w, h)
-    return math.floor(math.clamp(VIEW_W * h / w, VIEW_MIN, VIEW_MAX))
+    return fitHeight(VIEW_W, w, h, VIEW_MIN, VIEW_MAX)
 end
 
 ## The room the screen of a game takes, in pixels.
@@ -66,15 +66,15 @@ func titleLayout(viewH, levelCount, resumable)
         lay.cont = rectOf(x, top + 446, w, 56)
         lay.start = rectOf(x, top + 514, w, 56)
     else
-        lay.cont = nil
         lay.start = rectOf(x, top + 470, w, 64)
     end
     return lay
 end
 
-## The column that an x in the field is over, or nil when it is past the grid on either side.
-func columnAt(lay, x)
-    if x < lay.panel.x or x > lay.panel.x + lay.panel.w then
+## The column that an x in the field is over, or nil when it is past the grid on either side. It does not depend on the height of the
+## field: the grid is as wide on every screen.
+func columnAt(x)
+    if x < BOARD_X - PANEL_PAD or x > BOARD_X + BOARD_W + PANEL_PAD then
         return nil
     end
     return math.clamp((x - BOARD_X) // CELL + 1, 1, COLS)
@@ -82,7 +82,7 @@ end
 
 ## Whether a point is in the part of the screen that aims and drops a disc: the strip above the grid and the grid itself.
 func inBoardZone(lay, x, y)
-    return columnAt(lay, x) <> nil and y >= lay.aimTop and y <= lay.panel.y + lay.panel.h
+    return columnAt(x) <> nil and y >= lay.aimTop and y <= lay.panel.y + lay.panel.h
 end
 
 ## The centre of a square, `row` counted from the bottom.

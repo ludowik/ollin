@@ -10,21 +10,21 @@ const GAME_KEY = "connect4.game"
 const GAME_VERSION = 1
 
 func gameSaveState()
-    return {v: GAME_VERSION, state: "play", level: levelIdx, human: human, moves: game.moves.copy()}
+    return {v: GAME_VERSION, level: levelIdx, human: human, moves: game.moves.copy()}
 end
 
 ## Whether what was read back is a game that can be played on from where it was left.
 func gameSaveValid(t)
-    if typeof(t) <> "map" or t.v <> GAME_VERSION or t.state <> "play" then
+    if typeof(t) <> "map" or t.v <> GAME_VERSION then
         return false
     end
     if not isWhole(t.level, 1, #LEVELS) or not isWhole(t.human, 1, 2) then
         return false
     end
-    if not isArrayOf(t.moves, 0, CELLS - 1, func(c) return isWhole(c, 1, COLS) end) then
+    if typeof(t.moves) <> "array" then
         return false
     end
-    var b = replay(t.moves)
+    var b = replay(t.moves)          ## which refuses a column that does not exist, a full one, and a move after the game was won
     return b <> nil and not justWon(b) and not isFull(b)
 end
 

@@ -5,12 +5,14 @@
 import "play.ol"
 import "layout.ol"
 
-func playLay()
-    return playLayout(viewH)
-end
+global pointer = nil        ## the finger or the mouse that is down on the grid: {id}
 
-func titleLay()
-    return titleLayout(viewH, #LEVELS, resumable <> nil)
+## A lift that was never seen must not leave the screen deaf to the next touch: with no finger and no button down, nobody holds the
+## screen. Called every frame with what the engine says.
+func releaseLostPointer(touches, mouseHeld)
+    if pointer <> nil and touches == 0 and not mouseHeld then
+        pointer = nil
+    end
 end
 
 func chooseLevel(i)
@@ -25,7 +27,7 @@ end
 
 ## Aims at the column an x is over; nothing happens past the grid.
 func aim(x)
-    var col = columnAt(playLay(), x)
+    var col = columnAt(x)
     if col <> nil then
         hover = col
     end
@@ -53,7 +55,7 @@ end
 func pressPlay(id, x, y)
     var lay = playLay()
     if inBoardZone(lay, x, y) then
-        pointer = {id: id, aiming: true}
+        pointer = {id: id}
         aim(x)
     elseif inRect(x, y, lay.left) then
         undoMove()
@@ -96,11 +98,10 @@ func pointerUp(id, x, y)
     if pointer == nil or pointer.id <> id then
         return
     end
-    var aiming = pointer.aiming
     pointer = nil
     var lay = playLay()
-    if aiming and state == "play" and inBoardZone(lay, x, y) then
-        hover = columnAt(lay, x)
+    if state == "play" and inBoardZone(lay, x, y) then
+        hover = columnAt(x)
         humanDrop(hover)
     end
 end

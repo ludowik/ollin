@@ -53,7 +53,7 @@ end
 ## ── An empty grid ────────────────────────────────────────────────────────────────────────────────────────────────────────
 var b = newBoard()
 assert(b.count == 0 and toMove(b) == 1 and winner(b) == 0 and not justWon(b) and not isFull(b))
-assert(openColumns(b).join(",") == "4,3,5,2,6,1,7", "every column is open, the centre first")
+assert(openColumns(b).join(",") == "1,2,3,4,5,6,7", "every column is open")
 assert(undo(b) == nil, "there is nothing to take back")
 
 ## ── Gravity, and who is who ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -118,7 +118,6 @@ assert(b.moves.join(",") == "4,3,4,3,4,3")
 
 ## ── Against the plain scan, on random games ──────────────────────────────────────────────────────────────────────────────
 var rng = Random(2024)
-var finished = 0
 var wins = [0, 0, 0]
 for game = 1, 400 do
     var g = naiveNew()
@@ -143,10 +142,9 @@ for game = 1, 400 do
     end
     assert(winningCells(b).len() == 0 or winner(b) <> 0, "a game nobody has won lights nothing")
     wins[winner(b) + 1] += 1
-    finished += 1
 end
 var tally = wins.join(" ")
-assert(finished == 400 and wins[2] > 50 and wins[3] > 50, "both players win random games: {tally}")
+assert(wins[2] > 50 and wins[3] > 50, "both players win random games: {tally}")
 
 ## undoing a whole random game, move by move, comes back to the empty grid
 b = newBoard()
@@ -183,4 +181,42 @@ assert(replay([0]) == nil and replay([8]) == nil and replay([3.5]) == nil and re
 assert(replay([1, 1, 1, 1, 1, 1, 1]) == nil, "a seventh disc in a column")
 assert(replay([1, 7, 2, 7, 3, 7, 4, 5]) == nil, "a move after the game was won")
 assert(replay([1, 7, 2, 7, 3, 7, 4]).count == 7, "the winning move itself is part of the game")
+## ── The facts of the grid ────────────────────────────────────────────────────────────────────────────────────────────────
+assert(LINE_SHIFTS.join(",") == "7,1,8,6", "the four ways a line runs, in bits: across, up, the two diagonals")
+b = newBoard()
+assert(isOpen(b, 1) and isOpen(b, COLS) and heightOf(b, 3) == 0)
+drop(b, 3)
+drop(b, 3)
+assert(heightOf(b, 3) == 2 and heightOf(b, 4) == 0 and isOpen(b, 3), "a column's height is the discs in it")
+for i = 3, ROWS do
+    drop(b, 3)
+end
+assert(heightOf(b, 3) == ROWS and not isOpen(b, 3) and isOpen(b, 2), "a column with six discs is not open")
+
+## ── The threats ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+## player 1 has the cells 1, 2 and 3 of the bottom row: the cell that would complete the line is column 4, and column 0 is not one
+b = replay([1, 7, 2, 7, 3, 7])
+assert((threatCells(b.mine[1]) & (1 << 3 * STRIDE)) <> 0, "three across threaten the cell next to them")
+assert((threatCells(b.mine[1]) & (1 << 0)) == 0, "and not a cell that holds a disc of theirs")
+b = replay([1, 2, 1, 2, 1])
+assert((threatCells(b.mine[1]) & (1 << 3)) <> 0, "three up threaten the cell above")
+assert((threatCells(b.mine[2]) & playableCells(b)) == 0, "two discs threaten nothing")
+## a gap: 1 _ 3 4 in the bottom row, the gap being column 2
+b = replay([1, 7, 3, 7, 4, 7])
+assert((threatCells(b.mine[1]) & (1 << STRIDE)) <> 0, "a gap between discs is a threat")
+## a rising diagonal with the cell at its foot missing: three discs on (2,1) (3,2) (4,3) threaten (1,0) and (5,4)
+b = newBoard()
+b.mine[1] = (1 << (STRIDE + 1)) | (1 << (2 * STRIDE + 2)) | (1 << (3 * STRIDE + 3))
+assert((threatCells(b.mine[1]) & (1 << 0)) <> 0 and (threatCells(b.mine[1]) & (1 << (4 * STRIDE + 4))) <> 0, "both ends of a diagonal")
+## no wrap: the top of column 1 and the foot of column 2 are no line
+b = newBoard()
+b.mine[1] = (1 << 4) | (1 << 5) | (1 << STRIDE)
+assert((threatCells(b.mine[1]) & BOARD_MASK) == 0, "nothing is threatened across the guard")
+assert(countBits(0) == 0 and countBits(1) == 1 and countBits(0b1011) == 3 and countBits(1 << 48) == 1)
+var feet = 0
+for col = 1, COLS do
+    feet = feet | (1 << ((col - 1) * STRIDE))
+end
+assert(playableCells(newBoard()) == feet, "an empty grid can be played at the foot of every column")
+assert(countBits(BOARD_MASK) == CELLS and (BOARD_MASK & (1 << (STRIDE - 1))) == 0, "and none on the guards")
 print("connect4 board ok")
