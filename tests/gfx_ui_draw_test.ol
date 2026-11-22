@@ -10,19 +10,19 @@ global pick = nil
 var picker = {__ref: true, get: func() if wipe then ui.clear() end return chosen end, set: func(v) chosen = v end}
 
 func setup()
-    graphics.canvas(320, 240, "ui draw")
+    gfx.canvas(320, 240, "ui draw")
     pick = ui.list("Pick", [1, 2, 3, 4], picker)
     ui.open()
     pick.open()
 end
 
 func draw()
-    graphics.clear(0.1, 0.1, 0.15)
+    gfx.clear(0.1, 0.1, 0.15)
     frames += 1
     if frames == 3 then
         wipe = true
     end
     if frames == 8 then
-        graphics.quit()
+        gfx.quit()
     end
 end

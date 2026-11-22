@@ -21,11 +21,11 @@ global loaded = {}          ## "cx,cz" → the endChunk handle
 func ckey(cx, cz)
     return cx + "," + cz
 end
-global cam = graphics.camera(0, 0, 10,  0, 0, 0)
+global cam = gfx.camera(0, 0, 10,  0, 0, 0)
 ## The CONTROL camera, for debugging: a view from above looking down, oriented like the player's
 ## camera, so as to CHECK from the outside that only the visible chunks — those in the player
 ## camera's frustum — are drawn. The "C" key toggles it.
-global ctrlCam = graphics.camera(0, 0, 10,  0, 0, 0)
+global ctrlCam = gfx.camera(0, 0, 10,  0, 0, 0)
 global debugCam = false
 global CAMBTN = 46          ## the "C" button, which toggles the control camera, in the top-left corner
 
@@ -136,8 +136,8 @@ func buildAtlas()
     putTile(T_STONE, 0.36, 0.36, 0.40, 0.16)
     putTile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
     image.endPixels(atlas)
-    graphics.tileset(atlas, ACOLS, AROWS)
-    graphics.tileAnim(T_WATER)
+    gfx.tileset(atlas, ACOLS, AROWS)
+    gfx.tileAnim(T_WATER)
 end
 
 ## The cloud texture: white, faintly speckled by a brightness noise, at full alpha. It breaks the
@@ -223,16 +223,16 @@ func streamUnload(pcx, pcz, margin)
         if math.abs(c.cx - pcx) <= vd.radius + margin and math.abs(c.cz - pcz) <= vd.radius + margin then
             keep[k] = c
         else
-            graphics.freeChunk(c)
+            gfx.freeChunk(c)
         end
     end
     loaded = keep
 end
 
 func setup()
-    graphics.canvas(W, H, "Endless voxels")
-    graphics.ambient(AMB)
-    graphics.light("dir", -0.5, -1, -0.35)
+    gfx.canvas(W, H, "Endless voxels")
+    gfx.ambient(AMB)
+    gfx.light("dir", -0.5, -1, -0.35)
     math.noiseSeed(7)
     buildAtlas()
     buildCloudTex()
@@ -286,16 +286,16 @@ func camBtnHit(x, y)
 end
 
 func drawCamButton()
-    graphics.noStroke()
-    graphics.fill(Color(0, 0, 0, 0.38))
-    graphics.rect(12, 36, CAMBTN, CAMBTN)
+    gfx.noStroke()
+    gfx.fill(Color(0, 0, 0, 0.38))
+    gfx.rect(12, 36, CAMBTN, CAMBTN)
     if debugCam then                   ## lit means the control camera is on
-        graphics.fill(Color(0.30, 0.70, 1.00, 0.55))
-        graphics.rect(12, 36, CAMBTN, CAMBTN)
+        gfx.fill(Color(0.30, 0.70, 1.00, 0.55))
+        gfx.rect(12, 36, CAMBTN, CAMBTN)
     end
-    graphics.stroke(colors.WHITE)
-    graphics.fontSize(28)
-    graphics.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15)
+    gfx.stroke(colors.WHITE)
+    gfx.fontSize(28)
+    gfx.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15)
 end
 
 func mouse.pressed(x, y)
@@ -436,7 +436,7 @@ func cullCloudSectors()
         var s0x = math.floor((wlo - drift) / CLOUD_SEC) * CLOUD_SEC
         for sx = s0x, whi - drift, CLOUD_SEC do
             tested = tested + 1
-            if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, wz, CLOUD_SEC * 0.72 + 4) then
+            if gfx.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, wz, CLOUD_SEC * 0.72 + 4) then
                 secs[#secs + 1] = sx
                 secs[#secs + 1] = sz
             end
@@ -450,22 +450,22 @@ end
 
 func drawClouds(secs)
     var drift = elapsedTime * CLOUD_SPEED
-    graphics.ambient(0.8)                        ## below 1, so the directional light gives the clouds some volume
-    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))
-    graphics.texture(cloudTex)                    ## a soft speckle, which breaks the flat white
+    gfx.ambient(0.8)                        ## below 1, so the directional light gives the clouds some volume
+    gfx.fill(Color(1, 1, 1, CLOUD_ALPHA))
+    gfx.texture(cloudTex)                    ## a soft speckle, which breaks the flat white
     for i = 1, #secs, 2 do
         var sx = secs[i]
         var sz = secs[i + 1]
         for cx = sx, sx + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
             for cz = sz, sz + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
                 if math.noise(cx * CLOUD_SCALE, cz * CLOUD_SCALE) > CLOUD_THRESH then
-                    graphics.cube(cx + drift, CLOUD_Y, cz,  CLOUD_SIZE, CLOUD_TH, CLOUD_SIZE)
+                    gfx.cube(cx + drift, CLOUD_Y, cz,  CLOUD_SIZE, CLOUD_TH, CLOUD_SIZE)
                 end
             end
         end
     end
-    graphics.noTexture()
-    graphics.fill(colors.WHITE)
+    gfx.noTexture()
+    gfx.fill(colors.WHITE)
 end
 
 ## The walk, the streaming of the chunks and the eye's placement: everything that advances the
@@ -504,8 +504,8 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(C_SKY)
-    graphics.noStroke()
+    gfx.clear(C_SKY)
+    gfx.noStroke()
     ## The rendering camera: the player's, or the control camera up high, looking down, with up set
     ## to the player's heading so the orientation on screen matches. The culling ALWAYS remains the
     ## player's: in control mode we render from ANOTHER camera, so the player's frustum is frozen
@@ -514,8 +514,8 @@ func draw()
     ## froze, so the normal path has no empty 3D pass.
     var rcam = cam
     if debugCam then
-        graphics.begin3d(cam)
-        graphics.end3d()
+        gfx.begin3d(cam)
+        gfx.end3d()
         var high = vd.radius * CS * 2.0 + 40
         ctrlCam.setPos(camX, camY + high, camZ)
         ctrlCam.lookAt(camX, camY, camZ)
@@ -527,34 +527,34 @@ func draw()
 
     var vis = []
     for k, c in loaded do
-        if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
+        if gfx.inFrustum(c.wx, SEA, c.wz, CS + 24) then
             vis[#vis + 1] = c
         end
     end
     var cloudSecs = cullCloudSectors()   ## culled before begin3d(rcam), the player's frustum being frozen
-    graphics.begin3d(rcam)
+    gfx.begin3d(rcam)
     do
         for chunk in vis do
-            graphics.drawChunk(chunk)
+            gfx.drawChunk(chunk)
         end
         for chunk in vis do
-            graphics.drawChunkAlpha(chunk)
+            gfx.drawChunkAlpha(chunk)
         end
         drawClouds(cloudSecs)
     end
-    graphics.end3d()
-    graphics.ambient(AMB)           ## drawClouds lowered the ambient, so restore it for the terrain
+    gfx.end3d()
+    gfx.ambient(AMB)           ## drawClouds lowered the ambient, so restore it for the terrain
 
     pad.draw()
     vd.draw()
     drawCamButton()
     var camlbl = "player"
     if debugCam then camlbl = "control" end
-    graphics.stroke(colors.WHITE)
-    graphics.fontSize(15)
-    graphics.text("view " + vd.radius + " " + vd.mode() + " " + vd.hz() + "Hz  chunks " + #vis +
+    gfx.stroke(colors.WHITE)
+    gfx.fontSize(15)
+    gfx.text("view " + vd.radius + " " + vd.mode() + " " + vd.hz() + "Hz  chunks " + #vis +
                   "  cam " + camlbl, 12, 12)
-    graphics.stroke(colors.WHITE)
-    graphics.fontSize(13)
-    graphics.text("clouds: " + cloudStats.tested + "/" + cloudStats.full + " tested  " + cloudStats.kept + " drawn", 12, 30)
+    gfx.stroke(colors.WHITE)
+    gfx.fontSize(13)
+    gfx.text("clouds: " + cloudStats.tested + "/" + cloudStats.full + " tested  " + cloudStats.kept + " drawn", 12, 30)
 end

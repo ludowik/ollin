@@ -1,5 +1,5 @@
 ## The size of the field and of what is in it, in the pixels of the arcade game's own screen (224 x 256, the cabinet's monitor
-## standing on its side) — graphics.viewport does the rest. The frog hops on a grid of 16 pixel cells, and a ROW of the
+## standing on its side) — gfx.viewport does the rest. The frog hops on a grid of 16 pixel cells, and a ROW of the
 ## field is one cell high: row 0 is the strip where it starts, rows 1 to 5 the road, row 6 the median strip, rows 7 to 11 the
 ## river and row 12 the homes. The lanes are the eleven rows from 1 to 11, which the arcade numbers from the top: lane 0 is the
 ## top row of the river and lane 10 the bottom row of the road.

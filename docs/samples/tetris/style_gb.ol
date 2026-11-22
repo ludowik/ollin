@@ -52,7 +52,7 @@ func block(x, y, w, h, shade)
     var x0 = math.floor(L.ox + x * L.s)
     var y0 = math.floor(L.oy + y * L.s)
     fillC(look.shade[shade])
-    graphics.rect(x0, y0, math.floor(L.ox + (x + w) * L.s) - x0, math.floor(L.oy + (y + h) * L.s) - y0)
+    gfx.rect(x0, y0, math.floor(L.ox + (x + w) * L.s) - x0, math.floor(L.oy + (y + h) * L.s) - y0)
 end
 
 ## A text at a point of the screen, `size` points high, in one of the greens.
@@ -258,14 +258,14 @@ end
 func gbPads()
     var c = view.layout.cross
     fillC(look.padFill)
-    graphics.rect(c.x - c.u, c.y - c.u, 2 * c.u, 2 * c.u)
+    gfx.rect(c.x - c.u, c.y - c.u, 2 * c.u, 2 * c.u)
     for b in view.layout.buttons do
         fillC(padFill(b.name))
         if b.r then
-            graphics.circle(b.x, b.y, b.r)
+            gfx.circle(b.x, b.y, b.r)
             drawText(b.text, b.x, b.y, b.r * 0.84, "center", "center", look.padInk)
         else
-            graphics.rect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, b.round)
+            gfx.rect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, b.round)
             if b.text then
                 drawText(b.text, b.x, b.y, b.h * 0.5, "center", "center", look.padInk)
             end

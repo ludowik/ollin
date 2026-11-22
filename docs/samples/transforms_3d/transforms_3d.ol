@@ -19,12 +19,12 @@
 ## global to the engine, so the host relays the three of them.
 import "../lib/trackball.ol"
 global ball = Trackball()
-global cam = graphics.camera(0, 14, 34,  0, 0, 0)   ## FIXED: it is the scene that turns
+global cam = gfx.camera(0, 14, 34,  0, 0, 0)   ## FIXED: it is the scene that turns
 
 func setup()
-    graphics.canvas(W, H, "3D transforms")
-    graphics.ambient(0.2)
-    graphics.light("dir", -1, -2, -0.5)
+    gfx.canvas(W, H, "3D transforms")
+    gfx.ambient(0.2)
+    gfx.light("dir", -1, -2, -0.5)
 end
 
 ## Mouse AND touch: on the web a finger drives the pointer, hence the same callbacks.
@@ -41,31 +41,31 @@ func mouse.released(x, y)
 end
 
 func draw()
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
 
-    graphics.noStroke()
-    graphics.begin3d(cam)
-        graphics.grid(16, 2)         ## before rotateq, hence unaffected by it
-        graphics.rotateq(ball.orient())
+    gfx.noStroke()
+    gfx.begin3d(cam)
+        gfx.grid(16, 2)         ## before rotateq, hence unaffected by it
+        gfx.rotateq(ball.orient())
         for x = -4, 4 do
             for z = -4, 4 do
                 var t = elapsedTime * 2 + x + z
                 var h = 1 + (math.sin(t) + 1) * 1.5
-                graphics.fill(Color((x + 4) / 8, (z + 4) / 8, 0.8))
-                graphics.cube(x * 2, h / 2, z * 2,  1.4, h, 1.4)
+                gfx.fill(Color((x + 4) / 8, (z + 4) / 8, 0.8))
+                gfx.cube(x * 2, h / 2, z * 2,  1.4, h, 1.4)
             end
         end
 
-        graphics.push()
-            graphics.translate(0, 6, 0)
-            graphics.rotateY(elapsedTime * 60)
-            graphics.rotate(elapsedTime * 40, 1, 0, 1)
-            graphics.fill(colors.WHITE)
-            graphics.cube(0, 0, 0,  2, 2, 2)
-        graphics.pop()
-    graphics.end3d()
+        gfx.push()
+            gfx.translate(0, 6, 0)
+            gfx.rotateY(elapsedTime * 60)
+            gfx.rotate(elapsedTime * 40, 1, 0, 1)
+            gfx.fill(colors.WHITE)
+            gfx.cube(0, 0, 0,  2, 2, 2)
+        gfx.pop()
+    gfx.end3d()
 
-    graphics.stroke(colors.WHITE)
-    graphics.fontSize(20)
-    graphics.text("Drag to turn the scene", 12, 12)
+    gfx.stroke(colors.WHITE)
+    gfx.fontSize(20)
+    gfx.text("Drag to turn the scene", 12, 12)
 end

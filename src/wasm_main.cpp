@@ -42,7 +42,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
         source_files->push_back(fname);
         s_vm->execute(Compiler().compile(
             Parser(Lexer(source, fname, 0).tokenize(), base_dir, imported, nullptr, source_files).parse()));
-        s_vm->run_entry_hooks(); // setup(), then draw() through graphics.run: shared logic, with the is_map guard
+        s_vm->run_entry_hooks(); // setup(), then draw() through gfx.run: shared logic, with the is_map guard
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();
@@ -57,7 +57,7 @@ static void preload_image_js(const std::string& name, const std::string& b64, co
     image_preload_b64(name, b64, ext);
 }
 
-// Preload a 3D model from JS so graphics.model(name) works on WASM.
+// Preload a 3D model from JS so gfx.model(name) works on WASM.
 // ext: extension without dot, e.g. "obj", "glb".
 static void preload_model_js(const std::string& name, const std::string& b64, const std::string& ext) {
     model_preload_bytes(name, image_b64_decode(b64), std::string(".") + ext);
@@ -95,7 +95,7 @@ static void clock_break_js() {
 }
 
 // The host hides or shows the memory and frame-rate readout (the icon generator hides it before it
-// takes a picture). Independent of the program's own graphics.stats.
+// takes a picture). Independent of the program's own gfx.stats.
 static void set_stats_visible_js(bool visible) {
     gfx_set_stats_visible(visible);
 }

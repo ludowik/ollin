@@ -5,7 +5,7 @@
 // The `audio` module: the sound SESSION — opening the device, master volume, state. One per
 // program, like the graphics canvas.
 //
-// Unlike `graphics`, this module is NEVER nil: a build without raylib keeps the whole API and only
+// Unlike `gfx`, this module is NEVER nil: a build without raylib keeps the whole API and only
 // the output goes silent (audio_stub.cpp). The reason is that generating waveforms is pure
 // computation, and therefore testable without a device — and the integration container has none,
 // `/dev/snd` being absent.

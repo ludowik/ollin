@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs a .ol script with the native-raylib binary under a virtual display (Xvfb), which allows
-# the graphics to be tested with no screen and captured through graphics.screenshot("file.png")
+# the graphics to be tested with no screen and captured through gfx.screenshot("file.png")
 # (a path relative to the working directory).
 #
 # Usage:         bash tools/run-headless.sh <script.ol> [args...]

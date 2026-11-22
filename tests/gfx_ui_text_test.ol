@@ -12,14 +12,14 @@ global wipe = false
 var tricky = {__ref: true, get: func() if wipe then ui.clear() end return name end, set: func(v) name = v end}
 
 func setup()
-    graphics.canvas(320, 240, "ui text")
+    gfx.canvas(320, 240, "ui text")
     field = ui.textField("Name", ref name, 10, "your name")
     second = ui.textField("Tricky", tricky)
     ui.open()
 end
 
 func draw()
-    graphics.clear(0.1, 0.1, 0.15)
+    gfx.clear(0.1, 0.1, 0.15)
     frames += 1
     if frames == 2 then
         field.edit()
@@ -36,6 +36,6 @@ func draw()
         wipe = true
     elseif frames == 14 then
         assert(ui.current() <> nil)
-        graphics.quit()
+        gfx.quit()
     end
 end

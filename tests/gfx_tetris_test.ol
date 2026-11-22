@@ -149,7 +149,7 @@ func update(dt)
     var count = len(scenes)
     var k = frames - 1
     if k >= 4 * count then
-        graphics.quit()
+        gfx.quit()
         return
     end
     var combo = k // count

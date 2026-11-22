@@ -77,7 +77,7 @@ correction changerait un comportement voulu ou déborderait largement du périm�
 **Ne pas se répéter — DRY (règle permanente, décidée par l'utilisateur)** : ne jamais recopier une règle, une
 formule ou un morceau de code qui existe déjà ou qui vient d'être écrit ailleurs. Avant d'écrire, chercher l'existant
 et l'appeler ; si trois lignes se retrouvent à deux endroits, les sortir en UNE fonction ; si un exemple refait à la
-main ce que le moteur sait (comme la perspective de la caméra, d'où `graphics.project`), c'est au MOTEUR de le donner.
+main ce que le moteur sait (comme la perspective de la caméra, d'où `gfx.project`), c'est au MOTEUR de le donner.
 Un constat de revue qui nomme une duplication ne s'écarte pas au motif que sa correction demande une fonction neuve.
 
 **`todo.md` n'est PAS à Claude (règle permanente)** : ne jamais le lire pour se donner
@@ -150,7 +150,7 @@ ollin/
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── shaders/       lit.vert / lit.frag (la 3D), fxaa.frag (la composition), sdf.frag (le texte) — le GLSL, EMBARQUÉ (cf. « Shaders »)
 │   ├── modules/       modules natifs : core, math, string, color, date, window, mouse, keyboard,
-│   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
+│   │                  gfx (fichiers graphics_* ; graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
 │   │                  image (+ image_stub), ui (+ ui_stub), tween, https (+ https_internal.h : moteur web ou stub), json, + modules.h/.cpp, module_utils.h
 │   │                  array_module = pseudo-méthodes des tableaux ET module global `array` (le même objet)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
@@ -354,9 +354,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   dessin — d'où des vignettes qui ne montraient qu'un petit morceau de la fenêtre. Invisible à densité 1, donc au
   harnais par défaut : tester avec `deviceScaleFactor: 2` et `3`. Mesuré : cadre aux quatre bords et point central
   de même taille aux trois densités. **Il n'y a qu'UNE lecture de l'écran** : `flush_pending_screenshot` lit une
-  fois, encode le PNG, puis le range selon la demande — fichier pour `graphics.screenshot` (`SaveFileData`),
+  fois, encode le PNG, puis le range selon la demande — fichier pour `gfx.screenshot` (`SaveFileData`),
   base64 pour la capture de l'hôte. `TakeScreenshot` de raylib a été abandonné : il lit lui aussi la taille
-  LOGIQUE, et deux lectures pouvaient diverger. ⚠ Non mesuré au navigateur pour `graphics.screenshot` (le
+  LOGIQUE, et deux lectures pouvaient diverger. ⚠ Non mesuré au navigateur pour `gfx.screenshot` (le
   fichier y reste dans le système de fichiers en mémoire, que le moteur n'exporte pas) : garanti par construction. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
 - **Toute écriture GitHub passe par `commitOnBranch` (`lib/pg-github.js`), qui se REJOUE sur la
@@ -414,7 +414,7 @@ prétexte de cette colonne.
 | `tests/syntax.ol` | Claude | **la FORME** : toute construction du langage y figure, avec l'assertion minimale qui montre qu'elle s'écrit et fonctionne |
 | `tests/regressions/` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…). **Deux dossiers, un fichier par domaine** : `language/` suit `grammar.ebnf` (`functions.ol`, `classes.ol`, `scopes.ol`, `errors.ol`, `control.ol`…), `modules/` suit `src/modules/` (`string.ol`, `math.ol`, `tween.ol`, `color.ol`, `array.ol`…). `run.sh` les trouve sans liste : un test va dans le fichier de son domaine, un module neuf est un fichier neuf dans `modules/` |
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
-| `tests/check_api_coverage.sh` | Claude | **garde-fou de couverture de l'API** : chaque fonction qu'un module expose aux scripts doit être NOMMÉE par un test (`.nom` ou `nom(`). Compare des noms, n'exécute rien ; les modules qui exigent un écran ou un périphérique (graphics, image, camera, mouse, keyboard) en sont exclus, `graphics` y étant nil. Le pourquoi et les limites sont en tête du script |
+| `tests/check_api_coverage.sh` | Claude | **garde-fou de couverture de l'API** : chaque fonction qu'un module expose aux scripts doit être NOMMÉE par un test (`.nom` ou `nom(`). Compare des noms, n'exécute rien ; les modules qui exigent un écran ou un périphérique (gfx, image, camera, mouse, keyboard) en sont exclus, `gfx` y étant nil. Le pourquoi et les limites sont en tête du script |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `tests/check_func_limit.sh` | Claude | **garde-fou du plafond de fonctions** : un programme de N fonctions est ENGENDRÉ par le script, car le plafond lui-même interdit d'en committer un — et chacune doit être appelable PAR SON NOM, la dernière comprise. Rien du plafond n'y est écrit : il est cherché (doublement puis bissection), donc la garde survit à son déplacement. ⚠ Une boucle de closures ne l'exerce PAS (un `func` du texte = un proto, et une closure s'appelle par `CALL_DYN`) |
@@ -466,8 +466,8 @@ monte durablement. Hors de `run.sh` : la compilation instrumentée prend une min
 Dernier relevé : **97,6 %** des lignes (lexer 100 %, parser 100 %, compilateur 99 %, VM 96 %). Une accolade fermante seule marquée `=====` par gcov (le nettoyage d'une fonction dont les locales se détruisent sur un `bad_alloc`) n'est PAS comptée — aucun script ne fait échouer une allocation ; un relevé d'avant ce choix n'est pas comparable. ⚠ **Ne marquer que l'accolade** : gcov met aussi `=====` du code ordinaire d'un gestionnaire computed-goto que rien n'exécute (modulo flottant, `throw` d'opérande non entier…), et les écarter de tout le fichier cachait 39 lignes de `vm.cpp` qui n'avaient aucun test. Deux binaires instrumentés alimentent le relevé et leurs compteurs sont FUSIONNÉS (une ligne compte dès qu'UN des
 deux l'a exécutée) : le build HEADLESS, où les modules graphiques ne sont que des stubs, et `build-cov-gfx/` (raylib,
 `COVERAGE=1 bash tools/native-gfx.sh`) qui lance `tests/run_gfx.sh` sous Xvfb — c'est lui qui atteint les lignes de
-`vm.cpp` propres à une session graphique (le lancement de `graphics.run`, `set_global` à chaque image) ; le canvas implicite et les rappels de `mouse`/`keyboard` n'y ont encore aucun test. Les sources
-que SEUL ce second build compile (`graphics`, `image`, `ui`, `touch`, `audio`…) sont listées à part sous « Display » et
+`vm.cpp` propres à une session graphique (le lancement de `gfx.run`, `set_global` à chaque image) ; le canvas implicite et les rappels de `mouse`/`keyboard` n'y ont encore aucun test. Les sources
+que SEUL ce second build compile (`gfx`, `image`, `ui`, `touch`, `audio`…) sont listées à part sous « Display » et
 restent **HORS du total et du plancher** : quelques tests Xvfb les couvrent à 20 %, et les y mettre ferait tomber le
 chiffre sous le plancher. Sans Xvfb ou sans source raylib le script le dit et ne mesure que le headless. Un relevé
 d'avant ce second binaire n'est pas comparable (la VM gagnait 1,4 point à elle seule). Les
@@ -673,7 +673,7 @@ GL logiciel et `build-gfx/` sont présents). Si un échec survient, c'est un dé
 abandonner ni redemander.
 
 ### A. Desktop raylib sous Xvfb (le plus simple, PRIVILÉGIER)
-Le build natif par défaut utilise le **stub graphique** (`graphics` = nil → un script
+Le build natif par défaut utilise le **stub graphique** (`gfx` = nil → un script
 graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigateur :
 - `build-gfx/ollin` est **construit automatiquement en tâche de fond au démarrage de
   session** (hook `session-start.sh`), gitignoré donc reconstruit à chaque reprise.
@@ -690,9 +690,9 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
   exécution rend une image entièrement **noire** (constaté au navigateur sur la capture du
   mode plein écran). `flush_pending_screenshot` vide donc le batch une fois, pour le fichier
   comme pour la capture mémoire.
-- Capture : `graphics.screenshot("f.png")` — **chemin RELATIF** au répertoire courant
+- Capture : `gfx.screenshot("f.png")` — **chemin RELATIF** au répertoire courant
   du processus (`run-headless.sh` se place à la racine du dépôt). La capture est **différée en fin de frame** → elle contient
-  l'écran composé (pas la RenderTexture). Le script doit **terminer** (`graphics.quit()`
+  l'écran composé (pas la RenderTexture). Le script doit **terminer** (`gfx.quit()`
   après la capture) sinon la boucle tourne à l'infini sous Xvfb.
 - Inspecter les pixels (pas de PIL/imagemagick) : via chromium (voir B) sur `file://…png`
   → `drawImage` + `getImageData` (centroïde, bbox, couleur d'un pixel).
@@ -762,6 +762,7 @@ void visit(const WhileStmt& s) override {
 - **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `map_set(..., make_builtin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`) sont exemptées.
 - **Règle stricte, côté C++ interne : `snake_case` partout.** Une seule convention pour tout le code du moteur (choix de cohérence interne, indépendant de l'API langage). Le C++ « parle la même langue » que la STL qu'il appelle. **Exceptions** (axes orthogonaux, pas des choix de casse) : types/classes en `PascalCase`, statiques préfixés `s_`, méta-noms `__…` du langage, et **identifiants externes conservés tels quels** — API raylib/rlgl (`rl*`/`gl*`), méthodes `emscripten::val` (`isNumber`, `isNull`…), champs de structs raylib (`vaoId`, `texId`, `meshMaterial`…). Les noms d'API exposés et les identifiants GLSL des shaders vivent dans des **littéraux de chaîne** → hors casse C++. **Les blocs `EM_ASM({…})` sont du JavaScript stringifié par la macro (PAS un littéral de chaîne)** : leurs identifiants JS (`getElementById`, `srcObject`, `createElement`…) restent en camelCase et sont neutralisés par span équilibré (comme dans `check_naming.sh`) — un renommage naïf par mot les casserait.
 - **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) vérifie les **deux sens** — (1) aucun builtin exposé ne contient de `_` ; (2) aucun identifiant camelCase dans le **code** C++ (chaînes/commentaires ignorés), hors liste blanche externe (`rl*`/`gl*`, méthodes `emscripten::val`, champs raylib). Un nouvel identifiant camelCase interne fait échouer le test.
+- **Le module graphique s'appelle `gfx`, SANS alias `graphics`** (décision de l'utilisateur : un nom court pour la lecture et la taille du code ; `gfx` est aussi le préfixe C++ interne `gfx_`). Les fichiers C++ gardent leur nom (`graphics_module.cpp`, `graphics3d.cpp`…). Un programme qui écrit encore `graphics.` échoue à la compilation (`undeclared variable 'graphics'`) : les projets déjà enregistrés dans l'application web (IndexedDB, dossiers GitHub synchronisés) sont à réécrire, aucun script n'est migré par le moteur.
 - **Code utilisateur** (`.ol`) : aucune contrainte imposée par le langage (le nommage des variables/fonctions de l'utilisateur est libre).
 
 ## Commentaires (règle générale — moteur C++ ET code Ollin)
@@ -1104,10 +1105,10 @@ Le moteur appelle le module en trois endroits de sa boucle de rendu, et **l'ordr
 - **`ui_draw()` APRÈS la COMPOSITION**, dans `render_frame` : l'interface est **indépendante du
   viewport** (décision de l'utilisateur), donc elle se dessine dans les coordonnées de la ZONE,
   par-dessus le champ déjà composé et jusque sur les bandes du letterbox. Elle reste **avant**
-  `flush_pending_screenshot`, ce qui la fait capturer par `graphics.screenshot`, et toujours
+  `flush_pending_screenshot`, ce qui la fait capturer par `gfx.screenshot`, et toujours
   après `end3d_internal()`, donc par-dessus la 3D.
 - **`ui_reset()` dans `ollin_run` (wasm_main.cpp), PAS dans `gfx_run`** : les widgets
-  sont déclarés au niveau du fichier, donc AVANT `graphics.run` — réinitialiser dans
+  sont déclarés au niveau du fichier, donc AVANT `gfx.run` — réinitialiser dans
   `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
   PROGRAMME, comme `image_reset`/`camera_reset`.
 
@@ -1319,7 +1320,7 @@ Ce que le code ne dit pas :
   demander à l'utilisateur avant de raisonner sur ce qu'un clavier de téléphone envoie (leçon de `#/perf`) : « touchez le ✓ puis
   envoyez une capture ».
 - **La page FIGE le panneau du canvas tant que l'élément de saisie a le focus** (`freeze`/`thaw`, `pg-text-input.js`) : un clavier
-  qui redimensionne la fenêtre faisait rétrécir tout l'écran (la zone de `graphics.fitArea`, ou le canvas remis à l'échelle). Le
+  qui redimensionne la fenêtre faisait rétrécir tout l'écran (la zone de `gfx.fitArea`, ou le canvas remis à l'échelle). Le
   panneau garde la taille qu'il avait au focus, le clavier couvre le bas, et une vraie rotation (`screen.orientation.type`) le
   libère. Mesuré au navigateur en réduisant la fenêtre pendant l'édition, avec et sans `fitArea` ; ⚠ **non vérifié sur un
   appareil** : on ne sait pas si l'iPhone redimensionne la fenêtre ou ne fait que la déplacer, et ce qui rétrécit chez
@@ -1330,14 +1331,14 @@ Ce que le code ne dit pas :
   (même piège que le clic instantané, cf. « Modules `audio` et `sound` »). Tenir le toucher 150 ms par
   `Input.dispatchTouchEvent`.
 
-## Zone de dessin qui suit l'hôte (`graphics.fitArea`, implémentation)
+## Zone de dessin qui suit l'hôte (`gfx.fitArea`, implémentation)
 
-> API : voir le tutoriel (`graphics.fitArea`, section « Le module window »).
+> API : voir le tutoriel (`gfx.fitArea`, section « Le module window »).
 
-La taille du canvas n'était fixée qu'une fois, à `graphics.canvas` : après une rotation du téléphone
+La taille du canvas n'était fixée qu'une fois, à `gfx.canvas` : après une rotation du téléphone
 le dessin gardait l'ancienne taille. **Décision de l'utilisateur** : par défaut un programme graphique
 **garde l'orientation de départ** (le moteur demande au navigateur de la verrouiller à la création du
-canvas), et seul `graphics.fitArea()` libère la rotation et fait suivre la zone. Le moteur la suit à
+canvas), et seul `gfx.fitArea()` libère la rotation et fait suivre la zone. Le moteur la suit à
 chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit pas :
 
 - **Le redimensionnement se fait AVANT `BeginTextureMode(s_target)`, jamais pendant.** Il décharge
@@ -1346,15 +1347,15 @@ chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit 
   non d'un écouteur DOM. Une taille n'est suivie qu'après être restée stable **une image** : un
   séparateur qu'on glisse la change à presque chaque image, et chaque changement reconstruit la cible
   à la résolution de l'appareil.
-- **`resize_area` n'est PAS `graphics.canvas`.** Les deux partagent `set_phys_size`,
+- **`resize_area` n'est PAS `gfx.canvas`.** Les deux partagent `set_phys_size`,
   `size_canvas_element`, `create_render_target` et `publish_window_size`, mais `canvas` remet à zéro
   le style, l'éclairage 3D et les ressources de l'hôte, ce qu'un redimensionnement ne doit pas faire.
   Le `texelSize` de FXAA suit la cible (`load_fxaa_shader` le renvoie à chaque appel) : oublié, le lissage
   serait calculé sur l'ancienne taille.
 - **Le réglage `fitArea` se remet à faux au DÉMARRAGE DU PROGRAMME (`gfx_program_reset`, appelé par
-  `ollin_run`), pas dans `graphics.canvas`.** Le canvas implicite est créé APRÈS `setup()` : un
-  `graphics.fitArea()` écrit dans `setup()` y aurait été effacé en silence. Même défaut encore présent
-  pour `graphics.antialias`, remis à zéro par `canvas` : à déplacer de la même façon le jour où on y touche.
+  `ollin_run`), pas dans `gfx.canvas`.** Le canvas implicite est créé APRÈS `setup()` : un
+  `gfx.fitArea()` écrit dans `setup()` y aurait été effacé en silence. Même défaut encore présent
+  pour `gfx.antialias`, remis à zéro par `canvas` : à déplacer de la même façon le jour où on y touche.
 - **Le verrou d'orientation est un VŒU adressé au navigateur** (`lock_orientation`,
   `screen.orientation.lock(type courant)`), jamais une garantie : Android Chrome ne l'accorde qu'en plein
   écran ou dans une application installée, et iOS Safari n'expose pas `lock()` (même en application posée
@@ -1383,7 +1384,7 @@ chaque image (`follow_area`, en tête de `render_frame`). Ce que le code ne dit 
 - Mesuré au navigateur (rotation simulée par `setViewportSize` et `Emulation.setDeviceMetricsOverride`) :
   le canvas passe de 800×352 à 400×752 en CSS comme en bitmap, `W`, `H`, `SIZE` et `window.width/height`
   suivent, le rappel part une seule fois, dans le playground comme en plein écran. Non couvert par
-  `tests/run.sh` (`graphics` y est nil).
+  `tests/run.sh` (`gfx` y est nil).
 
 ## Modules `audio` et `sound` (implémentation)
 
@@ -1394,7 +1395,7 @@ pause), `sound` est ce qui SONNE — un oscillateur vivant ou un tampon calculé
 et non trois : l'oscillateur est une fabrique de `sound` (`sound.osc`), décision prise pour
 garder une surface réduite.
 
-**Ni l'un ni l'autre n'est jamais nil**, contrairement à `graphics` : la génération d'ondes
+**Ni l'un ni l'autre n'est jamais nil**, contrairement à `gfx` : la génération d'ondes
 est un pur calcul, donc l'API entière existe dans un build sans raylib, où seule la sortie
 devient muette. C'est ce qui rend la synthèse testable dans le conteneur d'intégration, qui
 n'a aucun périphérique (`/dev/snd` absent) — sans quoi les tests ne pourraient vérifier que
@@ -1737,32 +1738,32 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   précédent, déjà détruit.
 - Côté langage, la police est un **état de style** comme `fontSize` : `s_font_idx` est
   sauvegardé par `capture_style`/`restore_style` et remis au défaut par `reset_styles`.
-  `graphics.font([nom])` le pilote et renvoie le nom courant ; `graphics.textSize(valeur)`
+  `gfx.font([nom])` le pilote et renvoie le nom courant ; `gfx.textSize(valeur)`
   mesure avec la police ET la taille courantes (deux valeurs, via `ctx.set_result`).
 - **Un argument texte se convertit ou se refuse, jamais ne s'ignore.** La conversion est
-  réservée à ce que le moteur DESSINE — `graphics.text` et `graphics.textSize`, par
+  réservée à ce que le moteur DESSINE — `gfx.text` et `gfx.textSize`, par
   `drawn_text` (graphics_module.cpp), donc `value_to_string` et la méta-méthode `__str` comme
   `print`. **Partout ailleurs la chaîne est obligatoire** : un titre de fenêtre ou un message
   d'`assert` est écrit par l'auteur, un nombre y est une faute et non un raccourci (une valeur
   s'y insère par interpolation, `"level {n}"`), et un identifiant — police, mode de fusion,
   sorte de lumière, nom de touche, clé de `data` — n'a aucun sens en nombre. Le troisième
   comportement, remplacer en SILENCE par un défaut, était le pire des trois et a été éliminé :
-  `graphics.text(score, x, y)` ne dessinait rien, un titre non-chaîne devenait « Ollin »,
+  `gfx.text(score, x, y)` ne dessinait rien, un titre non-chaîne devenait « Ollin »,
   `blendMode(nil)` retombait sur `alpha`, `light(1, …)` allumait une directionnelle, et
   `assert(false, 42)` perdait son message.
 - **Le type du message d'`assert` est vérifié même quand l'assertion TIENT** : le contrôler
   seulement à l'échec cacherait la faute jusqu'au jour où l'assertion casse. Figé dans
   `test_errors.sh` (les deux refus) et dans `tests/regressions/` (un message chaîne remonte
   intact, l'absence de message donne « assertion failed »).
-- **`graphics.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
+- **`gfx.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
   `print`, méta-méthode `__str` comprise. Auparavant un non-string devenait la chaîne vide :
-  `graphics.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `textSize` fait la
+  `gfx.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `textSize` fait la
   même conversion, sinon on pourrait écrire un nombre sans jamais pouvoir le centrer (vérifié :
   mêmes largeur et hauteur pour `42` et `"42"`, pour une instance et son `__str`).
   ⚠ **La géométrie est lue AVANT la conversion** : `__str` est du code Ollin, son appel peut
   redimensionner le fichier de registres, et `ctx.args` serait alors pendant. La conversion vient
   aussi APRÈS le test de police, pour qu'un `__str` ne s'exécute pas quand il n'y a rien à dessiner.
-  Non couvert par `tests/run.sh` (graphics y est nil) : mesuré sous Xvfb avec `build-gfx/ollin`.
+  Non couvert par `tests/run.sh` (gfx y est nil) : mesuré sous Xvfb avec `build-gfx/ollin`.
 - `tests/check_naming.sh` **exclut** `font_sans.h`/`font_mono.h` : les identifiants d'un
   fichier généré sont ceux de l'outil, et une correction serait effacée à la génération
   suivante.
@@ -1793,9 +1794,9 @@ par rendu de l'autre — les deux moitiés de couleur étaient inversées entre 
 sont maintenant identiques. Et le rendu du Rubik (texture de fichier) comme celui d'un atlas de
 tuiles sont **inchangés à l'octet**, `uFlipV` valant 0 : `abs(0 - v)` est exactement `v`.
 
-## Viewport (résolution virtuelle, `graphics.viewport`)
+## Viewport (résolution virtuelle, `gfx.viewport`)
 
-`graphics.viewport(w, h)` fait dessiner le script dans un champ de `w × h`, que le moteur met à
+`gfx.viewport(w, h)` fait dessiner le script dans un champ de `w × h`, que le moteur met à
 l'échelle et centre dans la zone, bandes noires à côté. Sans argument, le viewport est abandonné.
 
 Il se glisse en **trois** points, et nulle part ailleurs :
@@ -1817,7 +1818,7 @@ Il se glisse en **trois** points, et nulle part ailleurs :
 
 `W`/`H`/`CX`/`CY`/`SIZE` valent la taille **virtuelle** (décision de l'utilisateur) : le script n'a
 qu'un seul repère à connaître. `window.width`/`height` continuent de rapporter la zone RÉELLE.
-`graphics.canvas` abandonne le viewport — il appartient au programme qui l'a demandé — et la
+`gfx.canvas` abandonne le viewport — il appartient au programme qui l'a demandé — et la
 publication des cinq globales passe par un seul endroit, `publish_draw_size`.
 
 **Ce qu'il ne fait pas** : l'interface `ui` est indépendante (cf. plus haut), et la 3D tire son
@@ -1826,7 +1827,7 @@ rapport d'aspect de la fenêtre et non du viewport — c'est une fonctionnalité
 **Densité de la texture de rendu = densité de l'écran, TOUJOURS, dans un rapport constant.**
 `s_targetW`/`s_targetH` (la taille réelle de `s_target`, la `RenderTexture` dans laquelle
 `draw()` dessine) valent exactement `s_physW`/`s_physH` (la résolution physique du canvas,
-`logique × devicePixelRatio`) — jamais un multiple. Seule la taille LOGIQUE (`graphics.canvas(w,
+`logique × devicePixelRatio`) — jamais un multiple. Seule la taille LOGIQUE (`gfx.canvas(w,
 h)`) est un choix du script ; la densité, elle, ne varie jamais.
 
 ⚠ **Un plancher de suréchantillonnage fixe (`SSAA = 2`, indépendant de la densité) a été essayé
@@ -1836,14 +1837,14 @@ en dessous — la plupart des écrans de bureau, à `devicePixelRatio = 1`, ET l
 (`s_physW = w`, sans notion de densité) — la texture de rendu restait deux fois plus grande que
 ce qui s'affiche, et la composition finale (`DrawTexturePro`, filtrage BILINÉAIRE **sans
 mipmap**) devait la réduire de moitié à chaque frame. Cette réduction, sur des traits fins
-animés par du bruit (`graphics.strokeSize` sous 1 px, cf. « Polices du moteur » pour le même
+animés par du bruit (`gfx.strokeSize` sous 1 px, cf. « Polices du moteur » pour le même
 repli alpha), scintillait d'une image à l'autre — un artefact de RÉÉCHANTILLONNAGE, pas de
 mouvement : sensible à la position sous-pixel du trait, donc visible même sur une animation
 lente, et absent sur les appareils où le rapport valait déjà 1. Retirer le plancher (toujours
 `s_targetW = s_physW`) généralise à tous les écrans ce que l'iPhone montrait déjà sans lissage
 superflu, au prix de bords un peu moins lissés sur un écran à faible densité.
 
-## Compteur mémoire / images par seconde (`graphics.stats`)
+## Compteur mémoire / images par seconde (`gfx.stats`)
 
 Le moteur dessine en bas à droite un relevé qui est **vide tant que tout va bien** : la mémoire **seulement quand elle a
 fortement grossi** (plus de la moitié en dix secondes) et le débit d'images **seulement quand il tombe à plus de 5 % sous
@@ -1856,13 +1857,13 @@ la poussaient au-dessus de 63, la cible passait à 75 et un programme à 60 s'af
 avant deux secondes (un chargement n'est pas un programme lent). Natif : la boucle est tenue à 60 par `SetTargetFPS`, la
 cible est donc 60, ou le rythme du moniteur s'il est plus bas. **Décision de l'utilisateur pour la mémoire** : elle ne s'affiche que sur une forte augmentation, mesurée une fois par seconde (`MemoryWatch`, même fichier : plus de 1,5 fois la valeur d'il y a dix secondes, pas avant deux secondes de programme, donc ce qu'un programme charge en démarrant ne compte pas), et elle reste affichée **tant qu'elle reste au-dessus de 1,5 fois le niveau d'où elle est partie** : sans ce niveau retenu, la fenêtre glissante la ferait disparaître dix secondes après un saut, alors qu'elle est toujours haute. Une mémoire qui retombe l'éteint. Le relevé n'est
 dessiné que quand **deux interrupteurs indépendants** sont allumés : celui du PROGRAMME
-(`graphics.stats([enabled])`, sans argument il l'allume, comme `graphics.antialias`) et celui de l'HÔTE
+(`gfx.stats([enabled])`, sans argument il l'allume, comme `gfx.antialias`) et celui de l'HÔTE
 (`Module.setStatsVisible(bool)`, lié dans `wasm_main.cpp`). Deux, parce qu'ils ne se remettent pas à zéro au
 même moment : celui du programme revient à « allumé » à chaque démarrage de programme
 (`gfx_program_reset`), celui de l'hôte **survit** au démarrage — avec un seul interrupteur, un hôte qui
 cache le relevé avant de lancer un exemple le retrouverait allumé. L'hôte joint le module par
 `window.__ollinModule`, posé par `app.js` à la résolution du module. Vérifié au navigateur dans les deux
-sens, et après un relancement. Non couvert par `tests/run.sh` (`graphics` y est nil).
+sens, et après un relancement. Non couvert par `tests/run.sh` (`gfx` y est nil).
 
 ## Globales moteur (engine-injected globals)
 
@@ -1880,12 +1881,12 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 
 **Implémentation** :
 - `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
-- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` (int) aux dimensions de `window` (lues via `makeBuiltinModule("window")`), `CX`/`CY` (float) à `W/2`/`H/2` et `SIZE` (int) à `min(W, H)` **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
-- `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CX`/`CY`/`SIZE` sur les dimensions logiques réelles à chaque `graphics.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
+- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` (int) aux dimensions de `window` (lues via `makeBuiltinModule("window")`), `CX`/`CY` (float) à `W/2`/`H/2` et `SIZE` (int) à `min(W, H)` **avant le top-level** — ainsi `gfx.canvas(W, H)` fonctionne dès le script principal.
+- `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CX`/`CY`/`SIZE` sur les dimensions logiques réelles à chaque `gfx.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
 - `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `graphics_module.cpp` avant chaque frame.
 - `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
-- **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `graphics` est un module (pas le stub), mais que `graphics.canvas()` n'a **pas** été appelé (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `graphics.canvas(W, H)` → une session graphique démarre sur la seule présence de `draw()`. **Fait APRÈS `setup()`** : `setup()` est un endroit courant pour appeler `canvas()` soi-même ; le créer avant provoquerait un **double `InitWindow`** (crash « memory access out of bounds » en WASM). Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.
-  ⚠ **`graphics` n'est un global que si le script le NOMME** (`execute` ne construit que les modules nommés, cf. « Points de passage uniques ») : un `draw()` qui n'écrit jamais `graphics` — un programme qui ne dessine qu'avec `ui`, par exemple — n'avait donc plus de session, le canvas implicite ne démarrait pas, et rien ne l'annonçait. `run_entry_hooks` demande le module lui-même quand le global est absent. Gardé par `tests/gfx_implicit_canvas_test.ol` (sous Xvfb, `tests/run_gfx.sh`).
+- **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `gfx` est un module (pas le stub), mais que `gfx.canvas()` n'a **pas** été appelé (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `gfx.canvas(W, H)` → une session graphique démarre sur la seule présence de `draw()`. **Fait APRÈS `setup()`** : `setup()` est un endroit courant pour appeler `canvas()` soi-même ; le créer avant provoquerait un **double `InitWindow`** (crash « memory access out of bounds » en WASM). Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.
+  ⚠ **`gfx` n'est un global que si le script le NOMME** (`execute` ne construit que les modules nommés, cf. « Points de passage uniques ») : un `draw()` qui n'écrit jamais `gfx` — un programme qui ne dessine qu'avec `ui`, par exemple — n'avait donc plus de session, le canvas implicite ne démarrait pas, et rien ne l'annonçait. `run_entry_hooks` demande le module lui-même quand le global est absent. Gardé par `tests/gfx_implicit_canvas_test.ol` (sous Xvfb, `tests/run_gfx.sh`).
 
 **Une frame que la boucle n'a PAS exécutée n'est pas du temps passé par le programme**, et cette
 interruption est **DÉCLARÉE, jamais devinée** : `gfx_clock_break()` (graphics_internal.h) arme le
@@ -1928,7 +1929,7 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   conventions C++ : `check_naming.sh` ne parcourt que `src/**/*.cpp` et `src/**/*.h`, donc ni les
   `.glsl` ni le `.h.in`. Le header généré vit dans `build*/`, ignoré par git.
 - **Un seul couple de shaders** pour toute la 3D. Il porte cinq sujets — éclairage Blinn-Phong,
-  atlas de tuiles, eau animée, test alpha du feuillage, relief tiré de la texture (`graphics.bump`). Le retournement vertical
+  atlas de tuiles, eau animée, test alpha du feuillage, relief tiré de la texture (`gfx.bump`). Le retournement vertical
   (`uFlipV`, cf. « Orientation verticale d'une image ») n'en est pas un cinquième : c'est un uniforme
   et non un attribut d'instance, il ne coûte qu'une soustraction par pixel, et le sens étant une
   propriété de la TEXTURE il n'ajoute rien à la clé de regroupement. Chaque instance
@@ -1937,7 +1938,7 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),
   donc un tri et des changements d'état en cours de frame. Seuil de bascule : une **sixième**
   fonctionnalité, ou un attribut d'instance supplémentaire.
-  Le relief (`graphics.bump(hauteur, grain)`) prend la LUMINANCE du texel comme hauteur et plie la normale par les
+  Le relief (`gfx.bump(hauteur, grain)`) prend la LUMINANCE du texel comme hauteur et plie la normale par les
   dérivées d'écran de la hauteur et de la position (`bent_normal`) : aucune tangente, aucun attribut, aucune seconde
   texture. Un uniforme `bump` à 0 ne coûte qu'un test, et le chemin d'atlas n'y passe jamais. Le grain (bruit de valeur)
   n'apparaît que là où un texel couvre plus d'un pixel (`fwidth` des texels), si bien qu'une vue lointaine ne change pas.
@@ -1947,7 +1948,7 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   `mixCorners` et `blendColor` (hauteurs, normales et couleur par coin d'un cube) ont été ajoutés puis
   RETIRÉS. Ils faisaient porter 16 floats de coin à CHAQUE instance — une voiture comme un cube
   ordinaire — et des branches au vertex shader, pour un terrain dont chaque cellule coûtait 24 sommets
-  dont quatre visibles ; `graphics.heightfield` (maillage, cf. plus bas) les remplace sans rien
+  dont quatre visibles ; `gfx.heightfield` (maillage, cf. plus bas) les remplace sans rien
   ajouter à l'instance. Un futur besoin de relief par instance se discute, il ne se rajoute pas.
   La couleur par sommet ne compte NI pour l'une NI pour l'autre, et c'est vérifiable : elle
   n'ajoute aucune branche (une multiplication de plus dans `fragColor`) et rien à l'instance —
@@ -1986,7 +1987,7 @@ et s'exécute sans erreur sur les deux cibles réellement utilisées : GL 3.3 (`
 GLES3/WebGL2 (WASM, chargé directement via `OllinModule({...})`, en contournant l'éditeur du
 playground).
 
-**`graphics.antialias([enabled[, size]])` est une fonction du LANGAGE**, pas un réglage hôte — une
+**`gfx.antialias([enabled[, size]])` est une fonction du LANGAGE**, pas un réglage hôte — une
 première version passait par une case à cocher du playground/run (bascule JS, liaison WASM
 `Module.setFxaaEnabled`) ; retirée à la demande de l'utilisateur au profit d'un appel Ollin, plus
 direct et disponible aussi en natif (`build-gfx`), pas seulement au navigateur. `size` règle
@@ -1995,7 +1996,7 @@ détectée avant de mélanger (`fxaa.frag`) — PAS un nombre d'échantillons ni
 toutes les directions : FXAA ne fait jamais plus de 4 lectures de texture pour le mélange, quelle
 que soit `size`, donc l'élargir ne coûte rien de plus. `s_fxaa_enabled`/`s_fxaa_span`
 (`graphics_module.cpp`) sont un réglage du PROGRAMME EN COURS, comme l'éclairage 3D : remis à
-`true`/`8.0` à chaque `graphics.canvas()`, au même endroit que `reset3d_lighting_state()` — un
+`true`/`8.0` à chaque `gfx.canvas()`, au même endroit que `reset3d_lighting_state()` — un
 script n'hérite jamais du réglage du précédent. Indépendant de `s_fxaa_ready` (le chargement du
 shader, jamais rechargé pour un simple bascule) et de `with_area` (pur état, aucun appel GL
 direct, comme `strokeSize`/`fontSize` — à la différence de `blendMode`, qui appelle
@@ -2108,27 +2109,27 @@ soit 2,7 Mo que le moteur ne peut pas lire (1,5 Mo livré contre 3,8 Mo à la so
 
 La 3D s'appuie sur raylib (`Camera3D`, `BeginMode3D`/`EndMode3D`, `GenMesh*`) mais les **solides pleins** passent par un **batcher retained à instancing** avec un shader Blinn-Phong custom. Fonctionne desktop (GL 3.3) **et** WebGL2/GLES3 (vérifié).
 
-- **Intégration frame** : `graphics.begin3d(cam)` → `BeginMode3D` (perspective + depth test) et réinitialise les buckets ; `graphics.end3d()` flushe les buckets puis `EndMode3D` (restaure l'ortho 2D → HUD 2D possible ensuite). Bloc ouvert **dans** `draw()`, donc dans la `RenderTexture` `s_target`.
+- **Intégration frame** : `gfx.begin3d(cam)` → `BeginMode3D` (perspective + depth test) et réinitialise les buckets ; `gfx.end3d()` flushe les buckets puis `EndMode3D` (restaure l'ortho 2D → HUD 2D possible ensuite). Bloc ouvert **dans** `draw()`, donc dans la `RenderTexture` `s_target`.
 - **Batcher instancié** : `cube/sphere/cylinder/plane` en `fill` n'affichent rien — ils **empilent** une instance `{transfo = local·pileMatrices, tint = couleur fill}` dans un bucket `(shape, texture)` (`s_buckets`), où `local = scale·translate` (placement) et `pileMatrices = rlGetMatrixTransform()` capturée à l'appel. `end3d`/`flush3dBuckets` résout chaque bucket en **UN** `DrawMeshInstanced` custom (réplique de raylib + **2ᵉ VBO d'instance couleur** → couleur PAR INSTANCE) avec des VBO d'instance **persistants** (create/grow + `glBufferSubData`, pas de churn). Meshes unitaires en cache (`GenMeshCube/Sphere/Cylinder/Plane`) ; draw indexé ou non selon `mesh.indices`. Le **fil de fer** (`stroke`), `grid`, `line3d`, `point3d` restent en **immédiat non éclairé** (dessinés pendant la collecte ; `flush3dBuckets` fait `rlDrawRenderBatchActive` avant les draws instanciés).
 - **Transformations 3D** : `translate(x,y[,z])`, `rotate(deg[,ax,ay,az])`, `rotateX/Y/Z(deg)`, `scale(s|sx,sy|sx,sy,sz)` pilotent la pile rlgl. `begin3d` fait un `rlPushMatrix` (refermé par `end3d`) → tout le bloc est en mode « transform » : translate/rotate/scale écrivent dans `RLGL.State.transform` (espace monde, lu par `rlGetMatrixTransform()`) **qu'ils soient encadrés par `push`/`pop` ou « nus »** (cumulatifs). Chaque instance fige cette transfo (`pushInstance`), et les primitives immédiates l'appliquent (`transformRequired`) → même sémantique pour tous. Le MVP du flush utilise `s_view3d` (vue figée au `begin3d`), la modelview restant = vue.
-- **Shader** (`loadLitShader`, embarqué en littéral, `#version 330` desktop / `300 es` WASM via `#ifdef __EMSCRIPTEN__`) : `instanceTransform` (auto) + `instanceColor` (attribut custom via `GetShaderLocationAttrib`) + `texture0`. `final = texture(uv) × tint`, puis Blinn-Phong (ambient + 1 lumière) ; le reflet est un réglage du frame, `graphics.specular(force, exposant)` (0,3 et 16 par défaut, remis à zéro à chaque `canvas`), qui vaut pour toute surface éclairée : le shader ne distingue pas une mer d'une terre, un script qui veut un reflet seulement sur l'eau le coupe et le dessine lui-même. **Opt-in** : sans lumière (`s_lighting_used=false`), ambient forcé à blanc + lumière off ⇒ rendu plat (aucune régression).
+- **Shader** (`loadLitShader`, embarqué en littéral, `#version 330` desktop / `300 es` WASM via `#ifdef __EMSCRIPTEN__`) : `instanceTransform` (auto) + `instanceColor` (attribut custom via `GetShaderLocationAttrib`) + `texture0`. `final = texture(uv) × tint`, puis Blinn-Phong (ambient + 1 lumière) ; le reflet est un réglage du frame, `gfx.specular(force, exposant)` (0,3 et 16 par défaut, remis à zéro à chaque `canvas`), qui vaut pour toute surface éclairée : le shader ne distingue pas une mer d'une terre, un script qui veut un reflet seulement sur l'eau le coupe et le dessine lui-même. **Opt-in** : sans lumière (`s_lighting_used=false`), ambient forcé à blanc + lumière off ⇒ rendu plat (aucune régression).
 - **Une direction nulle est REFUSÉE** pour une lumière directionnelle (`apply_light_from_instance`,
   donc à la création comme au `setDir`) : le shader calculerait `normalize(vec3(0))`, indéfini —
   mesuré comme « la lumière ne contribue rien » sur llvmpipe, mais rien ne le garantit ailleurs. Une
   lumière ponctuelle n'a pas ce cas, sa position étant un lieu et non une direction. Non figeable
-  dans `test_errors.sh` (`graphics` y est nil) : vérifié sous Xvfb.
-- **Éclairage** (phase 1 : ambient + 1 lumière) : `graphics.ambient(v|couleur)` ; `graphics.light("dir"|"point", x,y,z [,couleur])` renvoie un objet **classe `Light`** (patron `makeClass`) — méthodes `set_dir`/`set_pos`/`set_color`/`enable` qui mutent l'état global via `applyLightFromInstance`. Réinitialisé à chaque `gfx_run` (`reset3dLightingState`, statiques persistants en WASM).
-- **Textures** : toute image chargée ou créée est échantillonnée en **NEAREST** (le défaut de rlgl, ni lissage ni mipmaps) : étirée, elle montre des carrés, et réduite elle scintille. `image.filter(img, "linear"|"mipmap")` change cela ; c'est un réglage de la TEXTURE, pas de la frame. `graphics.texture(img)` lit l'id GL via `image_gl_texid(handle.id)` (accessor ajouté à image_module) ; `noTexture()` → texture blanche 1×1 (`whiteTexId`). `s_cur_tex3d` se comporte comme `fill`/`stroke` : remis à 0 dans `resetStyles` chaque frame.
-- **Atlas de tuiles (terrain voxel)** : `graphics.tileset(img, cols, rows)` déclare un atlas (grille de tuiles, filtrage NEAREST) ; `graphics.tiles(top, side, bottom)` / `graphics.tile(t)` fixent les tuiles du prochain cube (état, comme `fill` ; -1 = aucune). Un **3ᵉ attribut d'instance** `instanceTile` (vec3, VBO `vboT` pour les chunks / `s_inst_vbo_tile` pour l'immédiat) porte le triplet ; le shader **choisit la tuile selon la normale** (dessus/côté/dessous) et échantillonne l'atlas (`(cell + fract(uv)) / atlasGrid`, inset anti-bleeding). `tile.x < 0` → chemin classique (texture0 @ fragTexCoord, modèles/immédiat). **1 seul draw call par chunk conservé** — l'atlas est lié par `drawChunk` (à la place du blanc). L'atlas est généré en Ollin via le module `image` (`create`/`set_pixel`/`end_pixels` — render texture, échantillonnée SANS flip V car mise à jour par `UpdateTexture`, pas par rendu).
+  dans `test_errors.sh` (`gfx` y est nil) : vérifié sous Xvfb.
+- **Éclairage** (phase 1 : ambient + 1 lumière) : `gfx.ambient(v|couleur)` ; `gfx.light("dir"|"point", x,y,z [,couleur])` renvoie un objet **classe `Light`** (patron `makeClass`) — méthodes `set_dir`/`set_pos`/`set_color`/`enable` qui mutent l'état global via `applyLightFromInstance`. Réinitialisé à chaque `gfx_run` (`reset3dLightingState`, statiques persistants en WASM).
+- **Textures** : toute image chargée ou créée est échantillonnée en **NEAREST** (le défaut de rlgl, ni lissage ni mipmaps) : étirée, elle montre des carrés, et réduite elle scintille. `image.filter(img, "linear"|"mipmap")` change cela ; c'est un réglage de la TEXTURE, pas de la frame. `gfx.texture(img)` lit l'id GL via `image_gl_texid(handle.id)` (accessor ajouté à image_module) ; `noTexture()` → texture blanche 1×1 (`whiteTexId`). `s_cur_tex3d` se comporte comme `fill`/`stroke` : remis à 0 dans `resetStyles` chaque frame.
+- **Atlas de tuiles (terrain voxel)** : `gfx.tileset(img, cols, rows)` déclare un atlas (grille de tuiles, filtrage NEAREST) ; `gfx.tiles(top, side, bottom)` / `gfx.tile(t)` fixent les tuiles du prochain cube (état, comme `fill` ; -1 = aucune). Un **3ᵉ attribut d'instance** `instanceTile` (vec3, VBO `vboT` pour les chunks / `s_inst_vbo_tile` pour l'immédiat) porte le triplet ; le shader **choisit la tuile selon la normale** (dessus/côté/dessous) et échantillonne l'atlas (`(cell + fract(uv)) / atlasGrid`, inset anti-bleeding). `tile.x < 0` → chemin classique (texture0 @ fragTexCoord, modèles/immédiat). **1 seul draw call par chunk conservé** — l'atlas est lié par `drawChunk` (à la place du blanc). L'atlas est généré en Ollin via le module `image` (`create`/`set_pixel`/`end_pixels` — render texture, échantillonnée SANS flip V car mise à jour par `UpdateTexture`, pas par rendu).
 - **Test alpha sur le chemin d'atlas** (`if (texel.a < 0.5) discard;`) : un trou de la TUILE perce le cube, ce qui permet un feuillage ajouré sans retirer un seul cube (`voxel_world.ol`, paramètre `trous` de `putTile`). Franc et non fondu, donc **indépendant de l'ordre de dessin** : les cubes restent dans le groupe opaque, rien à trier. Limité au chemin d'atlas (`fragTile.x >= 0`) — une texture semi-transparente posée sur un modèle garde son fondu, et l'eau n'est pas concernée (sa transparence vient de la couleur d'instance, pas de la texture).
-- **Terrain en maillage (`graphics.heightfield({cols, rows, x, z, cell, heights, …})`)** : un cube par cellule coûte 24 sommets pour un dessus de 4 (83 % de gaspillage, et des points noirs aux jointures). `heightfield` construit UN `Mesh` raylib (`UploadMesh`, indices 16 bits donc **65 535 sommets au plus** par morceau) aux positions MONDE, et le range comme un groupe d'une instance à l'identité : la valeur rendue est un handle de chunk ordinaire (`drawChunk`, `freeChunk`, `inFrustum` marchent), qui porte en plus sa sphère englobante `x, y, z, r`. `InstGroup::owns_mesh` fait décharger le maillage avec le groupe (les cubes unité, eux, sont partagés et jamais déchargés). **`graphics.terrainHeight(x, z)` relit la hauteur sur les triangles MÊMES du maillage** (diagonale du coin (-x,-z) au coin (+x,+z)), en parcourant les morceaux vivants — chaque groupe garde donc une copie de ses hauteurs (`hf_*` de `InstGroup`, vidée à la libération). Un script qui pose un objet sur le sol l'appelle au lieu de refaire la triangulation : tant qu'il la reproduisait, changer la diagonale l'aurait fait flotter ou s'enfoncer sans erreur, et rien ne le testait (`graphics` est nil dans la suite). La couleur vient du `vertexColor` du maillage (le `fill` n'y compte pas) et les normales de `slopesX`/`slopesZ` fournis, pour qu'un bord partagé entre deux morceaux soit éclairé comme une seule surface ; sans eux, différences centrées, continues à l'intérieur d'un morceau seulement.
+- **Terrain en maillage (`gfx.heightfield({cols, rows, x, z, cell, heights, …})`)** : un cube par cellule coûte 24 sommets pour un dessus de 4 (83 % de gaspillage, et des points noirs aux jointures). `heightfield` construit UN `Mesh` raylib (`UploadMesh`, indices 16 bits donc **65 535 sommets au plus** par morceau) aux positions MONDE, et le range comme un groupe d'une instance à l'identité : la valeur rendue est un handle de chunk ordinaire (`drawChunk`, `freeChunk`, `inFrustum` marchent), qui porte en plus sa sphère englobante `x, y, z, r`. `InstGroup::owns_mesh` fait décharger le maillage avec le groupe (les cubes unité, eux, sont partagés et jamais déchargés). **`gfx.terrainHeight(x, z)` relit la hauteur sur les triangles MÊMES du maillage** (diagonale du coin (-x,-z) au coin (+x,+z)), en parcourant les morceaux vivants — chaque groupe garde donc une copie de ses hauteurs (`hf_*` de `InstGroup`, vidée à la libération). Un script qui pose un objet sur le sol l'appelle au lieu de refaire la triangulation : tant qu'il la reproduisait, changer la diagonale l'aurait fait flotter ou s'enfoncer sans erreur, et rien ne le testait (`gfx` est nil dans la suite). La couleur vient du `vertexColor` du maillage (le `fill` n'y compte pas) et les normales de `slopesX`/`slopesZ` fournis, pour qu'un bord partagé entre deux morceaux soit éclairé comme une seule surface ; sans eux, différences centrées, continues à l'intérieur d'un morceau seulement.
 - ⚠ **Remplacer `transpose(inverse(mat3(m)))` du vertex shader par la matrice des cofacteurs a été ESSAYÉ puis RETIRÉ, mesure à l'appui.** La matrice des cofacteurs (`cross` des colonnes, signe du déterminant rétabli) donne la même direction de normale, et les rendus sont identiques à l'octet — y compris sous une rotation, une échelle non uniforme et une échelle miroir. Mais sur 400 images d'une scène de terrain en rendu logiciel (llvmpipe) : 7,51 s avec les cofacteurs contre 7,40 s avec l'inverse, donc aucun gain. Une fois le terrain en maillage (≈ 3 000 sommets à l'image au lieu de 181 700), le vertex shader n'est plus le goulot ; ne pas refaire sans une scène qui en redevienne un.
-- **Tuile animée** : `graphics.tileAnim(t)` désigne une tuile dont l'UV défile (`uniform uTime` = `GetTime()`, `uniform animTile`) → eau qui ondule sans recuire les chunks.
-- **Transparence (eau)** : à l'enregistrement, `endChunk` **scinde** les instances en 2 groupes selon l'alpha de la couleur d'instance (`col.a < 250` → groupe transparent) et renvoie `{id, idw, count, wcount}`. Chaque groupe garde son **propre mesh** (`s_rec_mesh` opaque = cube, `s_rec_mesh_w` transparent = **plane** pour l'eau) → l'eau est une **surface plane** au niveau de la mer (`graphics.plane`, une par colonne, jointives = surface continue), PAS une pile de cubes (sinon on verrait les faces internes). `drawChunk` dessine l'opaque (`id`) ; `graphics.drawChunkAlpha(handle)` dessine le transparent (`idw`) en `BLEND_ALPHA` (depth test+write gardés → occlusion propre). **Ordre obligatoire** côté script : TOUT l'opaque (boucle `drawChunk`) PUIS TOUTE l'eau (boucle `drawChunkAlpha`) dans le même `begin3d`. `freeChunk` libère les deux groupes. Les slots de `s_groups` libérés sont **recyclés** via `s_free_groups` (`placeGroup`) → `s_groups` reste borné en streaming infini ; un chunk sans eau ne crée **pas** de groupe transparent (`idw = 0`). `freeGroupById` ne rend un slot au pool que s'il était vivant (double-libération idempotente).
-- **Caméra** : classe native `Camera` ; `graphics.camera(...)` renvoie une INSTANCE (`px,py,pz, tx,ty,tz, fovy`). Méthodes : `set_pos`, `look_at`, `move`, `orbit(angle rad, rayon [, hauteur])`. `cameraFromMap()` la relit (up +Y, perspective) ; `s_cam3d` fournit `viewPos` au shader.
-- **Profondeur** : la RT raylib porte un depth buffer (desktop + GLES) ; `graphics.clear(couleur opaque)` efface couleur **+ depth** (`rlClearScreenBuffers`).
+- **Tuile animée** : `gfx.tileAnim(t)` désigne une tuile dont l'UV défile (`uniform uTime` = `GetTime()`, `uniform animTile`) → eau qui ondule sans recuire les chunks.
+- **Transparence (eau)** : à l'enregistrement, `endChunk` **scinde** les instances en 2 groupes selon l'alpha de la couleur d'instance (`col.a < 250` → groupe transparent) et renvoie `{id, idw, count, wcount}`. Chaque groupe garde son **propre mesh** (`s_rec_mesh` opaque = cube, `s_rec_mesh_w` transparent = **plane** pour l'eau) → l'eau est une **surface plane** au niveau de la mer (`gfx.plane`, une par colonne, jointives = surface continue), PAS une pile de cubes (sinon on verrait les faces internes). `drawChunk` dessine l'opaque (`id`) ; `gfx.drawChunkAlpha(handle)` dessine le transparent (`idw`) en `BLEND_ALPHA` (depth test+write gardés → occlusion propre). **Ordre obligatoire** côté script : TOUT l'opaque (boucle `drawChunk`) PUIS TOUTE l'eau (boucle `drawChunkAlpha`) dans le même `begin3d`. `freeChunk` libère les deux groupes. Les slots de `s_groups` libérés sont **recyclés** via `s_free_groups` (`placeGroup`) → `s_groups` reste borné en streaming infini ; un chunk sans eau ne crée **pas** de groupe transparent (`idw = 0`). `freeGroupById` ne rend un slot au pool que s'il était vivant (double-libération idempotente).
+- **Caméra** : classe native `Camera` ; `gfx.camera(...)` renvoie une INSTANCE (`px,py,pz, tx,ty,tz, fovy`). Méthodes : `set_pos`, `look_at`, `move`, `orbit(angle rad, rayon [, hauteur])`. `cameraFromMap()` la relit (up +Y, perspective) ; `s_cam3d` fournit `viewPos` au shader.
+- **Profondeur** : la RT raylib porte un depth buffer (desktop + GLES) ; `gfx.clear(couleur opaque)` efface couleur **+ depth** (`rlClearScreenBuffers`).
 - **Garde-fou** : `s_in_3d` ; `runUserCallbacks` appelle `end3dInternal()` si `draw()` oublie `end3d` (flush + rééquilibre la pile). `end3d` idempotent.
-- **Quaternions** (`graphics_quat.cpp`, math raymath pure, fichier séparé) : classe native `Quat` ; fabriques `graphics.quat()`/`quat_axis(ax,ay,az,deg)`/`quat_euler(pitch,yaw,roll)` (**degrés**) ; méthodes `mul`/`slerp`/`normalize`/`inverse`/`rotate_vec` (renvoient de NOUVELLES instances, valeurs immuables). `graphics.rotateq(q)` (dans graphics3d.cpp) applique `QuaternionToMatrix(q)` via `rlMultMatrixf` (gauche-multiplie comme `rlRotatef` → compose comme `rotate`). `quatFromInstance()`/`makeQuatInstance()` = pont graphics3d↔graphics_quat.
+- **Quaternions** (`graphics_quat.cpp`, math raymath pure, fichier séparé) : classe native `Quat` ; fabriques `gfx.quat()`/`quat_axis(ax,ay,az,deg)`/`quat_euler(pitch,yaw,roll)` (**degrés**) ; méthodes `mul`/`slerp`/`normalize`/`inverse`/`rotate_vec` (renvoient de NOUVELLES instances, valeurs immuables). `gfx.rotateq(q)` (dans graphics3d.cpp) applique `QuaternionToMatrix(q)` via `rlMultMatrixf` (gauche-multiplie comme `rlRotatef` → compose comme `rotate`). `quatFromInstance()`/`makeQuatInstance()` = pont graphics3d↔graphics_quat.
 - **Perf/limites** : 1 draw call par `(shape, texture)` — le nombre de **couleurs** n'ajoute pas de draw call (couleur par instance). `cylinder` est **mono-rayon** (`x,y,z,r,h`) : contrainte du mesh unitaire figé. Models externes = extension additive (bucket déjà keyé `(mesh, texture)`).
 
 
@@ -2200,7 +2201,7 @@ du programme) et les chargeurs de ressources —, et chacune ayant écrit sa ver
 divergé : une entrée en sous-dossier cherchait ses voisins à la racine, et un chemin de ressource
 n'était jamais normalisé alors qu'un import l'était toujours.
 
-**Une ressource se cherche À CÔTÉ du programme.** `graphics.model("rubik.glb")` et
+**Une ressource se cherche À CÔTÉ du programme.** `gfx.model("rubik.glb")` et
 `image.load("logo.png")` désignent un fichier par un nom NU ; `asset_candidates(nom)` rend la liste
 ordonnée des endroits où regarder — le dossier du programme, puis le nom tel quel —, si bien qu'un
 chargeur n'a plus qu'une question à trancher : « est-ce que ça a chargé ? ». Un nom **ancré**
@@ -2215,7 +2216,7 @@ alloue quand même un matériau par défaut à défaire, et écrit un avertissem
   CWD, si bien que `model_3d` ne tournait en natif que lancé depuis `docs/samples/`.
 - **Le nom écrit dans le code reste la clé** : le préchargeur web (`fetchAsset`, lib/pg-run.js) cherche
   `<dossier de l'entrée>/<nom>` puis `<nom>`, mais déclare toujours l'octet sous le **nom nu**, que
-  `graphics.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
+  `gfx.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
   même nom.
 - Les six générateurs et convertisseurs de `tools/` écrivent dans `docs/samples/model_3d/`, par
   `sample_path(nom)` (tools/sample_paths.py, que `gltf_util` réexporte en `gl.sample_path`) : le chemin de sortie était recopié six fois, et le
@@ -2403,7 +2404,7 @@ une fonction. Les fonctions sans boucle (`fib`) n'en paient rien. ⚠ Le premier
 `compile_stmt_seq`, l'endroit où se pose le nettoyage : il y passe désormais. Mesuré
 (`icount.sh` et les huit autres scripts de `bench/`, avant → après) : de −1,15 % à +0,40 %, sans tendance, donc
 neutre. Mutation vérifiée : sans l'émission du `CLEAR_REGS`, `tests/regressions/language/temporaries.ol` échoue.
-Reste hors de portée : une fonction longue sans boucle propre (elle appelle directement `graphics.run`), et un
+Reste hors de portée : une fonction longue sans boucle propre (elle appelle directement `gfx.run`), et un
 temporaire d'une instruction DANS une boucle, borné à la dernière valeur du dernier tour.
 ⚠ **La dernière instruction d'une fonction à boucle garde son nettoyage, bien que le cadre meure juste après.**
 `RETURN` dépile le cadre mais ne vide PAS ses registres : la fenêtre de l'appelé reste peuplée jusqu'à ce qu'un
@@ -2545,7 +2546,7 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 - **tableau** : membre de `array_module_` (`len`, `push`/`add`/`enqueue`, `pop`, `dequeue`, `insert`, `delete`, `remove`, `indexOf`, `contains`, `copy`, `repeat`, `concat`, `first`, `last`, `reverse`, `shuffle`, `clear`, `map`, `filter`, `reduce`, `sort`, `join`). Un champ absent est une **erreur** (`array has no field '…'`), pas `nil`. Ces maps sont construites **une fois** au démarrage — plus de chaîne de `strcmp` reconstruisant une closure par accès.
 - **pseudo-méthodes des maps** (`len`, `keys`, `values`, `has`, `delete`, `copy`, `clear`, module `map`, `map_module.cpp`) : un **repli tout-froid** (rien trouvé dans la data propre ni la chaîne, et jamais tenté sur une **instance** — `!is_instance(obj)`, même restriction que `len` a toujours eue) — cherché dans `map_module_` via `module_member()`, comme `array_module_`/`string_module_`. Ça ne peut pas être une simple entrée de map servie par lookup, puisqu'une entrée définie par la map elle-même doit toujours gagner (`{len: 42}.len == 42`).
 
-**Injection de `self` (`CALL_METHOD`)** : instances, chaînes, tableaux → `self` injecté sans condition (fermés : rien d'autre ne peut vivre sous `arr.foo`, `SET_INDEX` refuse même une clé de tableau non entière). Maps → **non** en général (un module ne se reçoit pas : `math`, `string`, `graphics`… SONT des maps), **sauf** quand la fonction résolue est l'une des pseudo-méthodes du module `map`, reconnues par **pointeur** (`is_map_module_fn`, map_module.h) — jamais par le type du receveur, ce qui protège `{f: math.sin}.f(0)` (une map qui range un builtin SANS RAPPORT reste appelée telle quelle, `math.sin` n'étant aucune d'elles).
+**Injection de `self` (`CALL_METHOD`)** : instances, chaînes, tableaux → `self` injecté sans condition (fermés : rien d'autre ne peut vivre sous `arr.foo`, `SET_INDEX` refuse même une clé de tableau non entière). Maps → **non** en général (un module ne se reçoit pas : `math`, `string`, `gfx`… SONT des maps), **sauf** quand la fonction résolue est l'une des pseudo-méthodes du module `map`, reconnues par **pointeur** (`is_map_module_fn`, map_module.h) — jamais par le type du receveur, ce qui protège `{f: math.sin}.f(0)` (une map qui range un builtin SANS RAPPORT reste appelée telle quelle, `math.sin` n'étant aucune d'elles).
 ⚠ **Sans exclure aussi un receveur MODULE (`recv.mptr->kind != Map::MODULE`), `map.len(m)` casse** : `len` est une clé RÉELLE du module `map` (trouvée dans sa data propre, pas par le repli), donc `map.len(m)` s'analyse comme un appel de méthode SUR `map` — sans cette garde, `self` s'injecte avec `map` (ses pseudo-méthodes en guise de clés) et `m` glisse en second argument non désiré ; `map.len(m)` rendait alors `map.len()` (le nombre de ses clés) au lieu de `m.len()`. Régression réelle, débusquée en écrivant les tests plutôt que devinée — bissectée puis figée dans `tests/regressions/`.
 
 **`Map::kind == MODULE`** (`collections/map.h`) marque la racine d'un module (posé une fois par `make_builtin_module`), et sert en DEUX endroits seulement : ce garde-fou de `CALL_METHOD`, et `Value::type_name` (`typeof(math)` rend `"module"`, `typeof({})` rend `"map"`). Ce n'est **pas** un tag de `Value` — `is_map()` reste vrai partout ailleurs (`proto_chain_get`, le `switch` de retain/release, `SET_INDEX`…) — et ça ne se propage **jamais** à ce qu'un module contient, ce qui est tout l'intérêt : un tag DISTINCT (`T_MODULE`) a été essayé pour ce même problème et supprimé le 20/07 après quatre correctifs en chaîne (une instance `Color` tenue par un module perdait son identité propre, un marquage récursif puis limité à la racine, des vérifications `Color` du module graphique qui testaient le mauvais tag…) — un module n'est pas fermé comme un tableau, il doit pouvoir contenir n'importe quelle valeur, donc la distinction ne peut PAS vivre dans le tag sans se répercuter partout où ce tag est testé. `kind` reste sur l'OBJET map racine, jamais sur ce qu'il référence, donc rien de tout ça ne se reproduit.
@@ -2570,7 +2571,7 @@ Mesuré (`bash bench/icount.sh`, avant/après ce changement) : `fib` −2,9 %, b
 - Deux compteurs, tous deux tirés de `++g_map_epoch` (époque globale monotone, donc insensibles à la réutilisation d'adresse) : `Map::layout` bouge quand une entrée APPARAÎT ou DISPARAÎT (et au recyclage dans `MapPool::release`) — c'est lui que lit le cache, puisque seul cela déplace un emplacement ; `Map::version` bouge à CHAQUE `Map::set`, écrasement en place compris — c'est lui que lisent les consommateurs du CONTENU (le cache de caméra de `graphics3d.cpp`). Écraser une valeur en place laisse donc le cache de `GET_INDEX` valide, et le prochain accès lit la nouvelle valeur.
 - `module_member()` (vm.h) applique le même cache (validé sur `layout`) aux maps de module `string_module_` et `array_module_`, qui sont aussi les modules GLOBAUX `string` et `array` : un script peut y ajouter ou y remplacer un membre (`array.len = …` change `a.len()` partout), et le cache le voit. Hit systématique après le premier passage.
 - **Le lien d'une map vers la suite de la chaîne est un EMPLACEMENT (`Map::proto`), pas une entrée de ses données, et AUCUN script ne peut le lire ni l'écrire** : la classe pour une instance, la classe parente pour une classe. Le nom d'une classe en est un autre (`Map::class_name`, un `uint16_t` logé dans le trou d'alignement après `kind`, id d'un registre de noms dans `map.cpp` : 65 535 noms DISTINCTS au plus). Ces trois informations furent d'abord des clés (`__class__`, `__parent__`, `__name__`) que n'importe quel script ou texte JSON pouvait remplir : le moteur lisait alors l'entier de `m["__class__"] = 5` comme un pointeur de map, et `A.__parent__ = A` faisait tourner la recherche en rond (SIGSEGV, constatés). L'emplacement a d'abord été protégé par une écriture gardée (`set_class_checked`) puis la mécanique a été **supprimée du langage** (décision de l'utilisateur : elle ne doit pas être visible) : ces trois noms sont aujourd'hui des clés comme les autres, rangées dans `data`, qui ne changent rien à la chaîne. Seul le moteur remplit les emplacements (`Value::make_class(nom, parent)`, `Value::set_class` par `instantiate_class` et `MapBuilder::klass`), donc ils sont nil ou une classe PAR CONSTRUCTION et aucun lecteur ne vérifie ; un parent existe avant son enfant, donc **aucun cycle n'est possible**, et `NEW_CLASS` refuse un parent qui n'est pas une classe. Il n'existe plus de chaîne de prototypes de maps (`{__class__: base}`). Une instance n'a pas de clé pour sa classe (`len`, itération, `json.stringify` ne la voient pas) et reste VRAIE même sans champ (`is_falsy_cold`). Un module natif qui crée une instance pose sa classe par `set_class`/`klass`, jamais par `map_set("__class__", …)`, qui créerait un champ que personne ne lit. `sizeof(Map)` est passé de 88 à 104 octets (le lien de classe) puis n'a plus bougé.
-  La classe se demande par `classOf(obj)` (la classe, ou nil) et `instanceOf(obj, Classe)` (le long de la chaîne des classes parentes, `Value::is_instance_of`), deux membres de `core` (core_module.cpp) ; le module `graphics` s'en sert aussi pour reconnaître un `Quat`, là où il comparait le nom de la classe. ⚠ Un builtin écrit son résultat dans `args[0]` : `classOf` copie la classe AVANT `ret`, sinon un objet temporaire dont c'était la dernière référence est libéré sous la référence qu'on rend. La palette de `colors` partage la classe `Color` GLOBALE (les membres de `core` sont posés AVANT la construction des modules), sans quoi `instanceOf(colors.RED, Color)` était faux. ⚠ **`is_instance` ne reconnaît que les MAPS** (`v.is_map()`) : une classe fille a un lien non nil, et la compter comme instance enverrait `C + 1` vers le `__add` de son parent (figé dans `tests/regressions/language/classes.ol`).
+  La classe se demande par `classOf(obj)` (la classe, ou nil) et `instanceOf(obj, Classe)` (le long de la chaîne des classes parentes, `Value::is_instance_of`), deux membres de `core` (core_module.cpp) ; le module `gfx` s'en sert aussi pour reconnaître un `Quat`, là où il comparait le nom de la classe. ⚠ Un builtin écrit son résultat dans `args[0]` : `classOf` copie la classe AVANT `ret`, sinon un objet temporaire dont c'était la dernière référence est libéré sous la référence qu'on rend. La palette de `colors` partage la classe `Color` GLOBALE (les membres de `core` sont posés AVANT la construction des modules), sans quoi `instanceOf(colors.RED, Color)` était faux. ⚠ **`is_instance` ne reconnaît que les MAPS** (`v.is_map()`) : une classe fille a un lien non nil, et la compter comme instance enverrait `C + 1` vers le `__add` de son parent (figé dans `tests/regressions/language/classes.ol`).
   **Mesuré (`bash bench/icount.sh`, avant → après le passage du parent et du nom en emplacements)** : `fib` −0,00 %, boucle −0,00 %, map −0,86 %, et −5,5 % sur un programme de classes (le parent se lit dans l'emplacement, plus par une recherche de `__parent__`). ⚠ **Le gestionnaire `NEW_CLASS` doit garder `make_class` EN LIGNE** : le sortir dans une fonction (`noinline`, avec ou sans la vérification du parent) coûtait **+1,9 % sur `fib` et +3,5 % sur la boucle** — 3 instructions par tour, dans `run_goto`, pour des scripts qui ne déclarent aucune classe (même mécanisme que `LEN` et `SWITCH`). Seul le refus du parent est hors ligne (`refuse_parent`, `noreturn`). Il encode le nom en `Bx` (constante décalée d'un cran, bit de poids faible = un parent est en `R[A]`) : aucun opcode de plus.
   **Mesuré** : −11,8 % d'instructions sur un programme d'objets (instanciation, héritage, méthodes, `__add` ; 270,1 M → 238,3 M) — le test d'instance n'est plus une recherche de hachage. ⚠ Et un piège de GCC : avec un corps aussi petit, `has_class_link` (la moitié hors ligne de `is_instance`) faisait réallouer les registres de `run_goto` (**+0,61 % sur `fib`**, deux instructions par appel, pour un chemin que `fib` ne prend jamais) ; ni `noinline`, ni déplacer le code de `GET_INDEX`/`SET_INDEX`, ni le champ `class_key_` n'y changeaient rien — c'est l'inférence interprocédurale de registres, et `[[gnu::noipa]]` sur la fonction la supprime (fib +0,03 %). Trouvé en bissectant les fonctions de `vm.cpp` une à une. **Fusionner `is_instance` et `has_class_link` en UNE fonction hors ligne a été essayé puis RETIRÉ, mesure à l'appui** : le test de type doit rester en ligne, sinon une comparaison de deux flottants paie un appel pour s'entendre répondre « non » (mandelbrot **+4,4 %** d'instructions, classes **+0,9 %** ; en ligne et fusionnée, `fib` +0,58 %). Cacher la moitié hors ligne dans une lambda `noipa` DANS `is_instance`, pour n'avoir qu'un nom, a aussi été essayé : `fib` +0,29 %, classes +0,45 %. Le découpage en deux fonctions est voulu.
 - **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
@@ -2589,7 +2590,7 @@ risque, aucun bytecode n'étant sérialisé sur disque.
   `Value(0)` un booléen par conversion implicite silencieuse.
 - **Producteurs** : `NOT`, `AND`, les six comparaisons, les trois sites de
   `negate_result` (RETURN), les littéraux (`BoolExpr`), et les prédicats natifs
-  (`math.isNan`/`isInf`, `keyboard.isDown`, `data.has`, `graphics.isOpen`/`isVisible`,
+  (`math.isNan`/`isInf`, `keyboard.isDown`, `data.has`, `gfx.isOpen`/`isVisible`,
   `camera.isOpen`, `tween.isDone`, champ `enabled` d'une `Light`).
 - **Étanchéité tenue en UN point** : `VM::as_double` (vm.h) refuse le booléen comme il
   refuse `nil`. Toute l'arithmétique et toutes les comparaisons d'ordre y passent, donc
@@ -3021,7 +3022,7 @@ n'importe quel appel. Mesuré neutre (`fib` −0,29 %, boucle +0,00 %, map +0,26
   DESCEND jamais `varargs_base`, donc quand il ne relève pas la capacité est celle que le
   compilateur garantit (`reg_count ≥ call_base + n` pour `n` cibles) ; et quand il relève, c'est
   que `total > n`, donc la capacité vaut `total`. Vérifié sous Xvfb sur `var w, h =
-  graphics.textSize(...)`, le cas que la zone fraîche avait été écrite pour corriger — les deux
+  gfx.textSize(...)`, le cas que la zone fraîche avait été écrite pour corriger — les deux
   valeurs arrivent.
 - ⚠ **`push_frame_self` relève AVANT de glisser.** Insérer `self` rend le cadre une case plus
   large que le bloc que l'appelant a posé, si bien que la glissade écrit au-delà — sur les varargs

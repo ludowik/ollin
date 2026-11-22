@@ -71,7 +71,7 @@ func draw()
     end
 end
 func setup()
-    graphics.canvas(W, H)
+    gfx.canvas(W, H)
     https.get("${API}/hello", func(r) note("hello", r) end)
     https.get("${API}/nocors", func(r) note("nocors", r) end)
     https.get("${API}/missing", func(r) note("missing", r) end)

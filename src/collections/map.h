@@ -33,7 +33,7 @@ struct Map {
     // The map's role. It fits in the alignment hole before userdata, so sizeof(Map) is unchanged.
     // ENUM is tested ONLY on writes (SET_INDEX): an enum reads like an ordinary map — iterable,
     // len, print — but refuses every mutation.
-    // MODULE marks the root object of a built-in module (math, string, graphics…), set once by
+    // MODULE marks the root object of a built-in module (math, string, gfx…), set once by
     // make_builtin_module. It is read in exactly two places: Value::type_name (typeof(math) says
     // "module", not "map") and CALL_METHOD's self-injection (see the comment there). It is NOT a
     // separate Value tag — a module is still is_map() everywhere else (proto_chain_get, the

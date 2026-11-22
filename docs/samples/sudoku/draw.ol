@@ -6,7 +6,7 @@ func drawButton(label, r, fill, textSize, ink = nil)
         ink = config.onButton
     end
     fillC(fill)
-    graphics.rect(r.x, r.y, r.w, r.h, L.c * 0.28)
+    gfx.rect(r.x, r.y, r.w, r.h, L.c * 0.28)
     drawText(label, r.x + r.w / 2, r.y + r.h / 2, fitSize(label, textSize, r.w * 0.88), "center", "center", ink)
 end
 
@@ -43,7 +43,7 @@ func drawBoard()
             hintCells[j] = true
         end
     end
-    graphics.noStroke()
+    gfx.noStroke()
     for i = 1, CELLS do
         var x, y = cellPos(i)
         var tint = config.boxLight
@@ -72,7 +72,7 @@ func drawBoard()
             end
         end
         fillC(tint)
-        graphics.rect(x, y, c, c)
+        gfx.rect(x, y, c, c)
     end
     for i = 1, CELLS do
         var x, y = cellPos(i)
@@ -92,8 +92,8 @@ func drawBoard()
             drawText("{v}", x + c / 2, y + c / 2, size, "center", "center", col)
         end
     end
-    graphics.fontSize(c * 0.27)
-    graphics.textMode("center", "center")
+    gfx.fontSize(c * 0.27)
+    gfx.textMode("center", "center")
     for i = 1, CELLS do
         if game.grid[i] == 0 and game.notes[i] <> 0 then
             var x, y = cellPos(i)
@@ -103,13 +103,13 @@ func drawBoard()
                     if d == digit then
                         col = config.blue
                     end
-                    graphics.stroke(col[1], col[2], col[3], col[4])
-                    graphics.text("{d}", x + ((d - 1) % 3 + 0.5) * c / 3, y + ((d - 1) // 3 + 0.5) * c / 3)
+                    gfx.stroke(col[1], col[2], col[3], col[4])
+                    gfx.text("{d}", x + ((d - 1) % 3 + 0.5) * c / 3, y + ((d - 1) // 3 + 0.5) * c / 3)
                 end
             end
         end
     end
-    graphics.noStroke()
+    gfx.noStroke()
     for k = 0, N do
         var thick = k % BOX == 0
         var w = math.max(1, c * 0.02)
@@ -119,17 +119,17 @@ func drawBoard()
         else
             fillC(config.thin)
         end
-        graphics.rect(L.bx + k * c - w / 2, L.by - w / 2, w, L.bs + w)
-        graphics.rect(L.bx - w / 2, L.by + k * c - w / 2, L.bs + w, w)
+        gfx.rect(L.bx + k * c - w / 2, L.by - w / 2, w, L.bs + w)
+        gfx.rect(L.bx - w / 2, L.by + k * c - w / 2, L.bs + w, w)
     end
     if game.hint <> nil then
         var x, y = cellPos(game.hint.cell)
         var pulse = 0.5 + 0.5 * math.sin(elapsedTime * 6)
-        graphics.noFill()
-        graphics.stroke(config.amber[1], config.amber[2], config.amber[3], 0.6 + 0.4 * pulse)
-        graphics.strokeSize(math.max(3, c * 0.1))
-        graphics.rect(x + c * 0.06, y + c * 0.06, c * 0.88, c * 0.88, c * 0.2)
-        graphics.noStroke()
+        gfx.noFill()
+        gfx.stroke(config.amber[1], config.amber[2], config.amber[3], 0.6 + 0.4 * pulse)
+        gfx.strokeSize(math.max(3, c * 0.1))
+        gfx.rect(x + c * 0.06, y + c * 0.06, c * 0.88, c * 0.88, c * 0.2)
+        gfx.noStroke()
     end
 end
 
@@ -151,7 +151,7 @@ func drawPad()
             ink = config.onButton
         end
         fillC(fill)
-        graphics.rect(r.x, r.y, r.w, r.h, c * 0.22)
+        gfx.rect(r.x, r.y, r.w, r.h, c * 0.22)
         drawText("{d}", r.x + r.w / 2, r.y + r.h / 2, math.min(r.h, c * 1.3) * 0.62, "center", "center", ink)
     end
 end
@@ -201,8 +201,8 @@ func drawWon()
     var h = L.c * 1.5
     var x = L.bx + L.bs / 2 - w / 2
     var y = L.by + L.bs / 2 - h / 2
-    graphics.fill(1, 1, 1, a)
-    graphics.rect(x, y, w, h, L.c * 0.3)
+    gfx.fill(1, 1, 1, a)
+    gfx.rect(x, y, w, h, L.c * 0.3)
     drawText(tr("won"), x + w / 2, y + h / 2, fitSize(tr("won"), L.c * 0.8, w * 0.9), "center", "center", config.ink, a)
 end
 

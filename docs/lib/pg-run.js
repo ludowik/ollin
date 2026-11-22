@@ -61,7 +61,7 @@ export function loadProjectIntoRuntime(m, project) {
 }
 
 // Hands the engine the pane's size as window.__ollinRenderW/H: the `window` module reads that pair when a
-// program starts and, for a program that called graphics.fitArea, the engine reads it again on every frame
+// program starts and, for a program that called gfx.fitArea, the engine reads it again on every frame
 // to follow the area. A hidden pane measures 0 x 0: `onlyIfShown` leaves the pair alone then, whereas a
 // launch measures once the pane is shown and publishes whatever it finds.
 export function publishRenderArea(pane, onlyIfShown = false) {
@@ -114,7 +114,7 @@ export function runProgram(m, code, canvasEl, hooks) {
     return
   }
   // A top-level error can arise AFTER the canvas is open (an image.load right after
-  // graphics.canvas, say), so it is handled before the "canvas visible" branch; otherwise the
+  // gfx.canvas, say), so it is handled before the "canvas visible" branch; otherwise the
   // screen would stay mute.
   if (typeof out === 'string' && out.startsWith('error:')) {
     hooks.onError(out)
@@ -219,7 +219,7 @@ function fetchAsset(name, v, entry) {
   return found
 }
 
-// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") and the pictures referenced
+// SAMPLE mode: preloads the 3D models referenced by gfx.model("x.obj") and the pictures referenced
 // by image.load("x.png") (user projects go through their own resources instead). The key is the name AS
 // WRITTEN in the code, which is what the engine looks up — never the URL it was found at.
 export async function preloadSampleAssets(m, code, v, entry = '') {

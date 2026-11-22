@@ -18,7 +18,7 @@ global sprites = []
 ## The sprite is a texture and the swarm is placed inside the render area, so both wait for the
 ## window to exist.
 func setup()
-    graphics.canvas(W, H, "image.loadData")
+    gfx.canvas(W, H, "image.loadData")
     img = image.loadData("png", SMILEY)
     for i = 1, config.count do
         sprites[i] = {
@@ -42,7 +42,7 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(Color(0.08, 0.09, 0.14))
+    gfx.clear(Color(0.08, 0.09, 0.14))
 
     for sp in sprites do
         image.draw(img, sp.x, sp.y, sp.s, sp.s)
@@ -51,6 +51,6 @@ func draw()
     var big = config.bigSize + math.sin(elapsedTime * 2) * config.pulse
     image.draw(img, W / 2 - big / 2, H / 2 - big / 2, big, big)
 
-    graphics.stroke(Color(0.75, 0.8, 0.9))
-    graphics.text("image.loadData: an embedded PNG (base64)", 12, 12)
+    gfx.stroke(Color(0.75, 0.8, 0.9))
+    gfx.text("image.loadData: an embedded PNG (base64)", 12, 12)
 end

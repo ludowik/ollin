@@ -19,11 +19,11 @@ import "draw.ol"
 ## Everything the program owns is built here, in the order it depends on: the window first, since a
 ## sprite is a texture and a texture needs a graphics context.
 func setup()
-    graphics.canvas(W, H, "Ollin Invaders")
+    gfx.canvas(W, H, "Ollin Invaders")
     best = wholeOr(data.get(BEST_KEY, 0), 0, SAVE_WHOLES.score[2])
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
-    graphics.viewport(FIELD_W, FIELD_H)
+    gfx.viewport(FIELD_W, FIELD_H)
     buildSprites()
     buildSounds()
     ## The field is laid out but not started: the title screen holds it, and its fleet is the one the

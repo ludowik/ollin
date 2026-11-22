@@ -9,7 +9,7 @@
 // stretched to ten times its size does not. They need a shader to be read, so text is drawn through
 // engine_draw_text, never through DrawTextEx directly; "pixel" is a plain bitmap and needs nothing.
 //
-// Shared by `graphics` (the current font for text calls) and by `ui` (widget labels), so that an
+// Shared by `gfx` (the current font for text calls) and by `ui` (widget labels), so that an
 // atlas is loaded only once.
 
 int engine_font_count();
@@ -40,7 +40,7 @@ void engine_font_reset();
 int engine_font_default();
 
 // Distance from the top of a line down to its BASELINE, at the size asked for. raylib's Font does
-// not carry it, so it is a metric of the REGISTRY rather than of any one caller: `graphics` aligns
+// not carry it, so it is a metric of the REGISTRY rather than of any one caller: `gfx` aligns
 // text on it, and `ui` will the day a widget label has to.
 // Precondition: engine_font_usable(idx).
 float engine_font_ascent(int idx, float size);

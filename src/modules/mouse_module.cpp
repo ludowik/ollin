@@ -17,7 +17,7 @@
 //
 // Detection happens in mouse_poll(), called once per frame by the render loop
 // loop (graphics_module.cpp), so the pointer only works during a
-// graphics.run(...) — or through the automatically called draw function.
+// gfx.run(...) — or through the automatically called draw function.
 //
 // Two things can also be ASKED, rather than waited for:
 //   mouse.position()      → x, y

@@ -67,7 +67,7 @@ func buildMoon(size)
 end
 
 func setup()
-    graphics.canvas(W, H, "Lunar eclipse")
+    gfx.canvas(W, H, "Lunar eclipse")
     math.noiseSeed(11)
     buildMoon(256)
     buildVeil()
@@ -116,7 +116,7 @@ func veilIntersection(mx, my, rl, ox, oy, ro, color, hole = 0)
     var ro2 = ro * ro
     var tr2 = hole * hole
     ## 1 px, deliberately: in multiplicative blending the edge is crisp, and 2 px would make a staircase.
-    graphics.stroke(color, 1)
+    gfx.stroke(color, 1)
     for y = y0, y1 do
         var dy = (y - oy) * (y - oy)
         var dl = rl2 - (y - my) * (y - my)
@@ -141,7 +141,7 @@ end
 
 func drawSegment(a, b, y)
     if b > a then
-        graphics.line(a, y, b, y)
+        gfx.line(a, y, b, y)
     end
 end
 
@@ -238,16 +238,16 @@ end
 
 func drawMarks()
     var rl = moonRadius()
-    graphics.noFill()
-    graphics.stroke(Color(0.45, 0.55, 0.8, 0.55), 1)
-    graphics.circle(CX, umbraCentre(), R_PENUMBRA * rl)
-    graphics.stroke(Color(0.8, 0.45, 0.35, 0.7), 1)
-    graphics.circle(CX, umbraCentre(), R_UMBRA * rl)
-    graphics.stroke(Color(0.5, 0.6, 0.85, 0.8))
-    graphics.fontSize(H * 0.022)
-    graphics.text("penumbra", CX + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
-    graphics.stroke(Color(0.85, 0.5, 0.4, 0.9))
-    graphics.text("shadow", CX + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
+    gfx.noFill()
+    gfx.stroke(Color(0.45, 0.55, 0.8, 0.55), 1)
+    gfx.circle(CX, umbraCentre(), R_PENUMBRA * rl)
+    gfx.stroke(Color(0.8, 0.45, 0.35, 0.7), 1)
+    gfx.circle(CX, umbraCentre(), R_UMBRA * rl)
+    gfx.stroke(Color(0.5, 0.6, 0.85, 0.8))
+    gfx.fontSize(H * 0.022)
+    gfx.text("penumbra", CX + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
+    gfx.stroke(Color(0.85, 0.5, 0.4, 0.9))
+    gfx.text("shadow", CX + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
 end
 
 ## The simulation's own clock, which draw() then reads.
@@ -259,7 +259,7 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(Color(0.02, 0.02, 0.05))
+    gfx.clear(Color(0.02, 0.02, 0.05))
     sky.draw()
     if config.marks then
         drawMarks()
@@ -273,8 +273,8 @@ func draw()
     var d = centreDist()
 
     ## The Moon fully lit, then the shadow ON TOP: that is nature's own order.
-    graphics.noStroke()
-    graphics.sprite(moon, mx - rl, my - rl, rl * 2, rl * 2)
+    gfx.noStroke()
+    gfx.sprite(moon, mx - rl, my - rl, rl * 2, rl * 2)
 
     ## The veil MULTIPLIES the Moon's light instead of covering it: that is the physical model — the
     ## surface stays the same, only the illumination changes. The craters therefore remain visible
@@ -285,7 +285,7 @@ func draw()
     ## exactly abutting, one band's hole being the next one's outer radius: making them
     ## overlapping by half a pixel multiplied the joint twice, hence periodic DARK lines, which were
     ## measured.
-    graphics.blendMode(blend.MULTIPLY)
+    gfx.blendMode(blend.MULTIPLY)
     for b in veil do
         ## The Moon may fit entirely inside the band's hole, which is common in a total
         ## eclipse: the sweep would then not draw a single pixel.
@@ -294,15 +294,15 @@ func draw()
         end
         veilIntersection(mx, my, rl, ox, oy, b.ext * rl, b.color, b.int * rl)
     end
-    graphics.blendMode(blend.ALPHA)
+    gfx.blendMode(blend.ALPHA)
 
-    graphics.fontSize(H * 0.032)
-    graphics.stroke(Color(0.88, 0.9, 0.96))
+    gfx.fontSize(H * 0.032)
+    gfx.stroke(Color(0.88, 0.9, 0.96))
     ## The interpolation formats directly: {expr:.2f} saves rounding by hand.
-    graphics.text("{phase(d)}   magnitude {magnitude(d):.2f}", W * 0.04, H * 0.06)
-    graphics.fontSize(H * 0.024)
-    graphics.stroke(Color(0.6, 0.65, 0.78))
+    gfx.text("{phase(d)}   magnitude {magnitude(d):.2f}", W * 0.04, H * 0.06)
+    gfx.fontSize(H * 0.024)
+    gfx.stroke(Color(0.6, 0.65, 0.78))
     ## Accented letters go through, the embedded font covering them, but not a middle dot: a missing
     ## glyph would show as a "?".
-    graphics.text("T+{t:.1f} h   -   {config.type} eclipse", W * 0.04, H * 0.11)
+    gfx.text("T+{t:.1f} h   -   {config.type} eclipse", W * 0.04, H * 0.11)
 end

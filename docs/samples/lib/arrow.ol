@@ -1,4 +1,4 @@
-## The triangle of an arrow button: the flat list of points for graphics.polygon.
+## The triangle of an arrow button: the flat list of points for gfx.polygon.
 
 ## The points of a triangle pointing "up", "down", "left" or "right", centred on (cx, cy), 2 * k wide and 2 * k high.
 func arrowPoints(dir, cx, cy, k)

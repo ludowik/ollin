@@ -14,7 +14,7 @@
 ## relays the three mouse callbacks to it.
 import "../lib/trackball.ol"
 global ball = Trackball()
-global cam = graphics.camera(0, 0, 10,  0, 0, 0)
+global cam = gfx.camera(0, 0, 10,  0, 0, 0)
 
 ## One entry per model: everything that differs from one object to the next lives here, and the
 ## rest of the program does not depend on it.
@@ -41,14 +41,14 @@ global zoom = {
 func choose(i)
     current = models[i]
     zoom.factor = 1.0   ## each model has its own framing: the previous zoom means nothing here
-    ## graphics.model caches the model, so calling it again in draw() reloads nothing.
-    sz = graphics.modelSize(graphics.model(current.file))
-    graphics.ambient(current.ambient)
+    ## gfx.model caches the model, so calling it again in draw() reloads nothing.
+    sz = gfx.modelSize(gfx.model(current.file))
+    gfx.ambient(current.ambient)
 end
 
 func setup()
-    graphics.canvas(W, H, "3D models")
-    graphics.light("dir", -1, -1, -0.6)
+    gfx.canvas(W, H, "3D models")
+    gfx.light("dir", -1, -1, -0.6)
 
     ## One button per entry: the list is the only place to edit to add a model. Each closure
     ## captures the index of ITS iteration, the loop variable being per-turn.
@@ -157,23 +157,23 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(colors.BLACK)
-    var dist = graphics.fitDistance(sz.radius) * current.margin / zoom.factor
+    gfx.clear(colors.BLACK)
+    var dist = gfx.fitDistance(sz.radius) * current.margin / zoom.factor
     cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
 
-    graphics.begin3d(cam)
-        graphics.fill(current.tint)
-        graphics.translate(sz.cx, sz.cy, sz.cz)            ## pivot around the model's centre
-        graphics.rotateq(ball.orient())
-        graphics.translate(-sz.cx, -sz.cy, -sz.cz)
-        graphics.drawModel(graphics.model(current.file), 0, 0, 0, 1)
-    graphics.end3d()
+    gfx.begin3d(cam)
+        gfx.fill(current.tint)
+        gfx.translate(sz.cx, sz.cy, sz.cz)            ## pivot around the model's centre
+        gfx.rotateq(ball.orient())
+        gfx.translate(-sz.cx, -sz.cy, -sz.cz)
+        gfx.drawModel(gfx.model(current.file), 0, 0, 0, 1)
+    gfx.end3d()
 
     ## Two lines: the model's name, then the controls. On one line they ran under the menu, which
     ## sits in the top right corner.
-    graphics.stroke(colors.WHITE)
-    graphics.text(current.name, 12, 12)
-    graphics.text("drag or arrows: turn   space: drift on/off   wheel or pinch: zoom   return: reset",
-                  12, 12 + graphics.fontSize() * 1.4)
+    gfx.stroke(colors.WHITE)
+    gfx.text(current.name, 12, 12)
+    gfx.text("drag or arrows: turn   space: drift on/off   wheel or pinch: zoom   return: reset",
+                  12, 12 + gfx.fontSize() * 1.4)
 end

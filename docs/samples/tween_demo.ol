@@ -52,7 +52,7 @@ func onCurve(name)
 end
 
 func setup()
-    graphics.canvas(W, H, "tween")
+    gfx.canvas(W, H, "tween")
 
     for i = 1, #labels do
         dots[i] = {x: 0}
@@ -74,25 +74,25 @@ func mouse.pressed(x, y)
 end
 
 func draw()
-    graphics.clear(Color(0.08, 0.09, 0.13))
-    graphics.fontSize(H * 0.028)
+    gfx.clear(Color(0.08, 0.09, 0.13))
+    gfx.fontSize(H * 0.028)
 
     var y = H * 0.18
     var step = H * 0.1
     for i, dot in dots do
-        graphics.stroke(Color(1, 1, 1, 0.12), 1)
-        graphics.line(xStart(), y, xEnd(), y)
-        graphics.noStroke()
-        graphics.fill(Color(0.45, 0.8, 1))
-        graphics.circle(dot.x, y, H * 0.014)
-        graphics.stroke(Color(0.65, 0.72, 0.85))
-        graphics.text(labels[i], W * 0.02, y - H * 0.014)
+        gfx.stroke(Color(1, 1, 1, 0.12), 1)
+        gfx.line(xStart(), y, xEnd(), y)
+        gfx.noStroke()
+        gfx.fill(Color(0.45, 0.8, 1))
+        gfx.circle(dot.x, y, H * 0.014)
+        gfx.stroke(Color(0.65, 0.72, 0.85))
+        gfx.text(labels[i], W * 0.02, y - H * 0.014)
         y += step
     end
 
-    graphics.noStroke()
-    graphics.fill(star.tint)
-    graphics.circle(star.x, H * 0.86, star.size)
-    graphics.stroke(Color(0.85, 0.88, 0.95))
-    graphics.text(config.curve + " — click to restart", W * 0.02, H * 0.93)
+    gfx.noStroke()
+    gfx.fill(star.tint)
+    gfx.circle(star.x, H * 0.86, star.size)
+    gfx.stroke(Color(0.85, 0.88, 0.95))
+    gfx.text(config.curve + " — click to restart", W * 0.02, H * 0.93)
 end

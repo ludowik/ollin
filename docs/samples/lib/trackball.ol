@@ -1,7 +1,7 @@
 ## A REUSABLE "trackball" rotation: dragging with the mouse or a finger turns a scene or an
 ## object, with no gimbal lock, by composing quaternions.
 ##
-##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
+##   orient()  gives the current orientation quaternion, to pass to gfx.rotateq
 ##   dragging  → true while dragging, so an automatic rotation can be suspended
 ##   spin(dxDeg, dyDeg)          turns it directly, for the keyboard or any other source
 ##   idle(dt, degreesPerSecond)  a gentle rotation at rest, to be called from update(dt)
@@ -15,11 +15,11 @@
 ##   func mouse.pressed(x, y)  ball.press(x, y) end
 ##   func mouse.moved(x, y)    ball.move(x, y)  end
 ##   func mouse.released(x, y) ball.release()   end
-##   ## in draw(): graphics.rotateq(ball.orient())
+##   ## in draw(): gfx.rotateq(ball.orient())
 
 class Trackball
     func init(sensitivity)
-        self.q = graphics.quat()
+        self.q = gfx.quat()
         self.dragging = false
         self.lastx = 0
         self.lasty = 0
@@ -39,7 +39,7 @@ class Trackball
     ## Back to the orientation of the first frame. The drag is released as well: a reset triggered
     ## in the middle of one would otherwise keep turning from the old reference point.
     func reset()
-        self.q = graphics.quat()
+        self.q = gfx.quat()
         self.dragging = false
     end
 
@@ -69,7 +69,7 @@ class Trackball
     ## and dy around X, composed on the LEFT — hence in the SCREEN's frame, so the rotation follows
     ## the gesture whatever the orientation already reached.
     func spin(dx, dy)
-        var turn = graphics.quatAxis(0, 1, 0, dx).mul(graphics.quatAxis(1, 0, 0, dy))
+        var turn = gfx.quatAxis(0, 1, 0, dx).mul(gfx.quatAxis(1, 0, 0, dy))
         self.q = turn.mul(self.q)
     end
 
@@ -80,6 +80,6 @@ class Trackball
         if self.dragging then
             return
         end
-        self.q = graphics.quatAxis(0, 1, 0, dt * degreesPerSecond).mul(self.q)
+        self.q = gfx.quatAxis(0, 1, 0, dt * degreesPerSecond).mul(self.q)
     end
 end

@@ -98,7 +98,7 @@ func drawSource(r, t, s)
     var pad = SIZE * 0.02
     var chars = run.chars
     var n = #chars
-    graphics.font("mono")
+    gfx.font("mono")
     var availW = r.w - 2 * pad
     var availH = r.h - titleHeight() - pad
     var fs = math.min(availW / (run.maxCols * monoRatio), availH / (run.lines * CODE_LEADING), SIZE * 0.07)
@@ -155,7 +155,7 @@ func drawSource(r, t, s)
     end
 
     ## the text itself: what is behind the lexeme is dimmed, what is ahead stays bright
-    graphics.fontSize(fs)
+    gfx.fontSize(fs)
     for idx, c in chars do
         if c <> NEWLINE then
             var ink = TEXT
@@ -260,7 +260,7 @@ func setup()
     stage.errorNote = errorNote
     stage.pace = paceOf
     stage.keywords = KEYWORD_TYPES
-    graphics.canvas(W, H, "How the lexer works")
+    gfx.canvas(W, H, "How the lexer works")
     openMenu()
     loadProgram(1)
 end

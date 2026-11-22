@@ -98,8 +98,8 @@ cmake --build "$CLAUDE_PROJECT_DIR/build" -j"$(nproc)"
 # ── Chaînes de test graphique (mémo — voir CLAUDE.md « Tests graphiques ») ───
 # DEUX moyens FONCTIONNENT ici ; ne jamais conclure « environnement cassé » :
 #  A. Desktop raylib sous Xvfb : `bash tools/run-headless.sh <script.ol>`
-#     (build-gfx/ollin ; capture via graphics.screenshot("f.png") CHEMIN RELATIF,
-#      quitter avec graphics.quit() après la capture).
+#     (build-gfx/ollin ; capture via gfx.screenshot("f.png") CHEMIN RELATIF,
+#      quitter avec gfx.quit() après la capture).
 #  B. Playwright/chromium (/opt/pw-browsers/.../chrome) : file://PNG ou playground
 #     servi en local — inspection pixels par drawImage+getImageData.
 # build-gfx/ est gitignoré (perdu à chaque reprise du conteneur) → on le

@@ -86,14 +86,14 @@ end
 ## ── drawing helpers ──────────────────────────────────────────────────────────
 
 func box(x, y, w, h, radius, color)
-    graphics.noStroke()
-    graphics.fill(color)
-    graphics.rect(x, y, w, h, radius)
+    gfx.noStroke()
+    gfx.fill(color)
+    gfx.rect(x, y, w, h, radius)
 end
 
 func label(value, x, y, color)
-    graphics.stroke(color)
-    graphics.text(value, x, y)
+    gfx.stroke(color)
+    gfx.text(value, x, y)
 end
 
 ## Where the title of a panel sits, and the height it takes: the content starts below it.
@@ -106,11 +106,11 @@ func titleHeight()
 end
 
 func panel(r, title)
-    graphics.fill(PANEL)
-    graphics.stroke(EDGE, 1.5)
-    graphics.rect(r.x, r.y, r.w, r.h, SIZE * 0.014)
-    graphics.font("sans")
-    graphics.fontSize(clampSize(SIZE * 0.02))
+    gfx.fill(PANEL)
+    gfx.stroke(EDGE, 1.5)
+    gfx.rect(r.x, r.y, r.w, r.h, SIZE * 0.014)
+    gfx.font("sans")
+    gfx.fontSize(clampSize(SIZE * 0.02))
     label(title, r.x + SIZE * 0.016, r.y + titleTop(), DIM)
 end
 
@@ -129,11 +129,11 @@ func baseLayout()
 end
 
 func beginFrame()
-    graphics.clear(BG)
+    gfx.clear(BG)
     if monoRatio == nil then
-        graphics.font("mono")
-        graphics.fontSize(100)
-        monoRatio = graphics.textSize("M") / 100
+        gfx.font("mono")
+        gfx.fontSize(100)
+        monoRatio = gfx.textSize("M") / 100
     end
 end
 
@@ -160,12 +160,12 @@ func layoutChips(tokens, fs, availW, rowGap)
     var chips = []
     var x = 0
     var y = 0
-    graphics.font("mono")
+    gfx.font("mono")
     for k, tok in tokens do
-        graphics.fontSize(fs)
-        var w1 = graphics.textSize(tokenLabel(tok))
-        graphics.fontSize(tfs)
-        var w2 = graphics.textSize(tok.type)
+        gfx.fontSize(fs)
+        var w1 = gfx.textSize(tokenLabel(tok))
+        gfx.fontSize(tfs)
+        var w2 = gfx.textSize(tok.type)
         var w = math.max(w1, w2) + SIZE * 0.022
         if x > 0 and x + w > availW then
             x = 0
@@ -179,16 +179,16 @@ end
 
 func drawChip(chip, tok, x, y, alpha, fs, tfs)
     var c = tokenColor(tok)
-    graphics.fill(fade(c, 0.16 * alpha))
-    graphics.stroke(fade(c, alpha), 1.5)
-    graphics.rect(x, y, chip.w, chip.h, SIZE * 0.01)
-    graphics.font("mono")
-    graphics.textMode("center", "top")
-    graphics.fontSize(tfs)
+    gfx.fill(fade(c, 0.16 * alpha))
+    gfx.stroke(fade(c, alpha), 1.5)
+    gfx.rect(x, y, chip.w, chip.h, SIZE * 0.01)
+    gfx.font("mono")
+    gfx.textMode("center", "top")
+    gfx.fontSize(tfs)
     label(tok.type, x + chip.w / 2, y + SIZE * 0.008, fade(c, alpha))
-    graphics.fontSize(fs)
+    gfx.fontSize(fs)
     label(tokenLabel(tok), x + chip.w / 2, y + SIZE * 0.008 + tfs * 1.35, fade(TEXT, alpha))
-    graphics.textMode("left", "top")
+    gfx.textMode("left", "top")
 end
 
 ## ── the engine's code ────────────────────────────────────────────────────────
@@ -236,13 +236,13 @@ func drawCode(r, i, t, s)
     var listing = codeLines(s.fn, cols)
     panel(r, stage.file + "  -  " + stage.owner + "::" + s.fn + "()")
     var pad = SIZE * 0.02
-    graphics.font("mono")
+    gfx.font("mono")
     var cw = fs * monoRatio
     var lh = fs * CODE_LEADING
     var y0 = r.y + titleHeight()
 
     ## what is being called, and the locals
-    graphics.fontSize(fs)
+    gfx.fontSize(fs)
     label(clipLeft(s.stack, cols), r.x + pad, y0, CARET)
     if s.watchText == nil then
         s.watchText = stage.watch(s)    ## a step never changes
@@ -307,7 +307,7 @@ func drawNote(r, s)
             parts.push({text: stage.errorNote(s), ink: ERROR})
         end
         var fs = math.max(math.min(SIZE * 0.034, 26), 11)
-        graphics.font("sans")
+        gfx.font("sans")
         var lines = []
         while true do
             lines = []
@@ -323,8 +323,8 @@ func drawNote(r, s)
         end
         noteCache = {prog: state.prog, id: s.noteId, w: W, h: H, lines: lines, size: fs}
     end
-    graphics.font("sans")
-    graphics.fontSize(noteCache.size)
+    gfx.font("sans")
+    gfx.fontSize(noteCache.size)
     var y = r.y + titleHeight() + pad * 0.2
     for l in noteCache.lines do
         label(l.text, r.x + pad, y, l.ink)
@@ -336,17 +336,17 @@ end
 
 func drawHeader(L)
     var n = #run.steps
-    graphics.font("sans")
-    graphics.fontSize(math.max(SIZE * 0.05, 14))
+    gfx.font("sans")
+    gfx.fontSize(math.max(SIZE * 0.05, 14))
     label(stage.title, L.m, L.m * 0.8, TEXT)
     ## the program and what it teaches, shrunk to leave the right end to the menu's handle
     var text = stage.programs[state.prog].name + "  -  " + stage.lessons[state.prog]
     var base = math.max(SIZE * 0.026, 10)
     var fs = fitSize(text, base, W - 2 * L.m - SIZE * 0.2)
-    graphics.fontSize(fs)
+    gfx.fontSize(fs)
     if fs < 9 then
         text = stage.programs[state.prog].name   ## too long for a narrow screen: the lesson is left out
-        graphics.fontSize(base)
+        gfx.fontSize(base)
     end
     label(text, L.m, L.m * 0.8 + SIZE * 0.065, DIM)
     ## progress
@@ -366,27 +366,27 @@ func drawFooter(L, i)
     buttons.push({id: "restart", text: "Restart", on: false})
     var gap = L.m * 0.6
     var bw = math.min(math.max((W - 2 * L.m - (#buttons - 1) * gap) / #buttons, 40), SIZE * 0.2)
-    graphics.font("sans")
+    gfx.font("sans")
     var fs = math.clamp(SIZE * 0.028, 11, 22)
     for k, b in buttons do
         var x = L.m + (k - 1) * (bw + gap)
         if b.on then
-            graphics.fill(CARET_FILL)
-            graphics.stroke(CARET, 2)
+            gfx.fill(CARET_FILL)
+            gfx.stroke(CARET, 2)
         else
-            graphics.fill(PANEL)
-            graphics.stroke(EDGE, 1.5)
+            gfx.fill(PANEL)
+            gfx.stroke(EDGE, 1.5)
         end
-        graphics.rect(x, L.footY, bw, L.footH, SIZE * 0.012)
-        graphics.fontSize(fs)
-        graphics.textMode("center", "center")
+        gfx.rect(x, L.footY, bw, L.footH, SIZE * 0.012)
+        gfx.fontSize(fs)
+        gfx.textMode("center", "center")
         label(b.text, x + bw / 2, L.footY + L.footH / 2, TEXT)
         hits.push({id: b.id, x: x, y: L.footY, w: bw, h: L.footH})
     end
-    graphics.textMode("left", "top")
+    gfx.textMode("left", "top")
 
     ## under the buttons: where the program is, and what a tap does. The right of that strip belongs to
     ## the memory and frame counter the engine draws.
-    graphics.fontSize(math.max(fs * 0.85, 10))
+    gfx.fontSize(math.max(fs * 0.85, 10))
     label("step {i} / {#run.steps}   -   {tapHint()}", L.m, L.footY + L.footH + SIZE * 0.012, DIM)
 end

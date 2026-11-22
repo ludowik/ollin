@@ -24,7 +24,7 @@
 //                The names are data of the calendar, not a formatting: a script that shows them in another
 //                language asks for it here, and a language is one more row of each table below.
 //
-// The first three return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
+// The first three return a plain map, like gfx.modelSize: no class, no method, nothing to learn.
 
 // The weekday is numbered ISO, Monday = 1 to Sunday = 7: the C library counts Sunday as 0, which puts
 // the week-end at both ends and trips up every "is it a weekday" test.

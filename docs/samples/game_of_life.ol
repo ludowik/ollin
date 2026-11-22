@@ -147,7 +147,7 @@ func step()
 end
 
 func setup()
-    graphics.canvas(W, H, "Game of Life")
+    gfx.canvas(W, H, "Game of Life")
     ## The grid derives from the render area, so it is sized once the canvas exists.
     COLS = W // CELL
     ROWS = H // CELL
@@ -198,14 +198,14 @@ func update(dt)
 end
 
 func draw()
-    graphics.noStroke()
+    gfx.noStroke()
     ## a semi-transparent clear leaves a slight visual trail; the simulation itself stays exact
-    graphics.clear(Color(0.05, 0.06, 0.10, 0.45))
-    graphics.fill(CELL_COLOR)
+    gfx.clear(Color(0.05, 0.06, 0.10, 0.45))
+    gfx.fill(CELL_COLOR)
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
             if cells[idx(x, y)] == 1 then
-                graphics.rect(x * CELL, y * CELL, CELL - GAP, CELL - GAP)
+                gfx.rect(x * CELL, y * CELL, CELL - GAP, CELL - GAP)
             end
         end
     end

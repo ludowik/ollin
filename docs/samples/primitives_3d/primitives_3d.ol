@@ -4,7 +4,7 @@
 ## relays the three mouse callbacks to it.
 import "../lib/trackball.ol"
 global ball = Trackball()
-global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
+global cam = gfx.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
 
 ## A grid cell (col, row) to world XZ coordinates, for the isometric camera looking from
 ## (12,12,12) at the origin, where screen_x = (wx - wz) / √2 and screen_y = (-wx - wz) / √6
@@ -23,9 +23,9 @@ func cellPos(col, row, cols, rows)
 end
 
 func setup()
-    graphics.canvas(W, H, "Primitives 3D")
-    graphics.ambient(0.25)
-    graphics.light("dir", -1, -2, -0.5)
+    gfx.canvas(W, H, "Primitives 3D")
+    gfx.ambient(0.25)
+    gfx.light("dir", -1, -2, -0.5)
 end
 
 ## Mouse AND touch: on the web a finger drives the pointer, hence the same callbacks.
@@ -42,7 +42,7 @@ func mouse.released(x, y)
 end
 
 func draw()
-    graphics.clear(Color(0.08, 0.08, 0.12))
+    gfx.clear(Color(0.08, 0.08, 0.12))
 
     ## Four columns in landscape, two in portrait: eight cells either way.
     var cols = 4
@@ -59,105 +59,105 @@ func draw()
         return idx // cols
     end
 
-    graphics.noStroke()
-    graphics.begin3d(cam)
+    gfx.noStroke()
+    gfx.begin3d(cam)
 
         ## cube
         var p = cellPos(gc(0), gr(0), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.fill(Color(0.9, 0.3, 0.3))
-            graphics.cube(0, 0, 0,  2, 2, 2)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.fill(Color(0.9, 0.3, 0.3))
+            gfx.cube(0, 0, 0,  2, 2, 2)
+        gfx.pop()
 
         ## sphere
         p = cellPos(gc(1), gr(1), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.fill(Color(0.3, 0.7, 0.9))
-            graphics.stroke(Color(1, 1, 1, 0.35))
-            graphics.sphere(0, 0, 0,  1.4)
-            graphics.noStroke()
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.fill(Color(0.3, 0.7, 0.9))
+            gfx.stroke(Color(1, 1, 1, 0.35))
+            gfx.sphere(0, 0, 0,  1.4)
+            gfx.noStroke()
+        gfx.pop()
 
         ## cylinder
         p = cellPos(gc(2), gr(2), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.fill(Color(0.4, 0.85, 0.4))
-            graphics.cylinder(0, -1.2, 0,  0.9, 2.4)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.fill(Color(0.4, 0.85, 0.4))
+            gfx.cylinder(0, -1.2, 0,  0.9, 2.4)
+        gfx.pop()
 
         ## plane
         p = cellPos(gc(3), gr(3), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.rotateX(90)
-            graphics.fill(Color(0.9, 0.7, 0.2, 0.75))
-            graphics.plane(0, 0, 0,  2.5, 2.5)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.rotateX(90)
+            gfx.fill(Color(0.9, 0.7, 0.2, 0.75))
+            gfx.plane(0, 0, 0,  2.5, 2.5)
+        gfx.pop()
 
         ## line3d and point3d
         p = cellPos(gc(4), gr(4), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.stroke(Color(1, 0.5, 0.1))
-            graphics.strokeSize(4)
-            graphics.line3d(-1.8, -1.8, -1.8,   1.8,  1.8,  1.8)
-            graphics.line3d(-1.8, -1.8,  1.8,   1.8,  1.8, -1.8)
-            graphics.line3d( 1.8, -1.8, -1.8,  -1.8,  1.8,  1.8)
-            graphics.strokeSize(6)
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.stroke(Color(1, 0.5, 0.1))
+            gfx.strokeSize(4)
+            gfx.line3d(-1.8, -1.8, -1.8,   1.8,  1.8,  1.8)
+            gfx.line3d(-1.8, -1.8,  1.8,   1.8,  1.8, -1.8)
+            gfx.line3d( 1.8, -1.8, -1.8,  -1.8,  1.8,  1.8)
+            gfx.strokeSize(6)
             for i = 1, 40 do
                 var t = i * 2.399
                 var r = 1.0 * math.sqrt(i / 40.0)
-                graphics.stroke(Color(0.3 + r * 0.5, 0.5 + r * 0.2, 1.0 - r * 0.4))
-                graphics.point3d(r * math.cos(t), r * math.sin(t), math.sin(t * 2) * 0.4)
+                gfx.stroke(Color(0.3 + r * 0.5, 0.5 + r * 0.2, 1.0 - r * 0.4))
+                gfx.point3d(r * math.cos(t), r * math.sin(t), math.sin(t * 2) * 0.4)
             end
-            graphics.stroke(colors.WHITE)
-            graphics.strokeSize(10)
-            graphics.point3d(0, 0, 0)
-            graphics.strokeSize(1)
-            graphics.noStroke()
-        graphics.pop()
+            gfx.stroke(colors.WHITE)
+            gfx.strokeSize(10)
+            gfx.point3d(0, 0, 0)
+            gfx.strokeSize(1)
+            gfx.noStroke()
+        gfx.pop()
 
         ## cone
         p = cellPos(gc(5), gr(5), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.fill(Color(0.9, 0.4, 0.8))
-            graphics.cone(0, -1.2, 0,  1.0, 2.4)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.fill(Color(0.9, 0.4, 0.8))
+            gfx.cone(0, -1.2, 0,  1.0, 2.4)
+        gfx.pop()
 
         ## torus
         p = cellPos(gc(6), gr(6), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.fill(Color(0.4, 0.9, 0.7))
-            graphics.torus(0, 0, 0,  1.1, 0.4)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.fill(Color(0.4, 0.9, 0.7))
+            gfx.torus(0, 0, 0,  1.1, 0.4)
+        gfx.pop()
 
         ## the same sphere at a low resolution
         p = cellPos(gc(7), gr(7), cols, rows)
-        graphics.push()
-            graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(ball.orient())
-            graphics.segments(6)
-            graphics.fill(Color(0.3, 0.7, 0.9))
-            graphics.sphere(0, 0, 0,  1.4)
-        graphics.pop()
+        gfx.push()
+            gfx.translate(p[1], 0, p[2])
+            gfx.rotateq(ball.orient())
+            gfx.segments(6)
+            gfx.fill(Color(0.3, 0.7, 0.9))
+            gfx.sphere(0, 0, 0,  1.4)
+        gfx.pop()
 
-    graphics.end3d()
+    gfx.end3d()
 
     var pad = 4
     var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]
-    graphics.fontSize(13)
+    gfx.fontSize(13)
     for i = 1, 8 do
         var idx = i - 1
         var col = idx % cols
@@ -166,15 +166,15 @@ func draw()
         var cy = H * (rows - 0.5 - row) / rows
         ## The label is MEASURED rather than guessed: a hand-written table of half-widths had to be
         ## revised at every rename, and drifted with the font and the size in any case.
-        var tw, th = graphics.textSize(names[i])
-        graphics.noStroke()
-        graphics.fill(Color(1, 1, 1, 0.88))
-        graphics.rect(cx - tw/2 - pad, cy - th/2 - pad, tw + pad*2, th + pad*2)
-        graphics.stroke(Color(0, 0, 0))
-        graphics.text(names[i], cx - tw/2, cy - th/2)
+        var tw, th = gfx.textSize(names[i])
+        gfx.noStroke()
+        gfx.fill(Color(1, 1, 1, 0.88))
+        gfx.rect(cx - tw/2 - pad, cy - th/2 - pad, tw + pad*2, th + pad*2)
+        gfx.stroke(Color(0, 0, 0))
+        gfx.text(names[i], cx - tw/2, cy - th/2)
     end
 
-    graphics.stroke(Color(1, 1, 1, 0.5))
-    graphics.fontSize(16)
-    graphics.text("Drag to turn", 12, 12)
+    gfx.stroke(Color(1, 1, 1, 0.5))
+    gfx.fontSize(16)
+    gfx.text("Drag to turn", 12, 12)
 end

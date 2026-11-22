@@ -3,7 +3,7 @@
 #include "sound_internal.h"
 
 // Sound session, build WITHOUT raylib: no output, hence nothing audible. The module
-// still exists in full — unlike `graphics`, which is nil — because generating waveforms is pure
+// still exists in full — unlike `gfx`, which is nil — because generating waveforms is pure
 // computation: it runs identically here, and that is what makes synthesis testable in a container
 // with no sound card.
 //

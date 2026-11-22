@@ -49,7 +49,7 @@ global config = {speed: nil, clouds: true, lights: true, atmosphere: true, stars
 
 global days = 0.0            ## the simulated time, in days since J2000 (see astro.ol)
 global ball = Trackball()
-global cam = graphics.camera(0, 0, 4, 0, 0, 0, FOV)
+global cam = gfx.camera(0, 0, 4, 0, 0, 0, FOV)
 global sun = nil             ## the light
 global zoom = {factor: 1.0, min: 0.45, max: 2.7, wheelStep: 0.1}
 global ground = nil          ## the textures
@@ -67,14 +67,14 @@ func resetView()
     zoom.factor = 1.0
     var lx, ly, lz = sunLightDirection(days)
     var sunAzimuth = math.deg(math.atan2(-lx, -lz))        ## where the Sun is, round the vertical axis
-    var camera = graphics.quatAxis(0, 1, 0, sunAzimuth + 55).mul(graphics.quatAxis(1, 0, 0, -18))
+    var camera = gfx.quatAxis(0, 1, 0, sunAzimuth + 55).mul(gfx.quatAxis(1, 0, 0, -18))
     ball.reset()
     ball.q = camera.inverse()
 end
 
 ## How far the camera stands from the centre of the globe.
 func cameraDistance()
-    return graphics.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
+    return gfx.fitDistance(GLOBE, FOV) * 1.15 / zoom.factor
 end
 
 func placeCamera()
@@ -101,9 +101,9 @@ end
 ## bigger on the screen, so a fixed sensitivity made a close view race away from the finger.
 func degreesPerPixel()
     var fx, fy, fz, rx, ry, rz = cameraAxes()
-    var x0, y0 = graphics.project(cam, -fx * GLOBE, -fy * GLOBE, -fz * GLOBE)     ## the surface nearest to the camera
+    var x0, y0 = gfx.project(cam, -fx * GLOBE, -fy * GLOBE, -fz * GLOBE)     ## the surface nearest to the camera
     var step = GLOBE * math.rad(1)                                                  ## and the point one degree off it, along the tangent
-    var x1, y1 = graphics.project(cam, -fx * GLOBE + rx * step, -fy * GLOBE + ry * step, -fz * GLOBE + rz * step)
+    var x1, y1 = gfx.project(cam, -fx * GLOBE + rx * step, -fy * GLOBE + ry * step, -fz * GLOBE + rz * step)
     return 1 / screenDistance(x0, y0, x1, y1)
 end
 
@@ -169,16 +169,16 @@ end
 ## The stars are fixed in space, at infinity: one unit from the camera along their direction, a star
 ## lands where it would on the sky. A star behind the camera has no place on the screen.
 func drawStars()
-    graphics.noStroke()
+    gfx.noStroke()
     for i = 1, #stars, 4 do
-        var sx, sy, ahead = graphics.project(cam, cam.px + stars[i], cam.py + stars[i + 1], cam.pz + stars[i + 2])
+        var sx, sy, ahead = gfx.project(cam, cam.px + stars[i], cam.py + stars[i + 1], cam.pz + stars[i + 2])
         if ahead > 0 and sx >= 0 and sx < W and sy >= 0 and sy < H then
             var b = stars[i + 3]
-            graphics.fill(0.85 * b, 0.9 * b, b)
+            gfx.fill(0.85 * b, 0.9 * b, b)
             if b > 0.6 then
-                graphics.rect(sx, sy, 2, 2)
+                gfx.rect(sx, sy, 2, 2)
             else
-                graphics.rect(sx, sy, 1, 1)
+                gfx.rect(sx, sy, 1, 1)
             end
         end
     end
@@ -191,7 +191,7 @@ func limbRadius()
     var fx, fy, fz, rx, ry, rz = cameraAxes()
     var back = GLOBE * GLOBE / cameraDistance()
     var side = math.sqrt(GLOBE * GLOBE - back * back)
-    var x, y = graphics.project(cam, -fx * back + rx * side, -fy * back + ry * side, -fz * back + rz * side)
+    var x, y = gfx.project(cam, -fx * back + rx * side, -fy * back + ry * side, -fz * back + rz * side)
     return screenDistance(CX, CY, x, y)
 end
 
@@ -216,8 +216,8 @@ func drawHalo()
         warms.push(math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind))
     end
     var thickness = radius * 0.006 + 1
-    graphics.noFill()
-    graphics.strokeSize(thickness)
+    gfx.noFill()
+    gfx.strokeSize(thickness)
     for k = 0, 5 do
         var ring = radius * (1 + 0.004 * k) + thickness / 2
         var fade = (1 - k / 6) * (1 - k / 6)
@@ -225,8 +225,8 @@ func drawHalo()
             var glow = glows[i]
             if glow > 0.01 then
                 var warm = warms[i]
-                graphics.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
-                graphics.line(CX + HALO_COS[i] * ring, CY - HALO_SIN[i] * ring, CX + HALO_COS[i + 1] * ring, CY - HALO_SIN[i + 1] * ring)
+                gfx.stroke(0.3 + 0.7 * warm, 0.6 - 0.1 * warm, 1.0 - 0.7 * warm, 0.55 * fade * glow)
+                gfx.line(CX + HALO_COS[i] * ring, CY - HALO_SIN[i] * ring, CX + HALO_COS[i + 1] * ring, CY - HALO_SIN[i + 1] * ring)
             end
         end
     end
@@ -235,7 +235,7 @@ end
 ## ── the program ───────────────────────────────────────────────────────────────────────────────
 
 func setup()
-    graphics.canvas(W, H, "Earth from space")
+    gfx.canvas(W, H, "Earth from space")
     config.speed = speedLabels[1]
     days = unixToDays(time())
     ground = image.load(GROUND_FILE)
@@ -251,9 +251,9 @@ func setup()
     end
 
     var lx, ly, lz = sunLightDirection(days)
-    sun = graphics.light("dir", lx, ly, lz)
-    graphics.ambient(AMBIENT)
-    graphics.specular(0)    ## the Earth seen from space shows no highlight of its own
+    sun = gfx.light("dir", lx, ly, lz)
+    gfx.ambient(AMBIENT)
+    gfx.specular(0)    ## the Earth seen from space shows no highlight of its own
 
     var menu = ui.menu("Earth")
     menu.list("Time", speedLabels, ref config.speed)
@@ -296,34 +296,34 @@ end
 
 ## The equator and the axis, drawn with the globe's own tilt, to make the lean of the planet visible.
 func drawAxis()
-    graphics.noFill()
-    graphics.stroke(1, 0.85, 0.3)
-    graphics.strokeSize(0.4)                   ## a 3D line is a tube of strokeSize * 0.02 units: this one is thin
-    graphics.line3d(0, -1.5, 0, 0, 1.5, 0)
+    gfx.noFill()
+    gfx.stroke(1, 0.85, 0.3)
+    gfx.strokeSize(0.4)                   ## a 3D line is a tube of strokeSize * 0.02 units: this one is thin
+    gfx.line3d(0, -1.5, 0, 0, 1.5, 0)
     var steps = 72
     for i = 0, steps - 1 do
         var a0 = math.TAU * i / steps
         var a1 = math.TAU * (i + 1) / steps
-        graphics.line3d(1.01 * math.cos(a0), 0, 1.01 * math.sin(a0), 1.01 * math.cos(a1), 0, 1.01 * math.sin(a1))
+        gfx.line3d(1.01 * math.cos(a0), 0, 1.01 * math.sin(a0), 1.01 * math.cos(a1), 0, 1.01 * math.sin(a1))
     end
 end
 
 ## The globe takes its place in space: tilted, turned, and stood up on its poles.
 func orientGlobe()
-    graphics.rotateX(-OBLIQUITY)                          ## the tilt of the axis, fixed in space
-    graphics.rotateY(greenwichAngle(days) + 180)          ## the turn of the globe: the prime meridian is local −X
-    graphics.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
+    gfx.rotateX(-OBLIQUITY)                          ## the tilt of the axis, fixed in space
+    gfx.rotateY(greenwichAngle(days) + 180)          ## the turn of the globe: the prime meridian is local −X
+    gfx.rotateX(-90)                                 ## the sphere's mesh has its poles on Z: stand it up
 end
 
 ## One sphere of the globe, in the tilt and the turn of the Earth, wrapped in a picture.
 func drawLayer(tex, radius)
-    graphics.push()
+    gfx.push()
     orientGlobe()
-    graphics.fill(1, 1, 1)
-    graphics.texture(tex)
-    graphics.sphere(0, 0, 0, radius)
-    graphics.noTexture()
-    graphics.pop()
+    gfx.fill(1, 1, 1)
+    gfx.texture(tex)
+    gfx.sphere(0, 0, 0, radius)
+    gfx.noTexture()
+    gfx.pop()
 end
 
 ## Three layers, one block each, because the light is ONE setting for a whole block. The ground and the
@@ -333,39 +333,39 @@ end
 func drawGlobe()
     var lx, ly, lz = sunLightDirection(days)
     sun.setDir(lx, ly, lz)
-    graphics.segments(96)
-    graphics.begin3d(cam)
-    graphics.noStroke()
-    graphics.bump(RELIEF, GRAIN)
+    gfx.segments(96)
+    gfx.begin3d(cam)
+    gfx.noStroke()
+    gfx.bump(RELIEF, GRAIN)
     drawLayer(ground, GLOBE)
-    graphics.end3d()
-    graphics.bump()
+    gfx.end3d()
+    gfx.bump()
 
     if config.lights then
         sun.setDir(-lx, -ly, -lz)
-        graphics.ambient(0)
-        graphics.blendMode("add")
-        graphics.begin3d(cam)
-        graphics.noStroke()
+        gfx.ambient(0)
+        gfx.blendMode("add")
+        gfx.begin3d(cam)
+        gfx.noStroke()
         drawLayer(nightTex, GLOBE * LIGHTS_SHELL)
-        graphics.end3d()
-        graphics.blendMode("alpha")
-        graphics.ambient(AMBIENT)
+        gfx.end3d()
+        gfx.blendMode("alpha")
+        gfx.ambient(AMBIENT)
         sun.setDir(lx, ly, lz)
     end
 
-    graphics.begin3d(cam)
-    graphics.noStroke()
+    gfx.begin3d(cam)
+    gfx.noStroke()
     if config.clouds then
         drawLayer(cloudTex, GLOBE * CLOUD_SHELL)
     end
     if config.axis then
-        graphics.push()
-        graphics.rotateX(-OBLIQUITY)
+        gfx.push()
+        gfx.rotateX(-OBLIQUITY)
         drawAxis()
-        graphics.pop()
+        gfx.pop()
     end
-    graphics.end3d()
+    gfx.end3d()
 end
 
 func degrees(value, positive, negative)
@@ -379,20 +379,20 @@ end
 func drawText()
     var t = date.utc(daysToUnix(days))
     var lat, lon = subsolarPoint(days)
-    graphics.fill(1, 1, 1)
-    graphics.stroke(1, 1, 1)
-    graphics.fontSize(16)
-    graphics.text("{t.year}-{t.month:02d}-{t.day:02d}  {t.hour:02d}:{t.minute:02d} UTC", 12, 12)
-    graphics.fontSize(13)
-    graphics.stroke(0.75, 0.85, 1)
-    var line = graphics.fontSize() * 1.5
-    graphics.text("The Sun is overhead at {degrees(lat, "N", "S")}, {degrees(lon, "E", "W")}", 12, 12 + line * 1.4)
-    graphics.stroke(0.6, 0.65, 0.75)
-    graphics.text("drag: move around   wheel or pinch: zoom   space: stop time   return: reset", 12, H - 22)
+    gfx.fill(1, 1, 1)
+    gfx.stroke(1, 1, 1)
+    gfx.fontSize(16)
+    gfx.text("{t.year}-{t.month:02d}-{t.day:02d}  {t.hour:02d}:{t.minute:02d} UTC", 12, 12)
+    gfx.fontSize(13)
+    gfx.stroke(0.75, 0.85, 1)
+    var line = gfx.fontSize() * 1.5
+    gfx.text("The Sun is overhead at {degrees(lat, "N", "S")}, {degrees(lon, "E", "W")}", 12, 12 + line * 1.4)
+    gfx.stroke(0.6, 0.65, 0.75)
+    gfx.text("drag: move around   wheel or pinch: zoom   space: stop time   return: reset", 12, H - 22)
 end
 
 func draw()
-    graphics.clear(0.005, 0.007, 0.02)
+    gfx.clear(0.005, 0.007, 0.02)
     placeCamera()
     if config.stars then
         drawStars()

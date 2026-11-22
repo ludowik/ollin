@@ -68,13 +68,13 @@ func drawEntries(entries)
         end
         menuLook.drawButton(entry.label, r, fill, r.h * 0.4)
         if entry.done then
-            graphics.stroke(1, 1, 1, 1)
-            graphics.strokeSize(math.max(3, r.h * 0.1))
+            gfx.stroke(1, 1, 1, 1)
+            gfx.strokeSize(math.max(3, r.h * 0.1))
             var cx = r.x + r.w - r.h * 0.6
             var cy = r.y + r.h / 2
-            graphics.line(cx - r.h * 0.18, cy, cx - r.h * 0.04, cy + r.h * 0.14)
-            graphics.line(cx - r.h * 0.04, cy + r.h * 0.14, cx + r.h * 0.2, cy - r.h * 0.16)
-            graphics.noStroke()
+            gfx.line(cx - r.h * 0.18, cy, cx - r.h * 0.04, cy + r.h * 0.14)
+            gfx.line(cx - r.h * 0.04, cy + r.h * 0.14, cx + r.h * 0.2, cy - r.h * 0.16)
+            gfx.noStroke()
         end
     end
 end
@@ -125,17 +125,17 @@ end
 func drawGear(r)
     var s = r.w
     fillC(menuLook.accent)
-    graphics.push()
-    graphics.translate(r.x + s / 2, r.y + s / 2)
-    graphics.rectMode("center")
+    gfx.push()
+    gfx.translate(r.x + s / 2, r.y + s / 2)
+    gfx.rectMode("center")
     for k = 1, 8 do
-        graphics.rect(0, -s * 0.34, s * 0.20, s * 0.20, s * 0.04)
-        graphics.rotate(45)
+        gfx.rect(0, -s * 0.34, s * 0.20, s * 0.20, s * 0.04)
+        gfx.rotate(45)
     end
-    graphics.pop()
-    graphics.circle(r.x + s / 2, r.y + s / 2, s * 0.30)
-    graphics.fill(menuLook.paper)
-    graphics.circle(r.x + s / 2, r.y + s / 2, s * 0.13)
+    gfx.pop()
+    gfx.circle(r.x + s / 2, r.y + s / 2, s * 0.30)
+    gfx.fill(menuLook.paper)
+    gfx.circle(r.x + s / 2, r.y + s / 2, s * 0.13)
 end
 
 ## The paragraphs of the help, cut into lines at the largest size that fits under the title: kept while the area and the

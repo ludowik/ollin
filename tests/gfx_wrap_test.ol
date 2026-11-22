@@ -1,6 +1,6 @@
 ## The text wrapping the samples share (docs/samples/lib/draw.ol): wrapText cuts a text into lines that fit a width at a
 ## font size, between words, and wrapParagraphs does it for each paragraph of a list. The widths come from the font, so
-## it needs a window: it runs under Xvfb (tests/run_gfx.sh) and ends with graphics.quit(). What is checked holds for
+## it needs a window: it runs under Xvfb (tests/run_gfx.sh) and ends with gfx.quit(). What is checked holds for
 ## any font, since it compares the lines with the measure of the text and never with a number.
 
 import "../docs/samples/lib/draw.ol"
@@ -25,28 +25,28 @@ func firstWord(line)
 end
 
 func run()
-    graphics.font("sans")
+    gfx.font("sans")
     for size in [9, 14, 30] do
-        graphics.fontSize(size)
-        var oneLine = graphics.textSize(TEXTS[3])
+        gfx.fontSize(size)
+        var oneLine = gfx.textSize(TEXTS[3])
         for width in [1, oneLine * 0.2, oneLine * 0.5, oneLine * 0.9, oneLine * 2] do
             for text in TEXTS do
                 var lines = wrapText(text, size, width)
                 var label = "'{text}' at {size} in {width}"
                 assert(joined(lines) == text, "no word lost or added: " + label)
                 for line in lines do
-                    assert(line.split(" ").len() == 1 or graphics.textSize(line) <= width, "a line fits, or is one word: " + label)
+                    assert(line.split(" ").len() == 1 or gfx.textSize(line) <= width, "a line fits, or is one word: " + label)
                 end
                 for i = 2, #lines do
                     var longer = lines[i - 1] + " " + firstWord(lines[i])
-                    assert(graphics.textSize(longer) > width, "a line is as full as it can be: " + label)
+                    assert(gfx.textSize(longer) > width, "a line is as full as it can be: " + label)
                 end
             end
         end
     end
 
     ## the extremes: wide enough for everything is one line, and no width at all is one word a line
-    graphics.fontSize(14)
+    gfx.fontSize(14)
     var wide = wrapText(TEXTS[3], 14, 100000)
     assert(#wide == 1 and wide[1] == TEXTS[3], "a wide area holds the text on one line")
     var narrow = wrapText(TEXTS[2], 14, 1)
@@ -69,5 +69,5 @@ end
 
 func draw()
     run()
-    graphics.quit()
+    gfx.quit()
 end

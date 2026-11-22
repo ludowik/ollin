@@ -16,7 +16,7 @@ Value make_ui_module();
 // ui_draw()  AFTER the frame is composed (inside the drawing area, so the interface is independent of the
 //            viewport) and before a screenshot is taken; paints the widget stack over the scene.
 // ui_reset() when a PROGRAM starts (ollin_run, wasm_main.cpp) — NOT in gfx_run: widgets are declared
-//            at file level, hence BEFORE graphics.run, and a reset there would erase them all. It is
+//            at file level, hence BEFORE gfx.run, and a reset there would erase them all. It is
 //            needed because the statics survive the VM between two playground runs. ui.clear() calls
 //            it too, which also folds the interface back to its handle.
 bool ui_poll();

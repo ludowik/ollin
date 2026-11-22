@@ -48,9 +48,9 @@ end
 ## A rounded rectangle with a faint edge round it.
 func modernPanel(x, y, w, h, radius, fill)
     fillC(modernLook.edge)
-    graphics.rect(x - 1, y - 1, w + 2, h + 2, radius + 1)
+    gfx.rect(x - 1, y - 1, w + 2, h + 2, radius + 1)
     fillC(fill)
-    graphics.rect(x, y, w, h, radius)
+    gfx.rect(x, y, w, h, radius)
 end
 
 ## A block of side c at (x, y): its shadow, the colour of the piece, and the light from above.
@@ -59,11 +59,11 @@ func modernBlock(x, y, c, kind)
     var g = math.max(1, math.floor(c * 0.07))
     var radius = c * 0.18
     fillC(MODERN_SHADOW[kind])
-    graphics.rect(x, y, c, c, radius)
+    gfx.rect(x, y, c, c, radius)
     fillC(col)
-    graphics.rect(x + g, y + g, c - 2 * g, c - 2 * g, radius * 0.8)
+    gfx.rect(x + g, y + g, c - 2 * g, c - 2 * g, radius * 0.8)
     fillC(MODERN_LIGHT[kind], 0.45)
-    graphics.rect(x + 2 * g, y + 2 * g, c - 4 * g, math.max(1, c * 0.2), radius * 0.5)
+    gfx.rect(x + 2 * g, y + 2 * g, c - 4 * g, math.max(1, c * 0.2), radius * 0.5)
 end
 
 ## A piece in its turn, its box starting at (x, y), cells of side c.
@@ -80,10 +80,10 @@ func modernWell(f)
     modernPanel(x, y, f.well.w, f.well.h, c * 0.3, modernLook.well)
     fillC(MODERN_WHITE, 0.045)
     for i = 1, COLS - 1 do
-        graphics.rect(x + i * c, y, 1, ROWS * c)
+        gfx.rect(x + i * c, y, 1, ROWS * c)
     end
     for j = 1, ROWS - 1 do
-        graphics.rect(x, y + j * c, COLS * c, 1)
+        gfx.rect(x, y + j * c, COLS * c, 1)
     end
     var flash = clearFlashOn()
     for row = 0, ROWS - 1 do
@@ -93,7 +93,7 @@ func modernWell(f)
                 modernBlock(x + col * c, y + row * c, c, v)
                 if flash and game.clearing.contains(row) then
                     fillC(MODERN_WHITE, 0.85)
-                    graphics.rect(x + col * c, y + row * c, c, c, c * 0.18)
+                    gfx.rect(x + col * c, y + row * c, c, c, c * 0.18)
                 end
             end
         end
@@ -108,7 +108,7 @@ func modernWell(f)
     for i = 0, curtainShown() - 1 do
         for col = 0, COLS - 1 do
             fillC(MODERN_CURTAIN)
-            graphics.rect(x + col * c + 1, y + (ROWS - 1 - i) * c + 1, c - 2, c - 2, c * 0.18)
+            gfx.rect(x + col * c + 1, y + (ROWS - 1 - i) * c + 1, c - 2, c - 2, c * 0.18)
         end
     end
 end
@@ -184,7 +184,7 @@ func modernItem(it, m)
     elseif it.w then
         if it.lit then
             fillC(modernLook.accent)
-            graphics.rect(m.ox + it.x * m.s, m.oy + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22)
+            gfx.rect(m.ox + it.x * m.s, m.oy + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22)
         else
             modernPanel(m.ox + it.x * m.s, m.oy + it.y * m.s, it.w * m.s, it.h * m.s, it.h * m.s * 0.22, modernLook.card)
         end
@@ -215,9 +215,9 @@ func modernPads()
         var ink = lit and modernLook.accentInk or modernLook.ink
         if b.r then
             fillC(modernLook.edge)
-            graphics.circle(b.x, b.y, b.r + 1)
+            gfx.circle(b.x, b.y, b.r + 1)
             fillC(fill)
-            graphics.circle(b.x, b.y, b.r)
+            gfx.circle(b.x, b.y, b.r)
             drawText(b.text, b.x, b.y, b.r * 0.9, "center", "center", ink)
         else
             modernPanel(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, b.round * 1.4, fill)
@@ -225,7 +225,7 @@ func modernPads()
                 drawText(b.text, b.x, b.y, b.h * 0.42, "center", "center", ink)
             else
                 fillC(ink)
-                graphics.polygon(arrowPoints(b.name, b.x, b.y, b.w * 0.2))
+                gfx.polygon(arrowPoints(b.name, b.x, b.y, b.w * 0.2))
             end
         end
     end

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-// The readout of the engine (graphics.stats) shows the frame rate only when the program falls short of what the screen
+// The readout of the engine (gfx.stats) shows the frame rate only when the program falls short of what the screen
 // can give, and the memory only when it has grown a lot. The rules live here, with no window and no clock, so that a
 // unit test can run them.
 

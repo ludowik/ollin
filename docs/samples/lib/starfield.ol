@@ -46,8 +46,8 @@ class Starfield
         end
         for i = 1, #self.stars, 3 do
             var e = self.stars[i + 2] * fade
-            graphics.stroke(Color(self.tint.r, self.tint.g, self.tint.b, math.clamp(e, 0, 1)), e * 2)
-            graphics.point(self.stars[i], self.stars[i + 1])
+            gfx.stroke(Color(self.tint.r, self.tint.g, self.tint.b, math.clamp(e, 0, 1)), e * 2)
+            gfx.point(self.stars[i], self.stars[i + 1])
         end
     end
 end

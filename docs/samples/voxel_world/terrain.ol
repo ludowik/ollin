@@ -67,27 +67,27 @@ end
 func setBlockTiles(b, h, y)
     if y >= h then
         if h < SEA + 1 then
-            graphics.tile(T_SAND)
+            gfx.tile(T_SAND)
         elseif h >= SEA + 13 then
-            graphics.tiles(T_SNOW, T_SNOW, T_ROCK)
+            gfx.tiles(T_SNOW, T_SNOW, T_ROCK)
         elseif h >= SEA + 8 then
-            graphics.tile(T_ROCK)
+            gfx.tile(T_ROCK)
         elseif b == 0 then
-            graphics.tile(T_SAND)
+            gfx.tile(T_SAND)
         else
-            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)
+            gfx.tiles(T_GRASS, T_DIRT, T_DIRT)
         end
         return
     end
     if y >= h - 2 then
         if b == 0 then
-            graphics.tile(T_SANDD)
+            gfx.tile(T_SANDD)
         else
-            graphics.tile(T_DIRT)
+            gfx.tile(T_DIRT)
         end
         return
     end
-    graphics.tile(T_STONE)
+    gfx.tile(T_STONE)
 end
 
 
@@ -105,7 +105,7 @@ func canopy(x, y, z, r, round)
     for tx = -r, r do
         for tz = -r, r do
             if not (round and math.abs(tx) == r and math.abs(tz) == r) then
-                graphics.cube(x + tx, y, z + tz,  1, 1, 1)
+                gfx.cube(x + tx, y, z + tz,  1, 1, 1)
             end
         end
     end
@@ -116,27 +116,27 @@ end
 func putTree(x, z, h)
     var th = 3 + treeHash(x, z, 1) % 4      ## the trunk, 3 to 6 cubes
     var shape = treeHash(x, z, 2) % 3       ## 0 round, 1 bushy, 2 conical
-    graphics.tile(T_TRUNK)
+    gfx.tile(T_TRUNK)
     for k = 1, th do
-        graphics.cube(x, h + k, z,  1, 1, 1)
+        gfx.cube(x, h + k, z,  1, 1, 1)
     end
-    graphics.tile(T_LEAF)
+    gfx.tile(T_LEAF)
     var top = h + th
     if shape == 2 then
         canopy(x, top - 1, z, 1, true)       ## conical: a rounded base plus a spire
-        graphics.cube(x, top, z,  1, 1, 1)
-        graphics.cube(x, top + 1, z,  1, 1, 1)
+        gfx.cube(x, top, z,  1, 1, 1)
+        gfx.cube(x, top + 1, z,  1, 1, 1)
     else
         var round = shape == 0               ## round, with the corners taken off, or bushy, hence solid
         canopy(x, top - 1, z, 1, round)
         canopy(x, top, z, 1, round)
-        graphics.cube(x, top + 1, z,  1, 1, 1)
+        gfx.cube(x, top + 1, z,  1, 1, 1)
     end
 end
 
 func bakeChunk(cx, cz)
-    graphics.beginChunk()
-    graphics.fill(colors.WHITE)   ## a neutral tint: the atlas supplies the colour
+    gfx.beginChunk()
+    gfx.fill(colors.WHITE)   ## a neutral tint: the atlas supplies the colour
     var x0 = cx * CS
     var z0 = cz * CS
     ## RAW heights over the area plus a one-cell border (indices -1..CS), used to cull
@@ -169,11 +169,11 @@ func bakeChunk(cx, cz)
                     ## It is the BOTTOM that darkens with depth, not the water, which is uniform.
                     if y < SEA then
                         var dk = math.clamp((SEA - y) / 5.0, 0, 0.85)   ## it darkens earlier and harder
-                        graphics.fill(Color(1 - dk, 1 - dk, 1 - dk))
+                        gfx.fill(Color(1 - dk, 1 - dk, 1 - dk))
                     else
-                        graphics.fill(colors.WHITE)
+                        gfx.fill(colors.WHITE)
                     end
-                    graphics.cube(x, y, z,  1, 1, 1)
+                    gfx.cube(x, y, z,  1, 1, 1)
                 end
             end
             ## The sheet is laid as soon as the column's top falls below the surface: the same
@@ -181,10 +181,10 @@ func bakeChunk(cx, cz)
             if top + 0.5 < WATER then
                 ## water = ONE UNIFORM semi-transparent plane at sea level, giving a
                 ## continuous surface; the fading with depth is carried by the cubes on the bottom.
-                graphics.tile(T_WATER)
-                graphics.fill(Color(1, 1, 1, 0.72))
-                graphics.plane(x, WATER, z,  1, 1)
-                graphics.fill(colors.WHITE)
+                gfx.tile(T_WATER)
+                gfx.fill(Color(1, 1, 1, 0.72))
+                gfx.plane(x, WATER, z,  1, 1)
+                gfx.fill(colors.WHITE)
             end
             var hp = treeHash(x, z, 0) % 100    ## a scattered placement, from the mixed hash
             var grassy = h > SEA and h < SEA + 8 and b <> 0
@@ -194,7 +194,7 @@ func bakeChunk(cx, cz)
             end
         end
     end
-    var g = graphics.endChunk()
+    var g = gfx.endChunk()
     g.wx = x0 + CS / 2
     g.wz = z0 + CS / 2
     g.cx = cx

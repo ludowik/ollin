@@ -13,14 +13,14 @@ global config = {
     wheelStep: 0.1      ## zoom fraction per wheel notch
 }
 
-global cam  = graphics.cameraOrtho(0, config.height, config.dist,  0, 0, 0,  config.size)
+global cam  = gfx.cameraOrtho(0, config.height, config.dist,  0, 0, 0,  config.size)
 global view = { angle: config.angle, size: config.size }
 global drag = { active: false, x: 0 }
 
 func setup()
-    graphics.canvas(W, H, "Isometric camera")
-    graphics.ambient(0.3)
-    graphics.light("dir", -1, -2, -0.5)
+    gfx.canvas(W, H, "Isometric camera")
+    gfx.ambient(0.3)
+    gfx.light("dir", -1, -2, -0.5)
 end
 
 func mouse.pressed(x, y)
@@ -76,16 +76,16 @@ func checkerColor(x, z)
 end
 
 func draw()
-    graphics.clear(Color(0.15, 0.16, 0.20))
-    graphics.noStroke()
+    gfx.clear(Color(0.15, 0.16, 0.20))
+    gfx.noStroke()
 
-    graphics.begin3d(cam)
+    gfx.begin3d(cam)
 
         ## A flat floor, one thin cube per cell
         for x = -4, 4 do
             for z = -4, 4 do
-                graphics.fill(checkerColor(x, z))
-                graphics.cube(x, -0.55, z,  1, 0.1, 1)
+                gfx.fill(checkerColor(x, z))
+                gfx.cube(x, -0.55, z,  1, 0.1, 1)
             end
         end
 
@@ -100,25 +100,25 @@ func draw()
             [ 3,  2, 1.2, 3.6, Color(0.90, 0.50, 0.25)],
         ]
         for b in bldgs do
-            graphics.fill(b[5])
-            graphics.cube(b[1], b[4] / 2, b[2],  b[3], b[4], b[3])
+            gfx.fill(b[5])
+            gfx.cube(b[1], b[4] / 2, b[2],  b[3], b[4], b[3])
         end
 
         var t   = elapsedTime * 0.8
         var sx  = math.cos(t) * 3.2
         var sz  = math.sin(t) * 3.2
         var sy  = 4.5 + math.sin(elapsedTime * 2.0) * 0.4
-        graphics.fill(Color(1.0, 0.95, 0.40))
-        graphics.sphere(sx, sy, sz,  0.55)
+        gfx.fill(Color(1.0, 0.95, 0.40))
+        gfx.sphere(sx, sy, sz,  0.55)
 
         ## A cast shadow, faked by a flat translucent disc
-        graphics.fill(Color(0.0, 0.0, 0.0, 0.30))
-        graphics.cylinder(sx, 0.01, sz,  0.45, 0.02)
+        gfx.fill(Color(0.0, 0.0, 0.0, 0.30))
+        gfx.cylinder(sx, 0.01, sz,  0.45, 0.02)
 
-    graphics.end3d()
+    gfx.end3d()
 
     var hint = "Drag: orbit   Wheel or pinch: zoom   Double-click: reset"
-    graphics.stroke(Color(1, 1, 1, 0.55))
-    graphics.fontSize(14)
-    graphics.text(hint, 12, H - 28)
+    gfx.stroke(Color(1, 1, 1, 0.55))
+    gfx.fontSize(14)
+    gfx.text(hint, 12, H - 28)
 end

@@ -17,7 +17,7 @@
 //    also cancels the emulated mouse events that would blur the sink. Without it the keyboard still came up, but the
 //    sink had lost the focus and typed nothing.
 //  - the keyboard SHRINKS the window on some browsers, and the pane that holds the canvas follows it: the engine then
-//    resizes its area (graphics.fitArea) or scales the whole canvas down to fit, and a screen "shrinks" as the keyboard
+//    resizes its area (gfx.fitArea) or scales the whole canvas down to fit, and a screen "shrinks" as the keyboard
 //    comes up. So while the sink has the focus the pane keeps the size it had when the focus was taken (freeze), and the
 //    keyboard simply covers the bottom of it. A real rotation (the orientation changes) lets it go.
 // Programs that declare neither keyboard.typed nor a ui.textField ("wanted" stays false) are not touched at all.

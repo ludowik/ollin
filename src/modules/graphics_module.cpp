@@ -54,7 +54,7 @@ static int s_physW = 0, s_physH = 0;
 static int s_logicalW = 0; // the area's logical width, used by the memory and FPS overlay
 static int s_logicalH = 0; // the area's logical height
 // PERSISTENT drawing context: draw() renders into this RenderTexture, which is NOT cleared between
-// frames — it is up to draw() to call graphics.clear() when it wants a fresh background. It is
+// frames — it is up to draw() to call gfx.clear() when it wants a fresh background. It is
 // blitted to the screen every frame with the FPS overlay ON TOP, so the overlay stays crisp and does
 // not smear.
 static RenderTexture2D s_target{};
@@ -67,7 +67,7 @@ static void publish_draw_size();
 static bool s_target_ready = false;
 static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, always == the physical
                                             // size (see gfx_canvas) — never a separate density
-// Current blend mode, set by graphics.blendMode and tracked so it can be restored after a fade — a
+// Current blend mode, set by gfx.blendMode and tracked so it can be restored after a fade — a
 // clear with alpha — and reset to ALPHA every frame.
 static int s_blend_mode = BLEND_ALPHA;
 
@@ -79,12 +79,12 @@ static Shader s_fxaa{};
 static bool s_fxaa_ready = false;
 static int s_fxaa_loc_texel = -1;
 static int s_fxaa_loc_span = -1;
-// Script-level state (graphics.antialias), independent of s_fxaa_ready: the shader still loads
-// either way, so toggling it costs no reload. Reset to these defaults on every graphics.canvas —
+// Script-level state (gfx.antialias), independent of s_fxaa_ready: the shader still loads
+// either way, so toggling it costs no reload. Reset to these defaults on every gfx.canvas —
 // a preference of the RUNNING PROGRAM, not of the host, like the 3D lighting state.
 static bool s_fxaa_enabled = true;
 static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's spanMax
-// Whether the readout is drawn takes TWO switches, and both must be on: the program's (graphics.stats)
+// Whether the readout is drawn takes TWO switches, and both must be on: the program's (gfx.stats)
 // and the host's (gfx_set_stats_visible). They are separate because they are reset at different
 // moments — the program's goes back on at every program start, whereas the host's must survive it, or
 // a host that hid the readout before launching a program would find it back on.
@@ -105,7 +105,7 @@ static void load_fxaa_shader() {
     s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
     s_fxaa_ready = true;
     // texelSize only changes with the render target's size (load_fxaa_shader re-uploads it when the area
-    // follows the host) and spanMax only on a graphics.antialias(_, size) call (which re-uploads it
+    // follows the host) and spanMax only on a gfx.antialias(_, size) call (which re-uploads it
     // itself, see gfx_antialias) — so both are uploaded here rather than every frame in render_frame.
     upload_fxaa_texel();
     SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
@@ -119,16 +119,16 @@ static void reset_fxaa_shader() {
         s_fxaa_ready = false;
     }
 }
-// graphics.antialias([enabled[, size]]): toggles FXAA on the composite, and optionally sets how
+// gfx.antialias([enabled[, size]]): toggles FXAA on the composite, and optionally sets how
 // far (in texels) the edge search may slide — see fxaa.frag's spanMax. Pure style state, so
-// unlike graphics.blendMode it needs no window and is never wrapped in with_area.
+// unlike gfx.blendMode it needs no window and is never wrapped in with_area.
 static int gfx_antialias(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     s_fxaa_enabled = (argc > 0) ? !is_falsy(args[0]) : true;
     if (argc > 1) {
-        double span = num_arg(args, argc, 1, "graphics.antialias");
+        double span = num_arg(args, argc, 1, "gfx.antialias");
         if (span < 0.0)
-            throw std::runtime_error("graphics.antialias: size must not be negative");
+            throw std::runtime_error("gfx.antialias: size must not be negative");
         s_fxaa_span = (float)span;
         if (s_fxaa_ready)   // the shader is already loaded: push the new value now, not next canvas()
             SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
@@ -143,7 +143,7 @@ static bool s_shot_pending = false;
 static void flush_pending_screenshot();   // defined below; used by gfx_end_draw
 static void gfx_reset_capture();          // likewise; used by gfx_canvas
 // reset_3d_lighting_state, reset_3d_graphics_state and end_3d_internal are declared in graphics_internal.h and defined in graphics3d.cpp.
-// ONE graphics.run per program. The engine (run_entry_hooks) calls graphics.run(draw) automatically
+// ONE gfx.run per program. The engine (run_entry_hooks) calls gfx.run(draw) automatically
 // when a draw() exists; if the script ALSO calls it explicitly we would get two loops, hence a double
 // CloseWindow (a native crash) or a double emscripten_set_main_loop on WASM. This guard ignores the
 // second call, and is reset to false in gfx_canvas — the start of a program — so a playground re-run
@@ -152,7 +152,7 @@ static bool s_run_active = false;
 
 void gfx_need_area() {
     if (!IsWindowReady())
-        throw std::runtime_error("graphics: no drawing area — call graphics.canvas(w, h) first, or "
+        throw std::runtime_error("gfx: no drawing area — call gfx.canvas(w, h) first, or "
                                  "define draw() and the engine opens one");
 }
 
@@ -229,9 +229,9 @@ static void publish_window_size(int w, int h) {
     }
 }
 
-// graphics.fitArea: the canvas follows the host's drawing area — rotation, window resize, a moved
+// gfx.fitArea: the canvas follows the host's drawing area — rotation, window resize, a moved
 // divider. A setting of THIS program, reset when a program starts (gfx_program_reset) and NOT by
-// graphics.canvas: the implicit canvas is created AFTER setup(), where a script has already turned it on.
+// gfx.canvas: the implicit canvas is created AFTER setup(), where a script has already turned it on.
 static bool s_fit_area = false;
 
 // A program that did not ask to follow the area keeps the shape it started in, in two steps. The engine
@@ -299,7 +299,7 @@ void gfx_program_reset() {
 }
 
 #ifdef __EMSCRIPTEN__
-// The drawing area changes size: the same sizing steps as graphics.canvas, without what makes that one
+// The drawing area changes size: the same sizing steps as gfx.canvas, without what makes that one
 // a NEW program (styles, lighting and the 3D resources are untouched). The render target is the only
 // thing that must be rebuilt, and render_frame calls this BEFORE binding it.
 static void resize_area(int w, int h) {
@@ -368,29 +368,29 @@ static void follow_area() {
 #endif
 }
 
-// graphics.fitArea([enabled]): with no argument, turns it on.
+// gfx.fitArea([enabled]): with no argument, turns it on.
 static int gfx_fit_area(CallCtx& ctx) {
     s_fit_area = (ctx.argc > 0) ? !is_falsy(ctx.args[0]) : true;
-    if (IsWindowReady())   // before the canvas exists, graphics.canvas decides
+    if (IsWindowReady())   // before the canvas exists, gfx.canvas decides
         lock_orientation(!s_fit_area);
     return ctx.ret(Value{});
 }
 
 static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    // The size is CHECKED, as graphics.viewport's is: a window of zero pixels is a mistake, and so
+    // The size is CHECKED, as gfx.viewport's is: a window of zero pixels is a mistake, and so
     // is a non-number, which the permissive conversion used to turn into 0 in silence — the third
     // behaviour this engine does not keep, next to converting and refusing. The consequences ran
     // deep: InitWindow(0, 0), a render texture of nothing, and W and H published as 0 to the script.
-    int w = argc > 0 ? (int)num_arg(args, argc, 0, "graphics.canvas") : 800;
-    int h = argc > 1 ? (int)num_arg(args, argc, 1, "graphics.canvas") : 600;
+    int w = argc > 0 ? (int)num_arg(args, argc, 0, "gfx.canvas") : 800;
+    int h = argc > 1 ? (int)num_arg(args, argc, 1, "gfx.canvas") : 600;
     if (w <= 0 || h <= 0)
-        throw std::runtime_error("graphics.canvas: the width and the height must be positive");
+        throw std::runtime_error("gfx.canvas: the width and the height must be positive");
     // The title is written by the author, so a string is MANDATORY: a number there is a mistake,
     // and it used to become "Ollin" in silence. A value is inserted the ordinary way, through an
-    // interpolation — graphics.canvas(W, H, "level {n}").
+    // interpolation — gfx.canvas(W, H, "level {n}").
     if (argc > 2 && !args[2].is_string())
-        throw std::runtime_error("graphics.canvas: the title must be a string");
+        throw std::runtime_error("gfx.canvas: the title must be a string");
     std::string title = argc > 2 ? args[2].as_string() : std::string("Ollin");
     s_shot_pending = false;   // a new program: forget any pending screenshot
     gfx_reset_capture();      // likewise for the capture the host asked for
@@ -398,10 +398,10 @@ static int gfx_canvas(CallCtx& ctx) {
     // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
     // in gfx_run, which runs AFTER and would wipe the configuration.
     reset3d_lighting_state();
-    s_fxaa_enabled = true;   // graphics.antialias: a setting of THIS program, not of the host
+    s_fxaa_enabled = true;   // gfx.antialias: a setting of THIS program, not of the host
     s_fxaa_span = 8.0f;
-    s_stats_program = true;  // graphics.stats likewise; the HOST's switch (s_stats_host) is left alone
-    s_run_active = false;   // a new program, hence ONE graphics.run allowed again
+    s_stats_program = true;  // gfx.stats likewise; the HOST's switch (s_stats_host) is left alone
+    s_run_active = false;   // a new program, hence ONE gfx.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
     // InitWindow. Every InitWindow (re)creates a WebGL context on the same canvas and recompiles
@@ -452,7 +452,7 @@ static int gfx_canvas(CallCtx& ctx) {
     s_logicalW = w;
     s_logicalH = h;
     // Repositions the engine globals on the canvas's real size: W and H to the logical dimensions, CX
-    // and CY to the centre as floats. graphics.canvas(w, h) therefore recomputes them even when w and h
+    // and CY to the centre as floats. gfx.canvas(w, h) therefore recomputes them even when w and h
     // differ from the initial window values.
     // A new canvas drops any viewport: it belongs to the program that asked for it.
     s_view_w = 0;
@@ -501,7 +501,7 @@ static int gfx_clear(CallCtx& ctx) {
         // A semi-transparent colour means a FADE, as in p5.js background(r,g,b,a<255), and NOT a clean
         // erase: we paint a translucent full-screen rectangle in ALPHA blending, which fades the
         // persistent content towards `c`. Ideal for trails. ALPHA is forced for the duration of the
-        // rectangle, then the current blend mode — the one graphics.blendMode set in draw() — is
+        // rectangle, then the current blend mode — the one gfx.blendMode set in draw() — is
         // restored.
         BeginBlendMode(BLEND_ALPHA);
         rlPushMatrix();                 // the fade is independent of the current transform
@@ -536,14 +536,14 @@ static int gfx_blend_mode(CallCtx& ctx) {
         } else if (s == "premultiply") {
             mode = BLEND_ALPHA_PREMULTIPLY;
         } else {
-            throw std::runtime_error("graphics.blendMode: unknown mode '" + s + "'");
+            throw std::runtime_error("gfx.blendMode: unknown mode '" + s + "'");
         }
     } else if (argc > 0 && args[0].is_number()) {
         mode = (int)args[0].as_num();   // a constant of the `blend` module
     } else if (argc > 0) {
         // A mode is an IDENTIFIER, so a wrong type is refused: it used to fall back to ALPHA in
         // silence, and the drawing then simply ignored the mode asked for.
-        throw std::runtime_error("graphics.blendMode: expected a mode name or a blend constant");
+        throw std::runtime_error("gfx.blendMode: expected a mode name or a blend constant");
     }
     s_blend_mode = mode;
     BeginBlendMode(mode);
@@ -792,7 +792,7 @@ static int gfx_stroke_size(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.fontSize([height]) sets the font height and ALWAYS returns the current one, so with no
+// gfx.fontSize([height]) sets the font height and ALWAYS returns the current one, so with no
 // argument it is simply an accessor.
 static int gfx_font_size(CallCtx& ctx) {
     Value* args = ctx.args;
@@ -802,7 +802,7 @@ static int gfx_font_size(CallCtx& ctx) {
     return ctx.ret(Value((double)s_font_size));
 }
 
-// graphics.font([name]) picks the current font among the engine's and ALWAYS returns its name. An
+// gfx.font([name]) picks the current font among the engine's and ALWAYS returns its name. An
 // unknown name is an error that lists the available fonts: better to report it than to silently draw
 // with a different one.
 static int gfx_font(CallCtx& ctx) {
@@ -810,7 +810,7 @@ static int gfx_font(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc > 0 && !args[0].is_nil()) {
         if (!args[0].is_string())
-            throw std::runtime_error("graphics.font: expected a font name");
+            throw std::runtime_error("gfx.font: expected a font name");
         std::string name = args[0].as_string();
         int idx = engine_font_index(name.c_str());
         if (idx < 0) {
@@ -820,14 +820,14 @@ static int gfx_font(CallCtx& ctx) {
                     known += ", ";
                 known += engine_font_name(i);
             }
-            throw std::runtime_error("graphics.font: unknown font '" + name + "' (available: " + known + ")");
+            throw std::runtime_error("gfx.font: unknown font '" + name + "' (available: " + known + ")");
         }
         s_font_idx = idx;
     }
     return ctx.ret(Value(std::string(engine_font_name(s_font_idx))));
 }
 
-// What the text PRIMITIVES draw is converted, never refused: `graphics.text(score, x, y)` writes
+// What the text PRIMITIVES draw is converted, never refused: `gfx.text(score, x, y)` writes
 // the number, and an instance goes through its `__str`, exactly as `print` would. Only these two
 // convert — everywhere else a string argument is mandatory, since a title or a diagnostic message
 // is written by the author and a number there is a mistake, not a shortcut.
@@ -841,21 +841,21 @@ static std::string drawn_text(const Value* args, int argc, int i) {
 }
 
 
-// graphics.textSize(text) gives the width and height of the text WITH the current font and size — two
+// gfx.textSize(text) gives the width and height of the text WITH the current font and size — two
 // values, so centring or aligning needs no reimplementation of the measurement.
 static int gfx_text_size(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("graphics.textSize: expected a text");
+        throw std::runtime_error("gfx.textSize: expected a text");
     if (!engine_font_usable(s_font_idx)) {
         // With no drawing area no font is loaded, so we return 0 rather than divide by the native
-        // height — the same choice as graphics.text, which draws nothing.
+        // height — the same choice as gfx.text, which draws nothing.
         ctx.set_result(0, Value(0.0));
         ctx.set_result(1, Value(0.0));
         return 2;
     }
-    // Same conversion as graphics.text, and for the same reason: measuring must agree with
+    // Same conversion as gfx.text, and for the same reason: measuring must agree with
     // drawing, or a number could be written but never centred.
     std::string text = drawn_text(args, argc, 0);
     Vector2 size = engine_text_size(s_font_idx, text.c_str(), s_font_size);
@@ -871,17 +871,17 @@ static int gfx_text_size(CallCtx& ctx) {
 static const char* const CORNER_CENTER[] = {"corner", "center"};
 
 static int gfx_rect_mode(CallCtx& ctx) {
-    s_rect_mode = mode_arg(ctx, 0, "graphics.rectMode", CORNER_CENTER, RECT_CORNER);
+    s_rect_mode = mode_arg(ctx, 0, "gfx.rectMode", CORNER_CENTER, RECT_CORNER);
     return ctx.ret(Value{});
 }
 
 static int gfx_ellipse_mode(CallCtx& ctx) {
-    s_ellipse_mode = mode_arg(ctx, 0, "graphics.ellipseMode", CORNER_CENTER, ELLIPSE_CENTER);
+    s_ellipse_mode = mode_arg(ctx, 0, "gfx.ellipseMode", CORNER_CENTER, ELLIPSE_CENTER);
     return ctx.ret(Value{});
 }
 
 static int gfx_sprite_mode(CallCtx& ctx) {
-    image_set_sprite_mode(mode_arg(ctx, 0, "graphics.spriteMode", CORNER_CENTER, SPRITE_CORNER));
+    image_set_sprite_mode(mode_arg(ctx, 0, "gfx.spriteMode", CORNER_CENTER, SPRITE_CORNER));
     return ctx.ret(Value{});
 }
 
@@ -898,14 +898,14 @@ static int gfx_text_mode(CallCtx& ctx) {
     // Both axes are read BEFORE either is written: writing as the arguments were parsed left an
     // invalid call having already wiped the mode in force, so a script catching the error found
     // itself back at left/top without asking. A refused call must change nothing.
-    int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "graphics.textMode", TEXT_H_NAMES, 0)];
-    int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 0)];
+    int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "gfx.textMode", TEXT_H_NAMES, 0)];
+    int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "gfx.textMode", TEXT_V_NAMES, 0)];
     s_text_mode = horizontal;
     s_text_valign = vertical;
     return ctx.ret(Value{});
 }
 
-// graphics.viewport(w, h): draw in a fixed w×h space, whatever the area's real size — the engine
+// gfx.viewport(w, h): draw in a fixed w×h space, whatever the area's real size — the engine
 // scales it up, centres it, and letterboxes what is left. With no argument the viewport is dropped
 // and the area's own coordinates come back.
 // It exists because a game with a fixed field otherwise has to compute its own scale, push its own
@@ -919,11 +919,11 @@ static int gfx_viewport(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     if (ctx.argc < 2)
-        throw std::runtime_error("graphics.viewport: expected a width and a height");
+        throw std::runtime_error("gfx.viewport: expected a width and a height");
     int w = gfx_to_int(ctx.args[0]);
     int h = gfx_to_int(ctx.args[1]);
     if (w <= 0 || h <= 0)
-        throw std::runtime_error("graphics.viewport: the width and the height must be positive");
+        throw std::runtime_error("gfx.viewport: the width and the height must be positive");
     s_view_w = w;
     s_view_h = h;
     publish_draw_size();
@@ -946,7 +946,7 @@ static int gfx_stroke(CallCtx& ctx) {
     ColorRGBA k = parse_color(args, argc, "stroke");
     apply_stroke(true, rgba_color(k.r, k.g, k.b, k.a));
     // The optional size is accepted only with a Color object as first argument — stroke(Color, size).
-    // For the numeric forms use graphics.strokeSize, since there the numbers are the colour.
+    // For the numeric forms use gfx.strokeSize, since there the numbers are the colour.
     if ((args[0].is_map() || args[0].is_class()) && argc > 1 && args[1].is_number())
         apply_stroke_size((float)args[1].as_num());
     return ctx.ret(Value{});
@@ -979,7 +979,7 @@ static int gfx_no_fill(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Global image tint for graphics.sprite and image.draw: a Color object, or r,g,b[,a].
+// Global image tint for gfx.sprite and image.draw: a Color object, or r,g,b[,a].
 static int gfx_tint(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
@@ -1001,13 +1001,13 @@ static int gfx_no_tint(CallCtx& ctx) {
 static int gfx_line(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
-        throw std::runtime_error("graphics.line: expected x1, y1, x2, y2");
+        throw std::runtime_error("gfx.line: expected x1, y1, x2, y2");
     if (!s_has_stroke)
         return ctx.ret(Value{});
-    float x1 = (float)num_arg(args, 0, "graphics.line");
-    float y1 = (float)num_arg(args, 1, "graphics.line");
-    float x2 = (float)num_arg(args, 2, "graphics.line");
-    float y2 = (float)num_arg(args, 3, "graphics.line");
+    float x1 = (float)num_arg(args, 0, "gfx.line");
+    float y1 = (float)num_arg(args, 1, "gfx.line");
+    float x2 = (float)num_arg(args, 2, "gfx.line");
+    float y2 = (float)num_arg(args, 3, "gfx.line");
     StrokeWC s = stroke_params();   // a thin continuous line: below 1 the alpha is modulated, instead of dashes
     DrawLineEx({x1, y1}, {x2, y2}, s.w, s.c);
     return ctx.ret(Value{});
@@ -1016,7 +1016,7 @@ static int gfx_line(CallCtx& ctx) {
 static int gfx_rect(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
-        throw std::runtime_error("graphics.rect: expected x, y, w, h[, r]");
+        throw std::runtime_error("gfx.rect: expected x, y, w, h[, r]");
     double wn = gfx_to_num(args[2]);
     double hn = gfx_to_num(args[3]);
     double xn = gfx_to_num(args[0]);
@@ -1095,7 +1095,7 @@ static int gfx_fps(CallCtx& ctx) {
 static int gfx_screenshot(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string())
-        throw std::runtime_error("graphics.screenshot: expected a file path");
+        throw std::runtime_error("gfx.screenshot: expected a file path");
     s_shot_path = args[0].as_string();
     s_shot_pending = true;
     return ctx.ret(Value{});
@@ -1103,7 +1103,7 @@ static int gfx_screenshot(CallCtx& ctx) {
 
 // A capture requested by the HOST — the fullscreen button, see wasm_main — rather than by the script:
 // the PNG is produced IN MEMORY, encoded as base64, then collected by gfx_take_capture. Like
-// graphics.screenshot it is DEFERRED to the end of the frame, the only moment when the default
+// gfx.screenshot it is DEFERRED to the end of the frame, the only moment when the default
 // framebuffer holds the composed screen: without preserveDrawingBuffer the browser clears it after
 // compositing.
 static bool s_capture_pending = false;
@@ -1127,7 +1127,7 @@ std::string gfx_take_capture() {
     return out;
 }
 
-// Performs the pending captures, the script's (graphics.screenshot, a file) and the host's (gfx_take_capture,
+// Performs the pending captures, the script's (gfx.screenshot, a file) and the host's (gfx_take_capture,
 // base64): ONE read of the screen serves both, so they cannot disagree on what a capture is. Called at the
 // end of the frame by render_frame, when the default framebuffer holds the composed image — what is actually
 // on screen.
@@ -1160,9 +1160,9 @@ static void flush_pending_screenshot() {
 static int gfx_text(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
-        throw std::runtime_error("graphics.text: expected text, x, y");
+        throw std::runtime_error("gfx.text: expected text, x, y");
     // ANY value is drawn, converted exactly as `print` converts it — an instance's `__str`
-    // included. A non-string used to become the empty string, so `graphics.text(score, x, y)`
+    // included. A non-string used to become the empty string, so `gfx.text(score, x, y)`
     // drew nothing at all, in silence: neither a result nor a diagnosis.
     //
     // The geometry is read BEFORE the conversion, because `__str` is Ollin code: calling it can
@@ -1289,7 +1289,7 @@ static void draw_thick_path(const std::vector<Vector2>& pts, bool closed, float 
 
 static int gfx_polygon(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    static constexpr const char* FN = "graphics.polygon";
+    static constexpr const char* FN = "gfx.polygon";
     if (argc < 1 || !args[0].is_array())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
     auto pts = parse_points(args[0], FN);
@@ -1306,7 +1306,7 @@ static int gfx_polygon(CallCtx& ctx) {
 
 static int gfx_polyline(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    static constexpr const char* FN = "graphics.polyline";
+    static constexpr const char* FN = "gfx.polyline";
     if (argc < 1 || !args[0].is_array())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
     if (!s_has_stroke)
@@ -1381,20 +1381,20 @@ static void draw_oval(float cx, float cy, float rx, float ry, int segs) {
 static int gfx_ellipse(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
-        throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
+        throw std::runtime_error("gfx.ellipse: expected x, y, width, height");
     int segs = (argc > 4 && args[4].is_number()) ? std::max(3, (int)args[4].as_num()) : s_segments;
-    draw_oval((float)num_arg(args, 0, "graphics.ellipse"), (float)num_arg(args, 1, "graphics.ellipse"),
-             (float)num_arg(args, 2, "graphics.ellipse") * 0.5f, (float)num_arg(args, 3, "graphics.ellipse") * 0.5f, segs);
+    draw_oval((float)num_arg(args, 0, "gfx.ellipse"), (float)num_arg(args, 1, "gfx.ellipse"),
+             (float)num_arg(args, 2, "gfx.ellipse") * 0.5f, (float)num_arg(args, 3, "gfx.ellipse") * 0.5f, segs);
     return ctx.ret(Value{});
 }
 
 static int gfx_circle(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
-        throw std::runtime_error("graphics.circle: expected x, y, radius");
+        throw std::runtime_error("gfx.circle: expected x, y, radius");
     int segs = (argc > 3 && args[3].is_number()) ? std::max(3, (int)args[3].as_num()) : s_segments;
-    float r = (float)num_arg(args, 2, "graphics.circle");
-    draw_oval((float)num_arg(args, 0, "graphics.circle"), (float)num_arg(args, 1, "graphics.circle"), r, r, segs);
+    float r = (float)num_arg(args, 2, "gfx.circle");
+    draw_oval((float)num_arg(args, 0, "gfx.circle"), (float)num_arg(args, 1, "gfx.circle"), r, r, segs);
     return ctx.ret(Value{});
 }
 
@@ -1446,7 +1446,7 @@ static void draw_arc_stroke(float cx, float cy, float rx, float ry, float start,
 // angle.
 static int gfx_arc(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    static constexpr const char* FN = "graphics.arc";
+    static constexpr const char* FN = "gfx.arc";
     if (argc < 6)
         throw std::runtime_error(std::string(FN) + ": expected x, y, w, h, start, stop");
     float cx = (float)num_arg(args, 0, FN);
@@ -1480,11 +1480,11 @@ static int gfx_arc(CallCtx& ctx) {
 static int gfx_point(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
-        throw std::runtime_error("graphics.point: expected x, y");
+        throw std::runtime_error("gfx.point: expected x, y");
     if (!s_has_stroke)
         return ctx.ret(Value{});
-    float x = (float)num_arg(args, 0, "graphics.point");
-    float y = (float)num_arg(args, 1, "graphics.point");
+    float x = (float)num_arg(args, 0, "gfx.point");
+    float y = (float)num_arg(args, 1, "gfx.point");
     DrawCircleV({x, y}, s_stroke_size, s_stroke_color);
     return ctx.ret(Value{});
 }
@@ -1577,8 +1577,8 @@ void gfx_set_stats_visible(bool visible) {
     s_stats_host = visible;
 }
 
-// graphics.stats([enabled]): shows or hides the memory and frame-rate readout. With no argument it
-// shows it, as graphics.antialias turns smoothing back on. Pure state, like antialias: no window needed.
+// gfx.stats([enabled]): shows or hides the memory and frame-rate readout. With no argument it
+// shows it, as gfx.antialias turns smoothing back on. Pure state, like antialias: no window needed.
 static int gfx_stats(CallCtx& ctx) {
     s_stats_program = (ctx.argc > 0) ? !is_falsy(ctx.args[0]) : true;
     return ctx.ret(Value{});
@@ -1653,7 +1653,7 @@ static void call_update_if_any() {
 }
 
 // Renders ONE frame. The context is NOT cleared by default: draw() paints into the persistent target
-// s_target — it is up to draw() to call graphics.clear() for a fresh background — then s_target is
+// s_target — it is up to draw() to call gfx.clear() for a fresh background — then s_target is
 // blitted to the screen and the FPS overlay is laid ON TOP, so it stays crisp and never accumulates.
 // `tex` and `drawing` report which blocks are open, for a safe cleanup should draw() throw inside the
 // web loop.
@@ -1719,7 +1719,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // pixels. We replace it with the LOGICAL extents, origin at the top left as raylib does, so
         // draw() keeps logical coordinates over [0,w]×[0,h] while rendering at full physical
         // resolution. This goes on the PROJECTION and not the modelview, so it survives
-        // graphics.resetTransform.
+        // gfx.resetTransform.
         rlMatrixMode(RL_PROJECTION);
         rlLoadIdentity();
         // Under a viewport the extents are the VIRTUAL ones, so draw() works in that space while the
@@ -1738,7 +1738,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // clipping, never what covers what — that stays the order things are drawn in.
         int draw_w = (s_view_w > 0 ? s_view_w : s_logicalW);
         int draw_h = (s_view_w > 0 ? s_view_h : s_logicalH);
-        // At least 1 deep: graphics.canvas does not refuse a size of zero the way graphics.viewport
+        // At least 1 deep: gfx.canvas does not refuse a size of zero the way gfx.viewport
         // does, and a span of zero would divide by far - near in the ortho matrix, leaving a NaN
         // projection that draws nothing at all.
         double span = (draw_w + draw_h > 0 ? (double)(draw_w + draw_h) : 1.0);
@@ -1762,7 +1762,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // s_target is at the physical resolution and stored bottom-up, so the source is the RT's real
         // size with a negative height to display it upright, and the destination is in logical
         // coordinates, filling the screen through the physical viewport — a 1:1 pixel mapping with no
-        // resampling, except when graphics.viewport(w, h) is active, where the bilinear filter is what
+        // resampling, except when gfx.viewport(w, h) is active, where the bilinear filter is what
         // smooths the scale-up/down to the virtual size.
         float vscale = 1.0f, voff_x = 0.0f, voff_y = 0.0f;
         Rectangle dest{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH};
@@ -1773,9 +1773,9 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
         }
         // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader, which
-        // uploads texelSize and spanMax once (they change only on graphics.canvas/antialias, not
+        // uploads texelSize and spanMax once (they change only on gfx.canvas/antialias, not
         // per frame). Guarded by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled
-        // (graphics.antialias).
+        // (gfx.antialias).
         bool use_fxaa = s_fxaa_ready && s_fxaa_enabled;
         if (use_fxaa) {
             BeginShaderMode(s_fxaa);
@@ -1841,7 +1841,7 @@ static void emscripten_frame() {
 static int gfx_run(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("graphics.run: expected callback function");
+        throw std::runtime_error("gfx.run: expected callback function");
     if (s_run_active)   // already started for this program, so the second call is ignored (see s_run_active)
         return ctx.ret(Value{});
     s_run_active = true;
@@ -1930,14 +1930,14 @@ static int gfx_pop_style(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.translate(x, y [, z]): z is optional and defaults to 0, so this serves 2D and 3D alike.
+// gfx.translate(x, y [, z]): z is optional and defaults to 0, so this serves 2D and 3D alike.
 static int gfx_translate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
-        throw std::runtime_error("graphics.translate: expected x, y [, z]");
-    float x = (float)num_arg(args, 0, "graphics.translate");
-    float y = (float)num_arg(args, 1, "graphics.translate");
-    float z = argc > 2 ? (float)num_arg(args, 2, "graphics.translate") : 0.0f;
+        throw std::runtime_error("gfx.translate: expected x, y [, z]");
+    float x = (float)num_arg(args, 0, "gfx.translate");
+    float y = (float)num_arg(args, 1, "gfx.translate");
+    float z = argc > 2 ? (float)num_arg(args, 2, "gfx.translate") : 0.0f;
     rlTranslatef(x, y, z);
     return ctx.ret(Value{});
 }
@@ -1954,58 +1954,58 @@ static void rotate_axis(Value* args, int argc, float ax, float ay, float az, con
     rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
 
-// graphics.rotate(deg [, ax, ay, az]): with no axis it turns about Z, with all three components it is
+// gfx.rotate(deg [, ax, ay, az]): with no axis it turns about Z, with all three components it is
 // a 3D rotation about (ax,ay,az). A PARTIAL axis, two or three arguments, is an ERROR — we do not
 // silently fall back to Z.
 static int gfx_rotate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 1) {
-        rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // the Z axis by default
+        rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "gfx.rotate");   // the Z axis by default
     } else if (argc >= 4) {
-        rlRotatef((float)num_arg(args, argc, 0, "graphics.rotate"), (float)num_arg(args, argc, 1, "graphics.rotate"),
-                  (float)num_arg(args, argc, 2, "graphics.rotate"), (float)num_arg(args, argc, 3, "graphics.rotate"));
+        rlRotatef((float)num_arg(args, argc, 0, "gfx.rotate"), (float)num_arg(args, argc, 1, "gfx.rotate"),
+                  (float)num_arg(args, argc, 2, "gfx.rotate"), (float)num_arg(args, argc, 3, "gfx.rotate"));
     } else {
-        throw std::runtime_error("graphics.rotate: expected deg [, ax, ay, az] (a whole axis, or none)");
+        throw std::runtime_error("gfx.rotate: expected deg [, ax, ay, az] (a whole axis, or none)");
     }
     return ctx.ret(Value{});
 }
 
 static int gfx_rotate_x(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotate_axis(args, argc, 1.0f, 0.0f, 0.0f, "graphics.rotateX");
+    rotate_axis(args, argc, 1.0f, 0.0f, 0.0f, "gfx.rotateX");
     return ctx.ret(Value{});
 }
 static int gfx_rotate_y(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotate_axis(args, argc, 0.0f, 1.0f, 0.0f, "graphics.rotateY");
+    rotate_axis(args, argc, 0.0f, 1.0f, 0.0f, "gfx.rotateY");
     return ctx.ret(Value{});
 }
 static int gfx_rotate_z(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotateZ");
+    rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "gfx.rotateZ");
     return ctx.ret(Value{});
 }
 
-// graphics.scale(s | sx,sy | sx,sy,sz): one argument is uniform, two give (sx,sy,1) for 2D, and
+// gfx.scale(s | sx,sy | sx,sy,sz): one argument is uniform, two give (sx,sy,1) for 2D, and
 // three give (sx,sy,sz).
 //
 // A single argument scales Z only in a 3D block. rlgl gives EVERY 2D vertex a z of its own, the
 // batch's layering depth (rlgl.h, currentDepth), and scaling that would slide the whole drawing in
 // depth for no reason a 2D script could want — it would then sit at a different depth from
 // everything drawn under another scale. It used to be worse than pointless: with raylib's original
-// depth window, one unit deep, graphics.scale(40) drew NOTHING AT ALL, a blank screen with no
+// depth window, one unit deep, gfx.scale(40) drew NOTHING AT ALL, a blank screen with no
 // error, while two arguments worked — which is what made it so puzzling.
 static int gfx_scale(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("graphics.scale: expected s | sx, sy | sx, sy, sz");
-    float sx = (float)num_arg(args, 0, "graphics.scale");
+        throw std::runtime_error("gfx.scale: expected s | sx, sy | sx, sy, sz");
+    float sx = (float)num_arg(args, 0, "gfx.scale");
     float sy, sz;
     if (argc >= 3) {
-        sy = (float)num_arg(args, 1, "graphics.scale");
-        sz = (float)num_arg(args, 2, "graphics.scale");
+        sy = (float)num_arg(args, 1, "gfx.scale");
+        sz = (float)num_arg(args, 2, "gfx.scale");
     } else if (argc == 2) {
-        sy = (float)num_arg(args, 1, "graphics.scale");
+        sy = (float)num_arg(args, 1, "gfx.scale");
         sz = 1.0f;
     } else {
         sy = sx;
@@ -2027,18 +2027,18 @@ static int gfx_reset_transform(CallCtx& ctx) {
 static int gfx_sprite(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
-        throw std::runtime_error("graphics.sprite: expected img, x, y");
+        throw std::runtime_error("gfx.sprite: expected img, x, y");
     if (!args[0].is_map())
-        throw std::runtime_error("graphics.sprite: expected image handle");
+        throw std::runtime_error("gfx.sprite: expected image handle");
     Value idv = args[0].map_get(Value(std::string("id")));
     if (!idv.is_integer())
-        throw std::runtime_error("graphics.sprite: invalid image handle");
+        throw std::runtime_error("gfx.sprite: invalid image handle");
     int id = (int)idv.as_int();
 
-    float x = (float)num_arg(args, 1, "graphics.sprite");
-    float y = (float)num_arg(args, 2, "graphics.sprite");
-    float dw = argc > 3 ? (float)num_arg(args, 3, "graphics.sprite") : 0.0f;
-    float dh = argc > 4 ? (float)num_arg(args, 4, "graphics.sprite") : 0.0f;
+    float x = (float)num_arg(args, 1, "gfx.sprite");
+    float y = (float)num_arg(args, 2, "gfx.sprite");
+    float dw = argc > 3 ? (float)num_arg(args, 3, "gfx.sprite") : 0.0f;
+    float dh = argc > 4 ? (float)num_arg(args, 4, "gfx.sprite") : 0.0f;
 
     bool has = false;
     unsigned char r = 255, g = 255, b = 255, a = 255;

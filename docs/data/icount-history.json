@@ -498,7 +498,7 @@
       "fib": 59923832,
       "loop": 30553532,
       "map": 55466982,
-      "subject": "Review fixes: graphics.specular refuses NaN, stale OR opcode texts, the Earth header, the upvalue guard's message"
+      "subject": "Review fixes: gfx.specular refuses NaN, stale OR opcode texts, the Earth header, the upvalue guard's message"
     },
     {
       "date": "2026-10-30",

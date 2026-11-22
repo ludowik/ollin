@@ -208,56 +208,56 @@ const MODULE_MEMBERS = {
     fn('math.isNan','isNan(x)'), fn('math.isInf','isInf(x)'),
     fn('math.rand','rand([lo,hi])'), fn('math.randInt','randInt([lo,]hi)'), fn('math.seed','seed(n)'),
   ],
-  graphics: [
-    fn('graphics.canvas','canvas(w,h[,title])'),   fn('graphics.run','run(callback)'),
-    fn('graphics.clear','clear([color]) — alpha<1 = fade'),
-    fn('graphics.blendMode','blendMode(mode) — "add"/blend.ADD…'),
-    fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color]|r,g,b)'),
-    fn('graphics.noStroke','noStroke()'),
-    fn('graphics.fill','fill([color])'),           fn('graphics.noFill','noFill()'),
-    fn('graphics.tint','tint([color])'),           fn('graphics.noTint','noTint()'),
-    fn('graphics.beginDraw','beginDraw()'),      fn('graphics.endDraw','endDraw()'),
-    fn('graphics.screenshot','screenshot(path)'),
-    fn('graphics.line','line(x1,y1,x2,y2)'),       fn('graphics.rect','rect(x,y,w,h)'),
-    fn('graphics.circle','circle(x,y,r)'),          fn('graphics.ellipse','ellipse(x,y,rx,ry)'),
-    fn('graphics.point','point(x,y)'),
-    fn('graphics.polygon','polygon(pts)'),          fn('graphics.polyline','polyline(pts)'),
-    fn('graphics.push','push()'),                   fn('graphics.pop','pop()'),
-    fn('graphics.pushMatrix','pushMatrix()'),       fn('graphics.popMatrix','popMatrix()'),
-    fn('graphics.pushStyle','pushStyle()'),         fn('graphics.popStyle','popStyle()'),
-    fn('graphics.translate','translate(x,y [,z])'), fn('graphics.rotate','rotate(deg [,ax,ay,az])'),
-    fn('graphics.rotateX','rotateX(deg)'),          fn('graphics.rotateY','rotateY(deg)'),
-    fn('graphics.rotateZ','rotateZ(deg)'),
-    fn('graphics.scale','scale(s | sx,sy | sx,sy,sz)'), fn('graphics.resetTransform','resetTransform()'),
-    fn('graphics.sprite','sprite(img,x,y[,w,h])'),
-    fn('graphics.text','text(str,x,y,size[,color])'),
-    fn('graphics.fps','fps()→int'),                fn('graphics.isOpen','isOpen()→bool'),
-    fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
+  gfx: [
+    fn('gfx.canvas','canvas(w,h[,title])'),   fn('gfx.run','run(callback)'),
+    fn('gfx.clear','clear([color]) — alpha<1 = fade'),
+    fn('gfx.blendMode','blendMode(mode) — "add"/blend.ADD…'),
+    fn('gfx.strokeSize','strokeSize(n)'),     fn('gfx.stroke','stroke([color]|r,g,b)'),
+    fn('gfx.noStroke','noStroke()'),
+    fn('gfx.fill','fill([color])'),           fn('gfx.noFill','noFill()'),
+    fn('gfx.tint','tint([color])'),           fn('gfx.noTint','noTint()'),
+    fn('gfx.beginDraw','beginDraw()'),      fn('gfx.endDraw','endDraw()'),
+    fn('gfx.screenshot','screenshot(path)'),
+    fn('gfx.line','line(x1,y1,x2,y2)'),       fn('gfx.rect','rect(x,y,w,h)'),
+    fn('gfx.circle','circle(x,y,r)'),          fn('gfx.ellipse','ellipse(x,y,rx,ry)'),
+    fn('gfx.point','point(x,y)'),
+    fn('gfx.polygon','polygon(pts)'),          fn('gfx.polyline','polyline(pts)'),
+    fn('gfx.push','push()'),                   fn('gfx.pop','pop()'),
+    fn('gfx.pushMatrix','pushMatrix()'),       fn('gfx.popMatrix','popMatrix()'),
+    fn('gfx.pushStyle','pushStyle()'),         fn('gfx.popStyle','popStyle()'),
+    fn('gfx.translate','translate(x,y [,z])'), fn('gfx.rotate','rotate(deg [,ax,ay,az])'),
+    fn('gfx.rotateX','rotateX(deg)'),          fn('gfx.rotateY','rotateY(deg)'),
+    fn('gfx.rotateZ','rotateZ(deg)'),
+    fn('gfx.scale','scale(s | sx,sy | sx,sy,sz)'), fn('gfx.resetTransform','resetTransform()'),
+    fn('gfx.sprite','sprite(img,x,y[,w,h])'),
+    fn('gfx.text','text(str,x,y,size[,color])'),
+    fn('gfx.fps','fps()→int'),                fn('gfx.isOpen','isOpen()→bool'),
+    fn('gfx.close','close()'),                fn('gfx.quit','quit()'),
     // 3D.
-    fn('graphics.camera','camera(px,py,pz, tx,ty,tz [, fovy])'),
-    fn('graphics.begin3d','begin3d(cam)'),         fn('graphics.end3d','end3d()'),
-    fn('graphics.grid','grid(slices, spacing)'),
-    fn('graphics.cube','cube(x,y,z, w,h,l)'),      fn('graphics.sphere','sphere(x,y,z, r)'),
-    fn('graphics.cylinder','cylinder(x,y,z, r, h)'),
-    fn('graphics.plane','plane(x,y,z, sx,sz)'),
-    fn('graphics.model','model(name)'),            fn('graphics.drawModel','drawModel(handle, x,y,z [, scale])'),
-    fn('graphics.modelSize','modelSize(handle)'),  fn('graphics.fitDistance','fitDistance(radius [, fovy])'),
-    fn('graphics.inFrustum','inFrustum(x,y,z [, radius])'),
-    fn('graphics.beginChunk','beginChunk()'),      fn('graphics.endChunk','endChunk()'),
-    fn('graphics.drawChunk','drawChunk(handle)'),  fn('graphics.drawChunkAlpha','drawChunkAlpha(handle)'),
-    fn('graphics.freeChunk','freeChunk(handle)'),
-    fn('graphics.tileset','tileset(img, cols, rows)'),
-    fn('graphics.tiles','tiles(top, side, bottom)'), fn('graphics.tile','tile(t)'),
-    fn('graphics.tileAnim','tileAnim(t)'),
-    fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
-    fn('graphics.ambient','ambient(v | color)'),
-    fn('graphics.light','light("dir"|"point", x,y,z [, color]) → Light'),
-    fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
+    fn('gfx.camera','camera(px,py,pz, tx,ty,tz [, fovy])'),
+    fn('gfx.begin3d','begin3d(cam)'),         fn('gfx.end3d','end3d()'),
+    fn('gfx.grid','grid(slices, spacing)'),
+    fn('gfx.cube','cube(x,y,z, w,h,l)'),      fn('gfx.sphere','sphere(x,y,z, r)'),
+    fn('gfx.cylinder','cylinder(x,y,z, r, h)'),
+    fn('gfx.plane','plane(x,y,z, sx,sz)'),
+    fn('gfx.model','model(name)'),            fn('gfx.drawModel','drawModel(handle, x,y,z [, scale])'),
+    fn('gfx.modelSize','modelSize(handle)'),  fn('gfx.fitDistance','fitDistance(radius [, fovy])'),
+    fn('gfx.inFrustum','inFrustum(x,y,z [, radius])'),
+    fn('gfx.beginChunk','beginChunk()'),      fn('gfx.endChunk','endChunk()'),
+    fn('gfx.drawChunk','drawChunk(handle)'),  fn('gfx.drawChunkAlpha','drawChunkAlpha(handle)'),
+    fn('gfx.freeChunk','freeChunk(handle)'),
+    fn('gfx.tileset','tileset(img, cols, rows)'),
+    fn('gfx.tiles','tiles(top, side, bottom)'), fn('gfx.tile','tile(t)'),
+    fn('gfx.tileAnim','tileAnim(t)'),
+    fn('gfx.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('gfx.point3d','point3d(x,y,z)'),
+    fn('gfx.ambient','ambient(v | color)'),
+    fn('gfx.light','light("dir"|"point", x,y,z [, color]) → Light'),
+    fn('gfx.texture','texture(img)'),         fn('gfx.noTexture','noTexture()'),
     // Quaternions.
-    fn('graphics.quat','quat() → Quat (identity)'),
-    fn('graphics.quatAxis','quatAxis(ax,ay,az, deg) → Quat'),
-    fn('graphics.quatEuler','quatEuler(pitch,yaw,roll) → Quat'),
-    fn('graphics.rotateq','rotateq(q)'),
+    fn('gfx.quat','quat() → Quat (identity)'),
+    fn('gfx.quatAxis','quatAxis(ax,ay,az, deg) → Quat'),
+    fn('gfx.quatEuler','quatEuler(pitch,yaw,roll) → Quat'),
+    fn('gfx.rotateq','rotateq(q)'),
   ],
   image: [
     fn('image.load','load(path) → img'),
@@ -357,7 +357,7 @@ function ollinComplete(context) {
   }
   const word = context.matchBefore(/\w+/)
   if (!word || (word.from === word.to && !context.explicit)) return null
-  // Completing a module (math, graphics…) inserts "name." and reopens the list at once on its
+  // Completing a module (math, gfx…) inserts "name." and reopens the list at once on its
   // members, so the dot no longer has to be typed by hand.
   const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({
     label: m, type: 'namespace',
@@ -1991,7 +1991,7 @@ const outputHdr  = document.getElementById('output-header')
 // area, and app.js puts it back on unmount.
 canvasEl.style.display = 'none'
 outputPane.appendChild(canvasEl)
-disposers.push(Run.watchRenderArea(outputPane), Run.releaseProgramHolds)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
+disposers.push(Run.watchRenderArea(outputPane), Run.releaseProgramHolds)   // a rotation resizes the pane: the engine follows (gfx.fitArea)
 
 // The render area (output plus canvas) only appears while running or paused; at rest the editor
 // takes up ALL the space.
@@ -2188,7 +2188,7 @@ async function launch() {
   // ONE name for the file being run: the base its imports resolve against, both while preloading
   // and inside the engine, which derives its base directory from this very string.
   const entryName = currentProject ? (currentProject.entry || '') : (exampleFile || '')
-  // In sample or draft mode the 3D models referenced (graphics.model("x.obj")) are preloaded from
+  // In sample or draft mode the 3D models referenced (gfx.model("x.obj")) are preloaded from
   // samples/; user projects go through their own resources.
   if (!currentProject) {
     await Run.preloadProgramAssets(ollin, code, ctx.v, entryName)

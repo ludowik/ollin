@@ -37,7 +37,7 @@ global view = {
 
 ## The style the game is seen in, and the one after it: the layout, the font and the smoothing follow it.
 func applyStyle()
-    graphics.antialias(styles[view.style].smooth)
+    gfx.antialias(styles[view.style].smooth)
     view.hint = "V  " + styles[view.style % len(styles) + 1].name + " STYLE"
 end
 
@@ -138,8 +138,8 @@ func layoutCompute()
 end
 
 func setup()
-    graphics.canvas(W, H, "Tetris")
-    graphics.fitArea()
+    gfx.canvas(W, H, "Tetris")
+    gfx.fitArea()
     gameInit()
     loadGame()
     loadStyle()
@@ -156,9 +156,9 @@ end
 
 func draw()
     var st = styles[view.style]
-    graphics.font(st.font)
-    graphics.noStroke()
-    graphics.clear(st.ground[1], st.ground[2], st.ground[3])
+    gfx.font(st.font)
+    gfx.noStroke()
+    gfx.clear(st.ground[1], st.ground[2], st.ground[3])
     var items = screenItems(view.hint)
     if items <> nil then
         st.items(items)

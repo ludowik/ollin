@@ -8,7 +8,7 @@ end
 
 ## The rectangle of a cell, inset to leave the gap between neighbours.
 func cellRect(x, y, s)
-    graphics.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
+    gfx.rect(x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.16)
 end
 
 ## A block: the one blue, or the washed-out one of a piece that fits nowhere.
@@ -19,10 +19,10 @@ func drawCell(x, y, s, alpha = 1, stuck = false)
     end
     var g = s * 0.05
     var inner = s - 2 * g
-    graphics.fill(col[1], col[2], col[3], alpha)
-    graphics.rect(x + g, y + g, inner, inner, s * 0.18)
-    graphics.fill(1, 1, 1, 0.22 * alpha)
-    graphics.rect(x + g + s * 0.08, y + g + s * 0.06, inner - s * 0.16, inner * 0.32, s * 0.12)
+    gfx.fill(col[1], col[2], col[3], alpha)
+    gfx.rect(x + g, y + g, inner, inner, s * 0.18)
+    gfx.fill(1, 1, 1, 0.22 * alpha)
+    gfx.rect(x + g + s * 0.08, y + g + s * 0.06, inner - s * 0.16, inner * 0.32, s * 0.12)
 end
 
 ## The blocks of a shape whose top-left corner is at (x0, y0), s wide each.
@@ -38,8 +38,8 @@ end
 
 func drawButton(label, r, fill, textSize, alpha = 1)
     var L = game.layout
-    graphics.fill(fill[1], fill[2], fill[3], alpha)
-    graphics.rect(r.x, r.y, r.w, r.h, L.c * 0.3)
+    gfx.fill(fill[1], fill[2], fill[3], alpha)
+    gfx.rect(r.x, r.y, r.w, r.h, L.c * 0.3)
     drawText(label, r.x + r.w / 2, r.y + r.h / 2, fitSize(label, textSize, r.w * 0.9), "center", "center", config.onButton, alpha)
 end
 
@@ -61,7 +61,7 @@ func drawFloaters()
     var tx = L.scoreX + c * 0.6
     var ty = L.scoreY + c * 1.0
     var ink = config.outlineInk
-    graphics.textMode("center", "center")
+    gfx.textMode("center", "center")
     for f in game.floaters do
         if f.age > 0 then
             var u = math.min(f.age / config.floatPop, 1) - 1
@@ -76,16 +76,16 @@ func drawFloaters()
             var size = c * 0.46 * grow * (1 - 0.75 * k)
             var alpha = 1 - math.max(0, (k - 0.8) / 0.2)
             var edge = size * 0.07
-            graphics.fontSize(size)
-            graphics.stroke(ink[1], ink[2], ink[3], ink[4] * alpha * 0.9)
+            gfx.fontSize(size)
+            gfx.stroke(ink[1], ink[2], ink[3], ink[4] * alpha * 0.9)
             for off in config.outline do
-                graphics.text(f.text, x + off[1] * edge, y + off[2] * edge)
+                gfx.text(f.text, x + off[1] * edge, y + off[2] * edge)
             end
-            graphics.stroke(f.tint[1], f.tint[2], f.tint[3], f.tint[4] * alpha)
-            graphics.text(f.text, x, y)
+            gfx.stroke(f.tint[1], f.tint[2], f.tint[3], f.tint[4] * alpha)
+            gfx.text(f.text, x, y)
         end
     end
-    graphics.noStroke()
+    gfx.noStroke()
 end
 
 func drawBoard()
@@ -93,7 +93,7 @@ func drawBoard()
     var c = L.c
     ## The empty cells, the two greys of the 3x3 boxes one after the other: a fill per grey, not per cell.
     for tint = 0, 1 do
-        graphics.fill(config.cellLight - (config.cellLight - config.cellDark) * tint)
+        gfx.fill(config.cellLight - (config.cellLight - config.cellDark) * tint)
         for r = 1, GRID do
             for col = 1, GRID do
                 if ((r - 1) // BOX + (col - 1) // BOX) % 2 == tint then
@@ -113,7 +113,7 @@ func drawBoard()
                 var y = oy + (c - size) / 2
                 drawCell(x, y, size)
                 if cell.f > 0.01 then
-                    graphics.fill(1, 1, 1, cell.f * 0.9)
+                    gfx.fill(1, 1, 1, cell.f * 0.9)
                     cellRect(x, y, size)
                 end
             end
@@ -134,7 +134,7 @@ func drawPreview()
         var x0, y0 = cellOrigin(t.r, t.c)
         drawShape(held.shape, x0, y0, c, 0.38)
     else
-        graphics.fill(config.invalid[1], config.invalid[2], config.invalid[3], 0.55)
+        gfx.fill(config.invalid[1], config.invalid[2], config.invalid[3], 0.55)
         for off in held.shape.cells do
             if boardInside(t.r + off[1], t.c + off[2]) then
                 var x, y = cellOrigin(t.r + off[1], t.c + off[2])
@@ -142,7 +142,7 @@ func drawPreview()
             end
         end
     end
-    graphics.fill(1, 1, 1, 0.5)
+    gfx.fill(1, 1, 1, 0.5)
     for idx in game.previewCells do
         var x, y = cellOrigin(boardRow(idx), boardCol(idx))
         cellRect(x, y, c)
@@ -164,8 +164,8 @@ func drawOver()
         return
     end
     var c = L.c
-    graphics.fill(config.paper, 0.85 * game.fade.a)
-    graphics.rect(0, 0, W, H)
+    gfx.fill(config.paper, 0.85 * game.fade.a)
+    gfx.rect(0, 0, W, H)
     var mx = L.bx + L.bs / 2
     drawText(tr("gameOver"), mx, L.by + 2.3 * c, fitSize(tr("gameOver"), c * 1.1, L.bs * 0.95), "center", "center", config.ink, game.fade.a)
     drawText("{tr("score")} {game.score}", mx, L.by + 3.6 * c, c * 0.7, "center", "center", config.ink, game.fade.a)

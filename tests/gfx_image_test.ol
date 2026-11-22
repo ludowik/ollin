@@ -29,8 +29,8 @@ func pixel_is(img, x, y, r, g, b, a)
 end
 
 func setup()
-    graphics.canvas(64, 48, "image test")
-    graphics.antialias(false)   ## the pixels read back from the screenshot must be the drawn ones, not blurred edges
+    gfx.canvas(64, 48, "image test")
+    gfx.antialias(false)   ## the pixels read back from the screenshot must be the drawn ones, not blurred edges
 end
 
 ## ── loading ────────────────────────────────────────────────────────────────
@@ -105,10 +105,10 @@ func check_pixels()
 
     ## Drawing INTO the target, then reading it back: the rows come back top-down.
     image.beginDraw(rt)
-    graphics.clear(0, 0, 1)
-    graphics.fill(1, 1, 0)
-    graphics.noStroke()
-    graphics.rect(0, 0, 4, 3)
+    gfx.clear(0, 0, 1)
+    gfx.fill(1, 1, 0)
+    gfx.noStroke()
+    gfx.rect(0, 0, 4, 3)
     image.endDraw()
     assert(pixel_is(rt, 1, 1, 1, 1, 0, 1))
     assert(pixel_is(rt, 6, 5, 0, 0, 1, 1))
@@ -185,27 +185,27 @@ func prepare_images()
     image.filter(ramp, "nearest")                        ## and back
     target = image.create(4, 4)
     image.beginDraw(target)
-    graphics.clear(0, 1, 0)
+    gfx.clear(0, 1, 0)
     image.endDraw()
 end
 
 func draw_images()
-    graphics.clear(0, 0, 0)
+    gfx.clear(0, 0, 0)
     image.draw(stamp, 2, 2)                              ## its own size
     image.draw(stamp, 10, 2, 6, 6)                       ## stretched
     image.draw(stamp, 20, 2, 4, 4, Color(0, 0, 1))       ## an explicit tint
-    graphics.tint(0.5, 0.5, 0.5)
+    gfx.tint(0.5, 0.5, 0.5)
     image.draw(stamp, 30, 2)                             ## the global tint
-    graphics.noTint()
-    graphics.spriteMode("center")
+    gfx.noTint()
+    gfx.spriteMode("center")
     image.draw(stamp, 44, 10, 8, 8)                      ## anchored by its centre
-    graphics.spriteMode("corner")
+    gfx.spriteMode("corner")
     image.draw(target, 2, 20, 8, 8)                      ## a render target, rows flipped back
-    graphics.sprite(stamp, 14, 20, 4, 4)
+    gfx.sprite(stamp, 14, 20, 4, 4)
     image.draw(ramp, 0, 34, 40, 4)                       ## nearest: two flat halves
     image.draw(blended, 0, 39, 40, 4)                    ## linear: a ramp from red to blue between the pixel centres
     image.draw(mipped, 0, 44, 40, 3)                     ## mipmap: the same, seen bigger than it is
-    graphics.screenshot(SHOT)
+    gfx.screenshot(SHOT)
 end
 
 func draw()
@@ -237,6 +237,6 @@ func draw()
         mr, mg, mb, ma = image.getPixel(shot, 20, 45)
         assert(mr > 0.3 and mr < 0.7 and mb > 0.3 and mb < 0.7)
         image.unload(shot)
-        graphics.quit()
+        gfx.quit()
     end
 end

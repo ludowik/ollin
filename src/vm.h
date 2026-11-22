@@ -79,11 +79,11 @@ class VM {
     Value get_global(const std::string& name) const; // returns nil if not found
     void set_global(const std::string& name, const Value& value);
     // Runs after execute(): calls setup() once, then starts the render loop through
-    // graphics.run(draw) when a draw() exists. Shared by the native and WASM entry points,
-    // hence tolerant of a nil or non-map `graphics`.
+    // gfx.run(draw) when a draw() exists. Shared by the native and WASM entry points,
+    // hence tolerant of a nil or non-map `gfx`.
     void run_entry_hooks();
 
-    // Set by gfx_canvas to record that graphics.canvas() ran for this program (the VM is new
+    // Set by gfx_canvas to record that gfx.canvas() ran for this program (the VM is new
     // on every run). It lets run_entry_hooks create an IMPLICIT canvas at W×H when a draw()
     // exists but no canvas was created explicitly.
     void mark_gfx_canvas() {

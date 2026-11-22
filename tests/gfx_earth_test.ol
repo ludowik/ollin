@@ -8,7 +8,7 @@ const CLOUDS = "../docs/samples/earth/earth_clouds.png"
 const NIGHT = "../docs/samples/earth/earth_night.jpg"
 
 func setup()
-    graphics.canvas(32, 32, "earth test")
+    gfx.canvas(32, 32, "earth test")
 end
 
 ## The colour of a place, read where the layout puts it.
@@ -75,5 +75,5 @@ func draw()
 
     image.unload(ground)
     image.unload(clouds)
-    graphics.quit()
+    gfx.quit()
 end

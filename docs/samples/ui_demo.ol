@@ -61,7 +61,7 @@ end
 ## setup() is called ONCE before the first frame: that is where all the initialisation happens —
 ## the drawing area, the menus, the starting state.
 func setup()
-    graphics.canvas(W, H, "ui")
+    gfx.canvas(W, H, "ui")
 
     var main = ui.menu("Main")
     main.button("Reset", reset)
@@ -103,22 +103,22 @@ end
 ## ordinary variable.
 func drawShape(x, y, radius)
     if config.shape == "square" then
-        graphics.rect(x - radius, y - radius, radius * 2, radius * 2)
+        gfx.rect(x - radius, y - radius, radius * 2, radius * 2)
     elseif config.shape == "triangle" then
-        graphics.polygon([x, y - radius, x + radius, y + radius, x - radius, y + radius])
+        gfx.polygon([x, y - radius, x + radius, y + radius, x - radius, y + radius])
     else
-        graphics.circle(x, y, radius)
+        gfx.circle(x, y, radius)
     end
 end
 
 func drawGrid()
-    graphics.stroke(Color(1, 1, 1, 0.10), 1)
+    gfx.stroke(Color(1, 1, 1, 0.10), 1)
     var step = H / 12
     for x = 0, W, step do
-        graphics.line(x, 0, x, H)
+        gfx.line(x, 0, x, H)
     end
     for y = 0, H, step do
-        graphics.line(0, y, W, y)
+        gfx.line(0, y, W, y)
     end
 end
 
@@ -135,7 +135,7 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(Color(0.09, 0.10, 0.14))
+    gfx.clear(Color(0.09, 0.10, 0.14))
     if config.grid then
         drawGrid()
     end
@@ -144,21 +144,21 @@ func draw()
     var r = side * 0.28
     var radius = side * 0.06
     var gap = math.TAU / config.branches
-    graphics.stroke(armColor, config.thick and 8 or 2)
-    graphics.noFill()
+    gfx.stroke(armColor, config.thick and 8 or 2)
+    gfx.noFill()
     var direction = config.direction == "clockwise" and 1 or -1
     for i = 1, config.branches do
         var angle = direction * t + gap * i
         var cx = CX + math.cos(angle) * r
         var cy = CY + math.sin(angle) * r
         drawShape(cx, cy, radius)
-        graphics.line(CX, CY, cx, cy)
+        gfx.line(CX, CY, cx, cy)
     end
 
-    graphics.stroke(Color(0.85, 0.88, 0.95))
-    graphics.fontSize(H * 0.035)
-    graphics.text("turns: " + turns, W * 0.05, H * 0.12)
+    gfx.stroke(Color(0.85, 0.88, 0.95))
+    gfx.fontSize(H * 0.035)
+    gfx.text("turns: " + turns, W * 0.05, H * 0.12)
     if paused then
-        graphics.text("paused", W * 0.05, H * 0.17)
+        gfx.text("paused", W * 0.05, H * 0.17)
     end
 end

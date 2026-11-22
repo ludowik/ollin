@@ -77,14 +77,14 @@ static void push_color(std::vector<float>& out, Color c) {
 
 static float s_anim_tile = -1.0f;   // the animated tile, whose UV scrolls, water for one; -1 means none
 // Ripple parameters of the animated tile: {scroll, wave speed, spatial frequency,
-// amplitude}. Defaults give a water look; tunable through graphics.tileAnim(t, ...).
+// amplitude}. Defaults give a water look; tunable through gfx.tileAnim(t, ...).
 static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 
 // 3D display rests DIRECTLY on raylib's API (Camera3D / BeginMode3D…).
-// The camera is a first-class value (a map) built by graphics.camera; begin3d/end3d
+// The camera is a first-class value (a map) built by gfx.camera; begin3d/end3d
 // bracket the 3D drawing inside draw(). The shapes follow the fill/stroke state exactly
 // as the 2D primitives do (solid if fill, wireframe if stroke, both if both). Depth is
-// cleared by a graphics.clear(opaque colour) at the start of the frame (ClearBackground
+// cleared by a gfx.clear(opaque colour) at the start of the frame (ClearBackground
 // clears the colour buffer AND the depth buffer, through rlClearScreenBuffers).
 
 // A number stored in a map under `key`, or `def` when it is missing or not a number.
@@ -110,7 +110,7 @@ static Camera3D read_camera(const Value& v) {
     return cam;
 }
 
-// Rebuilds a raylib Camera3D from the map handle (graphics.camera). Default up = +Y,
+// Rebuilds a raylib Camera3D from the map handle (gfx.camera). Default up = +Y,
 // perspective projection, raylib's default near/far. Reading the camera out of its map is most of the cost
 // of a call that projects a point, and a script projects a few thousand a frame through ONE camera: the
 // last one read is kept, as long as the map has not changed (a version of 0 is a map never written to,
@@ -120,7 +120,7 @@ static Camera3D camera_from_map(const Value& v, const char* fn) {
     static uint64_t s_version = 0;
     static Camera3D s_camera{};
     if (!v.is_map())
-        throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
+        throw std::runtime_error(std::string(fn) + ": expected a camera (gfx.camera)");
     const Map* map = v.mptr;
     if (map != s_map || map->version != s_version || map->version == 0) {
         s_camera = read_camera(v);
@@ -280,37 +280,37 @@ static Value camera_class() {
     return cls;
 }
 
-// graphics.camera(px,py,pz, tx,ty,tz [, fovy]): a Camera class INSTANCE. Looks at
+// gfx.camera(px,py,pz, tx,ty,tz [, fovy]): a Camera class INSTANCE. Looks at
 // (tx,ty,tz) from (px,py,pz), up = +Y, fovy = vertical field of view (45° by default).
 // Mutable through its methods (setPos/lookAt/move/orbit/zoom); getViewDir, getRight and getUp return its axes {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
     cam.set_class(camera_class());
-    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.camera")));
-    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.camera")));
-    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.camera")));
-    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "graphics.camera")));
-    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "graphics.camera")));
-    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "graphics.camera")));
-    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "graphics.camera") : 45.0));
+    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "gfx.camera")));
+    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "gfx.camera")));
+    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "gfx.camera")));
+    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "gfx.camera")));
+    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "gfx.camera")));
+    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "gfx.camera")));
+    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "gfx.camera") : 45.0));
     return ctx.ret(cam);
 }
 
-// graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size]): an orthographic camera. No
+// gfx.cameraOrtho(px,py,pz, tx,ty,tz [, size]): an orthographic camera. No
 // perspective — the visible world is `size` units tall (10 by default). Same methods as
 // camera(); zoom() adjusts size.
 static int gfx_camera_ortho(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
     cam.set_class(camera_class());
-    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "graphics.cameraOrtho")));
-    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "graphics.cameraOrtho") : 10.0));
+    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "gfx.cameraOrtho")));
+    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "gfx.cameraOrtho") : 10.0));
     cam.map_set(Value(std::string("ortho")), Value((int64_t)1));
     return ctx.ret(cam);
 }
@@ -362,9 +362,9 @@ struct InstGroup {
     unsigned int vbo_c;   // the colours VBO, persistent
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
     int count;
-    // A graphics.heightfield patch (hf_cols > 0) owns its mesh, draws the shared identity-instance buffers
+    // A gfx.heightfield patch (hf_cols > 0) owns its mesh, draws the shared identity-instance buffers
     // (s_hf_*, never unloaded per group) and had its instance attributes bound into the mesh's VAO once, at
-    // creation. The rest is what graphics.terrainHeight reads back: the patch's grid and heights.
+    // creation. The rest is what gfx.terrainHeight reads back: the patch's grid and heights.
     int hf_cols;
     int hf_rows;
     double hf_x;
@@ -485,7 +485,7 @@ static int s_loc_animparams = -1, s_loc_flipv = -1, s_loc_specular = -1, s_loc_b
 static constexpr float k_default_specular_strength = 0.3f;
 static constexpr float k_default_specular_shininess = 16.0f;
 static float s_specular[2] = {k_default_specular_strength, k_default_specular_shininess};
-// Relief drawn from the texture itself (graphics.bump): the height of a white texel, then the height of the grain.
+// Relief drawn from the texture itself (gfx.bump): the height of a white texel, then the height of the grain.
 static float s_bump[2] = {0.0f, 0.0f};
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
@@ -850,8 +850,8 @@ void end3d_internal() {
 static int gfx_begin3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
-    s_cam3d = camera_from_map(args[0], "graphics.begin3d");
+        throw std::runtime_error("gfx.begin3d: expected a camera (gfx.camera)");
+    s_cam3d = camera_from_map(args[0], "gfx.begin3d");
     s_buckets.clear();
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // the view ALONE, before any transform the user applied
@@ -875,14 +875,14 @@ static int gfx_end3d(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.ambient(v | colour): ambient light, which turns the lit mode on.
+// gfx.ambient(v | colour): ambient light, which turns the lit mode on.
 static int gfx_ambient(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (is_color_arg(args, argc, 0)) {
         color_to_floats(gfx_to_color(args[0]), s_amb3d);
         s_amb3d[3] = 1.0f;
     } else {
-        float v = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.ambient") : 0.15f;
+        float v = argc > 0 ? (float)num_arg(args, argc, 0, "gfx.ambient") : 0.15f;
         s_amb3d[0] = v;
         s_amb3d[1] = v;
         s_amb3d[2] = v;
@@ -892,39 +892,39 @@ static int gfx_ambient(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.specular([strength [, shininess]]): the highlight a light leaves on every lit surface. The
+// gfx.specular([strength [, shininess]]): the highlight a light leaves on every lit surface. The
 // default is a soft, wide one; a strength of 0 leaves the diffuse light alone, and a larger shininess
 // narrows the spot. With no argument the defaults come back.
 static int gfx_specular(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    double strength = argc > 0 ? num_arg(args, argc, 0, "graphics.specular") : k_default_specular_strength;
-    double shininess = argc > 1 ? num_arg(args, argc, 1, "graphics.specular") : k_default_specular_shininess;
+    double strength = argc > 0 ? num_arg(args, argc, 0, "gfx.specular") : k_default_specular_strength;
+    double shininess = argc > 1 ? num_arg(args, argc, 1, "gfx.specular") : k_default_specular_shininess;
     // Written as the negation of the valid range, so that NaN (which compares false to everything) is refused too.
     if (!(strength >= 0.0)) {
-        throw std::runtime_error("graphics.specular: the strength must be 0 or more");
+        throw std::runtime_error("gfx.specular: the strength must be 0 or more");
     }
     if (!(shininess >= 1.0)) {
-        throw std::runtime_error("graphics.specular: the shininess must be at least 1");
+        throw std::runtime_error("gfx.specular: the shininess must be at least 1");
     }
     s_specular[0] = (float)strength;
     s_specular[1] = (float)shininess;
     return ctx.ret(Value{});
 }
 
-// graphics.bump([height [, grain]]): relief for the textured surfaces of the 3D block (one setting for the
+// gfx.bump([height [, grain]]): relief for the textured surfaces of the 3D block (one setting for the
 // whole block, like the light), read from the texture itself — the brighter a texel, the higher it stands, and the light then shades the slopes. Both
 // numbers are heights in scene units: how high a white texel stands above a black one, and how high the
 // grain is. The grain is fine noise that only shows where a texel is bigger than a screen pixel, to give
 // a surface seen close more to look at than the texture holds. Without argument, or with 0, the surface is flat.
 static int gfx_bump(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    double height = argc > 0 ? num_arg(args, argc, 0, "graphics.bump") : 0.0;
-    double grain = argc > 1 ? num_arg(args, argc, 1, "graphics.bump") : 0.0;
+    double height = argc > 0 ? num_arg(args, argc, 0, "gfx.bump") : 0.0;
+    double grain = argc > 1 ? num_arg(args, argc, 1, "gfx.bump") : 0.0;
     if (!(height >= 0.0)) {
-        throw std::runtime_error("graphics.bump: the height must be 0 or more");
+        throw std::runtime_error("gfx.bump: the height must be 0 or more");
     }
     if (!(grain >= 0.0)) {
-        throw std::runtime_error("graphics.bump: the grain must be 0 or more");
+        throw std::runtime_error("gfx.bump: the grain must be 0 or more");
     }
     s_bump[0] = (float)height;
     s_bump[1] = (float)grain;
@@ -939,7 +939,7 @@ static int gfx_bump(CallCtx& ctx) {
 // Tested on the FLOAT values the shader will get: 1e-46 is not zero as a double and is as a float.
 static void refuse_null_direction(double x, double y, double z) {
     if ((float)x == 0.0f && (float)y == 0.0f && (float)z == 0.0f)
-        throw std::runtime_error("graphics.light: a directional light needs a direction, and (0, 0, 0) is none");
+        throw std::runtime_error("gfx.light: a directional light needs a direction, and (0, 0, 0) is none");
 }
 
 static void apply_light_from_instance(const Value& self) {
@@ -1031,20 +1031,20 @@ static Value light_class() {
     return cls;
 }
 
-// graphics.light("dir"|"point", x,y,z [, colour]): creates a Light object and enables it.
+// gfx.light("dir"|"point", x,y,z [, colour]): creates a Light object and enables it.
 // For "dir", (x,y,z) is the direction of propagation; for "point", the position.
 static int gfx_light(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     // The kind is an IDENTIFIER: anything else used to become "dir" in silence, so a mistyped call
     // lit the scene the wrong way with no word said.
     if (argc > 0 && !args[0].is_string())
-        throw std::runtime_error("graphics.light: expected \"dir\" or \"point\"");
+        throw std::runtime_error("gfx.light: expected \"dir\" or \"point\"");
     std::string type = argc > 0 ? args[0].as_string() : "dir";
     if (type != "dir" && type != "point")
-        throw std::runtime_error("graphics.light: unknown kind '" + type + "' — expected \"dir\" or \"point\"");
-    float x = (float)num_arg(args, argc, 1, "graphics.light");
-    float y = (float)num_arg(args, argc, 2, "graphics.light");
-    float z = (float)num_arg(args, argc, 3, "graphics.light");
+        throw std::runtime_error("gfx.light: unknown kind '" + type + "' — expected \"dir\" or \"point\"");
+    float x = (float)num_arg(args, argc, 1, "gfx.light");
+    float y = (float)num_arg(args, argc, 2, "gfx.light");
+    float z = (float)num_arg(args, argc, 3, "gfx.light");
     Color c = color_arg_or_white(args, argc, 4);
     Value inst = Value::make_map();
     inst.set_class(light_class());
@@ -1058,17 +1058,17 @@ static int gfx_light(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// graphics.grid(slices, spacing): a ground grid (XZ plane) centred on the origin. Its
+// gfx.grid(slices, spacing): a ground grid (XZ plane) centred on the origin. Its
 // grey is raylib's own and fixed (it uses neither fill nor stroke).
 static int gfx_grid(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int slices = argc > 0 ? gfx_to_int(args[0]) : 10;
-    float spacing = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.grid") : 1.0f;
+    float spacing = argc > 1 ? (float)num_arg(args, argc, 1, "gfx.grid") : 1.0f;
     DrawGrid(slices, spacing);
     return ctx.ret(Value{});
 }
 
-// graphics.texture(img) / graphics.noTexture(): the current 3D texture (an image handle).
+// gfx.texture(img) / gfx.noTexture(): the current 3D texture (an image handle).
 static int gfx_texture(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].is_map()) {
@@ -1086,7 +1086,7 @@ static int gfx_no_texture(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.tileset(img, cols, rows): declares the tile atlas (voxel terrain). A single
+// gfx.tileset(img, cols, rows): declares the tile atlas (voxel terrain). A single
 // grid texture, sampled tile by tile according to the cube's face.
 static int gfx_tileset(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -1095,8 +1095,8 @@ static int gfx_tileset(CallCtx& ctx) {
         s_atlas_texid = idv.is_integer() ? image_gl_texid((int)idv.as_int()) : 0;
         s_atlas_flipped = image_gl_flipped(s_atlas_texid);
     }
-    s_atlas_grid[0] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tileset") : 1.0f;
-    s_atlas_grid[1] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tileset") : 1.0f;
+    s_atlas_grid[0] = argc > 1 ? (float)num_arg(args, argc, 1, "gfx.tileset") : 1.0f;
+    s_atlas_grid[1] = argc > 2 ? (float)num_arg(args, argc, 2, "gfx.tileset") : 1.0f;
     if (s_atlas_texid != 0) {
         // Crisp pixels (the voxel look): NEAREST filtering, no mipmap.
         rlTextureParameters(s_atlas_texid, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_NEAREST);
@@ -1105,54 +1105,54 @@ static int gfx_tileset(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.tiles(top, side, bottom): tiles of the next cube (state, like fill).
+// gfx.tiles(top, side, bottom): tiles of the next cube (state, like fill).
 static int gfx_tiles(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    s_cur_tile[0] = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tiles") : -1.0f;
-    s_cur_tile[1] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
-    s_cur_tile[2] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
+    s_cur_tile[0] = argc > 0 ? (float)num_arg(args, argc, 0, "gfx.tiles") : -1.0f;
+    s_cur_tile[1] = argc > 1 ? (float)num_arg(args, argc, 1, "gfx.tiles") : s_cur_tile[0];
+    s_cur_tile[2] = argc > 2 ? (float)num_arg(args, argc, 2, "gfx.tiles") : s_cur_tile[1];
     return ctx.ret(Value{});
 }
 
-// graphics.tile(t): the same tile on all six faces (a shorthand). tile(-1) = none.
+// gfx.tile(t): the same tile on all six faces (a shorthand). tile(-1) = none.
 static int gfx_tile(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float t = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tile") : -1.0f;
+    float t = argc > 0 ? (float)num_arg(args, argc, 0, "gfx.tile") : -1.0f;
     s_cur_tile[0] = t;
     s_cur_tile[1] = t;
     s_cur_tile[2] = t;
     return ctx.ret(Value{});
 }
 
-// graphics.tileAnim(t [, scroll, speed, frequency, amplitude]): a tile whose UV scrolls and
+// gfx.tileAnim(t [, scroll, speed, frequency, amplitude]): a tile whose UV scrolls and
 // ripples over time (water). -1 = none. The four optional parameters tune the ripple
 // (defaults give a water look); the spatial phase is in world coordinates.
 static int gfx_tile_anim(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    s_anim_tile = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tileAnim") : -1.0f;
+    s_anim_tile = argc > 0 ? (float)num_arg(args, argc, 0, "gfx.tileAnim") : -1.0f;
     if (argc > 1) {
-        s_anim_params[0] = (float)num_arg(args, argc, 1, "graphics.tileAnim");
+        s_anim_params[0] = (float)num_arg(args, argc, 1, "gfx.tileAnim");
     }
     if (argc > 2) {
-        s_anim_params[1] = (float)num_arg(args, argc, 2, "graphics.tileAnim");
+        s_anim_params[1] = (float)num_arg(args, argc, 2, "gfx.tileAnim");
     }
     if (argc > 3) {
-        s_anim_params[2] = (float)num_arg(args, argc, 3, "graphics.tileAnim");
+        s_anim_params[2] = (float)num_arg(args, argc, 3, "gfx.tileAnim");
     }
     if (argc > 4) {
-        s_anim_params[3] = (float)num_arg(args, argc, 4, "graphics.tileAnim");
+        s_anim_params[3] = (float)num_arg(args, argc, 4, "gfx.tileAnim");
     }
     return ctx.ret(Value{});
 }
 
-// graphics.cube(x,y,z, w,h,l): a cube centred on (x,y,z). Solid if fill (instanced, lit,
+// gfx.cube(x,y,z, w,h,l): a cube centred on (x,y,z). Solid if fill (instanced, lit,
 // textured), edges if stroke (immediate, unlit).
 static int gfx_cube(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cube"), (float)num_arg(args, argc, 1, "graphics.cube"),
-                (float)num_arg(args, argc, 2, "graphics.cube")};
-    Vector3 size{(float)num_arg(args, argc, 3, "graphics.cube"), (float)num_arg(args, argc, 4, "graphics.cube"),
-                 (float)num_arg(args, argc, 5, "graphics.cube")};
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.cube"), (float)num_arg(args, argc, 1, "gfx.cube"),
+                (float)num_arg(args, argc, 2, "gfx.cube")};
+    Vector3 size{(float)num_arg(args, argc, 3, "gfx.cube"), (float)num_arg(args, argc, 4, "gfx.cube"),
+                 (float)num_arg(args, argc, 5, "gfx.cube")};
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_CUBE), s_cur_tex3d, pos, size, gfx_fill_color());
     if (gfx_has_stroke())
@@ -1160,13 +1160,13 @@ static int gfx_cube(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.sphere(x,y,z, r): a sphere centred on (x,y,z). Solid if fill (instanced, lit,
+// gfx.sphere(x,y,z, r): a sphere centred on (x,y,z). Solid if fill (instanced, lit,
 // textured), wireframe if stroke (immediate). The unit mesh has radius 0.5.
 static int gfx_sphere(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.sphere"), (float)num_arg(args, argc, 1, "graphics.sphere"),
-                (float)num_arg(args, argc, 2, "graphics.sphere")};
-    float r = (float)num_arg(args, argc, 3, "graphics.sphere");
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.sphere"), (float)num_arg(args, argc, 1, "gfx.sphere"),
+                (float)num_arg(args, argc, 2, "gfx.sphere")};
+    float r = (float)num_arg(args, argc, 3, "gfx.sphere");
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfx_fill_color());
     if (gfx_has_stroke())
@@ -1174,15 +1174,15 @@ static int gfx_sphere(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.cylinder(x,y,z, r, h): a cylinder, (x,y,z) being the centre of the base, of
+// gfx.cylinder(x,y,z, r, h): a cylinder, (x,y,z) being the centre of the base, of
 // radius r and height h (towards +Y). Solid if fill (instanced), wireframe if stroke
 // (immediate). Single-radius, a constraint of the instancing: the unit mesh is frozen at radius 1, height 1.
 static int gfx_cylinder(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cylinder"), (float)num_arg(args, argc, 1, "graphics.cylinder"),
-                (float)num_arg(args, argc, 2, "graphics.cylinder")};
-    float r = (float)num_arg(args, argc, 3, "graphics.cylinder");
-    float h = (float)num_arg(args, argc, 4, "graphics.cylinder");
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.cylinder"), (float)num_arg(args, argc, 1, "gfx.cylinder"),
+                (float)num_arg(args, argc, 2, "gfx.cylinder")};
+    float r = (float)num_arg(args, argc, 3, "gfx.cylinder");
+    float h = (float)num_arg(args, argc, 4, "gfx.cylinder");
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
     if (gfx_has_stroke())
@@ -1190,13 +1190,13 @@ static int gfx_cylinder(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.cone(x,y,z, r, h): a cone, (x,y,z) being the centre of the base, of radius r and height h (towards +Y).
+// gfx.cone(x,y,z, r, h): a cone, (x,y,z) being the centre of the base, of radius r and height h (towards +Y).
 static int gfx_cone(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cone"), (float)num_arg(args, argc, 1, "graphics.cone"),
-                (float)num_arg(args, argc, 2, "graphics.cone")};
-    float r = (float)num_arg(args, argc, 3, "graphics.cone");
-    float h = (float)num_arg(args, argc, 4, "graphics.cone");
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.cone"), (float)num_arg(args, argc, 1, "gfx.cone"),
+                (float)num_arg(args, argc, 2, "gfx.cone")};
+    float r = (float)num_arg(args, argc, 3, "gfx.cone");
+    float h = (float)num_arg(args, argc, 4, "gfx.cone");
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
     if (gfx_has_stroke())
@@ -1204,15 +1204,15 @@ static int gfx_cone(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.torus(x,y,z, r, tube): a torus centred on (x,y,z), of major radius r and tube radius tube.
+// gfx.torus(x,y,z, r, tube): a torus centred on (x,y,z), of major radius r and tube radius tube.
 // The unit mesh has r=0.5 and tube=0.25, hence a uniform scale with tube/r fixed at 0.5.
 // To expose the two parameters independently, X and Z scale on r, and Y on tube.
 static int gfx_torus(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.torus"), (float)num_arg(args, argc, 1, "graphics.torus"),
-                (float)num_arg(args, argc, 2, "graphics.torus")};
-    float r    = (float)num_arg(args, argc, 3, "graphics.torus");
-    float tube = (float)num_arg(args, argc, 4, "graphics.torus");
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.torus"), (float)num_arg(args, argc, 1, "gfx.torus"),
+                (float)num_arg(args, argc, 2, "gfx.torus")};
+    float r    = (float)num_arg(args, argc, 3, "gfx.torus");
+    float tube = (float)num_arg(args, argc, 4, "gfx.torus");
     // Mesh: major=1 (XY), tube=0.3 (Z), hence XY scaled by r and Z by tube/0.3.
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfx_fill_color());
@@ -1221,14 +1221,14 @@ static int gfx_torus(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.plane(x,y,z, sx,sz): a horizontal plane (XZ) centred on (x,y,z), of size sx×sz.
+// gfx.plane(x,y,z, sx,sz): a horizontal plane (XZ) centred on (x,y,z), of size sx×sz.
 // Instanced and lit (it uses the fill colour, falling back to stroke to stay visible).
 static int gfx_plane(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.plane"), (float)num_arg(args, argc, 1, "graphics.plane"),
-                (float)num_arg(args, argc, 2, "graphics.plane")};
-    float sx = (float)num_arg(args, argc, 3, "graphics.plane");
-    float sz = (float)num_arg(args, argc, 4, "graphics.plane");
+    Vector3 pos{(float)num_arg(args, argc, 0, "gfx.plane"), (float)num_arg(args, argc, 1, "gfx.plane"),
+                (float)num_arg(args, argc, 2, "gfx.plane")};
+    float sx = (float)num_arg(args, argc, 3, "gfx.plane");
+    float sz = (float)num_arg(args, argc, 4, "gfx.plane");
     if (gfx_has_fill() || gfx_has_stroke()) {   // nothing to draw without fill or stroke, consistently with cube and sphere
         Color c = gfx_has_fill() ? gfx_fill_color() : gfx_stroke_color();
         push_instance(get_shape_mesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
@@ -1236,38 +1236,38 @@ static int gfx_plane(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.line3d(x1,y1,z1, x2,y2,z2): a 3D segment, drawn as a cylinder (radius = strokeSize * 0.02).
+// gfx.line3d(x1,y1,z1, x2,y2,z2): a 3D segment, drawn as a cylinder (radius = strokeSize * 0.02).
 static int gfx_line3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 a{(float)num_arg(args, argc, 0, "graphics.line3d"), (float)num_arg(args, argc, 1, "graphics.line3d"),
-              (float)num_arg(args, argc, 2, "graphics.line3d")};
-    Vector3 b{(float)num_arg(args, argc, 3, "graphics.line3d"), (float)num_arg(args, argc, 4, "graphics.line3d"),
-              (float)num_arg(args, argc, 5, "graphics.line3d")};
+    Vector3 a{(float)num_arg(args, argc, 0, "gfx.line3d"), (float)num_arg(args, argc, 1, "gfx.line3d"),
+              (float)num_arg(args, argc, 2, "gfx.line3d")};
+    Vector3 b{(float)num_arg(args, argc, 3, "gfx.line3d"), (float)num_arg(args, argc, 4, "gfx.line3d"),
+              (float)num_arg(args, argc, 5, "gfx.line3d")};
     float r = gfx_stroke_size() * 0.02f;
     DrawCylinderEx(a, b, r, r, 6, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
-// graphics.point3d(x,y,z): a 3D point, drawn as a small sphere (radius = strokeSize * 0.015).
+// gfx.point3d(x,y,z): a 3D point, drawn as a small sphere (radius = strokeSize * 0.015).
 static int gfx_point3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float x = (float)num_arg(args, argc, 0, "graphics.point3d");
-    float y = (float)num_arg(args, argc, 1, "graphics.point3d");
-    float z = (float)num_arg(args, argc, 2, "graphics.point3d");
+    float x = (float)num_arg(args, argc, 0, "gfx.point3d");
+    float y = (float)num_arg(args, argc, 1, "gfx.point3d");
+    float z = (float)num_arg(args, argc, 2, "gfx.point3d");
     float r = gfx_stroke_size() * 0.015f;
     push_instance(get_shape_mesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
-// graphics.rotateq(q): applies the quaternion q's rotation in the current transformation
+// gfx.rotateq(q): applies the quaternion q's rotation in the current transformation
 // stack — like rotate/rotateX-Y-Z but from a Quat. It therefore composes, works with
 // push/pop, and applies to instanced solids AS WELL AS immediate ones. rlMultMatrixf
 // left-multiplies (like rlRotatef), so the composition is identical.
 static int gfx_rotateq(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("graphics.rotateq: expected a Quat (graphics.quat…)");
-    Matrix m = QuaternionToMatrix(quat_from_instance(args[0], "graphics.rotateq"));
+        throw std::runtime_error("gfx.rotateq: expected a Quat (gfx.quat…)");
+    Matrix m = QuaternionToMatrix(quat_from_instance(args[0], "gfx.rotateq"));
     rlMultMatrixf(MatrixToFloatV(m).v);
     return ctx.ret(Value{});
 }
@@ -1275,7 +1275,7 @@ static int gfx_rotateq(CallCtx& ctx) {
 // External models (OBJ, GLTF…).
 // raylib has no LoadModel from memory, so we store the preloaded BYTES by name and, on
 // first use (once the GL context is ready), write them to the FS and call LoadModel.
-// The GPU load is LAZY (after graphics.canvas, hence after InitWindow) and cached. The
+// The GPU load is LAZY (after gfx.canvas, hence after InitWindow) and cached. The
 // rendering reuses the batcher: draw_model pushes the model's meshes as instances, so
 // they get the same lighting, fill and instancing as the primitives.
 // (PendingModel, s_model_bytes and s_model_cache are declared above, because
@@ -1330,42 +1330,42 @@ static Model* model_get(const std::string& name) {
     return &s_model_cache[name];
 }
 
-// graphics.model(name): returns a handle {name} to a preloaded model (or a loadable path).
+// gfx.model(name): returns a handle {name} to a preloaded model (or a loadable path).
 // It triggers the load, and raises an error if the model cannot be found.
 static int gfx_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string()) {
-        throw std::runtime_error("graphics.model: expected a model name (string)");
+        throw std::runtime_error("gfx.model: expected a model name (string)");
     }
     const std::string& name = args[0].as_string();
     if (!model_get(name)) {
-        throw std::runtime_error("graphics.model: model not found or unreadable: " + name);
+        throw std::runtime_error("gfx.model: model not found or unreadable: " + name);
     }
     Value h = Value::make_map();
     h.map_set(Value(std::string("name")), Value(name));
     return ctx.ret(h);
 }
 
-// graphics.drawModel(handle [, x, y, z [, scale]]): inside a begin3d block, pushes the
+// gfx.drawModel(handle [, x, y, z [, scale]]): inside a begin3d block, pushes the
 // model's meshes as instances (current transform · translate · scale, tint = fill), hence
 // the batcher's lighting and instancing.
 static int gfx_draw_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
-        throw std::runtime_error("graphics.drawModel: expected a model handle (graphics.model)");
+        throw std::runtime_error("gfx.drawModel: expected a model handle (gfx.model)");
     }
     Value name_v = args[0].map_get(Value(std::string("name")));
     if (!name_v.is_string()) {
-        throw std::runtime_error("graphics.drawModel: invalid model handle");
+        throw std::runtime_error("gfx.drawModel: invalid model handle");
     }
     Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.drawModel: model not found: " + name_v.as_string());
+        throw std::runtime_error("gfx.drawModel: model not found: " + name_v.as_string());
     }
-    float x = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.drawModel") : 0.0f;
-    float y = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.drawModel") : 0.0f;
-    float z = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.drawModel") : 0.0f;
-    float s = argc > 4 ? (float)num_arg(args, argc, 4, "graphics.drawModel") : 1.0f;
+    float x = argc > 1 ? (float)num_arg(args, argc, 1, "gfx.drawModel") : 0.0f;
+    float y = argc > 2 ? (float)num_arg(args, argc, 2, "gfx.drawModel") : 0.0f;
+    float z = argc > 3 ? (float)num_arg(args, argc, 3, "gfx.drawModel") : 0.0f;
+    float s = argc > 4 ? (float)num_arg(args, argc, 4, "gfx.drawModel") : 1.0f;
     Vector3 pos{x, y, z};
     Vector3 size{s, s, s};
     // fill is a GLOBAL tint (a multiplier): a white fill leaves the model its own colours and
@@ -1391,21 +1391,21 @@ static int gfx_draw_model(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.modelSize(handle): the model's dimensions (its bounding box), as a map
+// gfx.modelSize(handle): the model's dimensions (its bounding box), as a map
 // { w, h, d, cx, cy, cz, radius }, radius being that of the bounding sphere (half the
 // diagonal). To be called ONCE: walking the vertices is not free.
 static int gfx_model_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
-        throw std::runtime_error("graphics.modelSize: expected a model handle (graphics.model)");
+        throw std::runtime_error("gfx.modelSize: expected a model handle (gfx.model)");
     }
     Value name_v = args[0].map_get(Value(std::string("name")));
     if (!name_v.is_string()) {
-        throw std::runtime_error("graphics.modelSize: invalid model handle");
+        throw std::runtime_error("gfx.modelSize: invalid model handle");
     }
     Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.modelSize: model not found: " + name_v.as_string());
+        throw std::runtime_error("gfx.modelSize: model not found: " + name_v.as_string());
     }
     BoundingBox bb = GetModelBoundingBox(*mdl);
     float w = bb.max.x - bb.min.x;
@@ -1422,15 +1422,15 @@ static int gfx_model_size(CallCtx& ctx) {
     return ctx.ret(r);
 }
 
-// graphics.fitDistance(radius [, fovy]): the camera distance at which a sphere of radius
+// gfx.fitDistance(radius [, fovy]): the camera distance at which a sphere of radius
 // `radius` fits ENTIRELY in the view, given the current screen RATIO (portrait or
 // landscape) and the vertical field of view `fovy` (in degrees, 45 by default). In
 // landscape the constraint is vertical, in portrait horizontal, so we take the smaller
 // half-angle. Cheap enough to call every frame, which follows screen rotations.
 static int gfx_fit_distance(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    double radius = num_arg(args, argc, 0, "graphics.fitDistance");
-    double fovy = argc > 1 ? num_arg(args, argc, 1, "graphics.fitDistance") : 45.0;
+    double radius = num_arg(args, argc, 0, "gfx.fitDistance");
+    double fovy = argc > 1 ? num_arg(args, argc, 1, "gfx.fitDistance") : 45.0;
     int sh = GetScreenHeight();
     int sw = GetScreenWidth();
     double aspect = (sh > 0) ? (double)sw / (double)sh : 1.0;
@@ -1441,7 +1441,7 @@ static int gfx_fit_distance(CallCtx& ctx) {
     return ctx.ret(Value((s > 1e-4) ? radius / s : radius * 10.0));
 }
 
-// graphics.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
+// gfx.project(camera, x, y, z): where the point (x, y, z) of the scene lands on the screen, seen by
 // `camera`: the pixel (x, y) in the drawing area, and the depth, its distance in front of the camera. A
 // point behind the camera, or asked before the drawing area exists, has no place on the screen: x and y
 // are then nil, and 0 being false, the test to write is on the depth (`depth > 0`). The pixel is raylib's
@@ -1450,16 +1450,16 @@ static int gfx_fit_distance(CallCtx& ctx) {
 // script draw in 2D what belongs to the 3D scene.
 static int gfx_project(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Camera3D camera = camera_from_map(argc > 0 ? args[0] : Value(), "graphics.project");
-    float x = (float)num_arg(args, argc, 1, "graphics.project");
-    float y = (float)num_arg(args, argc, 2, "graphics.project");
-    float z = (float)num_arg(args, argc, 3, "graphics.project");
+    Camera3D camera = camera_from_map(argc > 0 ? args[0] : Value(), "gfx.project");
+    float x = (float)num_arg(args, argc, 1, "gfx.project");
+    float y = (float)num_arg(args, argc, 2, "gfx.project");
+    float z = (float)num_arg(args, argc, 3, "gfx.project");
     Vector3 p = Vector3{x, y, z};
     double depth = Vector3DotProduct(Vector3Subtract(p, camera.position), camera_forward(camera));
     Value sx;
     Value sy;
     // The drawing area in LOGICAL units, the space W and H name: GetScreenWidth() would be in physical pixels.
-    // Before graphics.canvas there is none (0 by 0, hence a NaN aspect): no place on the screen either.
+    // Before gfx.canvas there is none (0 by 0, hence a NaN aspect): no place on the screen either.
     int width = gfx_logical_width();
     int height = gfx_logical_height();
     if ((depth > 0.0 || camera.projection == CAMERA_ORTHOGRAPHIC) && width > 0 && height > 0) {
@@ -1473,17 +1473,17 @@ static int gfx_project(CallCtx& ctx) {
     return 3;
 }
 
-// graphics.inFrustum(x, y, z [, radius]): is the sphere (centre, radius) at least partly
+// gfx.inFrustum(x, y, z [, radius]): is the sphere (centre, radius) at least partly
 // INSIDE the current camera's field of view? It answers true (visible) or false (off
 // screen), which serves per-chunk culling: only the visible part is drawn. To be called
 // INSIDE a begin3d/end3d block, where the frame's view and projection are set. The test
 // is exact: the six frustum planes are extracted from view·projection.
 static int gfx_in_frustum(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float x = (float)num_arg(args, argc, 0, "graphics.inFrustum");
-    float y = (float)num_arg(args, argc, 1, "graphics.inFrustum");
-    float z = (float)num_arg(args, argc, 2, "graphics.inFrustum");
-    float r = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.inFrustum") : 0.0f;
+    float x = (float)num_arg(args, argc, 0, "gfx.inFrustum");
+    float y = (float)num_arg(args, argc, 1, "gfx.inFrustum");
+    float z = (float)num_arg(args, argc, 2, "gfx.inFrustum");
+    float r = argc > 3 ? (float)num_arg(args, argc, 3, "gfx.inFrustum") : 0.0f;
     if (!s_frustum_ready) {
         // Uses the projection FROZEN at begin3d (s_proj3d), not rlGetMatrixProjection() live:
         // per-chunk culling happens BEFORE begin3d, where the current projection is the 2D ortho
@@ -1522,9 +1522,9 @@ static int gfx_in_frustum(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(true));
 }
 
-// graphics.beginChunk(): starts recording a group of cubes. The graphics.cube(...) calls
+// gfx.beginChunk(): starts recording a group of cubes. The gfx.cube(...) calls
 // that follow are BAKED, not drawn. To be called in setup, the GL context having to be
-// ready, hence after graphics.canvas.
+// ready, hence after gfx.canvas.
 static int gfx_begin_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -1570,7 +1570,7 @@ static int place_group(const InstGroup& g) {
     return (int)s_groups.size();
 }
 
-// graphics.endChunk(): bakes the recorded cubes into persistent VBOs and returns a handle
+// gfx.endChunk(): bakes the recorded cubes into persistent VBOs and returns a handle
 // { id, idw, count, wcount }. `id` is the OPAQUE group, `idw` the TRANSPARENT one (water,
 // idw = 0 if there is none). It is redrawn every frame: drawChunk (opaque), then, after
 // ALL the opaque, drawChunkAlpha (water).
@@ -1606,7 +1606,7 @@ static int gfx_end_chunk(CallCtx& ctx) {
     return ctx.ret(make_chunk_handle(id_o, id_w, g.count, w.count));
 }
 
-// graphics.heightfield({cols, rows, x, z, cell, heights, [slopesX, slopesZ, colors]}): a retained
+// gfx.heightfield({cols, rows, x, z, cell, heights, [slopesX, slopesZ, colors]}): a retained
 // terrain patch, ONE mesh with four vertices per cell shared with its neighbours, instead of one
 // cube per cell (24 vertices, of which only the top four are ever seen). (cols+1)*(rows+1) vertices,
 // row by row along x then z, the first at world (x, z) and `cell` apart; `heights`, the optional
@@ -1620,9 +1620,9 @@ static int gfx_end_chunk(CallCtx& ctx) {
 // freeChunk and inFrustum work on it, and it carries its bounding sphere as x, y, z, r.
 static int gfx_heightfield(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    const char* fn = "graphics.heightfield";
+    const char* fn = "gfx.heightfield";
     if (argc < 1 || !args[0].is_map()) {
-        throw std::runtime_error("graphics.heightfield: expected a map {cols, rows, x, z, cell, heights, ...}");
+        throw std::runtime_error("gfx.heightfield: expected a map {cols, rows, x, z, cell, heights, ...}");
     }
     const Value& o = args[0];
     auto num = [&](const char* k) -> double {
@@ -1650,13 +1650,13 @@ static int gfx_heightfield(CallCtx& ctx) {
     // Range-checked as doubles first: casting an absurd value to int is undefined.
     if (!(cols_d >= 1.0 && cols_d <= 65535.0) || !(rows_d >= 1.0 && rows_d <= 65535.0) || !(cell > 0.0)) {
         throw std::runtime_error(
-            "graphics.heightfield: cols and rows must be between 1 and 65535 and cell positive");
+            "gfx.heightfield: cols and rows must be between 1 and 65535 and cell positive");
     }
     int cols = (int)cols_d;
     int rows = (int)rows_d;
     int64_t nv = (int64_t)(cols + 1) * (rows + 1);
     if (nv > 65535) {
-        throw std::runtime_error("graphics.heightfield: at most 65535 vertices per patch (a mesh indexes with 16 bits), got " +
+        throw std::runtime_error("gfx.heightfield: at most 65535 vertices per patch (a mesh indexes with 16 bits), got " +
                                  std::to_string(nv));
     }
     Value heights = arr("heights", true);
@@ -1674,7 +1674,7 @@ static int gfx_heightfield(CallCtx& ctx) {
     check(sz, "slopesZ");
     check(cols_v, "colors");
     if (sx.is_nil() != sz.is_nil()) {
-        throw std::runtime_error("graphics.heightfield: give both slopesX and slopesZ, or neither");
+        throw std::runtime_error("gfx.heightfield: give both slopesX and slopesZ, or neither");
     }
 
     int stride = cols + 1;
@@ -1705,7 +1705,7 @@ static int gfx_heightfield(CallCtx& ctx) {
         for (int64_t i = 0; i < nv; i++) {
             Value c = cols_v.array_get(i + 1);
             if (!is_color_arg(&c, 1, 0)) {
-                throw std::runtime_error("graphics.heightfield: 'colors' must hold Color objects only");
+                throw std::runtime_error("gfx.heightfield: 'colors' must hold Color objects only");
             }
             tints[(size_t)i] = gfx_to_color(c);
         }
@@ -1808,15 +1808,15 @@ static int gfx_heightfield(CallCtx& ctx) {
     return ctx.ret(hd);
 }
 
-// graphics.terrainHeight(x, z): the height of the heightfield patches at (x, z), read from the very
+// gfx.terrainHeight(x, z): the height of the heightfield patches at (x, z), read from the very
 // triangles that are drawn — a cell is two triangles split on the diagonal from its (-x,-z) corner to
 // its (+x,+z) corner, so the height is linear inside each of them. nil when no live patch covers the
 // point. A script that stands something on the ground asks this instead of reproducing the
 // triangulation: the two can never disagree.
 static int gfx_terrain_height(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    double x = num_arg(args, argc, 0, "graphics.terrainHeight");
-    double z = num_arg(args, argc, 1, "graphics.terrainHeight");
+    double x = num_arg(args, argc, 0, "gfx.terrainHeight");
+    double z = num_arg(args, argc, 1, "gfx.terrainHeight");
     for (const InstGroup& g : s_groups) {
         if (g.hf_cols <= 0) {
             continue;
@@ -1841,16 +1841,16 @@ static int gfx_terrain_height(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.drawChunk(handle): redraws a baked group in ONE instanced, lit call. To be
+// gfx.drawChunk(handle): redraws a baked group in ONE instanced, lit call. To be
 // called INSIDE a begin3d block. It re-emits NO cube from Ollin.
 static int gfx_draw_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
-        throw std::runtime_error("graphics.drawChunk: expected a chunk handle (graphics.endChunk)");
+        throw std::runtime_error("gfx.drawChunk: expected a chunk handle (gfx.endChunk)");
     }
     Value idv = args[0].map_get(Value(std::string("id")));
     if (!idv.is_integer()) {
-        throw std::runtime_error("graphics.drawChunk: invalid chunk handle");
+        throw std::runtime_error("gfx.drawChunk: invalid chunk handle");
     }
     int id = (int)idv.as_int();
     if (id < 1 || id > (int)s_groups.size()) {
@@ -1874,7 +1874,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.drawChunkAlpha(handle): draws the chunk's TRANSPARENT group (water) in alpha
+// gfx.drawChunkAlpha(handle): draws the chunk's TRANSPARENT group (water) in alpha
 // blending, so the opaque background already drawn shows through. Depth test and write
 // are kept, so the water surface occludes itself cleanly, with no accumulation between
 // layers. To be called INSIDE begin3d AFTER drawing ALL the chunks' opaque parts.
@@ -1908,7 +1908,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.freeChunk(handle): frees a baked group's VBOs (an unloaded distant chunk),
+// gfx.freeChunk(handle): frees a baked group's VBOs (an unloaded distant chunk),
 // reclaiming GPU memory. The handle becomes a no-op when drawn. This is what makes an
 // ENDLESS world possible: the chunks around the player are baked, the others freed.
 static void free_group_by_id(Value& handle, const char* key) {

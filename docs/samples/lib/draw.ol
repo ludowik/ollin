@@ -3,16 +3,16 @@
 ## importing file, "../lib/draw.ol".
 
 func fillC(col, alpha = 1)
-    graphics.fill(col[1], col[2], col[3], col[4] * alpha)
+    gfx.fill(col[1], col[2], col[3], col[4] * alpha)
 end
 
-## A text at (x, y), anchored by h and v (see graphics.textMode), `size` high, in the colour col.
+## A text at (x, y), anchored by h and v (see gfx.textMode), `size` high, in the colour col.
 func drawText(str, x, y, size, h, v, col, alpha = 1)
-    graphics.fontSize(size)
-    graphics.textMode(h, v)
-    graphics.stroke(col[1], col[2], col[3], col[4] * alpha)
-    graphics.text(str, x, y)
-    graphics.noStroke()
+    gfx.fontSize(size)
+    gfx.textMode(h, v)
+    gfx.stroke(col[1], col[2], col[3], col[4] * alpha)
+    gfx.text(str, x, y)
+    gfx.noStroke()
 end
 
 ## The colour `mix` of the way from `a` to `b` (arrays of the same length, one number per channel).
@@ -34,24 +34,24 @@ func drawGradient(top, bottom)
     var y0 = 0
     for i = 0, bands - 1 do
         var t = i / (bands - 1)
-        graphics.fill(math.lerp(top[1], bottom[1], t), math.lerp(top[2], bottom[2], t),
+        gfx.fill(math.lerp(top[1], bottom[1], t), math.lerp(top[2], bottom[2], t),
             math.lerp(top[3], bottom[3], t), 1)
         var y1 = math.floor(H * (i + 1) / bands)
-        graphics.rect(0, y0, W, y1 - y0 + 1)
+        gfx.rect(0, y0, W, y1 - y0 + 1)
         y0 = y1
     end
 end
 
 ## A text cut into the lines that fit `width` at the font size `size`, breaking between words. An empty text has no line.
 func wrapText(str, size, width)
-    graphics.fontSize(size)
+    gfx.fontSize(size)
     var lines = []
     var line = ""
     for word in str.split(" ") do
         var trial = line + " " + word
         if line == "" then
             line = word
-        elseif graphics.textSize(trial) > width then
+        elseif gfx.textSize(trial) > width then
             lines.push(line)
             line = word
         else
@@ -76,8 +76,8 @@ end
 
 ## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
 func fitSize(str, size, maxW)
-    graphics.fontSize(size)
-    var tw = graphics.textSize(str)
+    gfx.fontSize(size)
+    var tw = gfx.textSize(str)
     if tw > maxW then
         return size * maxW / tw
     end

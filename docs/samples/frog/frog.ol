@@ -16,8 +16,8 @@ import "play.ol"
 import "draw.ol"
 
 func setup()
-    graphics.canvas(W, H, "Ollin Frog")
-    graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
+    gfx.canvas(W, H, "Ollin Frog")
+    gfx.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
     fitView(window.width, window.height)
     loadBest()
     buildSprites()
@@ -29,7 +29,7 @@ end
 func fitView(w, h)
     viewH = viewHeight(w, h)
     buttons = padButtons(viewH)
-    graphics.viewport(FIELD_W, viewH)
+    gfx.viewport(FIELD_W, viewH)
 end
 
 func window.resized(w, h)

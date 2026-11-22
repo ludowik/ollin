@@ -14,7 +14,7 @@ fails=0
 
 run_pass tests/gfx_ui_test.ol || fails=$((fails + 1))
 run_pass tests/gfx_quat_test.ol || fails=$((fails + 1))
-## The tests that need a frame loop, hence a window: they run under Xvfb and end with graphics.quit().
+## The tests that need a frame loop, hence a window: they run under Xvfb and end with gfx.quit().
 if command -v xvfb-run >/dev/null 2>&1; then
     for f in tests/gfx_ui_draw_test.ol tests/gfx_ui_text_test.ol tests/gfx_image_test.ol tests/gfx_graphics_test.ol tests/gfx_3d_test.ol tests/gfx_project_test.ol tests/gfx_earth_test.ol tests/gfx_tetris_test.ol tests/gfx_wrap_test.ol; do
         out=$(timeout 60 bash tools/run-headless.sh "$f" 2>&1)
@@ -28,7 +28,7 @@ if command -v xvfb-run >/dev/null 2>&1; then
         fi
     done
 fi
-## A draw() alone, in a script that never names `graphics`, has no way to quit: it ends by a failed assertion.
+## A draw() alone, in a script that never names `gfx`, has no way to quit: it ends by a failed assertion.
 if command -v xvfb-run >/dev/null 2>&1; then
     f=tests/gfx_implicit_canvas_test.ol
     out=$(timeout 60 bash tools/run-headless.sh "$f" 2>&1)

@@ -22,21 +22,21 @@ const KEY_EDGE = Color(0.62, 0.48, 0.9)
 const SWIM = [0, 1, 2, 1]                      ## the poses of a swimming turtle, in the order its legs move
 
 func block(col, x, y, w, h)
-    graphics.noStroke()
-    graphics.fill(col)
-    graphics.rect(x, y, w, h)
+    gfx.noStroke()
+    gfx.fill(col)
+    gfx.rect(x, y, w, h)
 end
 
 ## A text of the board's own 8 pixel letters, from x, y, in the colour `col`.
 func drawText(str, x, y, col)
-    graphics.tint(col)
+    gfx.tint(col)
     for i = 1, len(str) do
         var img = glyphs[str.char(i)]
         if img <> nil then
-            graphics.sprite(img, x + (i - 1) * TILE, y, TILE, TILE)
+            gfx.sprite(img, x + (i - 1) * TILE, y, TILE, TILE)
         end
     end
-    graphics.noTint()
+    gfx.noTint()
 end
 
 func drawTextRight(str, x, y, col)
@@ -49,18 +49,18 @@ end
 
 ## The strip under the field: the four ways, and pause and sound with what they do now.
 func drawPad()
-    graphics.segments(8)                    ## the corners are 4 pixels: the default 64 segments each would be thousands of triangles
-    graphics.fill(KEY_FILL)
-    graphics.stroke(KEY_EDGE)
-    graphics.strokeSize(1)
+    gfx.segments(8)                    ## the corners are 4 pixels: the default 64 segments each would be thousands of triangles
+    gfx.fill(KEY_FILL)
+    gfx.stroke(KEY_EDGE)
+    gfx.strokeSize(1)
     for b in buttons do
-        graphics.rect(b.x, b.y, b.w, b.h, 4)
+        gfx.rect(b.x, b.y, b.w, b.h, 4)
     end
-    graphics.noStroke()
-    graphics.fill(YELLOW)
+    gfx.noStroke()
+    gfx.fill(YELLOW)
     for b in buttons do
         if b.name <> "pause" and b.name <> "sound" then
-            graphics.polygon(arrowPoints(b.name, b.x + b.w / 2, b.y + b.h / 2, math.floor(b.w / 4)))
+            gfx.polygon(arrowPoints(b.name, b.x + b.w / 2, b.y + b.h / 2, math.floor(b.w / 4)))
         end
     end
     for b in buttons do
@@ -77,7 +77,7 @@ func drawPad()
 end
 
 func drawBackground()
-    graphics.clear(BLACK)
+    gfx.clear(BLACK)
     block(HEDGE, 0, rowY(ROW_HOMES), FIELD_W, CELL)
     for h = 1, HOMES do
         block(WATER, homeX(h), rowY(ROW_HOMES), CELL, CELL)
@@ -103,11 +103,11 @@ func drawLanes()
                 var x = math.floor(it.x0 + 0.5)
                 if frame == 0 then
                     var imgs = laneImgs[lane + 1]
-                    graphics.sprite(imgs[(dives and pose or 0) + 1], x, y, it.x1 - it.x0, CELL)
+                    gfx.sprite(imgs[(dives and pose or 0) + 1], x, y, it.x1 - it.x0, CELL)
                 else
                     ## a group that dives is a ring of bubbles for each turtle, the board's own picture of something sinking
                     for k = 0, (it.x1 - it.x0) // CELL - 1 do
-                        graphics.sprite(splashImgs[frame], x + k * CELL, y, CELL, CELL)
+                        gfx.sprite(splashImgs[frame], x + k * CELL, y, CELL, CELL)
                     end
                 end
             end
@@ -119,7 +119,7 @@ end
 func drawHomes()
     for h = 1, HOMES do
         if homes[h] then
-            graphics.sprite(pics.home, homeX(h), rowY(ROW_HOMES), CELL, CELL)
+            gfx.sprite(pics.home, homeX(h), rowY(ROW_HOMES), CELL, CELL)
         end
     end
     if event <> nil then
@@ -129,7 +129,7 @@ func drawHomes()
         elseif math.floor(clock * 6) % 2 == 1 then
             img = pics.fly2
         end
-        graphics.sprite(img, homeX(event.home), rowY(ROW_HOMES), CELL, CELL)
+        gfx.sprite(img, homeX(event.home), rowY(ROW_HOMES), CELL, CELL)
     end
 end
 
@@ -153,7 +153,7 @@ func drawFrog()
     if frog.ready > 0 and math.floor(clock * 10) % 2 == 0 and frog.dead == nil then
         return
     end
-    graphics.sprite(img, math.floor(x + 0.5), math.floor(y + 0.5), CELL, CELL)
+    gfx.sprite(img, math.floor(x + 0.5), math.floor(y + 0.5), CELL, CELL)
 end
 
 ## The header — the score, the best score — and the foot: the frogs left, the clock and the board.
@@ -163,7 +163,7 @@ func drawHud()
     drawTextRight("{score}", 56, 18, RED)
     drawTextRight("{math.max(best, score)}", 136, 18, RED)
     for i = 1, math.max(lives - 1, 0) do
-        graphics.sprite(pics.frog, 2 + (i - 1) * 9, FIELD_H - 12, 8, 8)
+        gfx.sprite(pics.frog, 2 + (i - 1) * 9, FIELD_H - 12, 8, 8)
     end
     drawText("TIME", 120, FIELD_H - 12, YELLOW)
     var w = math.floor(timeLeft / TIME_LIMIT * 64)
@@ -201,7 +201,7 @@ func drawTitle()
     drawPad()
     block(BLACK, 8, 88, FIELD_W - 16, 84)
     for i = 1, 4 do
-        graphics.sprite(titleImgs[i], 80 + (i - 1) * 16, 100, CELL, CELL)
+        gfx.sprite(titleImgs[i], 80 + (i - 1) * 16, 100, CELL, CELL)
     end
     drawTextCentre("PRESS SPACE OR TAP", 132, WHITE)
     drawTextCentre("ARROWS OR THE BUTTONS", 148, YELLOW)

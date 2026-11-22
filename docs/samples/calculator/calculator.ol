@@ -2,7 +2,7 @@
 ## not 14.
 ##
 ## engine.ol holds the arithmetic (it has its own test); this file is the keypad: the layout, the input and the drawing.
-## The layout follows the area (graphics.fitArea) and is computed again at each frame, so nothing has to be kept in step.
+## The layout follows the area (gfx.fitArea) and is computed again at each frame, so nothing has to be kept in step.
 
 import "engine.ol"
 import "../lib/draw.ol"
@@ -117,17 +117,17 @@ func drawKey(L, key, r, c)
         glow = 1 - (elapsedTime - lit.since) / FLASH
     end
     fillC(fill)
-    graphics.rect(x, y, size, size, L.radius)
+    gfx.rect(x, y, size, size, L.radius)
     if glow > 0 then
         fillC(LIGHT_INK, 0.45 * glow)
-        graphics.rect(x, y, size, size, L.radius)
+        gfx.rect(x, y, size, size, L.radius)
     end
     if calc.op == key and calc.fresh and not calc.error then
-        graphics.noFill()
-        graphics.stroke(1, 1, 1, 1)
-        graphics.strokeSize(L.cell * 0.04)
-        graphics.rect(x, y, size, size, L.radius)
-        graphics.noStroke()
+        gfx.noFill()
+        gfx.stroke(1, 1, 1, 1)
+        gfx.strokeSize(L.cell * 0.04)
+        gfx.rect(x, y, size, size, L.radius)
+        gfx.noStroke()
     end
     var label = keyLabel(key)
     drawText(label, x + size / 2, y + size / 2, fitSize(label, L.cell * 0.4, size * 0.8), "center", "center", ink)
@@ -146,14 +146,14 @@ func drawDisplay(L)
 end
 
 func setup()
-    graphics.canvas(W, H, "Calculator")
-    graphics.fitArea()
+    gfx.canvas(W, H, "Calculator")
+    gfx.fitArea()
 end
 
 func draw()
     var L = layoutOf()
-    graphics.clear(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3])
-    graphics.noStroke()
+    gfx.clear(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3])
+    gfx.noStroke()
     drawDisplay(L)
     for r = 1, ROWS do
         for c = 1, COLS do

@@ -134,7 +134,7 @@ int method_is_playing(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(voices()[i].active.load(std::memory_order_relaxed)));
 }
 
-// The accessors follow the graphics.font rule: with no argument they READ, with one they write and
+// The accessors follow the gfx.font rule: with no argument they READ, with one they write and
 // return the handle, which makes them chainable.
 int method_freq(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.freq");

@@ -109,7 +109,7 @@ func light()
 end
 
 func setup()
-    graphics.canvas(W, H, "Solar eclipse")
+    gfx.canvas(W, H, "Solar eclipse")
     math.noiseSeed(5)
 
     ## Only the sky's height: a star below the horizon would be buried under the hills.
@@ -133,7 +133,7 @@ func skyColor(l)
 end
 
 func drawSky(l)
-    graphics.clear(skyColor(l))
+    gfx.clear(skyColor(l))
 end
 
 ## The stars only appear with the darkness: invisible by day, plain in totality, like the bright
@@ -146,8 +146,8 @@ func drawStars(l)
 end
 
 func drawHorizon(l)
-    graphics.noStroke()
-    graphics.fill(Color(0.04 + 0.10 * l, 0.05 + 0.12 * l, 0.07 + 0.13 * l))
+    gfx.noStroke()
+    gfx.fill(Color(0.04 + 0.10 * l, 0.05 + 0.12 * l, 0.07 + 0.13 * l))
     var pts = []
     for i, h in hills do
         pts[#pts + 1] = (i - 1) * 12
@@ -157,7 +157,7 @@ func drawHorizon(l)
     pts[#pts + 1] = H
     pts[#pts + 1] = 0
     pts[#pts + 1] = H
-    graphics.polygon(pts)
+    gfx.polygon(pts)
 end
 
 ## The halo: concentric discs in ADDITIVE blending, from the widest to the narrowest. Adding
@@ -165,28 +165,28 @@ end
 ## seven well-marked steps drew concentric rings instead of a gradient.
 func drawHalo(l)
     var rs = sunRadius()
-    graphics.blendMode(blend.ADD)
-    graphics.noStroke()
+    gfx.blendMode(blend.ADD)
+    gfx.noStroke()
     for k = 1, 22 do
         var r = rs * (1 + 1.5 * k / 22)
-        graphics.fill(Color(0.5, 0.42, 0.24, 0.016 * l))
-        graphics.circle(sunX(), sunY(), r)
+        gfx.fill(Color(0.5, 0.42, 0.24, 0.016 * l))
+        gfx.circle(sunX(), sunY(), r)
     end
-    graphics.blendMode(blend.ALPHA)
+    gfx.blendMode(blend.ALPHA)
 end
 
 ## The corona is visible ONLY when the photosphere is entirely hidden. Its streamers are irregular,
 ## and an angular noise gives that filamentary structure.
 func drawCorona()
     var rl = moonRadius()
-    graphics.blendMode(blend.ADD)
+    gfx.blendMode(blend.ADD)
     ## The inner halo, dense near the limb and fading outwards: it is what gives the corona
     ## its pearly look, the streamers doing no more than streaking it.
-    graphics.noStroke()
+    gfx.noStroke()
     for k = 1, 18 do
         var f = k / 18
-        graphics.fill(Color(0.48, 0.52, 0.58, 0.05 * (1 - f)))
-        graphics.circle(sunX(), sunY(), rl * (1 + 1.5 * f))
+        gfx.fill(Color(0.48, 0.52, 0.58, 0.05 * (1 - f)))
+        gfx.circle(sunX(), sunY(), rl * (1 + 1.5 * f))
     end
     ## The streamers: each in FOUR segments of decreasing opacity — a stroke of constant opacity
     ## ended abruptly, and the whole looked like a brush.
@@ -197,12 +197,12 @@ func drawCorona()
         for k = 0, 3 do
             var r0 = rl * 0.99 + length * k / 4
             var r1 = rl * 0.99 + length * (k + 1) / 4
-            graphics.stroke(Color(0.62, 0.65, 0.70, 0.13 - 0.028 * k), 1)
-            graphics.line(sunX() + math.cos(ang) * r0, sunY() + math.sin(ang) * r0,
+            gfx.stroke(Color(0.62, 0.65, 0.70, 0.13 - 0.028 * k), 1)
+            gfx.line(sunX() + math.cos(ang) * r0, sunY() + math.sin(ang) * r0,
                           sunX() + math.cos(ang) * r1, sunY() + math.sin(ang) * r1)
         end
     end
-    graphics.blendMode(blend.ALPHA)
+    gfx.blendMode(blend.ALPHA)
 end
 
 ## The moon's progress along its path, which draw() then reads.
@@ -225,24 +225,24 @@ func draw()
     ## The solar disc, then the corona, then the Moon ON TOP: that is the real stacking order,
     ## and it is enough to carve the crescent out — no intersection need be computed to draw it,
     ## since the Moon hides whatever it covers.
-    graphics.noStroke()
-    graphics.fill(Color(1, 0.97, 0.86))
-    graphics.circle(sunX(), sunY(), rs)
+    gfx.noStroke()
+    gfx.fill(Color(1, 0.97, 0.86))
+    gfx.circle(sunX(), sunY(), rs)
 
     if isTotal then
         drawCorona()
         ## The chromosphere: a thin pink border the Moon leaves visible just beyond its limb.
         ## Drawn before the Moon, only a fine line of it remains.
-        graphics.fill(Color(1, 0.35, 0.35, 0.55))
-        graphics.circle(moonX(), moonY(), rl * 1.03)
+        gfx.fill(Color(1, 0.35, 0.35, 0.55))
+        gfx.circle(moonX(), moonY(), rl * 1.03)
     end
 
     ## The Moon takes THE SKY'S COLOUR, barely darkened: away from the Sun one does not see it
     ## at all — a black disc on the blue of day would be an invention. In front of the Sun it
     ## hides it just as well.
     var c = skyColor(l)
-    graphics.fill(Color(c.r * 0.90, c.g * 0.90, c.b * 0.92))
-    graphics.circle(moonX(), moonY(), rl)
+    gfx.fill(Color(c.r * 0.90, c.g * 0.90, c.b * 0.92))
+    gfx.circle(moonX(), moonY(), rl)
 
     ## The halo comes AFTER the Moon: the light the atmosphere scatters lies between the Moon and
     ## us, so it veils the Moon as well. In totality there is almost nothing left to scatter.
@@ -250,10 +250,10 @@ func draw()
 
     drawHorizon(l)
 
-    graphics.fontSize(H * 0.032)
-    graphics.stroke(Color(0.92, 0.93, 0.97))
-    graphics.text("{phase()}   obscuration {obscuration() * 100:.1f} %", W * 0.04, H * 0.05)
-    graphics.fontSize(H * 0.024)
-    graphics.stroke(Color(0.68, 0.72, 0.82))
-    graphics.text("{config.type} eclipse   -   light {l * 100:.0f} %", W * 0.04, H * 0.10)
+    gfx.fontSize(H * 0.032)
+    gfx.stroke(Color(0.92, 0.93, 0.97))
+    gfx.text("{phase()}   obscuration {obscuration() * 100:.1f} %", W * 0.04, H * 0.05)
+    gfx.fontSize(H * 0.024)
+    gfx.stroke(Color(0.68, 0.72, 0.82))
+    gfx.text("{config.type} eclipse   -   light {l * 100:.0f} %", W * 0.04, H * 0.10)
 end

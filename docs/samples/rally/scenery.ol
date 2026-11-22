@@ -53,9 +53,9 @@ func drawPosts(cx, cz)
     for p in posts do
         var dx = p.x - cx
         var dz = p.z - cz
-        if dx * dx + dz * dz < see2 and graphics.inFrustum(p.x, p.y + mid, p.z, POST_HEIGHT) then
-            graphics.fill(p.color)
-            graphics.cube(p.x, p.y + mid, p.z,  POST_SIZE, POST_HEIGHT, POST_SIZE)
+        if dx * dx + dz * dz < see2 and gfx.inFrustum(p.x, p.y + mid, p.z, POST_HEIGHT) then
+            gfx.fill(p.color)
+            gfx.cube(p.x, p.y + mid, p.z,  POST_SIZE, POST_HEIGHT, POST_SIZE)
         end
     end
 end

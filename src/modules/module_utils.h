@@ -205,7 +205,7 @@ static inline double color_clamp01(double v) {
 }
 
 // Reads "flexible" colour arguments into [0,1] components. The same signature serves the Color
-// constructor and graphics.clear/fill/stroke:
+// constructor and gfx.clear/fill/stroke:
 //   a Color instance   -> its r,g,b,a fields
 //   1 number  n        -> (n,n,n,1)   grey
 //   2 numbers n,a      -> (n,n,n,a)   grey plus alpha

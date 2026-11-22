@@ -5,7 +5,7 @@
 ##
 ##   var chase = ChaseCamera(distance, height [, stiffness])
 ##   chase.update(dt, targetX, targetY, targetZ, headingRad)   ## every frame, before drawing
-##   chase.apply(cam)                                          ## cam = graphics.camera(...)
+##   chase.apply(cam)                                          ## cam = gfx.camera(...)
 
 class ChaseCamera
     func init(distance, height, stiffness)

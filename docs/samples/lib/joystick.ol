@@ -114,11 +114,11 @@ class Joystick
         var cx = self.cx()
         var cy = self.cy()
         var r = self.radius()
-        graphics.noStroke()
-        graphics.fill(Color(1, 1, 1, 0.06))
-        graphics.circle(cx, cy, r)
-        graphics.fill(Color(1, 1, 1, 0.16))
-        graphics.circle(cx, cy, r * self.dead + 4)    ## the neutral point
+        gfx.noStroke()
+        gfx.fill(Color(1, 1, 1, 0.06))
+        gfx.circle(cx, cy, r)
+        gfx.fill(Color(1, 1, 1, 0.16))
+        gfx.circle(cx, cy, r * self.dead + 4)    ## the neutral point
         if self.active then
             ## the thumb is held at the disc's edge, as a real stick would be
             var dx = self.px - cx
@@ -130,11 +130,11 @@ class Joystick
                 kx = cx + dx / d * r
                 ky = cy + dy / d * r
             end
-            graphics.stroke(Color(1, 1, 1, 0.45))
-            graphics.line(cx, cy, kx, ky)
-            graphics.noStroke()
-            graphics.fill(Color(0.45, 0.65, 1.0, 0.85))
-            graphics.circle(kx, ky, 20)
+            gfx.stroke(Color(1, 1, 1, 0.45))
+            gfx.line(cx, cy, kx, ky)
+            gfx.noStroke()
+            gfx.fill(Color(0.45, 0.65, 1.0, 0.85))
+            gfx.circle(kx, ky, 20)
         end
     end
 end

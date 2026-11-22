@@ -594,14 +594,14 @@ Value VM::get_global(const std::string& name) const {
 }
 
 void VM::run_entry_hooks() {
-    // `graphics` may be nil (the native stub, or a script that never mentions it) or reassigned
+    // `gfx` may be nil (the native stub, or a script that never mentions it) or reassigned
     // to a non-map, so the is_map() guard before map_get is mandatory.
-    Value gfx = get_global("graphics");
+    Value gfx = get_global("gfx");
     if (gfx.is_nil()) {
         // execute() builds only the modules the program NAMES, so a script whose draw() never writes
-        // `graphics` has no such global — yet a draw() alone must start a session (the implicit canvas
+        // `gfx` has no such global — yet a draw() alone must start a session (the implicit canvas
         // below). Ask for the module itself; the native stub answers nil, and nothing starts.
-        gfx = make_builtin_module("graphics");
+        gfx = make_builtin_module("gfx");
     }
     Value draw = get_global("draw");
     bool graphical = draw.is_callable() && gfx.is_map();
@@ -612,7 +612,7 @@ void VM::run_entry_hooks() {
         call_value(setup);
 
     // IMPLICIT canvas: the mere presence of a draw() is enough to start a graphics session.
-    // When NEITHER the top level NOR setup() called graphics.canvas(), we create it at W×H
+    // When NEITHER the top level NOR setup() called gfx.canvas(), we create it at W×H
     // (engine globals, pre-initialized to the window dimensions).
     // Done AFTER setup(), because setup() is a common place to call canvas() oneself: creating
     // it earlier would mean a double InitWindow, which crashes on WASM.
@@ -649,7 +649,7 @@ void VM::run_entry_hooks() {
         }
     }
 
-    // With a draw() present, start the render loop through graphics.run(draw).
+    // With a draw() present, start the render loop through gfx.run(draw).
     if (graphical) {
         Value run_fn = gfx.map_get(Value(std::string("run")));
         if (run_fn.is_builtin())
@@ -2291,7 +2291,7 @@ void VM::execute(Chunk chunk) {
     init_global("elapsedTime", Value(0.0));
     // W and H are the render-area dimensions injected by the engine, defaulting to
     // window.width/height for the environment. They are read before the top level so that
-    // graphics.canvas(W, H) works right away.
+    // gfx.canvas(W, H) works right away.
     {
         int64_t win_w = 0, win_h = 0;
         const Value& win = module_of("window");

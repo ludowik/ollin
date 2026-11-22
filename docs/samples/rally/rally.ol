@@ -27,7 +27,7 @@ global CHASE_HEIGHT_FAST = 4.2
 global SPEED_FEEL_RATE = 2.5
 global speedFeel = 0.0     ## |speed| / TOP_SPEED in [0; 1], eased so the camera does not jump on a gear change
 
-global cam = graphics.camera(0, 0, 10,  0, 0, 0)
+global cam = gfx.camera(0, 0, 10,  0, 0, 0)
 global ground = nil
 global carModel = nil
 
@@ -46,7 +46,7 @@ global wasPortrait = false
 global gasHeld = false      ## the pedals as update() read them: draw() lights the keys from the same answer
 global brakeHeld = false
 
-## The area follows the host (graphics.fitArea in setup), so W, H and SIZE already hold the new size
+## The area follows the host (gfx.fitArea in setup), so W, H and SIZE already hold the new size
 ## when this runs, and everything drawn from them re-places itself. What the script keeps — the
 ## wheel's neutral — it redoes here: whatever the player had set goes back to the standard position,
 ## the phone being held differently the other way up.
@@ -85,13 +85,13 @@ func touch.began(id, x, y)
 end
 
 func setup()
-    graphics.canvas(W, H, "Rally")
-    graphics.fitArea()
+    gfx.canvas(W, H, "Rally")
+    gfx.fitArea()
     wasPortrait = H > W
     motion.enable()
-    graphics.ambient(0.55)
-    graphics.light("dir", -0.5, -1, -0.4)
-    carModel = graphics.model("stratos.glb")
+    gfx.ambient(0.55)
+    gfx.light("dir", -0.5, -1, -0.4)
+    carModel = gfx.model("stratos.glb")
     ground = bakeTerrain()
     bakePosts()
     engineSound.start()
@@ -210,56 +210,56 @@ end
 ## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the
 ## same at every angle, so a lighter bar across the tread is what makes the spin visible.
 func drawWheel(x, y, z, yaw, spin)
-    graphics.push()
-    graphics.translate(x, y, z)
-    graphics.rotateY(math.deg(yaw))
-    graphics.rotateX(math.deg(spin))
-    graphics.fill(HUB_COLOR)
-    graphics.cube(0, 0, 0,  WHEEL_H + 0.06, 0.1, WHEEL_R * 1.9)
-    graphics.fill(TYRE_COLOR)
-    graphics.rotateZ(90)
-    ## graphics.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
+    gfx.push()
+    gfx.translate(x, y, z)
+    gfx.rotateY(math.deg(yaw))
+    gfx.rotateX(math.deg(spin))
+    gfx.fill(HUB_COLOR)
+    gfx.cube(0, 0, 0,  WHEEL_H + 0.06, 0.1, WHEEL_R * 1.9)
+    gfx.fill(TYRE_COLOR)
+    gfx.rotateZ(90)
+    ## gfx.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
     ## along its own (pre-rotation) axis so the wheel centres on (x, y, z) once rotated.
-    graphics.cylinder(0, -WHEEL_H / 2, 0,  WHEEL_R, WHEEL_H)
-    graphics.pop()
+    gfx.cylinder(0, -WHEEL_H / 2, 0,  WHEEL_R, WHEEL_H)
+    gfx.pop()
 end
 
 func drawCar()
     var groundY, pitch, roll = carPose(car.x, car.z, car.heading)
-    graphics.push()
+    gfx.push()
     ## The car's local origin sits at AXLE height: a wheel drawn at local y=0 (see drawWheel calls
     ## below) has its bottom exactly WHEEL_R below, right at the ground.
-    graphics.translate(car.x, groundY + WHEEL_R, car.z)
-    graphics.rotateY(math.deg(car.heading))
+    gfx.translate(car.x, groundY + WHEEL_R, car.z)
+    gfx.rotateY(math.deg(car.heading))
     ## rotateX lowers +Z for a positive angle and rotateZ raises +X, hence the pitch's minus.
-    graphics.rotateX(-math.deg(pitch))
-    graphics.rotateZ(math.deg(roll))
+    gfx.rotateX(-math.deg(pitch))
+    gfx.rotateZ(math.deg(roll))
     ## The body is one model (tools/gen_stratos_glb.py), drawn in the car's own frame: +Z is the
     ## car's forward (heading 0 → sin=0, cos=1 → z increases), and its origin is at axle height.
-    graphics.fill(MODEL_TINT)
-    graphics.drawModel(carModel, 0, 0, 0, 1)
+    gfx.fill(MODEL_TINT)
+    gfx.drawModel(carModel, 0, 0, 0, 1)
     var spin = car.travelled / WHEEL_R
     drawWheel(HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)
     drawWheel(-HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)
     drawWheel(HALF_TRACK, 0, -HALF_BASE, 0, spin)
     drawWheel(-HALF_TRACK, 0, -HALF_BASE, 0, spin)
-    graphics.pop()
+    gfx.pop()
 end
 
 ## One readout row: the value right-aligned on `xr`, its unit just after it, each with a dark
 ## copy underneath so the white stays readable over the grass, the road and the sky.
 func hudRow(value, unit, xr, y, size)
-    graphics.fontSize(size)
+    gfx.fontSize(size)
     hudCopy(value, unit, xr + 2, y + 2, size * 0.3, HUD_SHADOW)
     hudCopy(value, unit, xr, y, size * 0.3, HUD_TEXT)
 end
 
 func hudCopy(value, unit, xr, y, gap, color)
-    graphics.stroke(color)
-    graphics.textMode("right", "top")
-    graphics.text(value, xr, y)
-    graphics.textMode("left", "top")
-    graphics.text(unit, xr + gap, y)
+    gfx.stroke(color)
+    gfx.textMode("right", "top")
+    gfx.text(value, xr, y)
+    gfx.textMode("left", "top")
+    gfx.text(unit, xr + gap, y)
 end
 
 ## Speed, engaged gear and revs, top left. The monospaced font keeps the digits from jittering as
@@ -272,7 +272,7 @@ func drawHud()
         gear = "R"
         of = ""
     end
-    graphics.font("mono")
+    gfx.font("mono")
     var xr = u * 5.5
     hudRow("{math.floor(math.abs(car.speed) * 3.6)}", "km/h", xr, u * 0.6, u * 2.2)
     hudRow(gear, of, xr, u * 3.1, u * 1.3)
@@ -282,18 +282,18 @@ end
 ## A touch key: a rounded rectangle with its label, lit while a thumb is on it. `radius` and `text` are
 ## fractions of the key's height.
 func drawKey(r, label, held, radius, text)
-    graphics.noStroke()
+    gfx.noStroke()
     if held then
-        graphics.fill(PEDAL_HELD)
+        gfx.fill(PEDAL_HELD)
     else
-        graphics.fill(PEDAL_IDLE)
+        gfx.fill(PEDAL_IDLE)
     end
-    graphics.rect(r.x, r.y, r.w, r.h, r.h * radius)
-    graphics.font("mono")
-    graphics.fontSize(r.h * text)
-    graphics.stroke(HUD_TEXT)
-    graphics.textMode("center", "center")
-    graphics.text(label, r.x + r.w / 2, r.y + r.h / 2)
+    gfx.rect(r.x, r.y, r.w, r.h, r.h * radius)
+    gfx.font("mono")
+    gfx.fontSize(r.h * text)
+    gfx.stroke(HUD_TEXT)
+    gfx.textMode("center", "center")
+    gfx.text(label, r.x + r.w / 2, r.y + r.h / 2)
 end
 
 func drawTiltControls()
@@ -303,17 +303,17 @@ func drawTiltControls()
 end
 
 func draw()
-    graphics.clear(SKY_COLOR)
-    graphics.noStroke()    ## a solid is also outlined while a stroke is on, and the engine starts every frame with one
-    graphics.begin3d(cam)
+    gfx.clear(SKY_COLOR)
+    gfx.noStroke()    ## a solid is also outlined while a stroke is on, and the engine starts every frame with one
+    gfx.begin3d(cam)
     for block in ground do
-        if graphics.inFrustum(block.x, block.y, block.z, block.r) then
-            graphics.drawChunk(block)
+        if gfx.inFrustum(block.x, block.y, block.z, block.r) then
+            gfx.drawChunk(block)
         end
     end
     drawPosts(car.x, car.z)
     drawCar()
-    graphics.end3d()
+    gfx.end3d()
     drawHud()
     if tiltOn() then
         drawTiltControls()

@@ -47,7 +47,7 @@ static bool query_blocked() {
 // reasons, and what a browser accepts, are written there. On a computer it comes from raylib's character queue.
 //
 // Detection happens in keyboard_poll(), called once per frame by the render loop
-// (graphics_module.cpp), so the keyboard only works during a graphics.run(...) — or through the
+// (graphics_module.cpp), so the keyboard only works during a gfx.run(...) — or through the
 // automatically called draw function.
 
 // Readable name of a raylib key; "" when unhandled, and then ignored.

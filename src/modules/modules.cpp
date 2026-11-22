@@ -54,7 +54,7 @@ void gfx_program_reset();
 static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modules[] = {
     { "core",     make_core_module,     nullptr          },
     { "math",     make_math_module,     nullptr          },
-    { "graphics", make_graphics_module, gfx_program_reset },   // fitArea off, the orientation lock released
+    { "gfx",      make_graphics_module, gfx_program_reset },   // fitArea off, the orientation lock released
     { "string",   make_string_module,   nullptr          },
     { "map",      make_map_module,      nullptr          },
     { "array",    make_array_module,    nullptr          },

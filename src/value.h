@@ -52,7 +52,7 @@ struct CallCtx {
     // `args`, because a builtin that calls Ollin code — `__str`, a map callback — resizes the
     // register file meanwhile. The file itself never moves any more (see VM::execute), but a write through
     // `args` could still land in a slot that the nested call shrank away; the index names the live slot.
-    // (Before the file was allocated once, `args` dangled outright: `graphics.textSize` on an instance whose
+    // (Before the file was allocated once, `args` dangled outright: `gfx.textSize` on an instance whose
     // `__str` recurses gave back a non-number, and `[1,2,3].map(f)` with a recursive `f` gave nil, nil, nil.)
     //
     // Reading is still the caller's business: `args` must be read BEFORE calling Ollin code.
@@ -392,7 +392,7 @@ inline const char* Value::type_name() const {
     case T_STRING:
         return "string";
     case T_MAP:
-        // A built-in module (math, string, graphics…) is a T_MAP under the hood (see Map::kind
+        // A built-in module (math, string, gfx…) is a T_MAP under the hood (see Map::kind
         // in collections/map.h) but a script should read it as its own kind: typeof(math) says
         // "module", not "map".
         return mptr->kind == Map::MODULE ? "module" : "map";

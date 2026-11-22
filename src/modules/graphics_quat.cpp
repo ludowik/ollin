@@ -20,7 +20,7 @@ Quaternion quat_from_instance(const Value& v, const char* fn) {
     // Checks this really is a Quat instance and not some other map (a Camera or a Light object…): a quaternion
     // would be built silently wrong (a missing w reads as 0).
     if (!v.is_instance_of(quat_class()))
-        throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quatAxis / quatEuler)");
+        throw std::runtime_error(std::string(fn) + ": expected a Quat (gfx.quat / quatAxis / quatEuler)");
     return Quaternion{(float)quat_field(v, "x"), (float)quat_field(v, "y"), (float)quat_field(v, "z"),
                       (float)quat_field(v, "w")};
 }
@@ -101,7 +101,7 @@ static Value quat_class() {
     return cls;
 }
 
-// graphics.quat(): the identity quaternion, no rotation.
+// gfx.quat(): the identity quaternion, no rotation.
 static int gfx_quat(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -109,26 +109,26 @@ static int gfx_quat(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionIdentity()));
 }
 
-// graphics.quatAxis(ax, ay, az, deg): a rotation of deg degrees about the axis (ax,ay,az).
+// gfx.quatAxis(ax, ay, az, deg): a rotation of deg degrees about the axis (ax,ay,az).
 static int gfx_quat_axis(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 axis = {(float)num_arg(args, argc, 0, "graphics.quatAxis"),
-                    (float)num_arg(args, argc, 1, "graphics.quatAxis"),
-                    (float)num_arg(args, argc, 2, "graphics.quatAxis")};
+    Vector3 axis = {(float)num_arg(args, argc, 0, "gfx.quatAxis"),
+                    (float)num_arg(args, argc, 1, "gfx.quatAxis"),
+                    (float)num_arg(args, argc, 2, "gfx.quatAxis")};
     // A null axis (0,0,0) defines no rotation, so we return the identity explicitly rather than
     // depend on raymath's internal behaviour.
     if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
         return ctx.ret(make_quat_instance(QuaternionIdentity()));
-    float rad = (float)num_arg(args, argc, 3, "graphics.quatAxis") * DEG2RAD;
+    float rad = (float)num_arg(args, argc, 3, "gfx.quatAxis") * DEG2RAD;
     return ctx.ret(make_quat_instance(QuaternionFromAxisAngle(axis, rad)));
 }
 
-// graphics.quatEuler(pitch, yaw, roll): from Euler angles, in degrees.
+// gfx.quatEuler(pitch, yaw, roll): from Euler angles, in degrees.
 static int gfx_quat_euler(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float pitch = (float)num_arg(args, argc, 0, "graphics.quatEuler") * DEG2RAD;
-    float yaw = (float)num_arg(args, argc, 1, "graphics.quatEuler") * DEG2RAD;
-    float roll = (float)num_arg(args, argc, 2, "graphics.quatEuler") * DEG2RAD;
+    float pitch = (float)num_arg(args, argc, 0, "gfx.quatEuler") * DEG2RAD;
+    float yaw = (float)num_arg(args, argc, 1, "gfx.quatEuler") * DEG2RAD;
+    float roll = (float)num_arg(args, argc, 2, "gfx.quatEuler") * DEG2RAD;
     return ctx.ret(make_quat_instance(QuaternionFromEuler(pitch, yaw, roll)));
 }
 

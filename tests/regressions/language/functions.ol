@@ -383,7 +383,7 @@ func vaCheck()
     assert(vaThreeDeep(7, 8, 9) == "1/789/[7][8][9]")
     ## A BUILTIN under a `...` tail: the branch the abandoned fresh area used to size its result
     ## slots for. It is reachable without graphics, unlike a builtin returning TWO values under a
-    ## tail (`var w, h = graphics.textSize(...)`), which only the Xvfb run can exercise.
+    ## tail (`var w, h = gfx.textSize(...)`), which only the Xvfb run can exercise.
     assert(vaBuiltinTail(3, 9, 4) == "9/3")
 
     ## Declared HERE, not at the top level: `func obj.field(...)` is a lambda assigned to a field,

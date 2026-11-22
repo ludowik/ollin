@@ -1,6 +1,6 @@
 ## The 2D graphics module for real: styles and modes, the shape primitives, text, transforms, blending
 ## and the viewport. It needs a window, so it runs under Xvfb with the raylib build (tests/run_gfx.sh);
-## the headless build has no `graphics` (nil). The frames are screenshots read back with image.load, so
+## the headless build has no `gfx` (nil). The frames are screenshots read back with image.load, so
 ## what is checked is what reached the screen, with the smoothing off to keep the edges exact.
 
 const SHOT_A = "/tmp/ollin_gfx_graphics_a.png"
@@ -57,115 +57,115 @@ func lit(img, x0, y0, x1, y1)
 end
 
 func setup()
-    graphics.canvas(100, 80, "graphics test")
-    graphics.antialias(false)
+    gfx.canvas(100, 80, "gfx test")
+    gfx.antialias(false)
     quarterSprite = image.fromPattern(["####", "####"], {"#": Color(0, 1, 0, 0.25)})
     dot = image.fromPattern(["##", "##"], {"#": Color(0, 1, 0)})   ## made OUTSIDE draw: creating a target there unbinds the frame's
 end
 
 ## ── state that can be read back, and what is refused ──────────────────────
 func check_state()
-    assert(graphics.isOpen() == true)
-    assert(graphics.fps() >= 0)
-    graphics.stats(false)
-    graphics.stats()
-    graphics.fitArea(false)
-    graphics.fitArea()
-    graphics.fitArea(false)
+    assert(gfx.isOpen() == true)
+    assert(gfx.fps() >= 0)
+    gfx.stats(false)
+    gfx.stats()
+    gfx.fitArea(false)
+    gfx.fitArea()
+    gfx.fitArea(false)
 
-    assert(graphics.fontSize() == 18)
-    assert(graphics.fontSize(24) == 24)
-    assert(graphics.fontSize() == 24)
-    graphics.fontSize(18)
-    assert(graphics.font() == "sans")
-    assert(graphics.font("mono") == "mono")
-    assert(graphics.font("pixel") == "pixel")
-    assert(graphics.font(nil) == "pixel")
-    graphics.font("sans")
-    var w, h = graphics.textSize("Hello")
+    assert(gfx.fontSize() == 18)
+    assert(gfx.fontSize(24) == 24)
+    assert(gfx.fontSize() == 24)
+    gfx.fontSize(18)
+    assert(gfx.font() == "sans")
+    assert(gfx.font("mono") == "mono")
+    assert(gfx.font("pixel") == "pixel")
+    assert(gfx.font(nil) == "pixel")
+    gfx.font("sans")
+    var w, h = gfx.textSize("Hello")
     assert(w > 20 and h > 10)
-    var w2, h2 = graphics.textSize(42)
-    var w3, h3 = graphics.textSize("42")
+    var w2, h2 = gfx.textSize(42)
+    var w3, h3 = gfx.textSize("42")
     assert(w2 == w3 and h2 == h3)
-    graphics.fontSize(36)
-    var wBig, hBig = graphics.textSize("Hello")
+    gfx.fontSize(36)
+    var wBig, hBig = gfx.textSize("Hello")
     assert(wBig > w * 1.5 and hBig > h * 1.5)
-    graphics.fontSize(18)
+    gfx.fontSize(18)
 
-    expect(refusal(func() graphics.font(5) end), "graphics.font: expected a font name")
-    expect(refusal(func() graphics.font("no_such_font") end), "graphics.font: unknown font 'no_such_font' (available: sans, mono, pixel)")
-    expect(refusal(func() graphics.textSize() end), "graphics.textSize: expected a text")
-    expect(refusal(func() graphics.canvas(0, 10) end), "graphics.canvas: the width and the height must be positive")
-    expect(refusal(func() graphics.canvas(10, 10, 5) end), "graphics.canvas: the title must be a string")
-    expect(refusal(func() graphics.antialias(true, -1) end), "graphics.antialias: size must not be negative")
-    graphics.antialias(false)
-    expect(refusal(func() graphics.blendMode("no_such_mode") end), "graphics.blendMode: unknown mode 'no_such_mode'")
-    expect(refusal(func() graphics.blendMode(true) end), "graphics.blendMode: expected a mode name or a blend constant")
-    expect(refusal(func() graphics.viewport(10) end), "graphics.viewport: expected a width and a height")
-    expect(refusal(func() graphics.viewport(0, 10) end), "graphics.viewport: the width and the height must be positive")
-    expect(refusal(func() graphics.line(1, 2) end), "graphics.line: expected x1, y1, x2, y2")
-    expect(refusal(func() graphics.rect(1, 2, 3) end), "graphics.rect: expected x, y, w, h[, r]")
-    expect(refusal(func() graphics.text("a", 1) end), "graphics.text: expected text, x, y")
-    expect(refusal(func() graphics.screenshot() end), "graphics.screenshot: expected a file path")
-    expect(refusal(func() graphics.ellipse(1, 2, 3) end), "graphics.ellipse: expected x, y, width, height")
-    expect(refusal(func() graphics.circle(1, 2) end), "graphics.circle: expected x, y, radius")
-    expect(refusal(func() graphics.arc(1, 2, 3, 4, 5) end), "graphics.arc: expected x, y, w, h, start, stop")
-    expect(refusal(func() graphics.point(1) end), "graphics.point: expected x, y")
-    expect(refusal(func() graphics.polygon(5) end), "graphics.polygon: expected array of points")
-    expect(refusal(func() graphics.polyline(5) end), "graphics.polyline: expected array of points")
-    expect(refusal(func() graphics.translate(1) end), "graphics.translate: expected x, y [, z]")
-    expect(refusal(func() graphics.rotate(10, 1) end), "graphics.rotate: expected deg [, ax, ay, az] (a whole axis, or none)")
-    expect(refusal(func() graphics.scale() end), "graphics.scale: expected s | sx, sy | sx, sy, sz")
-    expect(refusal(func() graphics.sprite(1) end), "graphics.sprite: expected img, x, y")
-    expect(refusal(func() graphics.sprite(5, 1, 2) end), "graphics.sprite: expected image handle")
-    assert(refusal(func() graphics.rectMode("no_such") end) <> "")
-    assert(refusal(func() graphics.ellipseMode("no_such") end) <> "")
-    assert(refusal(func() graphics.spriteMode("no_such") end) <> "")
-    assert(refusal(func() graphics.textMode("no_such") end) <> "")
-    assert(refusal(func() graphics.textMode("left", "no_such") end) <> "")
-    assert(refusal(func() graphics.fill("red") end) <> "")
-    expect(refusal(func() graphics.run() end), "graphics.run: expected callback function")
+    expect(refusal(func() gfx.font(5) end), "gfx.font: expected a font name")
+    expect(refusal(func() gfx.font("no_such_font") end), "gfx.font: unknown font 'no_such_font' (available: sans, mono, pixel)")
+    expect(refusal(func() gfx.textSize() end), "gfx.textSize: expected a text")
+    expect(refusal(func() gfx.canvas(0, 10) end), "gfx.canvas: the width and the height must be positive")
+    expect(refusal(func() gfx.canvas(10, 10, 5) end), "gfx.canvas: the title must be a string")
+    expect(refusal(func() gfx.antialias(true, -1) end), "gfx.antialias: size must not be negative")
+    gfx.antialias(false)
+    expect(refusal(func() gfx.blendMode("no_such_mode") end), "gfx.blendMode: unknown mode 'no_such_mode'")
+    expect(refusal(func() gfx.blendMode(true) end), "gfx.blendMode: expected a mode name or a blend constant")
+    expect(refusal(func() gfx.viewport(10) end), "gfx.viewport: expected a width and a height")
+    expect(refusal(func() gfx.viewport(0, 10) end), "gfx.viewport: the width and the height must be positive")
+    expect(refusal(func() gfx.line(1, 2) end), "gfx.line: expected x1, y1, x2, y2")
+    expect(refusal(func() gfx.rect(1, 2, 3) end), "gfx.rect: expected x, y, w, h[, r]")
+    expect(refusal(func() gfx.text("a", 1) end), "gfx.text: expected text, x, y")
+    expect(refusal(func() gfx.screenshot() end), "gfx.screenshot: expected a file path")
+    expect(refusal(func() gfx.ellipse(1, 2, 3) end), "gfx.ellipse: expected x, y, width, height")
+    expect(refusal(func() gfx.circle(1, 2) end), "gfx.circle: expected x, y, radius")
+    expect(refusal(func() gfx.arc(1, 2, 3, 4, 5) end), "gfx.arc: expected x, y, w, h, start, stop")
+    expect(refusal(func() gfx.point(1) end), "gfx.point: expected x, y")
+    expect(refusal(func() gfx.polygon(5) end), "gfx.polygon: expected array of points")
+    expect(refusal(func() gfx.polyline(5) end), "gfx.polyline: expected array of points")
+    expect(refusal(func() gfx.translate(1) end), "gfx.translate: expected x, y [, z]")
+    expect(refusal(func() gfx.rotate(10, 1) end), "gfx.rotate: expected deg [, ax, ay, az] (a whole axis, or none)")
+    expect(refusal(func() gfx.scale() end), "gfx.scale: expected s | sx, sy | sx, sy, sz")
+    expect(refusal(func() gfx.sprite(1) end), "gfx.sprite: expected img, x, y")
+    expect(refusal(func() gfx.sprite(5, 1, 2) end), "gfx.sprite: expected image handle")
+    assert(refusal(func() gfx.rectMode("no_such") end) <> "")
+    assert(refusal(func() gfx.ellipseMode("no_such") end) <> "")
+    assert(refusal(func() gfx.spriteMode("no_such") end) <> "")
+    assert(refusal(func() gfx.textMode("no_such") end) <> "")
+    assert(refusal(func() gfx.textMode("left", "no_such") end) <> "")
+    assert(refusal(func() gfx.fill("red") end) <> "")
+    expect(refusal(func() gfx.run() end), "gfx.run: expected callback function")
 end
 
 ## ── scene A: shapes ────────────────────────────────────────────────────────
 func scene_a()
-    graphics.clear(0, 0, 0)
-    graphics.noStroke()
-    graphics.fill(1, 0, 0)
-    graphics.rect(5, 5, 20, 10)                        ## a plain rectangle
-    graphics.rectMode("center")
-    graphics.fill(0, 1, 0)
-    graphics.rect(45, 10, 10, 10)                      ## anchored by its centre
-    graphics.rectMode("corner")
-    graphics.fill(0, 0, 1)
-    graphics.rect(60, 5, 24, 24, 8)                    ## rounded corners
-    graphics.rect(90, 5, 8, 8, 100)                    ## a radius beyond the half side: a capsule
-    graphics.fill(1, 1, 0)
-    graphics.circle(15, 45, 8)
-    graphics.ellipseMode("corner")
-    graphics.ellipse(30, 37, 16, 16)                   ## its box starts at x, y
-    graphics.ellipseMode("center")
-    graphics.fill(0, 1, 1)
-    graphics.polygon([[55, 35], [75, 35], [65, 55]])   ## a triangle
-    graphics.fill(1, 0, 1)
-    graphics.arc(88, 45, 16, 16, 0, 270)               ## a pie slice
-    graphics.stroke(1, 1, 1)
-    graphics.strokeSize(2)
-    graphics.noFill()
-    graphics.rect(5, 60, 20, 16)                       ## an outline: the inside stays black
-    graphics.rect(30, 60, 20, 16, 5)                   ## a rounded outline
-    graphics.rect(55, 60, 6, 6, 2)                     ## a stroke thicker than half the shorter side
-    graphics.strokeSize(8)
-    graphics.rect(66, 60, 6, 6)
-    graphics.rect(76, 60, 8, 8, 2)
-    graphics.strokeSize(2)
-    graphics.line(90, 60, 98, 60)
-    graphics.polyline([[88, 66], [98, 66], [98, 76]])
-    graphics.point(90, 72)
-    graphics.segments(12)
-    graphics.circle(50, 70, 3)
-    graphics.segments(64)
-    graphics.screenshot(SHOT_A)
+    gfx.clear(0, 0, 0)
+    gfx.noStroke()
+    gfx.fill(1, 0, 0)
+    gfx.rect(5, 5, 20, 10)                        ## a plain rectangle
+    gfx.rectMode("center")
+    gfx.fill(0, 1, 0)
+    gfx.rect(45, 10, 10, 10)                      ## anchored by its centre
+    gfx.rectMode("corner")
+    gfx.fill(0, 0, 1)
+    gfx.rect(60, 5, 24, 24, 8)                    ## rounded corners
+    gfx.rect(90, 5, 8, 8, 100)                    ## a radius beyond the half side: a capsule
+    gfx.fill(1, 1, 0)
+    gfx.circle(15, 45, 8)
+    gfx.ellipseMode("corner")
+    gfx.ellipse(30, 37, 16, 16)                   ## its box starts at x, y
+    gfx.ellipseMode("center")
+    gfx.fill(0, 1, 1)
+    gfx.polygon([[55, 35], [75, 35], [65, 55]])   ## a triangle
+    gfx.fill(1, 0, 1)
+    gfx.arc(88, 45, 16, 16, 0, 270)               ## a pie slice
+    gfx.stroke(1, 1, 1)
+    gfx.strokeSize(2)
+    gfx.noFill()
+    gfx.rect(5, 60, 20, 16)                       ## an outline: the inside stays black
+    gfx.rect(30, 60, 20, 16, 5)                   ## a rounded outline
+    gfx.rect(55, 60, 6, 6, 2)                     ## a stroke thicker than half the shorter side
+    gfx.strokeSize(8)
+    gfx.rect(66, 60, 6, 6)
+    gfx.rect(76, 60, 8, 8, 2)
+    gfx.strokeSize(2)
+    gfx.line(90, 60, 98, 60)
+    gfx.polyline([[88, 66], [98, 66], [98, 76]])
+    gfx.point(90, 72)
+    gfx.segments(12)
+    gfx.circle(50, 70, 3)
+    gfx.segments(64)
+    gfx.screenshot(SHOT_A)
 end
 
 func check_a()
@@ -194,87 +194,87 @@ global dot = nil
 global quarterSprite = nil
 
 func scene_b()
-    graphics.clear(0, 0, 0)
-    graphics.noStroke()
-    graphics.fill(1, 0, 0)
-    graphics.push()
-    graphics.translate(10, 10)
-    graphics.rect(0, 0, 10, 10)                        ## moved
-    graphics.pop()
-    graphics.rect(0, 0, 4, 4)                          ## the origin again
-    graphics.pushMatrix()
-    graphics.translate(40, 10)
-    graphics.scale(2)
-    graphics.rect(0, 0, 5, 5)                          ## doubled: 10 x 10
-    graphics.scale(1, 2)
-    graphics.rect(0, 0, 3, 3)
-    graphics.scale(1, 1, 1)
-    graphics.popMatrix()
-    graphics.pushMatrix()
-    graphics.translate(70, 20)
-    graphics.rotate(90)
-    graphics.fill(0, 1, 0)
-    graphics.rect(0, 0, 10, 4)                         ## turned a quarter: it hangs down
-    graphics.rotate(-90)
-    graphics.rotateZ(90)
-    graphics.rotateX(0)
-    graphics.rotateY(0)
-    graphics.rotate(0, 0, 0, 1)
-    graphics.popMatrix()
-    graphics.translate(0, 0)
-    graphics.resetTransform()
-    graphics.rect(0, 30, 2, 2)
+    gfx.clear(0, 0, 0)
+    gfx.noStroke()
+    gfx.fill(1, 0, 0)
+    gfx.push()
+    gfx.translate(10, 10)
+    gfx.rect(0, 0, 10, 10)                        ## moved
+    gfx.pop()
+    gfx.rect(0, 0, 4, 4)                          ## the origin again
+    gfx.pushMatrix()
+    gfx.translate(40, 10)
+    gfx.scale(2)
+    gfx.rect(0, 0, 5, 5)                          ## doubled: 10 x 10
+    gfx.scale(1, 2)
+    gfx.rect(0, 0, 3, 3)
+    gfx.scale(1, 1, 1)
+    gfx.popMatrix()
+    gfx.pushMatrix()
+    gfx.translate(70, 20)
+    gfx.rotate(90)
+    gfx.fill(0, 1, 0)
+    gfx.rect(0, 0, 10, 4)                         ## turned a quarter: it hangs down
+    gfx.rotate(-90)
+    gfx.rotateZ(90)
+    gfx.rotateX(0)
+    gfx.rotateY(0)
+    gfx.rotate(0, 0, 0, 1)
+    gfx.popMatrix()
+    gfx.translate(0, 0)
+    gfx.resetTransform()
+    gfx.rect(0, 30, 2, 2)
 
-    graphics.pushStyle()
-    graphics.fill(0, 0, 1)
-    graphics.strokeSize(5)
-    graphics.fontSize(30)
-    graphics.font("mono")
-    graphics.rectMode("center")
-    graphics.popStyle()
-    assert(graphics.fontSize() == 18 and graphics.font() == "sans")
-    graphics.rect(10, 30, 4, 4)                        ## the style is back: green, as when pushStyle ran
+    gfx.pushStyle()
+    gfx.fill(0, 0, 1)
+    gfx.strokeSize(5)
+    gfx.fontSize(30)
+    gfx.font("mono")
+    gfx.rectMode("center")
+    gfx.popStyle()
+    assert(gfx.fontSize() == 18 and gfx.font() == "sans")
+    gfx.rect(10, 30, 4, 4)                        ## the style is back: green, as when pushStyle ran
 
-    graphics.fill(1, 1, 1)
-    graphics.stroke(1, 1, 1)
-    graphics.fontSize(14)
-    graphics.textMode("left", "top")
-    graphics.text("Ab", 4, 36)
-    graphics.textMode("center", "center")
-    graphics.text("Ab", 50, 44)
-    graphics.textMode("right", "bottom")
-    graphics.text("Ab", 96, 56)
-    graphics.textMode("corner", "baseline")
-    graphics.text(7, 4, 76)
-    graphics.textMode("left", "top")
-    graphics.fontSize(18)
-    graphics.noStroke()
+    gfx.fill(1, 1, 1)
+    gfx.stroke(1, 1, 1)
+    gfx.fontSize(14)
+    gfx.textMode("left", "top")
+    gfx.text("Ab", 4, 36)
+    gfx.textMode("center", "center")
+    gfx.text("Ab", 50, 44)
+    gfx.textMode("right", "bottom")
+    gfx.text("Ab", 96, 56)
+    gfx.textMode("corner", "baseline")
+    gfx.text(7, 4, 76)
+    gfx.textMode("left", "top")
+    gfx.fontSize(18)
+    gfx.noStroke()
 
-    graphics.fill(0.5, 0, 0)
-    graphics.rect(60, 36, 10, 10)
-    graphics.blendMode("add")
-    graphics.rect(60, 36, 10, 10)                      ## 0.5 + 0.5 red
-    graphics.blendMode("alpha")
-    graphics.fill(0, 0, 1, 0.5)
-    graphics.rect(74, 36, 10, 10)                      ## half a blue over black
-    graphics.blendMode("multiply")
-    graphics.blendMode("subtract")
-    graphics.blendMode("add_colors")
-    graphics.blendMode("premultiply")
-    graphics.blendMode(blend.ALPHA)
-    graphics.blendMode()
+    gfx.fill(0.5, 0, 0)
+    gfx.rect(60, 36, 10, 10)
+    gfx.blendMode("add")
+    gfx.rect(60, 36, 10, 10)                      ## 0.5 + 0.5 red
+    gfx.blendMode("alpha")
+    gfx.fill(0, 0, 1, 0.5)
+    gfx.rect(74, 36, 10, 10)                      ## half a blue over black
+    gfx.blendMode("multiply")
+    gfx.blendMode("subtract")
+    gfx.blendMode("add_colors")
+    gfx.blendMode("premultiply")
+    gfx.blendMode(blend.ALPHA)
+    gfx.blendMode()
 
-    graphics.tint(0.5, 0.5, 0.5)
-    graphics.sprite(dot, 4, 66, 6, 6)                  ## tinted to half
-    graphics.noTint()
-    graphics.sprite(dot, 14, 66, 6, 6)
-    graphics.spriteMode("center")
-    graphics.sprite(dot, 30, 69, 6, 6)
-    graphics.spriteMode("corner")
-    graphics.sprite(dot, 38, 66)
-    graphics.sprite(dot, 42, 66, 0, 0)
-    graphics.clear(0, 0, 0, 0.5)                       ## a fade: halves what is there
-    graphics.screenshot(SHOT_B)
+    gfx.tint(0.5, 0.5, 0.5)
+    gfx.sprite(dot, 4, 66, 6, 6)                  ## tinted to half
+    gfx.noTint()
+    gfx.sprite(dot, 14, 66, 6, 6)
+    gfx.spriteMode("center")
+    gfx.sprite(dot, 30, 69, 6, 6)
+    gfx.spriteMode("corner")
+    gfx.sprite(dot, 38, 66)
+    gfx.sprite(dot, 42, 66, 0, 0)
+    gfx.clear(0, 0, 0, 0.5)                       ## a fade: halves what is there
+    gfx.screenshot(SHOT_B)
 end
 
 func check_b()
@@ -298,34 +298,34 @@ end
 
 ## ── scene C: outlines, thin strokes, the forms of the style calls ─────────
 func scene_c()
-    graphics.clear()
-    graphics.noFill()
-    graphics.stroke(1, 1, 1)
-    graphics.strokeSize(4)
-    graphics.ellipse(25, 20, 30, 16)                   ## an oval outline
-    graphics.arc(70, 20, 30, 30, 0, 180)               ## an arc outline
-    graphics.arc(70, 20, 30, 30, 270, 90)              ## through the zero: the stop wraps round
-    graphics.arc(70, 20, 30, 30, 10, 10)               ## a degenerate arc
-    graphics.strokeSize(0.5)
-    graphics.line(5, 40, 40, 40)                       ## thinner than a pixel: a 1 px line, paler
-    graphics.strokeSize(2)
-    graphics.polyline([50, 40, 70, 40, 70, 50])        ## flat coordinates, two by two
-    graphics.polyline([])                              ## nothing to draw
-    graphics.polygon([[5, 50], [20, 50], [12, 62]])    ## a polygon outline
-    graphics.polygon([[5, 70]])                        ## fewer than three points
-    graphics.stroke(Color(0, 1, 0), 6)                 ## a Color and a size together
-    graphics.line(30, 55, 45, 55)
-    graphics.stroke()                                  ## no argument: stroke back on, same colour
-    graphics.noStroke()
-    graphics.stroke()
-    graphics.line(50, 60, 60, 60)
-    graphics.fill()
-    graphics.noFill()
-    graphics.tint()
-    graphics.fill(Color(1, 0, 0))
-    graphics.noStroke()
-    graphics.rect(80, 60, 10, 10)
-    graphics.screenshot(SHOT_C)
+    gfx.clear()
+    gfx.noFill()
+    gfx.stroke(1, 1, 1)
+    gfx.strokeSize(4)
+    gfx.ellipse(25, 20, 30, 16)                   ## an oval outline
+    gfx.arc(70, 20, 30, 30, 0, 180)               ## an arc outline
+    gfx.arc(70, 20, 30, 30, 270, 90)              ## through the zero: the stop wraps round
+    gfx.arc(70, 20, 30, 30, 10, 10)               ## a degenerate arc
+    gfx.strokeSize(0.5)
+    gfx.line(5, 40, 40, 40)                       ## thinner than a pixel: a 1 px line, paler
+    gfx.strokeSize(2)
+    gfx.polyline([50, 40, 70, 40, 70, 50])        ## flat coordinates, two by two
+    gfx.polyline([])                              ## nothing to draw
+    gfx.polygon([[5, 50], [20, 50], [12, 62]])    ## a polygon outline
+    gfx.polygon([[5, 70]])                        ## fewer than three points
+    gfx.stroke(Color(0, 1, 0), 6)                 ## a Color and a size together
+    gfx.line(30, 55, 45, 55)
+    gfx.stroke()                                  ## no argument: stroke back on, same colour
+    gfx.noStroke()
+    gfx.stroke()
+    gfx.line(50, 60, 60, 60)
+    gfx.fill()
+    gfx.noFill()
+    gfx.tint()
+    gfx.fill(Color(1, 0, 0))
+    gfx.noStroke()
+    gfx.rect(80, 60, 10, 10)
+    gfx.screenshot(SHOT_C)
 end
 
 func check_c()
@@ -346,11 +346,11 @@ end
 
 ## ── scene D: a viewport letterboxes what the script draws ────────────────
 func scene_d()
-    graphics.clear(0, 0, 0)
-    graphics.noStroke()
-    graphics.fill(1, 0, 0)
-    graphics.rect(0, 0, 40, 40)                        ## the whole viewport
-    graphics.screenshot(SHOT_D)
+    gfx.clear(0, 0, 0)
+    gfx.noStroke()
+    gfx.fill(1, 0, 0)
+    gfx.rect(0, 0, 40, 40)                        ## the whole viewport
+    gfx.screenshot(SHOT_D)
 end
 
 func check_d()
@@ -362,12 +362,12 @@ end
 
 ## ── scene E: the engine fonts are distance fields, drawn sharp at a large size ──
 func scene_e()
-    graphics.clear(0, 0, 0)
-    graphics.stroke(1, 1, 1)
-    graphics.fontSize(70)
-    graphics.textMode("left", "baseline")
-    graphics.text("H", 5, 70)                          ## the capital H has neither descender nor overshoot
-    graphics.screenshot(SHOT_E)
+    gfx.clear(0, 0, 0)
+    gfx.stroke(1, 1, 1)
+    gfx.fontSize(70)
+    gfx.textMode("left", "baseline")
+    gfx.text("H", 5, 70)                          ## the capital H has neither descender nor overshoot
+    gfx.screenshot(SHOT_E)
 end
 
 func check_e()
@@ -390,29 +390,29 @@ end
 ## The distance-field shader would cut a soft alpha at one half: a quarter-opaque sprite would vanish, and
 ## a bitmap-font text would lose its edge. Shapes, which it leaves alone, may follow a text freely.
 func scene_f()
-    graphics.clear(0, 0, 0)
-    graphics.stroke(1, 1, 1)
-    graphics.fontSize(20)
-    graphics.textMode("left", "top")
-    graphics.text("A", 2, 2)                            ## opens the run
-    graphics.noStroke()
-    graphics.fill(1, 0, 0)
-    graphics.rect(40, 2, 10, 10)                       ## a shape: the run stays open, the colour is untouched
-    graphics.fill(0, 0, 1, 0.5)
-    graphics.rect(56, 2, 10, 10)                       ## and so does its translucency
-    graphics.spriteMode("corner")
-    graphics.sprite(quarterSprite, 2, 40)                    ## a texture: closes the run first
-    graphics.stroke(1, 1, 1)
-    graphics.text("B", 2, 56)                          ## a text again, after the sprite
-    graphics.font("pixel")
-    graphics.text("C", 30, 56)                         ## a bitmap font: not read through the shader
-    graphics.font("sans")
-    graphics.text("D", 72, 16)                         ## waits in the batch...
-    graphics.translate(0, 30)                          ## ...when a bare translate edits the matrix the batch is flushed with
-    graphics.fill(1, 1, 0)
-    graphics.noStroke()
-    graphics.rect(90, 2, 8, 8)
-    graphics.screenshot(SHOT_F)
+    gfx.clear(0, 0, 0)
+    gfx.stroke(1, 1, 1)
+    gfx.fontSize(20)
+    gfx.textMode("left", "top")
+    gfx.text("A", 2, 2)                            ## opens the run
+    gfx.noStroke()
+    gfx.fill(1, 0, 0)
+    gfx.rect(40, 2, 10, 10)                       ## a shape: the run stays open, the colour is untouched
+    gfx.fill(0, 0, 1, 0.5)
+    gfx.rect(56, 2, 10, 10)                       ## and so does its translucency
+    gfx.spriteMode("corner")
+    gfx.sprite(quarterSprite, 2, 40)                    ## a texture: closes the run first
+    gfx.stroke(1, 1, 1)
+    gfx.text("B", 2, 56)                          ## a text again, after the sprite
+    gfx.font("pixel")
+    gfx.text("C", 30, 56)                         ## a bitmap font: not read through the shader
+    gfx.font("sans")
+    gfx.text("D", 72, 16)                         ## waits in the batch...
+    gfx.translate(0, 30)                          ## ...when a bare translate edits the matrix the batch is flushed with
+    gfx.fill(1, 1, 0)
+    gfx.noStroke()
+    gfx.rect(90, 2, 8, 8)
+    gfx.screenshot(SHOT_F)
 end
 
 func check_f()
@@ -430,9 +430,9 @@ end
 
 ## ── the viewport variables ────────────────────────────────────────────────
 func check_viewport()
-    graphics.viewport(50, 40)
+    gfx.viewport(50, 40)
     assert(W == 50 and H == 40 and CX == 25 and CY == 20 and SIZE == 40)
-    graphics.viewport()
+    gfx.viewport()
     assert(W == 100 and H == 80)
 end
 
@@ -450,12 +450,12 @@ func draw()
         scene_c()
     elseif frames == 4 then
         check_c()
-        graphics.viewport(40, 40)                      ## takes effect with the next frame
+        gfx.viewport(40, 40)                      ## takes effect with the next frame
     elseif frames == 5 then
         scene_d()
     elseif frames == 6 then
         check_d()
-        graphics.viewport()                            ## takes effect with the next frame
+        gfx.viewport()                            ## takes effect with the next frame
     elseif frames == 7 then
         scene_e()
     elseif frames == 8 then
@@ -466,8 +466,8 @@ func draw()
         assert(updates >= 5 and lastDt >= 0)
         var gone = image.fromPattern(["#"])
         image.unload(gone)
-        expect(refusal(func() graphics.sprite(gone, 1, 2) end), "")        ## an unloaded image draws nothing
-        expect(refusal(func() graphics.sprite({}, 1, 2) end), "graphics.sprite: invalid image handle")
-        graphics.quit()
+        expect(refusal(func() gfx.sprite(gone, 1, 2) end), "")        ## an unloaded image draws nothing
+        expect(refusal(func() gfx.sprite({}, 1, 2) end), "gfx.sprite: invalid image handle")
+        gfx.quit()
     end
 end

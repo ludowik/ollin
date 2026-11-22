@@ -23,7 +23,7 @@ std::string image_b64_encode(const uint8_t* data, size_t len);
 void image_reset();
 
 // GL texture id of an image handle, or 0 when not found. Used by the 3D side
-// (graphics.texture) to texture meshes with an image from this module.
+// (gfx.texture) to texture meshes with an image from this module.
 unsigned int image_gl_texid(int id);
 // True when that GL texture is one of ours AND its rows are bottom-up, which is the case only
 // when its content was written by RENDERING (image.beginDraw). The 3D path needs to know: it
@@ -31,7 +31,7 @@ unsigned int image_gl_texid(int id);
 // texture id and not by image handle, so a model's own texture answers false by itself.
 bool image_gl_flipped(unsigned int gl_texid);
 
-// Called by graphics.sprite() — draws image id at (x,y) scaled to (dw,dh).
+// Called by gfx.sprite() — draws image id at (x,y) scaled to (dw,dh).
 // Pass dw=0/dh=0 to use the image's natural size.
 // tint is RGBA 0-255 components.
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char r, unsigned char g, unsigned char b,
@@ -48,14 +48,14 @@ bool  image_tex_valid(int id);
 // Frees a streaming texture (GPU + CPU shadow) by id. No-op if invalid.
 void  image_free_tex(int id);
 
-// Global tint (graphics.tint / noTint), applied by default to image.draw and graphics.sprite.
+// Global tint (gfx.tint / noTint), applied by default to image.draw and gfx.sprite.
 // RGBA in 0-255; has=false means no tint, that is white.
 void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a);
 
-// Global image anchoring (graphics.spriteMode): x,y is either the top-left corner or the centre.
+// Global image anchoring (gfx.spriteMode): x,y is either the top-left corner or the centre.
 // Like the tint, the state lives here because it applies to BOTH surfaces that draw an image,
-// graphics.sprite and image.draw.
+// gfx.sprite and image.draw.
 enum { SPRITE_CORNER = 0, SPRITE_CENTER = 1 };
 void image_set_sprite_mode(int mode);
 int image_get_sprite_mode();

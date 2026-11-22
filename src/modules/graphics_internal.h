@@ -29,7 +29,7 @@ inline double gfx_to_num(const Value& v) {
 Color gfx_to_color(const Value& v);
 
 // Screenshot requested by the HOST (the playground's fullscreen mode).
-// Deferred to the end of the frame like graphics.screenshot: that is the only moment when the
+// Deferred to the end of the frame like gfx.screenshot: that is the only moment when the
 // default framebuffer holds the composed screen. gfx_take_capture returns the PNG as base64 and
 // clears it; an empty string means it is not ready yet.
 void gfx_request_capture();
@@ -40,20 +40,20 @@ std::string gfx_take_capture();
 // when the window comes back.
 void gfx_clock_break();
 
-// The HOST's switch for the memory and frame-rate readout (graphics.stats is the program's own). It is
+// The HOST's switch for the memory and frame-rate readout (gfx.stats is the program's own). It is
 // not reset when a program starts: the readout is drawn only while both are on.
 void gfx_set_stats_visible(bool visible);
 
-// A new program starts: its graphics.fitArea setting goes back to off and the orientation lock the previous
+// A new program starts: its gfx.fitArea setting goes back to off and the orientation lock the previous
 // program asked for is released.
 void gfx_program_reset();
 
-// Drawing area in LOGICAL units, as set by graphics.canvas.
+// Drawing area in LOGICAL units, as set by gfx.canvas.
 // A frame's projection is in logical units, so a module drawing inside it (ui_module) must refer to
 // these rather than to GetScreenWidth(), which is in physical pixels.
 int gfx_logical_width();
 int gfx_logical_height();
-// A VIEWPORT (graphics.viewport(w, h)): the script draws in a fixed w×h space, scaled and centred
+// A VIEWPORT (gfx.viewport(w, h)): the script draws in a fixed w×h space, scaled and centred
 // in the drawing area. Input must arrive in that same space, so the pointer and the contacts are
 // mapped through here — the engine holds the transform, and no script should be asked to invert it.
 // With no viewport the coordinates pass through unchanged and false is returned, which lets a
@@ -63,12 +63,12 @@ bool gfx_view_map(float* x, float* y);
 // drawing at the top of the area must leave it free.
 
 // A drawing call needs a drawing AREA. With no window there is no GL context, and raylib's draw
-// and state calls dereference it: `graphics.line(0, 0, 10, 10)` as a whole program used to take the
+// and state calls dereference it: `gfx.line(0, 0, 10, 10)` as a whole program used to take the
 // engine down with a SEGMENTATION FAULT — one line, no message, no line number, and the same for
 // image.endDraw and the matrix stack. The guard is applied by WRAPPING the entry in the module's
 // registration table (with_area<F>), which is the one place a primitive is named: a new one is
 // therefore protected unless somebody deliberately exempts it. The exemptions are the calls that
-// must work before a window exists — graphics.canvas, which opens it, and the pure style state.
+// must work before a window exists — gfx.canvas, which opens it, and the pure style state.
 // image_module.cpp uses this too, which is why the header serves three units and not two.
 void gfx_need_area();
 
@@ -92,7 +92,7 @@ template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
     return with_area_text_safe<F>(ctx);
 }
 
-// Inside a begin3d/end3d block? Defined on the 3D side, read by the 2D side's graphics.scale,
+// Inside a begin3d/end3d block? Defined on the 3D side, read by the 2D side's gfx.scale,
 // which must not touch the depth of a 2D drawing (see gfx_scale).
 bool gfx_in_3d();
 

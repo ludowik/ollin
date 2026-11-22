@@ -6,7 +6,7 @@
 ## The outlines are OURS: the arcade original's are its author's work. The shapes below are drawn
 ## to the same idea (a hollow ship, four irregular rocks, a two-decked saucer), not traced.
 ##
-## A point list is FLAT — x, y, x, y — because that is what graphics.polygon reads.
+## A point list is FLAT — x, y, x, y — because that is what gfx.polygon reads.
 
 ## Every outline is given at radius 1, and the scale it is drawn at IS the object's collision
 ## radius, so a rock's size names one number and not two.
@@ -36,7 +36,7 @@ const SAUCER_DECK = [-0.45, -0.3, -0.22, -0.62, 0.22, -0.62, 0.45, -0.3]
 
 ## Sizes an outline ONCE, at startup. The scales the game uses are a fixed handful — three rock
 ## radii, the ship, its icon, the two saucers — so scaling belongs to the loading and not to the
-## frame. Two reasons it is done here rather than by graphics.scale in the matrix: a scaled matrix
+## frame. Two reasons it is done here rather than by gfx.scale in the matrix: a scaled matrix
 ## would multiply the STROKE width with the shape, giving the large rock a fat outline and the
 ## small one a hairline; and a per-frame rebuild allocated one throwaway array per object per
 ## frame, up to four for an object straddling an edge.
@@ -53,15 +53,15 @@ end
 ## comes back on itself: an open one (the flame, the saucer's deck) is a polyline. One place drives
 ## the matrix stack, so no caller has to remember to pop it.
 func drawAt(pts, x, y, ang, closed)
-    graphics.pushMatrix()
-    graphics.translate(x, y)
-    graphics.rotate(math.deg(ang))
+    gfx.pushMatrix()
+    gfx.translate(x, y)
+    gfx.rotate(math.deg(ang))
     if closed then
-        graphics.polygon(pts)
+        gfx.polygon(pts)
     else
-        graphics.polyline(pts)
+        gfx.polyline(pts)
     end
-    graphics.popMatrix()
+    gfx.popMatrix()
 end
 
 ## Draws an outline WRAPPED: an object straddling an edge must be seen on both sides, otherwise it

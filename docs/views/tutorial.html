@@ -2004,26 +2004,26 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
 <section id="graphics">
 <h2>Graphics</h2>
-<p>The <code>graphics</code> module exposes raylib for real-time 2D rendering. It is available without any <code>import</code>. Rendering works on the desktop and in WASM.</p>
+<p>The <code>gfx</code> module exposes raylib for real-time 2D rendering. It is available without any <code>import</code>. Rendering works on the desktop and in WASM.</p>
 
 <h3>The lifecycle</h3>
 <p>Three optional functions, called by the engine: <code>setup()</code> once at startup, then <code>update(dt)</code> and <code>draw()</code> on every frame.</p>
 <pre data-no-run><code><span class="cmt">## called ONCE after loading, before the loop</span>
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Title"</span>)
+    <span class="bi">gfx</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Title"</span>)
 <span class="kw">end</span>
 
 <span class="cmt">## called on every frame</span>
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
 
     <span class="cmt">## draw here</span>
 
 <span class="kw">end</span></code></pre>
 <p>The three functions are independent: you may define just one. (You can also open the window at the script level rather than in <code>setup</code>.)</p>
-<div class="callout">The mere presence of a <code>draw()</code> is enough to start a graphics session: if you do not call <code>graphics.canvas(...)</code>, the engine creates a canvas of the default <code>W</code>×<code>H</code> size. Call <code>graphics.canvas(w, h)</code> only to choose another size or a title.</div>
+<div class="callout">The mere presence of a <code>draw()</code> is enough to start a graphics session: if you do not call <code>gfx.canvas(...)</code>, the engine creates a canvas of the default <code>W</code>×<code>H</code> size. Call <code>gfx.canvas(w, h)</code> only to choose another size or a title.</div>
 <p>To keep the logic apart from the rendering, define <code>update(dt)</code> as well: the engine calls it <strong>before <code>draw</code></strong> on every frame, with <code>dt</code> being the seconds elapsed since the previous frame. Multiplying the movements by <code>dt</code> makes the animation <strong>independent of the frame rate</strong>.</p>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">140</span>, <span class="str">"cycle"</span>)
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">260</span>, <span class="num">140</span>, <span class="str">"cycle"</span>)
 <span class="kw">var</span> x = <span class="num">0</span>
 
 <span class="cmt">## the logic: called BEFORE draw, dt = seconds since the previous frame</span>
@@ -2033,59 +2033,59 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>))
-    <span class="bi">graphics</span>.circle(x, <span class="num">70</span>, <span class="num">20</span>)
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.fill(<span class="bi">Color</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>))
+    <span class="bi">gfx</span>.circle(x, <span class="num">70</span>, <span class="num">20</span>)
 <span class="kw">end</span></code></pre>
-<p>You can also drive the loop explicitly with <code>graphics.run(callback)</code> if you would rather name your rendering function otherwise (<code>update</code> is still called first).</p>
+<p>You can also drive the loop explicitly with <code>gfx.run(callback)</code> if you would rather name your rendering function otherwise (<code>update</code> is still called first).</p>
 
 <h3>API</h3>
 <p><strong>The module's rule:</strong> the <em>geometry</em> comes through the arguments, the <em>style</em> from the current state — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>, <code>font</code>, <code>rectMode</code>, <code>ellipseMode</code>, <code>spriteMode</code>, <code>textMode</code>. No drawing primitive takes a colour or a size as an argument, and that state is reset to its defaults at the start of every frame.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which must be a string (60 fps on the desktop, the browser's vsync in WASM). The width and the height must be <strong>positive numbers</strong>: a window of zero pixels is refused, as <code>graphics.viewport</code>'s size is</td></tr>
+    <tr><td><code>gfx.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which must be a string (60 fps on the desktop, the browser's vsync in WASM). The width and the height must be <strong>positive numbers</strong>: a window of zero pixels is refused, as <code>gfx.viewport</code>'s size is</td></tr>
     <tr><td><code>func setup()</code></td><td>When present, called once after the script has loaded, before the update/draw loop</td></tr>
     <tr><td><code>func draw()</code></td><td>When a global <code>draw</code> function exists, the engine creates a W×H canvas if needed and then calls it on every frame, for the rendering</td></tr>
     <tr><td><code>func update(dt)</code></td><td>When present, called on every frame <strong>before</strong> <code>draw</code>; <code>dt</code> is the seconds elapsed since the previous frame</td></tr>
-    <tr><td><code>graphics.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
-    <tr><td><code>graphics.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
-    <tr><td><code>graphics.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
-    <tr><td><code>graphics.fitArea([enabled])</code></td><td>Lets the program follow the <strong>orientation and size</strong> of the area it is shown in. <strong>By default a graphics program keeps the orientation it started in</strong>: the engine asks the browser to lock it, so turning the phone does not turn the program, and where the browser refuses the engine keeps the canvas upright and whole — scaled down to fit the turned screen and centred, with bands on the sides, never rotated — so a program started in portrait stays in portrait on a phone turned to landscape, and the pointer and the touches keep arriving in the canvas's own pixels. Once <code>graphics.fitArea()</code> is called, the lock is released and, when the area changes size — a phone turned from portrait to landscape, a resized window, a moved divider — the engine resizes the canvas and updates <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code>, <code>SIZE</code>, <code>window.width</code> and <code>window.height</code>, then calls <code>window.resized(w, h)</code> if the script defined it. With no argument, turns it on; <code>graphics.fitArea(false)</code> turns it off and locks the current orientation again. It can be called at any point of the program, before the canvas exists or after. The browser decides about the lock: Android browsers grant it only in full screen or in an installed app, and iOS Safari has no <code>lock()</code> at all — that is where the engine's own fit takes over. The 3D camera's aspect ratio follows the new size; a <code>graphics.viewport</code> is kept. In the browser only: a desktop window never changes size under the program.</td></tr>
-    <tr><td><code>graphics.viewport(w, h)</code></td><td>Draw in a fixed <code>w × h</code> field, whatever the area's real size: the engine scales it up, centres it, and letterboxes what is left in black. <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code> and <code>SIZE</code> become the <strong>virtual</strong> size, and <code>mouse</code> and <code>touch</code> deliver their positions in that same frame — so a script never inverts the transform itself. With no argument the viewport is dropped; <code>graphics.canvas</code> drops it too. The <code>ui</code> widgets stay <strong>independent</strong>, at their own size in the area's corner. It is a <strong>2D</strong> feature: 3D takes its aspect ratio from the window, not from the viewport. Outside the field the coordinates are negative or past the edges, which is the honest answer for a finger on a black band.</td></tr>
-    <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. An unknown name, or a value of another type, is an error rather than a silent fallback. Reset to <code>"alpha"</code> on every frame.</td></tr>
-    <tr><td><code>graphics.stats([enabled])</code></td><td>Shows or hides the readout the engine draws in the bottom right corner of the area, the memory in use <strong>only when it has grown a lot</strong> (by more than half in ten seconds, and for as long as it stays high), and the frame rate <strong>only when it falls more than 5 % under what the screen gives</strong>; with neither, the readout is empty (on by default). With no argument, shows it. Back on at every program start.</td></tr>
-    <tr><td><code>graphics.antialias([enabled [, size]])</code></td><td>Smooths the edges of the composed frame (on by default). With no argument, turns it back on. <code>size</code> sets how far, in texels, the smoothing may reach along a detected edge (default 8) — a larger value can soften more but does not cost extra, a smaller one softens less. Reset to on/8 at every <code>graphics.canvas</code>.</td></tr>
-    <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Opens / closes a render frame by hand (an advanced use; the <code>draw</code>/<code>run</code> loop handles it otherwise)</td></tr>
-    <tr><td><code>graphics.strokeSize(n)</code></td><td>The width of <strong>2D</strong> strokes (default 2, reset to 2 on every frame). It has <strong>no effect in 3D</strong>: the 3D wireframe stays 1&nbsp;px wide, a WebGL limit.</td></tr>
-    <tr><td><code>graphics.rectMode(mode)</code></td><td>The anchor point of <code>graphics.rect</code>: <code>"corner"</code> (the default — <code>x, y</code> is the top-left corner) or <code>"center"</code> (<code>x, y</code> is the rectangle's centre). It affects <code>rect</code> only; reset to <code>"corner"</code> on every frame, and saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
-    <tr><td><code>graphics.ellipseMode(mode)</code></td><td>The anchor point of <code>graphics.circle</code>, <code>graphics.ellipse</code> and <code>graphics.arc</code>: <code>"center"</code> (the <strong>default</strong> — these primitives are centred, unlike <code>rect</code>) or <code>"corner"</code>, where <code>x, y</code> is the top-left corner of the bounding box (for <code>circle</code>, a box of side <code>2 × r</code>; for <code>arc</code>, that of the whole ellipse, not of the sector drawn).</td></tr>
-    <tr><td><code>graphics.spriteMode(mode)</code></td><td>The same for images: <code>"corner"</code> (the default) or <code>"center"</code>. It applies to <code>graphics.sprite</code> <strong>and</strong> to <code>image.draw</code>, as <code>graphics.tint</code> does. The offset uses the <strong>displayed</strong> size: centring an image drawn at 200×200 offsets it by 100, whatever the source's size.</td></tr>
-    <tr><td><code>graphics.textMode(h [, v])</code></td><td>The anchor of <code>graphics.text</code>, one axis per argument. Horizontally: <code>"left"</code> (the default — <code>x</code> is the left edge) or its synonym <code>"corner"</code>, <code>"center"</code> (the middle of the line) and <code>"right"</code> (the right edge). Vertically: <code>"top"</code> (the default — <code>y</code> is the top of the line), <code>"center"</code> (the middle of its height), <code>"bottom"</code> (its bottom) and <code>"baseline"</code>, where <code>y</code> is the line the letters sit on and which descenders cross — that is what aligns two different sizes on one line. A call describes the mode in full, so naming only <code>h</code> puts the vertical back to <code>"top"</code>, and calling with no argument puts both back. Reset on every frame, and saved and restored by <code>push</code>/<code>pop</code>. An anchor costs a measurement of the text, paid only when one is asked for.</td></tr>
-    <tr><td><code>graphics.segments(n)</code></td><td>The number of segments of the curved primitives — circle, ellipse and arc in <strong>2D</strong>, sphere, cylinder, cone and torus in <strong>3D</strong> (default 64). Part of the style system, so saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
-    <tr><td><code>graphics.stroke([grey | r,g,b | color …])</code></td><td>Turns the outline on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object, plus an optional width as a second argument; with no argument, it turns back on with the current colour</td></tr>
-    <tr><td><code>graphics.noStroke()</code></td><td>Turns the outline off, leaving no border — the current colour is kept</td></tr>
-    <tr><td><code>graphics.fill([grey | r,g,b | color …])</code></td><td>Turns the fill on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object; with no argument, it turns back on with the current colour</td></tr>
-    <tr><td><code>graphics.noFill()</code></td><td>Turns the fill off (the default) — the current colour is kept</td></tr>
-    <tr><td><code>graphics.tint([grey | r,g,b | color …])</code></td><td>The tint applied to images (<code>graphics.sprite</code> and <code>image.draw</code>). The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object</td></tr>
-    <tr><td><code>graphics.noTint()</code></td><td>Turns the image tint off, so images are drawn as they are</td></tr>
-    <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Draws a segment with the current global styles</td></tr>
-    <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>A rectangle: filled when <code>fill</code> is on, outlined when <code>stroke</code> is on. <code>x, y</code> is the top-left corner or the centre, according to <code>rectMode</code>. <code>r</code> is the corner radius in <strong>pixels</strong>, clamped to half the shorter side (beyond that you get a capsule); the outline stays inside the geometry declared, as it does for square corners. The corners' smoothness comes from <code>segments</code></td></tr>
-    <tr><td><code>graphics.fps()</code></td><td>Returns the current frame rate, as an integer</td></tr>
-    <tr><td><code>graphics.screenshot(file)</code></td><td>Captures the composed screen into a PNG, at the END of the frame (call it from <code>draw</code>). Natively it writes a real file, the path being relative to the working directory. <strong>In the browser it writes nothing you can reach</strong>: the file lands in the page's in-memory filesystem, and no download is started — use the <strong>Capture</strong> button of the fullscreen run view, which stores the PNG in the project's resources</td></tr>
-    <tr><td><code>graphics.text(value, x, y)</code></td><td>Draws <strong>any value</strong>, converted exactly as <code>print</code> converts it — a class instance goes through its <code>__str</code>. Only <code>text</code> and <code>textSize</code> convert like this; a window title or an <code>assert</code> message expects a string. In the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size, anchored on both axes by <code>textMode</code>. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
-    <tr><td><code>graphics.fontSize([n])</code></td><td>Sets the font height for <code>text</code> and <strong>always</strong> returns the current height — with no argument it is therefore a getter. The state is reset to 18 on every frame, that being the commonest value. It accepts a <strong>fractional</strong> size, useful for a scaled drawing, and imposes no minimum</td></tr>
-    <tr><td><code>graphics.font([name])</code></td><td>Chooses the current font and <strong>always</strong> returns its name. Three fonts are embedded in the engine: <code>"sans"</code> (the default, proportional), <code>"mono"</code> (fixed pitch) and <code>"pixel"</code> (raylib's bitmap font, for a retro look). An unknown name raises an error listing the fonts available. It is a style state, so it is reset to the default on every frame and saved by <code>pushStyle</code></td></tr>
-    <tr><td><code>graphics.textSize(value)</code></td><td>The width <strong>and</strong> height of the value in the current font and size, as two values: <code>var w, h = graphics.textSize("abc")</code>. It accepts whatever <code>text</code> accepts and converts it the same way, so what is measured is what would be drawn. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>
-    <tr><td><code>graphics.point(x, y)</code></td><td>Draws a point at the given coordinates</td></tr>
-    <tr><td><code>graphics.circle(x, y, r)</code></td><td>A circle centred on (x,y) with radius r — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
-    <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>An ellipse centred on (x,y), of width w and height h — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
-    <tr><td><code>graphics.arc(x, y, w, h, start, stop)</code></td><td>A portion of an ellipse from <code>start</code> to <code>stop</code>, the angles in <strong>radians</strong> (clockwise, 0 pointing right; <code>math.rad(deg)</code> converts). <code>fill</code> draws the solid sector — the slice of pie, radii included — whereas <code>stroke</code> draws the curve alone, without the radii. An interval wider than a full turn is brought back to one turn; a <code>stop</code> below <code>start</code> is made good by adding turns. Anchored according to <code>ellipseMode</code>, on the whole ellipse's box. Smoothness: <code>segments</code>, in proportion to the angle covered</td></tr>
-    <tr><td><code>graphics.polygon(pts)</code></td><td>A closed polygon — <code>pts</code> is a flat array <code>[x1,y1,x2,y2,…]</code> or an array of pairs <code>[[x1,y1],…]</code></td></tr>
-    <tr><td><code>graphics.polyline(pts)</code></td><td>An open polyline (stroke only) — the same formats as <code>polygon</code></td></tr>
-    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Draws a texture (an <code>image</code> handle) at (x,y) — tinted by the current <code>graphics.tint</code>, white when there is none; it honours the transformation matrix. <code>x, y</code> is the top-left corner or the centre, according to <code>spriteMode</code></td></tr>
-    <tr><td><code>graphics.quit()</code></td><td>Stops the <code>run()</code> loop without closing the window (safe in WASM)</td></tr>
-    <tr><td><code>graphics.close()</code></td><td>Closes the window and releases the resources</td></tr>
+    <tr><td><code>gfx.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
+    <tr><td><code>gfx.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
+    <tr><td><code>gfx.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
+    <tr><td><code>gfx.fitArea([enabled])</code></td><td>Lets the program follow the <strong>orientation and size</strong> of the area it is shown in. <strong>By default a graphics program keeps the orientation it started in</strong>: the engine asks the browser to lock it, so turning the phone does not turn the program, and where the browser refuses the engine keeps the canvas upright and whole — scaled down to fit the turned screen and centred, with bands on the sides, never rotated — so a program started in portrait stays in portrait on a phone turned to landscape, and the pointer and the touches keep arriving in the canvas's own pixels. Once <code>gfx.fitArea()</code> is called, the lock is released and, when the area changes size — a phone turned from portrait to landscape, a resized window, a moved divider — the engine resizes the canvas and updates <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code>, <code>SIZE</code>, <code>window.width</code> and <code>window.height</code>, then calls <code>window.resized(w, h)</code> if the script defined it. With no argument, turns it on; <code>gfx.fitArea(false)</code> turns it off and locks the current orientation again. It can be called at any point of the program, before the canvas exists or after. The browser decides about the lock: Android browsers grant it only in full screen or in an installed app, and iOS Safari has no <code>lock()</code> at all — that is where the engine's own fit takes over. The 3D camera's aspect ratio follows the new size; a <code>gfx.viewport</code> is kept. In the browser only: a desktop window never changes size under the program.</td></tr>
+    <tr><td><code>gfx.viewport(w, h)</code></td><td>Draw in a fixed <code>w × h</code> field, whatever the area's real size: the engine scales it up, centres it, and letterboxes what is left in black. <code>W</code>, <code>H</code>, <code>CX</code>, <code>CY</code> and <code>SIZE</code> become the <strong>virtual</strong> size, and <code>mouse</code> and <code>touch</code> deliver their positions in that same frame — so a script never inverts the transform itself. With no argument the viewport is dropped; <code>gfx.canvas</code> drops it too. The <code>ui</code> widgets stay <strong>independent</strong>, at their own size in the area's corner. It is a <strong>2D</strong> feature: 3D takes its aspect ratio from the window, not from the viewport. Outside the field the coordinates are negative or past the edges, which is the honest answer for a finger on a black band.</td></tr>
+    <tr><td><code>gfx.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. An unknown name, or a value of another type, is an error rather than a silent fallback. Reset to <code>"alpha"</code> on every frame.</td></tr>
+    <tr><td><code>gfx.stats([enabled])</code></td><td>Shows or hides the readout the engine draws in the bottom right corner of the area, the memory in use <strong>only when it has grown a lot</strong> (by more than half in ten seconds, and for as long as it stays high), and the frame rate <strong>only when it falls more than 5 % under what the screen gives</strong>; with neither, the readout is empty (on by default). With no argument, shows it. Back on at every program start.</td></tr>
+    <tr><td><code>gfx.antialias([enabled [, size]])</code></td><td>Smooths the edges of the composed frame (on by default). With no argument, turns it back on. <code>size</code> sets how far, in texels, the smoothing may reach along a detected edge (default 8) — a larger value can soften more but does not cost extra, a smaller one softens less. Reset to on/8 at every <code>gfx.canvas</code>.</td></tr>
+    <tr><td><code>gfx.beginDraw()</code> / <code>gfx.endDraw()</code></td><td>Opens / closes a render frame by hand (an advanced use; the <code>draw</code>/<code>run</code> loop handles it otherwise)</td></tr>
+    <tr><td><code>gfx.strokeSize(n)</code></td><td>The width of <strong>2D</strong> strokes (default 2, reset to 2 on every frame). It has <strong>no effect in 3D</strong>: the 3D wireframe stays 1&nbsp;px wide, a WebGL limit.</td></tr>
+    <tr><td><code>gfx.rectMode(mode)</code></td><td>The anchor point of <code>gfx.rect</code>: <code>"corner"</code> (the default — <code>x, y</code> is the top-left corner) or <code>"center"</code> (<code>x, y</code> is the rectangle's centre). It affects <code>rect</code> only; reset to <code>"corner"</code> on every frame, and saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
+    <tr><td><code>gfx.ellipseMode(mode)</code></td><td>The anchor point of <code>gfx.circle</code>, <code>gfx.ellipse</code> and <code>gfx.arc</code>: <code>"center"</code> (the <strong>default</strong> — these primitives are centred, unlike <code>rect</code>) or <code>"corner"</code>, where <code>x, y</code> is the top-left corner of the bounding box (for <code>circle</code>, a box of side <code>2 × r</code>; for <code>arc</code>, that of the whole ellipse, not of the sector drawn).</td></tr>
+    <tr><td><code>gfx.spriteMode(mode)</code></td><td>The same for images: <code>"corner"</code> (the default) or <code>"center"</code>. It applies to <code>gfx.sprite</code> <strong>and</strong> to <code>image.draw</code>, as <code>gfx.tint</code> does. The offset uses the <strong>displayed</strong> size: centring an image drawn at 200×200 offsets it by 100, whatever the source's size.</td></tr>
+    <tr><td><code>gfx.textMode(h [, v])</code></td><td>The anchor of <code>gfx.text</code>, one axis per argument. Horizontally: <code>"left"</code> (the default — <code>x</code> is the left edge) or its synonym <code>"corner"</code>, <code>"center"</code> (the middle of the line) and <code>"right"</code> (the right edge). Vertically: <code>"top"</code> (the default — <code>y</code> is the top of the line), <code>"center"</code> (the middle of its height), <code>"bottom"</code> (its bottom) and <code>"baseline"</code>, where <code>y</code> is the line the letters sit on and which descenders cross — that is what aligns two different sizes on one line. A call describes the mode in full, so naming only <code>h</code> puts the vertical back to <code>"top"</code>, and calling with no argument puts both back. Reset on every frame, and saved and restored by <code>push</code>/<code>pop</code>. An anchor costs a measurement of the text, paid only when one is asked for.</td></tr>
+    <tr><td><code>gfx.segments(n)</code></td><td>The number of segments of the curved primitives — circle, ellipse and arc in <strong>2D</strong>, sphere, cylinder, cone and torus in <strong>3D</strong> (default 64). Part of the style system, so saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
+    <tr><td><code>gfx.stroke([grey | r,g,b | color …])</code></td><td>Turns the outline on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object, plus an optional width as a second argument; with no argument, it turns back on with the current colour</td></tr>
+    <tr><td><code>gfx.noStroke()</code></td><td>Turns the outline off, leaving no border — the current colour is kept</td></tr>
+    <tr><td><code>gfx.fill([grey | r,g,b | color …])</code></td><td>Turns the fill on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object; with no argument, it turns back on with the current colour</td></tr>
+    <tr><td><code>gfx.noFill()</code></td><td>Turns the fill off (the default) — the current colour is kept</td></tr>
+    <tr><td><code>gfx.tint([grey | r,g,b | color …])</code></td><td>The tint applied to images (<code>gfx.sprite</code> and <code>image.draw</code>). The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object</td></tr>
+    <tr><td><code>gfx.noTint()</code></td><td>Turns the image tint off, so images are drawn as they are</td></tr>
+    <tr><td><code>gfx.line(x1, y1, x2, y2)</code></td><td>Draws a segment with the current global styles</td></tr>
+    <tr><td><code>gfx.rect(x, y, w, h [, r])</code></td><td>A rectangle: filled when <code>fill</code> is on, outlined when <code>stroke</code> is on. <code>x, y</code> is the top-left corner or the centre, according to <code>rectMode</code>. <code>r</code> is the corner radius in <strong>pixels</strong>, clamped to half the shorter side (beyond that you get a capsule); the outline stays inside the geometry declared, as it does for square corners. The corners' smoothness comes from <code>segments</code></td></tr>
+    <tr><td><code>gfx.fps()</code></td><td>Returns the current frame rate, as an integer</td></tr>
+    <tr><td><code>gfx.screenshot(file)</code></td><td>Captures the composed screen into a PNG, at the END of the frame (call it from <code>draw</code>). Natively it writes a real file, the path being relative to the working directory. <strong>In the browser it writes nothing you can reach</strong>: the file lands in the page's in-memory filesystem, and no download is started — use the <strong>Capture</strong> button of the fullscreen run view, which stores the PNG in the project's resources</td></tr>
+    <tr><td><code>gfx.text(value, x, y)</code></td><td>Draws <strong>any value</strong>, converted exactly as <code>print</code> converts it — a class instance goes through its <code>__str</code>. Only <code>text</code> and <code>textSize</code> convert like this; a window title or an <code>assert</code> message expects a string. In the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size, anchored on both axes by <code>textMode</code>. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
+    <tr><td><code>gfx.fontSize([n])</code></td><td>Sets the font height for <code>text</code> and <strong>always</strong> returns the current height — with no argument it is therefore a getter. The state is reset to 18 on every frame, that being the commonest value. It accepts a <strong>fractional</strong> size, useful for a scaled drawing, and imposes no minimum</td></tr>
+    <tr><td><code>gfx.font([name])</code></td><td>Chooses the current font and <strong>always</strong> returns its name. Three fonts are embedded in the engine: <code>"sans"</code> (the default, proportional), <code>"mono"</code> (fixed pitch) and <code>"pixel"</code> (raylib's bitmap font, for a retro look). An unknown name raises an error listing the fonts available. It is a style state, so it is reset to the default on every frame and saved by <code>pushStyle</code></td></tr>
+    <tr><td><code>gfx.textSize(value)</code></td><td>The width <strong>and</strong> height of the value in the current font and size, as two values: <code>var w, h = gfx.textSize("abc")</code>. It accepts whatever <code>text</code> accepts and converts it the same way, so what is measured is what would be drawn. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>
+    <tr><td><code>gfx.point(x, y)</code></td><td>Draws a point at the given coordinates</td></tr>
+    <tr><td><code>gfx.circle(x, y, r)</code></td><td>A circle centred on (x,y) with radius r — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
+    <tr><td><code>gfx.ellipse(x, y, w, h)</code></td><td>An ellipse centred on (x,y), of width w and height h — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
+    <tr><td><code>gfx.arc(x, y, w, h, start, stop)</code></td><td>A portion of an ellipse from <code>start</code> to <code>stop</code>, the angles in <strong>radians</strong> (clockwise, 0 pointing right; <code>math.rad(deg)</code> converts). <code>fill</code> draws the solid sector — the slice of pie, radii included — whereas <code>stroke</code> draws the curve alone, without the radii. An interval wider than a full turn is brought back to one turn; a <code>stop</code> below <code>start</code> is made good by adding turns. Anchored according to <code>ellipseMode</code>, on the whole ellipse's box. Smoothness: <code>segments</code>, in proportion to the angle covered</td></tr>
+    <tr><td><code>gfx.polygon(pts)</code></td><td>A closed polygon — <code>pts</code> is a flat array <code>[x1,y1,x2,y2,…]</code> or an array of pairs <code>[[x1,y1],…]</code></td></tr>
+    <tr><td><code>gfx.polyline(pts)</code></td><td>An open polyline (stroke only) — the same formats as <code>polygon</code></td></tr>
+    <tr><td><code>gfx.sprite(img, x, y [, w, h])</code></td><td>Draws a texture (an <code>image</code> handle) at (x,y) — tinted by the current <code>gfx.tint</code>, white when there is none; it honours the transformation matrix. <code>x, y</code> is the top-left corner or the centre, according to <code>spriteMode</code></td></tr>
+    <tr><td><code>gfx.quit()</code></td><td>Stops the <code>run()</code> loop without closing the window (safe in WASM)</td></tr>
+    <tr><td><code>gfx.close()</code></td><td>Closes the window and releases the resources</td></tr>
   </tbody>
 </table>
 
@@ -2094,39 +2094,39 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.push()</code></td><td>Saves the <strong>matrix and the style</strong> (stroke, fill, tint, blend mode…)</td></tr>
-    <tr><td><code>graphics.pop()</code></td><td>Restores the matrix and style of the last <code>push()</code></td></tr>
-    <tr><td><code>graphics.pushMatrix()</code> · <code>popMatrix()</code></td><td>Saves and restores the <strong>matrix</strong> alone</td></tr>
-    <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Saves and restores the <strong>style</strong> alone (stroke, fill, tint, blending)</td></tr>
-    <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Moves the origin; <code>z</code> is optional, for 3D</td></tr>
-    <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>A rotation in degrees; with no axis it turns around Z, otherwise around the axis <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis. They work in a <strong>2D</strong> drawing too: about X or Y the shape leaves its plane and turns <strong>orthographically</strong> — a square narrows to a sliver at 90°, with no perspective, a flat projection having no vanishing point. That is how a card is flipped in 2D</td></tr>
-    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform, two are <code>(x,y)</code>, three are <code>(x,y,z)</code>. A single argument scales the <strong>depth</strong> only inside a <code>begin3d</code> block: a 2D drawing carries a layering depth of its own, and sliding it in depth is nothing a 2D script wants. Note that a scale multiplies the <strong>stroke width</strong> with the shape, since it transforms the geometry: to draw one outline at several sizes with the same line, scale its points rather than the matrix</td></tr>
-    <tr><td><code>graphics.resetTransform()</code></td><td>Resets the matrix to the identity</td></tr>
+    <tr><td><code>gfx.push()</code></td><td>Saves the <strong>matrix and the style</strong> (stroke, fill, tint, blend mode…)</td></tr>
+    <tr><td><code>gfx.pop()</code></td><td>Restores the matrix and style of the last <code>push()</code></td></tr>
+    <tr><td><code>gfx.pushMatrix()</code> · <code>popMatrix()</code></td><td>Saves and restores the <strong>matrix</strong> alone</td></tr>
+    <tr><td><code>gfx.pushStyle()</code> · <code>popStyle()</code></td><td>Saves and restores the <strong>style</strong> alone (stroke, fill, tint, blending)</td></tr>
+    <tr><td><code>gfx.translate(x, y [, z])</code></td><td>Moves the origin; <code>z</code> is optional, for 3D</td></tr>
+    <tr><td><code>gfx.rotate(angle [, ax, ay, az])</code></td><td>A rotation in degrees; with no axis it turns around Z, otherwise around the axis <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>gfx.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis. They work in a <strong>2D</strong> drawing too: about X or Y the shape leaves its plane and turns <strong>orthographically</strong> — a square narrows to a sliver at 90°, with no perspective, a flat projection having no vanishing point. That is how a card is flipped in 2D</td></tr>
+    <tr><td><code>gfx.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform, two are <code>(x,y)</code>, three are <code>(x,y,z)</code>. A single argument scales the <strong>depth</strong> only inside a <code>begin3d</code> block: a 2D drawing carries a layering depth of its own, and sliding it in depth is nothing a 2D script wants. Note that a scale multiplies the <strong>stroke width</strong> with the shape, since it transforms the geometry: to draw one outline at several sizes with the same line, scale its points rather than the matrix</td></tr>
+    <tr><td><code>gfx.resetTransform()</code></td><td>Resets the matrix to the identity</td></tr>
   </tbody>
 </table>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">220</span>, <span class="num">180</span>, <span class="str">"transform"</span>)
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">220</span>, <span class="num">180</span>, <span class="str">"transform"</span>)
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.push()
-    <span class="bi">graphics</span>.translate(<span class="num">110</span>, <span class="num">90</span>)
-    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>)  <span class="cmt">## turns as time passes</span>
-    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>)    <span class="cmt">## a rotated, centred square</span>
-    <span class="bi">graphics</span>.pop()
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.push()
+    <span class="bi">gfx</span>.translate(<span class="num">110</span>, <span class="num">90</span>)
+    <span class="bi">gfx</span>.rotate(elapsedTime * <span class="num">60</span>)  <span class="cmt">## turns as time passes</span>
+    <span class="bi">gfx</span>.fill(<span class="bi">colors</span>.RED)
+    <span class="bi">gfx</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>)    <span class="cmt">## a rotated, centred square</span>
+    <span class="bi">gfx</span>.pop()
 <span class="kw">end</span></code></pre>
 
 <h3>The persistent context and the blend modes</h3>
-<p>The drawing context is <strong>not cleared automatically</strong> between frames: that is for <code>draw()</code> to decide. With no call to <code>graphics.clear()</code>, the drawing <strong>accumulates</strong> from one frame to the next, giving trails. With an <strong>opaque</strong> colour, <code>clear</code> starts from a clean background; with a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) it applies a <strong>fade</strong> — the previous content dims gradually towards that colour.</p>
-<p><code>graphics.blendMode(mode)</code> changes how the drawings combine with the content already there. The <strong>additive</strong> mode (<code>blend.ADD</code>), together with the persistent context and a slight fade, produces glows and luminous trails.</p>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">160</span>)
+<p>The drawing context is <strong>not cleared automatically</strong> between frames: that is for <code>draw()</code> to decide. With no call to <code>gfx.clear()</code>, the drawing <strong>accumulates</strong> from one frame to the next, giving trails. With an <strong>opaque</strong> colour, <code>clear</code> starts from a clean background; with a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) it applies a <strong>fade</strong> — the previous content dims gradually towards that colour.</p>
+<p><code>gfx.blendMode(mode)</code> changes how the drawings combine with the content already there. The <strong>additive</strong> mode (<code>blend.ADD</code>), together with the persistent context and a slight fade, produces glows and luminous trails.</p>
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">240</span>, <span class="num">160</span>)
 <span class="kw">global</span> t = <span class="num">0</span>
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.blendMode(<span class="bi">blend</span>.ADD)         <span class="cmt">## additive blending (a glow)</span>
-    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))  <span class="cmt">## a slight fade → trails</span>
+    <span class="bi">gfx</span>.blendMode(<span class="bi">blend</span>.ADD)         <span class="cmt">## additive blending (a glow)</span>
+    <span class="bi">gfx</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))  <span class="cmt">## a slight fade → trails</span>
     t = t + <span class="num">0.05</span>
-    <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">0.2</span>, <span class="num">0.5</span>, <span class="num">1</span>))
-    <span class="bi">graphics</span>.circle(<span class="num">120</span> + <span class="bi">math</span>.cos(t) * <span class="num">80</span>, <span class="num">80</span> + <span class="bi">math</span>.sin(t * <span class="num">1.3</span>) * <span class="num">50</span>, <span class="num">14</span>)
+    <span class="bi">gfx</span>.fill(<span class="bi">Color</span>(<span class="num">0.2</span>, <span class="num">0.5</span>, <span class="num">1</span>))
+    <span class="bi">gfx</span>.circle(<span class="num">120</span> + <span class="bi">math</span>.cos(t) * <span class="num">80</span>, <span class="num">80</span> + <span class="bi">math</span>.sin(t * <span class="num">1.3</span>) * <span class="num">50</span>, <span class="num">14</span>)
 <span class="kw">end</span></code></pre>
 
 <h3>Colours — the <code>Color</code> class</h3>
@@ -2149,7 +2149,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <span class="cmt">## direct access to the components</span>
 <span class="bi">print</span>(red.r, red.g, red.b, red.a)</code></pre>
-<p><code>graphics.clear</code>, <code>graphics.fill</code> and <code>graphics.stroke</code> accept <strong>the same signature</strong> as <code>Color</code> (1 to 4 numbers), or a <code>Color</code> object.</p>
+<p><code>gfx.clear</code>, <code>gfx.fill</code> and <code>gfx.stroke</code> accept <strong>the same signature</strong> as <code>Color</code> (1 to 4 numbers), or a <code>Color</code> object.</p>
 
 <h3>The <code>colors</code> module</h3>
 <p>A palette of predefined constants, available without any <code>import</code>. Each constant is a <code>Color</code> object.</p>
@@ -2175,7 +2175,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 </table>
 
 <h3>The <code>blend</code> module</h3>
-<p>Blend-mode constants to pass to <code>graphics.blendMode(...)</code>, equivalent to the matching strings.</p>
+<p>Blend-mode constants to pass to <code>gfx.blendMode(...)</code>, equivalent to the matching strings.</p>
 <table>
   <thead><tr><th>Constant</th><th>String</th><th>Effect</th></tr></thead>
   <tbody>
@@ -2199,35 +2199,35 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="bi">print</span>(c.r, c.g, c.b)</code></pre>
 
 <h3>3D</h3>
-<p>3D drawing shares the same loop and the same state as 2D. You place a <strong>camera</strong>, then draw shapes between <code>graphics.begin3d(cam)</code> and <code>graphics.end3d()</code>. As in 2D, <code>fill</code> and <code>stroke</code> drive the fill and the outline (the wireframe) — but the <strong>3D wireframe's width is fixed at 1&nbsp;px</strong>: <code>graphics.strokeSize</code> applies in 2D only. After <code>end3d()</code> a <strong>2D HUD</strong> can be drawn on top, in the same frame.</p>
+<p>3D drawing shares the same loop and the same state as 2D. You place a <strong>camera</strong>, then draw shapes between <code>gfx.begin3d(cam)</code> and <code>gfx.end3d()</code>. As in 2D, <code>fill</code> and <code>stroke</code> drive the fill and the outline (the wireframe) — but the <strong>3D wireframe's width is fixed at 1&nbsp;px</strong>: <code>gfx.strokeSize</code> applies in 2D only. After <code>end3d()</code> a <strong>2D HUD</strong> can be drawn on top, in the same frame.</p>
 
 <p>The camera is an <strong>object</strong> (the <code>Camera</code> class, like <code>Color</code>): you create it once and then drive it through its methods. <code>cam.setPos(x,y,z)</code> sets the position, <code>cam.lookAt(x,y,z)</code> aims it at a target, <code>cam.move(dx,dy,dz)</code> moves the camera and its target together, keeping the aim, and <code>cam.orbit(angle, radius [, height])</code> puts it in orbit around its target, the <code>angle</code> being in radians.</p>
 
-<div class="callout tip">In 3D, call <code>graphics.clear(<em>an opaque colour</em>)</code> at the start of every frame: an opaque clear resets the <strong>depth buffer</strong>, which the depth test needs, as well as the colour.</div>
+<div class="callout tip">In 3D, call <code>gfx.clear(<em>an opaque colour</em>)</code> at the start of every frame: an opaque clear resets the <strong>depth buffer</strong>, which the depth test needs, as well as the colour.</div>
 
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Creates a perspective camera (a <code>Camera</code> object) looking at <code>(tx,ty,tz)</code> from <code>(px,py,pz)</code>; <code>fovy</code> is the vertical field of view in degrees, 45 by default</td></tr>
-    <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>An orthographic camera — a projection with no perspective; <code>size</code> is the number of units visible vertically, 10 by default. The same methods as <code>camera()</code></td></tr>
+    <tr><td><code>gfx.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Creates a perspective camera (a <code>Camera</code> object) looking at <code>(tx,ty,tz)</code> from <code>(px,py,pz)</code>; <code>fovy</code> is the vertical field of view in degrees, 45 by default</td></tr>
+    <tr><td><code>gfx.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>An orthographic camera — a projection with no perspective; <code>size</code> is the number of units visible vertically, 10 by default. The same methods as <code>camera()</code></td></tr>
     <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Sets the camera's position / target</td></tr>
     <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, radius [, height])</code></td><td>Moves the camera, keeping its aim / puts it in orbit around its target (<code>angle</code> in radians)</td></tr>
     <tr><td><code>cam.getViewDir()</code> · <code>cam.getRight()</code> · <code>cam.getUp()</code></td><td>The camera's three axes, unit vectors <code>{x, y, z}</code>: where it looks, what is to the right of the screen and what is up on it. The up is the one the camera implies, square to the other two even if the <code>ux, uy, uz</code> it was given are not. An axis that cannot be worked out (looking straight along the up) is the null vector</td></tr>
     <tr><td><code>cam.zoom(factor)</code></td><td>Multiplies the visible size (orthographic: it adjusts <code>size</code>; perspective: it moves nearer or further along the viewing axis)</td></tr>
-    <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>They frame the 3D drawing inside <code>draw()</code></td></tr>
-    <tr><td><code>graphics.grid(slices, spacing)</code></td><td>A grid on the ground (the XZ plane), centred on the origin, in a fixed grey</td></tr>
-    <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>A cube centred on <code>(x,y,z)</code> — solid with <code>fill</code>, edges with <code>stroke</code></td></tr>
-    <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>A sphere — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
-    <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
-    <tr><td><code>graphics.cone(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code></td></tr>
-    <tr><td><code>graphics.torus(x,y,z, r, tube)</code></td><td>A torus centred on <code>(x,y,z)</code>, of main radius <code>r</code> and tube radius <code>tube</code> — solid with <code>fill</code></td></tr>
-    <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>A horizontal plane (XZ) of size <code>sx</code>×<code>sz</code>, filled</td></tr>
-    <tr><td><code>graphics.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code>. Like <code>image.load</code>, the name is looked for <strong>beside the program</strong> first — an example kept in its own directory carries its models there</td></tr>
-    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>, including a <strong>colour per vertex</strong> when the file carries one — many colours in one mesh, with no image; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
-    <tr><td><code>graphics.modelSize(handle)</code></td><td>The model's dimensions → a map <code>{ w, h, d, cx, cy, cz, radius }</code> (size, centre, bounding radius)</td></tr>
-    <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>The camera distance at which a sphere of radius <code>radius</code> fits on screen, following the portrait/landscape ratio — handy for framing a model</td></tr>
-    <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>A 3D segment, in the <code>stroke</code> colour</td></tr>
-    <tr><td><code>graphics.point3d(x,y,z)</code></td><td>A 3D point, in the <code>stroke</code> colour</td></tr>
+    <tr><td><code>gfx.begin3d(cam)</code> / <code>gfx.end3d()</code></td><td>They frame the 3D drawing inside <code>draw()</code></td></tr>
+    <tr><td><code>gfx.grid(slices, spacing)</code></td><td>A grid on the ground (the XZ plane), centred on the origin, in a fixed grey</td></tr>
+    <tr><td><code>gfx.cube(x,y,z, w,h,l)</code></td><td>A cube centred on <code>(x,y,z)</code> — solid with <code>fill</code>, edges with <code>stroke</code></td></tr>
+    <tr><td><code>gfx.sphere(x,y,z, r)</code></td><td>A sphere — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
+    <tr><td><code>gfx.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
+    <tr><td><code>gfx.cone(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code></td></tr>
+    <tr><td><code>gfx.torus(x,y,z, r, tube)</code></td><td>A torus centred on <code>(x,y,z)</code>, of main radius <code>r</code> and tube radius <code>tube</code> — solid with <code>fill</code></td></tr>
+    <tr><td><code>gfx.plane(x,y,z, sx,sz)</code></td><td>A horizontal plane (XZ) of size <code>sx</code>×<code>sz</code>, filled</td></tr>
+    <tr><td><code>gfx.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code>. Like <code>image.load</code>, the name is looked for <strong>beside the program</strong> first — an example kept in its own directory carries its models there</td></tr>
+    <tr><td><code>gfx.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>, including a <strong>colour per vertex</strong> when the file carries one — many colours in one mesh, with no image; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
+    <tr><td><code>gfx.modelSize(handle)</code></td><td>The model's dimensions → a map <code>{ w, h, d, cx, cy, cz, radius }</code> (size, centre, bounding radius)</td></tr>
+    <tr><td><code>gfx.fitDistance(radius [, fovy])</code></td><td>The camera distance at which a sphere of radius <code>radius</code> fits on screen, following the portrait/landscape ratio — handy for framing a model</td></tr>
+    <tr><td><code>gfx.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>A 3D segment, in the <code>stroke</code> colour</td></tr>
+    <tr><td><code>gfx.point3d(x,y,z)</code></td><td>A 3D point, in the <code>stroke</code> colour</td></tr>
   </tbody>
 </table>
 
@@ -2236,14 +2236,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>The ambient light, a uniform base. <code>v</code> ∈ [0,1]</td></tr>
-    <tr><td><code>graphics.bump([height [, grain]])</code></td><td>Relief for the textured surfaces drawn next, read from the texture itself: the brighter a texel, the higher it stands, and the light shades the slopes. <code>height</code> is how high a white texel stands above a black one, <code>grain</code> the height of a fine noise that only shows where a texel is bigger than a screen pixel (a surface seen close), both in scene units. Like the highlight it is one setting per <code>begin3d</code> block; with no argument, or 0, the surface is flat. Atlas tiles are not affected</td></tr>
-    <tr><td><code>graphics.specular([strength [, shininess]])</code></td><td>The highlight the light leaves on every lit surface: <code>strength</code> (default 0.3, 0 for none) and <code>shininess</code> (default 16, at least 1; the larger, the narrower the spot). It is one setting for the whole frame, and it lights the sea as much as the land — set it to 0 when a shiny spot would look wrong. With no argument the defaults come back</td></tr>
-    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object. The kind is an identifier: anything but <code>"dir"</code> or <code>"point"</code> is refused, and named in the error</td></tr>
-    <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>A point light at the position <code>(x,y,z)</code> → a <code>Light</code> object</td></tr>
+    <tr><td><code>gfx.ambient(v)</code> ou <code>gfx.ambient(color)</code></td><td>The ambient light, a uniform base. <code>v</code> ∈ [0,1]</td></tr>
+    <tr><td><code>gfx.bump([height [, grain]])</code></td><td>Relief for the textured surfaces drawn next, read from the texture itself: the brighter a texel, the higher it stands, and the light shades the slopes. <code>height</code> is how high a white texel stands above a black one, <code>grain</code> the height of a fine noise that only shows where a texel is bigger than a screen pixel (a surface seen close), both in scene units. Like the highlight it is one setting per <code>begin3d</code> block; with no argument, or 0, the surface is flat. Atlas tiles are not affected</td></tr>
+    <tr><td><code>gfx.specular([strength [, shininess]])</code></td><td>The highlight the light leaves on every lit surface: <code>strength</code> (default 0.3, 0 for none) and <code>shininess</code> (default 16, at least 1; the larger, the narrower the spot). It is one setting for the whole frame, and it lights the sea as much as the land — set it to 0 when a shiny spot would look wrong. With no argument the defaults come back</td></tr>
+    <tr><td><code>gfx.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object. The kind is an identifier: anything but <code>"dir"</code> or <code>"point"</code> is refused, and named in the error</td></tr>
+    <tr><td><code>gfx.light("point", x,y,z [, color])</code></td><td>A point light at the position <code>(x,y,z)</code> → a <code>Light</code> object</td></tr>
     <tr><td><code>light.setDir(x,y,z)</code> · <code>light.setPos(x,y,z)</code></td><td>Reaims / moves the light</td></tr>
     <tr><td><code>light.setColor(color)</code> · <code>light.enable(bool)</code></td><td>Changes the colour / turns the light on or off</td></tr>
-    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applies an image (an <code>image</code> handle) as a texture to the solids that follow; <code>fill</code> becomes a multiplied tint. For a terrain of several materials, see the <a href="#voxel">tile atlas</a> further down</td></tr>
+    <tr><td><code>gfx.texture(img)</code> · <code>gfx.noTexture()</code></td><td>Applies an image (an <code>image</code> handle) as a texture to the solids that follow; <code>fill</code> becomes a multiplied tint. For a terrain of several materials, see the <a href="#voxel">tile atlas</a> further down</td></tr>
   </tbody>
 </table>
 
@@ -2252,42 +2252,42 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h4>Transforming 3D objects</h4>
 <p>The <a href="#/tutorial/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) act on 3D solids as well. <code>translate(x,y,z)</code> places, <code>rotate(deg, ax,ay,az)</code> (or <code>rotateX/Y/Z</code>) orients, <code>scale(...)</code> resizes. They are <strong>cumulative</strong> inside the <code>begin3d</code>/<code>end3d</code> block; <code>push()</code>/<code>pop()</code> serve to <strong>isolate</strong> one object's transformation, by saving and restoring it.</p>
 <pre><code><span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)
-    <span class="bi">graphics</span>.begin3d(cam)
+    <span class="bi">gfx</span>.clear(colors.BLACK)
+    <span class="bi">gfx</span>.begin3d(cam)
         <span class="cmt">## each cube in a push/pop block of its own</span>
-        <span class="bi">graphics</span>.push()
-            <span class="bi">graphics</span>.translate(-<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
-            <span class="bi">graphics</span>.rotateY(elapsedTime * <span class="num">60</span>)   <span class="cmt">## turns around Y</span>
-            <span class="bi">graphics</span>.fill(colors.RED)
-            <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
-        <span class="bi">graphics</span>.pop()
-        <span class="bi">graphics</span>.push()
-            <span class="bi">graphics</span>.translate(<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
-            <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## an arbitrary axis</span>
-            <span class="bi">graphics</span>.fill(colors.SKYBLUE)
-            <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
-        <span class="bi">graphics</span>.pop()
-    <span class="bi">graphics</span>.end3d()
+        <span class="bi">gfx</span>.push()
+            <span class="bi">gfx</span>.translate(-<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
+            <span class="bi">gfx</span>.rotateY(elapsedTime * <span class="num">60</span>)   <span class="cmt">## turns around Y</span>
+            <span class="bi">gfx</span>.fill(colors.RED)
+            <span class="bi">gfx</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+        <span class="bi">gfx</span>.pop()
+        <span class="bi">gfx</span>.push()
+            <span class="bi">gfx</span>.translate(<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
+            <span class="bi">gfx</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## an arbitrary axis</span>
+            <span class="bi">gfx</span>.fill(colors.SKYBLUE)
+            <span class="bi">gfx</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+        <span class="bi">gfx</span>.pop()
+    <span class="bi">gfx</span>.end3d()
 <span class="kw">end</span></code></pre>
 
 <pre><code><span class="cmt">## the camera is an object: created once, driven by its methods</span>
-<span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
-<span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## lighting: an ambient base…</span>
-<span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …plus a directional "sun"</span>
+<span class="kw">global</span> cam = <span class="bi">gfx</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
+<span class="bi">gfx</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## lighting: an ambient base…</span>
+<span class="bi">gfx</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …plus a directional "sun"</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## clears the colour and the depth</span>
+    <span class="bi">gfx</span>.clear(colors.BLACK)      <span class="cmt">## clears the colour and the depth</span>
     cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbits around the target (the angle in radians)</span>
-    <span class="bi">graphics</span>.noStroke()
-    <span class="bi">graphics</span>.begin3d(cam)
-        <span class="bi">graphics</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
-        <span class="bi">graphics</span>.fill(colors.RED)
-        <span class="bi">graphics</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## shaded faces</span>
-        <span class="bi">graphics</span>.fill(colors.SKYBLUE)
-        <span class="bi">graphics</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
-    <span class="bi">graphics</span>.end3d()
-    <span class="bi">graphics</span>.fontSize(<span class="num">22</span>)
-    <span class="bi">graphics</span>.text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>)   <span class="cmt">## a 2D HUD on top</span>
+    <span class="bi">gfx</span>.noStroke()
+    <span class="bi">gfx</span>.begin3d(cam)
+        <span class="bi">gfx</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
+        <span class="bi">gfx</span>.fill(colors.RED)
+        <span class="bi">gfx</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## shaded faces</span>
+        <span class="bi">gfx</span>.fill(colors.SKYBLUE)
+        <span class="bi">gfx</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
+    <span class="bi">gfx</span>.end3d()
+    <span class="bi">gfx</span>.fontSize(<span class="num">22</span>)
+    <span class="bi">gfx</span>.text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>)   <span class="cmt">## a 2D HUD on top</span>
 <span class="kw">end</span></code></pre>
 
 <h4>Rotations by quaternion (<code>Quat</code>)</h4>
@@ -2295,28 +2295,28 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.quat()</code></td><td>The identity quaternion, meaning no rotation</td></tr>
-    <tr><td><code>graphics.quatAxis(ax,ay,az, deg)</code></td><td>A rotation of <code>deg</code>° around the axis <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.quatEuler(pitch,yaw,roll)</code></td><td>From Euler angles, in degrees</td></tr>
+    <tr><td><code>gfx.quat()</code></td><td>The identity quaternion, meaning no rotation</td></tr>
+    <tr><td><code>gfx.quatAxis(ax,ay,az, deg)</code></td><td>A rotation of <code>deg</code>° around the axis <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>gfx.quatEuler(pitch,yaw,roll)</code></td><td>From Euler angles, in degrees</td></tr>
     <tr><td><code>q.mul(other)</code></td><td>The composition <code>q · other</code> → a new <code>Quat</code></td></tr>
     <tr><td><code>q.slerp(other, t)</code></td><td>Spherical interpolation, <code>t</code> ∈ [0,1] → a new <code>Quat</code></td></tr>
     <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>The normalised quaternion / the inverse rotation</td></tr>
     <tr><td><code>q.rotateVec(x,y,z)</code></td><td>Returns the vector <code>(x,y,z)</code> rotated, as <code>[x,y,z]</code></td></tr>
-    <tr><td><code>graphics.rotateq(q)</code></td><td>Applies the rotation <code>q</code>, as <code>rotate</code> does but from a <code>Quat</code></td></tr>
+    <tr><td><code>gfx.rotateq(q)</code></td><td>Applies the rotation <code>q</code>, as <code>rotate</code> does but from a <code>Quat</code></td></tr>
   </tbody>
 </table>
 <pre><code><span class="cmt">## interpolates smoothly between two orientations</span>
-<span class="kw">global</span> qa = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## the start</span>
-<span class="kw">global</span> qb = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## the end</span>
+<span class="kw">global</span> qa = <span class="bi">gfx</span>.quatAxis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## the start</span>
+<span class="kw">global</span> qb = <span class="bi">gfx</span>.quatAxis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## the end</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)
+    <span class="bi">gfx</span>.clear(colors.BLACK)
     <span class="kw">var</span> t = (<span class="bi">math</span>.sin(elapsedTime) + <span class="num">1</span>) / <span class="num">2</span>   <span class="cmt">## back and forth, 0↔1</span>
-    <span class="bi">graphics</span>.begin3d(cam)
-        <span class="bi">graphics</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## the interpolated rotation</span>
-        <span class="bi">graphics</span>.fill(colors.ORANGE)
-        <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
-    <span class="bi">graphics</span>.end3d()
+    <span class="bi">gfx</span>.begin3d(cam)
+        <span class="bi">gfx</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## the interpolated rotation</span>
+        <span class="bi">gfx</span>.fill(colors.ORANGE)
+        <span class="bi">gfx</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
+    <span class="bi">gfx</span>.end3d()
 <span class="kw">end</span></code></pre>
 
 <h4 id="voxel">Voxel terrain: retained geometry and culling</h4>
@@ -2324,13 +2324,13 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.beginChunk()</code></td><td>Opens the recording: the <code>graphics.cube</code>/<code>plane</code> calls that follow are <strong>baked</strong>, that is recorded, rather than drawn</td></tr>
-    <tr><td><code>graphics.endChunk()</code></td><td>Ends it and returns a <strong>handle</strong> to redraw on every frame: a map <code>{ id, idw, count, wcount }</code></td></tr>
-    <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redraws a baked chunk's <strong>opaque</strong> part in a single call, inside <code>begin3d</code></td></tr>
-    <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Draws the <strong>transparent</strong> part (instances whose <code>fill</code> alpha is &lt; 1, water for instance). To be called AFTER all the opaque geometry</td></tr>
-    <tr><td><code>graphics.freeChunk(handle)</code></td><td>Frees a (distant) chunk's GPU buffers, giving the memory back</td></tr>
-    <tr><td><code>graphics.project(camera, x, y, z)</code></td><td>Where the point <code>(x, y, z)</code> of the scene lands on the screen, seen by <code>camera</code> → <code>sx, sy, depth</code>: the pixel in the drawing area, and the distance in front of the camera. It answers at any time and for any camera, so a script can draw in 2D (a label, a marker, a halo) what belongs to the 3D scene. A point behind the camera has no place on the screen: <code>sx</code> and <code>sy</code> are <code>nil</code>, and since 0 is false the test to write is <code>depth &gt; 0</code>. It follows the drawing area, not a <code>graphics.viewport</code></td></tr>
-    <tr><td><code>graphics.inFrustum(x,y,z [, radius])</code></td><td>Is the sphere (centre, radius) visible to the camera, at least in part? → <code>1</code>/<code>0</code>. Used for culling by chunk; to be called inside <code>begin3d</code></td></tr>
+    <tr><td><code>gfx.beginChunk()</code></td><td>Opens the recording: the <code>gfx.cube</code>/<code>plane</code> calls that follow are <strong>baked</strong>, that is recorded, rather than drawn</td></tr>
+    <tr><td><code>gfx.endChunk()</code></td><td>Ends it and returns a <strong>handle</strong> to redraw on every frame: a map <code>{ id, idw, count, wcount }</code></td></tr>
+    <tr><td><code>gfx.drawChunk(handle)</code></td><td>Redraws a baked chunk's <strong>opaque</strong> part in a single call, inside <code>begin3d</code></td></tr>
+    <tr><td><code>gfx.drawChunkAlpha(handle)</code></td><td>Draws the <strong>transparent</strong> part (instances whose <code>fill</code> alpha is &lt; 1, water for instance). To be called AFTER all the opaque geometry</td></tr>
+    <tr><td><code>gfx.freeChunk(handle)</code></td><td>Frees a (distant) chunk's GPU buffers, giving the memory back</td></tr>
+    <tr><td><code>gfx.project(camera, x, y, z)</code></td><td>Where the point <code>(x, y, z)</code> of the scene lands on the screen, seen by <code>camera</code> → <code>sx, sy, depth</code>: the pixel in the drawing area, and the distance in front of the camera. It answers at any time and for any camera, so a script can draw in 2D (a label, a marker, a halo) what belongs to the 3D scene. A point behind the camera has no place on the screen: <code>sx</code> and <code>sy</code> are <code>nil</code>, and since 0 is false the test to write is <code>depth &gt; 0</code>. It follows the drawing area, not a <code>gfx.viewport</code></td></tr>
+    <tr><td><code>gfx.inFrustum(x,y,z [, radius])</code></td><td>Is the sphere (centre, radius) visible to the camera, at least in part? → <code>1</code>/<code>0</code>. Used for culling by chunk; to be called inside <code>begin3d</code></td></tr>
   </tbody>
 </table>
 <p>A chunk is <strong>split</strong> into two groups according to the <code>fill</code> alpha: opaque (<code>drawChunk</code>) and transparent (<code>drawChunkAlpha</code>). The <strong>order is mandatory</strong>: draw ALL the opaque geometry, THEN all the transparency — the alpha blending is wrong otherwise.</p>
@@ -2340,10 +2340,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.tileset(img, cols, rows)</code></td><td>Declares the tile atlas (a <code>cols</code>×<code>rows</code> grid, NEAREST filtering, so the pixels stay crisp)</td></tr>
-    <tr><td><code>graphics.tile(t)</code></td><td>The same tile <code>t</code> on the next cube's six faces (a state, like <code>fill</code>); <code>-1</code> means none, giving plain colour</td></tr>
-    <tr><td><code>graphics.tiles(top, side, bottom)</code></td><td>Distinct tiles per face, as indices into the atlas</td></tr>
-    <tr><td><code>graphics.tileAnim(t)</code></td><td>Names a tile whose UV <strong>scrolls</strong> over time, for rippling water</td></tr>
+    <tr><td><code>gfx.tileset(img, cols, rows)</code></td><td>Declares the tile atlas (a <code>cols</code>×<code>rows</code> grid, NEAREST filtering, so the pixels stay crisp)</td></tr>
+    <tr><td><code>gfx.tile(t)</code></td><td>The same tile <code>t</code> on the next cube's six faces (a state, like <code>fill</code>); <code>-1</code> means none, giving plain colour</td></tr>
+    <tr><td><code>gfx.tiles(top, side, bottom)</code></td><td>Distinct tiles per face, as indices into the atlas</td></tr>
+    <tr><td><code>gfx.tileAnim(t)</code></td><td>Names a tile whose UV <strong>scrolls</strong> over time, for rippling water</td></tr>
   </tbody>
 </table>
 <h4>Terrain meshes (heightfield)</h4>
@@ -2351,41 +2351,41 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.heightfield({cols, rows, x, z, cell, heights [, slopesX, slopesZ, colors]})</code></td><td>A retained <strong>terrain patch</strong> as ONE mesh: <code>(cols+1)·(rows+1)</code> vertices shared by the cells around them, instead of a cube per cell (24 vertices each, of which only the top four are seen). The first vertex is at world <code>(x, z)</code>, vertices are <code>cell</code> apart, and <code>heights</code>, <code>slopesX</code>/<code>slopesZ</code> (dh/dx and dh/dz per world unit, which give the lighting normal <code>(-sx, 1, -sz)</code>) and <code>colors</code> (<code>Color</code> instances, interpolated across the triangles) are flat arrays of that many values, row by row along x then z. Patches that give the same slopes to a shared edge are lit as one surface. Without slopes they come from the heights by central differences, seamless only inside one patch. Each cell is two triangles split on the diagonal from its <code>(-x,-z)</code> corner to its <code>(+x,+z)</code> corner. At most 65535 vertices per patch. Returns a chunk handle — <code>drawChunk</code>, <code>freeChunk</code> — that also carries its bounding sphere as <code>x, y, z, r</code>, for <code>inFrustum</code></td></tr>
-    <tr><td><code>graphics.terrainHeight(x, z)</code></td><td>The height of the heightfield patches at <code>(x, z)</code>, read from the very triangles that are drawn — so whatever you stand on the ground sits exactly on what is seen. <code>nil</code> when no live patch covers the point</td></tr>
+    <tr><td><code>gfx.heightfield({cols, rows, x, z, cell, heights [, slopesX, slopesZ, colors]})</code></td><td>A retained <strong>terrain patch</strong> as ONE mesh: <code>(cols+1)·(rows+1)</code> vertices shared by the cells around them, instead of a cube per cell (24 vertices each, of which only the top four are seen). The first vertex is at world <code>(x, z)</code>, vertices are <code>cell</code> apart, and <code>heights</code>, <code>slopesX</code>/<code>slopesZ</code> (dh/dx and dh/dz per world unit, which give the lighting normal <code>(-sx, 1, -sz)</code>) and <code>colors</code> (<code>Color</code> instances, interpolated across the triangles) are flat arrays of that many values, row by row along x then z. Patches that give the same slopes to a shared edge are lit as one surface. Without slopes they come from the heights by central differences, seamless only inside one patch. Each cell is two triangles split on the diagonal from its <code>(-x,-z)</code> corner to its <code>(+x,+z)</code> corner. At most 65535 vertices per patch. Returns a chunk handle — <code>drawChunk</code>, <code>freeChunk</code> — that also carries its bounding sphere as <code>x, y, z, r</code>, for <code>inFrustum</code></td></tr>
+    <tr><td><code>gfx.terrainHeight(x, z)</code></td><td>The height of the heightfield patches at <code>(x, z)</code>, read from the very triangles that are drawn — so whatever you stand on the ground sits exactly on what is seen. <code>nil</code> when no live patch covers the point</td></tr>
   </tbody>
 </table>
 <div class="callout tip">With an atlas active, give <strong>every</strong> cube of the chunk a tile (<code>tile</code>/<code>tiles</code>): a cube with no tile would sample tile 0 instead of a plain colour.</div>
 
 <pre><code><span class="cmt">## a voxel chunk: baked ONCE in setup(), redrawn in one call per frame</span>
-<span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">26</span>, <span class="num">20</span>, <span class="num">26</span>,  <span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>)
+<span class="kw">global</span> cam = <span class="bi">gfx</span>.camera(<span class="num">26</span>, <span class="num">20</span>, <span class="num">26</span>,  <span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>)
 <span class="kw">global</span> chunk = <span class="bool">nil</span>
 
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"voxel"</span>)
-    <span class="bi">graphics</span>.ambient(<span class="num">0.5</span>)
-    <span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">0.5</span>, -<span class="num">1</span>, -<span class="num">0.35</span>)
-    <span class="bi">graphics</span>.beginChunk()                 <span class="cmt">## the baking starts</span>
-    <span class="bi">graphics</span>.fill(colors.WHITE)
+    <span class="bi">gfx</span>.canvas(W, H, <span class="str">"voxel"</span>)
+    <span class="bi">gfx</span>.ambient(<span class="num">0.5</span>)
+    <span class="bi">gfx</span>.light(<span class="str">"dir"</span>, -<span class="num">0.5</span>, -<span class="num">1</span>, -<span class="num">0.35</span>)
+    <span class="bi">gfx</span>.beginChunk()                 <span class="cmt">## the baking starts</span>
+    <span class="bi">gfx</span>.fill(colors.WHITE)
     <span class="kw">for</span> x = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
         <span class="kw">for</span> z = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
             <span class="kw">var</span> h = <span class="bi">math</span>.floor(<span class="bi">math</span>.noise(x * <span class="num">0.12</span>, z * <span class="num">0.12</span>) * <span class="num">6</span>) + <span class="num">1</span>
             <span class="kw">for</span> y = <span class="num">0</span>, h <span class="kw">do</span>
-                <span class="bi">graphics</span>.cube(x, y, z,  <span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
+                <span class="bi">gfx</span>.cube(x, y, z,  <span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
             <span class="kw">end</span>
         <span class="kw">end</span>
     <span class="kw">end</span>
-    chunk = <span class="bi">graphics</span>.endChunk()           <span class="cmt">## a lasting handle</span>
+    chunk = <span class="bi">gfx</span>.endChunk()           <span class="cmt">## a lasting handle</span>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(Color(<span class="num">0.55</span>, <span class="num">0.8</span>, <span class="num">0.95</span>))
+    <span class="bi">gfx</span>.clear(Color(<span class="num">0.55</span>, <span class="num">0.8</span>, <span class="num">0.95</span>))
     cam.orbit(elapsedTime * <span class="num">0.3</span>, <span class="num">26</span>, <span class="num">20</span>)
-    <span class="bi">graphics</span>.begin3d(cam)
-        <span class="kw">if</span> <span class="bi">graphics</span>.inFrustum(<span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>, <span class="num">20</span>) <span class="kw">then</span>   <span class="cmt">## drawn only when visible</span>
-            <span class="bi">graphics</span>.drawChunk(chunk)                 <span class="cmt">## one call draws the whole chunk</span>
+    <span class="bi">gfx</span>.begin3d(cam)
+        <span class="kw">if</span> <span class="bi">gfx</span>.inFrustum(<span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>, <span class="num">20</span>) <span class="kw">then</span>   <span class="cmt">## drawn only when visible</span>
+            <span class="bi">gfx</span>.drawChunk(chunk)                 <span class="cmt">## one call draws the whole chunk</span>
         <span class="kw">end</span>
-    <span class="bi">graphics</span>.end3d()
+    <span class="bi">gfx</span>.end3d()
 <span class="kw">end</span></code></pre>
 <div class="callout tip">The complete <strong>Voxel world</strong> example — endless chunk streaming, biomes, a grass/rock/snow atlas, animated translucent water and a touch joystick — is in the playground, under the <em>Examples</em> menu.</div>
 </section>
@@ -2419,15 +2419,15 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span></code></pre>
 <p><strong>On a phone</strong> the system keyboard is not something a canvas can raise by itself, so a program asks for it: <code>keyboard.show()</code> from the handler of a tap (the box the user touches to write), <code>keyboard.hide()</code> when the writing is over. Declaring <code>keyboard.typed</code> is what tells the page that the program wants text: from then on the first touch of the canvas gets ready for the keyboard, and <code>show()</code> lets it come. The text arrives through <code>typed</code> in the same way as from a physical keyboard, with two differences to know: the straight apostrophe and the straight quote come as typed, because the phone's curly ones (<code>‘ ’ “ ”</code>) are turned back into <code>'</code> and <code>"</code>; and the control keys (<code>"return"</code>, <code>"backspace"</code>) are still key names, for <code>keypressed</code>. To edit a text without drawing the field yourself, see <code>ui.textField</code> in <a href="#ui">The ui module</a>.</p>
 <p>Without a <code>typed</code> function the page does nothing to the touches of the canvas, so a program that does not write text is not changed.</p>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
 <span class="kw">func</span> keyboard.keypressed(key)
     last = key
 <span class="kw">end</span>
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.fontSize(<span class="num">26</span>)
-    <span class="bi">graphics</span>.text(<span class="str">"key: "</span> + last, <span class="num">16</span>, <span class="num">45</span>)
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.fontSize(<span class="num">26</span>)
+    <span class="bi">gfx</span>.text(<span class="str">"key: "</span> + last, <span class="num">16</span>, <span class="num">45</span>)
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -2447,7 +2447,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>mouse.isDown([button])</code></td><td><code>true</code> while the button is held — <code>"left"</code> (the default), <code>"right"</code> or <code>"middle"</code>. It answers what a script used to mirror by hand, raising a flag on <code>pressed</code> and lowering it on <code>released</code>; <code>keyboard.isDown</code> never had that gap.</td></tr>
   </tbody>
 </table>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"mouse"</span>)  <span class="cmt">## click inside the canvas</span>
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"mouse"</span>)  <span class="cmt">## click inside the canvas</span>
 <span class="kw">global</span> px = <span class="num">130</span>
 <span class="kw">global</span> py = <span class="num">80</span>
 <span class="kw">func</span> mouse.pressed(x, y)
@@ -2455,9 +2455,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
     py = y
 <span class="kw">end</span>
 <span class="kw">func</span> draw()
-    graphics.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>))
-    graphics.fill(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
-    graphics.circle(px, py, <span class="num">10</span>)
+    gfx.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>))
+    gfx.fill(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
+    gfx.circle(px, py, <span class="num">10</span>)
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -2678,7 +2678,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <ul>
   <li>The interface's size is <strong>proportional</strong> to the drawing area's height, so it is readable on a desktop screen as much as on a phone, whose canvas counts several pixels per display pixel.</li>
   <li>The memory and frames-per-second overlay sits in the bottom-right corner, opposite the stack.</li>
-  <li>The labels use the engine's default font (see <code>graphics.font</code>), not the one the script has chosen: the interface keeps its appearance whatever the program does.</li>
+  <li>The labels use the engine's default font (see <code>gfx.font</code>), not the one the script has chosen: the interface keeps its appearance whatever the program does.</li>
   <li>Removing a menu you are inside moves the display up to the first parent menu still present. Using a removed handle raises an explicit error.</li>
   <li>A slider gives an <strong>integer</strong> value when its bounds and its starting value are integers, and a float otherwise: <code>ui.slider("Factor", <span class="kw">ref</span> f, 0, 1, 0.5)</code> therefore adjusts a float despite its integer bounds.</li>
   <li>The bound variable is the <strong>only source of truth</strong>: the slider reads its value on every frame, so the program can write it itself and the display follows. A value out of range is clamped for the display, without writing to the variable.</li>
@@ -2766,7 +2766,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <span class="kw">global</span> ball = {x: <span class="num">0</span>, r: <span class="num">20</span>, tint: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
 
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(W, H)
+    <span class="bi">gfx</span>.canvas(W, H)
     <span class="cmt">## Several fields at once, a COLOUR among them, interpolated component by component.</span>
     <span class="bi">tween</span>.to(ball, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, tint: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
     <span class="cmt">## Then a return, 0.3 s after the first has finished.</span>
@@ -2774,9 +2774,9 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)
-    <span class="bi">graphics</span>.fill(ball.tint)
-    <span class="bi">graphics</span>.circle(ball.x, CY, ball.r)
+    <span class="bi">gfx</span>.clear(colors.BLACK)
+    <span class="bi">gfx</span>.fill(ball.tint)
+    <span class="bi">gfx</span>.circle(ball.x, CY, ball.r)
 <span class="kw">end</span></code></pre>
 
 <h3>Curves</h3>
@@ -2815,7 +2815,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <pre><code><span class="kw">global</span> siren = <span class="bi">sound</span>.saw(<span class="num">220</span>)
 
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(W, H)
+    <span class="bi">gfx</span>.canvas(W, H)
     siren.volume(<span class="num">0.3</span>).start()
 <span class="kw">end</span>
 
@@ -3002,7 +3002,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <pre><code><span class="kw">global</span> temperature = <span class="kw">nil</span>
 
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"weather"</span>)
+    <span class="bi">gfx</span>.canvas(W, H, <span class="str">"weather"</span>)
     <span class="kw">var</span> url = <span class="bi">https</span>.query(<span class="str">"https://api.open-meteo.com/v1/forecast"</span>, {
         latitude: <span class="num">48.85</span>, longitude: <span class="num">2.35</span>, current: <span class="str">"temperature_2m"</span>
     })
@@ -3016,9 +3016,9 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
-    <span class="bi">graphics</span>.text(temperature <span class="kw">or</span> <span class="str">"loading…"</span>, CX, CY)
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.fill(<span class="bi">colors</span>.WHITE)
+    <span class="bi">gfx</span>.text(temperature <span class="kw">or</span> <span class="str">"loading…"</span>, CX, CY)
 <span class="kw">end</span></code></pre>
 <div class="callout"><strong>Two kinds of failure.</strong> A mistake in the call — an address that is not <code>https://</code>, an option that does not exist, a callback missing — is an <strong>error raised at once</strong>. A failure of the exchange itself — no network, a server that does not answer — is <strong>not</strong>: the callback runs with <code>ok</code> false, <code>status</code> 0 and <code>error</code> telling why. A refusal by the server (404, 500…) is an answer like another: it has its <code>status</code> and its <code>body</code>, and <code>error</code> is <code>nil</code>.</div>
 <div class="callout"><strong>Only <code>https://</code>.</strong> <code>http://</code> is refused, and the certificate of the server is always checked. In the browser the request is made by the browser itself, so its rules apply: the server must <strong>allow this page to read its answer</strong> (CORS), or the callback gets <code>error</code> set and nothing else. No cookie is sent. Outside the browser every request fails at once with <code>"unsupported"</code>.</div>
@@ -3055,32 +3055,32 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <section id="image">
 <h2>The <code>image</code> module</h2>
 <p>The <code>image</code> module loads textures from disk, or from base64 data, and creates <strong>render textures</strong> for off-screen rendering. Available without any <code>import</code>.</p>
-<div class="callout"><code>graphics.canvas()</code> must be called <strong>before</strong> any image operation — the GL context has to exist.</div>
+<div class="callout"><code>gfx.canvas()</code> must be called <strong>before</strong> any image operation — the GL context has to exist.</div>
 
 <h3>Loading an image</h3>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">140</span>, <span class="str">"image.load"</span>)
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">240</span>, <span class="num">140</span>, <span class="str">"image.load"</span>)
 <span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>)  <span class="cmt">## a handle {id, width, height} — a served resource</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.12</span>, <span class="num">0.2</span>))
-    <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
-    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## resized</span>
+    <span class="bi">gfx</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.12</span>, <span class="num">0.2</span>))
+    <span class="bi">gfx</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
+    <span class="bi">gfx</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## resized</span>
 <span class="kw">end</span></code></pre>
 <div class="callout"><code>image.load(name)</code> resolves the name like this: <strong>natively</strong>, a file on disk; in <strong>WASM</strong>, first an image added through the <strong>"Images"</strong> button, otherwise a <strong>resource served by the site</strong> (same origin, fetched automatically — <code>image.load("assets/logo.png")</code>, relative to the page). In both cases the file is looked for <strong>beside the program</strong> first, then under the name as written: a script kept in its own directory names its data without repeating that directory, and it no longer matters which directory the program was started from. For an image <strong>embedded</strong> in the script, portable anywhere and needing no network, use <code>image.loadData("png", base64)</code> — see the playground's "Image (loadData)" example.</div>
 
 <h3>Render texture (off-screen drawing)</h3>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
+<pre><code><span class="bi">gfx</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
 <span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>)  <span class="cmt">## a 120×120 render texture</span>
 
 image.beginDraw(rt)             <span class="cmt">## we draw INTO the texture, once</span>
-    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
-    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-    <span class="bi">graphics</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
+    <span class="bi">gfx</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
+    <span class="bi">gfx</span>.fill(<span class="bi">colors</span>.RED)
+    <span class="bi">gfx</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
 image.endDraw()
 
 <span class="kw">func</span> draw()                      <span class="cmt">## then show it like a sprite</span>
-    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.sprite(rt, <span class="num">30</span>, <span class="num">30</span>)
+    <span class="bi">gfx</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">gfx</span>.sprite(rt, <span class="num">30</span>, <span class="num">30</span>)
 <span class="kw">end</span></code></pre>
 
 <h3>API</h3>
@@ -3093,7 +3093,7 @@ image.endDraw()
     <tr><td><code>image.fromPattern(rows [, palette])</code></td><td>A sprite from a text pattern: one string per row, <code>.</code> and a space transparent, every other character opaque white — or taken from <code>palette</code>, a map of one character to a <code>Color</code>: <code>{"#": colors.WHITE, "o": Color(1, 0.4, 0.4)}</code>. It returns a handle like <code>image.create</code>. Rows of unequal length are <strong>refused</strong>, as is a character absent from the palette, which is named with its row and column — a stray letter in ASCII art is invisible to the eye. Textures are sampled NEAREST, so a sprite scaled up stays crisp.</td></tr>
     <tr><td><code>image.beginDraw(handle)</code></td><td>Redirects the rendering into the render texture, the counterpart of <code>BeginTextureMode</code></td></tr>
     <tr><td><code>image.endDraw()</code></td><td>Ends the off-screen rendering and restores the default target</td></tr>
-    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Draws the texture; an explicit <code>tint</code> (a Color object) wins, otherwise the global <code>graphics.tint</code> applies. The anchoring follows <code>graphics.spriteMode</code>, as <code>graphics.sprite</code> does</td></tr>
+    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Draws the texture; an explicit <code>tint</code> (a Color object) wins, otherwise the global <code>gfx.tint</code> applies. The anchoring follows <code>gfx.spriteMode</code>, as <code>gfx.sprite</code> does</td></tr>
     <tr><td><code>image.filter(handle, mode)</code></td><td>How the texture is sampled when it is drawn bigger or smaller than it is: <code>"nearest"</code> (the default, each pixel stays a square: what pixel art wants), <code>"linear"</code> (neighbouring pixels are blended: what a picture stretched over a surface wants) or <code>"mipmap"</code> (linear, plus smaller copies of the picture, so that one seen from afar is averaged instead of sparkling, and sampling along the stretched direction, so that one seen at a slant stays sharp). The copies are redone when the pixels are written with <code>endPixels</code>, but not after <code>beginDraw</code>: call it again then. Any other mode is an error</td></tr>
     <tr><td><code>image.unload(handle)</code></td><td>Frees the texture's GPU resources</td></tr>
     <tr><td><code>image.beginPixels(handle)</code></td><td>Opens pixel-by-pixel access to the texture, to be recomputed every frame</td></tr>
@@ -3103,7 +3103,7 @@ image.endDraw()
     <tr><td><code>image.mapPixel(handle, f)</code></td><td>Applies <code>f(x, y, r, g, b, a)</code> to every pixel; <code>f</code> returns the new <code>r, g, b, a</code>, the channels it does not return staying unchanged. <code>beginPixels</code>/<code>endPixels</code> are handled internally. Faster than the loop written by hand.</td></tr>
   </tbody>
 </table>
-<div class="callout tip"><code>graphics.sprite()</code> is the recommended alternative to <code>image.draw()</code>: it honours the current transformation matrix and takes <code>graphics.tint</code> as its tint, white when there is none.</div>
+<div class="callout tip"><code>gfx.sprite()</code> is the recommended alternative to <code>image.draw()</code>: it honours the current transformation matrix and takes <code>gfx.tint</code> as its tint, white when there is none.</div>
 </section>
 
 <section id="window">
@@ -3116,12 +3116,12 @@ image.endDraw()
     <tr><td><code>window.height</code></td><td>int</td><td>The render area's height, in pixels</td></tr>
   </tbody>
 </table>
-<p>One callback belongs to this module: <code>window.resized(w, h)</code>, called <strong>once per change</strong> of the area after a program asked to follow it with <code>graphics.fitArea()</code>. When it runs, <code>W</code>, <code>H</code>, <code>SIZE</code> and the others already hold the new size, so anything drawn from them has re-placed itself; the callback is for what the script <em>keeps</em> — a layout it computed once, a camera, a neutral position.</p>
+<p>One callback belongs to this module: <code>window.resized(w, h)</code>, called <strong>once per change</strong> of the area after a program asked to follow it with <code>gfx.fitArea()</code>. When it runs, <code>W</code>, <code>H</code>, <code>SIZE</code> and the others already hold the new size, so anything drawn from them has re-placed itself; the callback is for what the script <em>keeps</em> — a layout it computed once, a camera, a neutral position.</p>
 <pre data-no-run><code><span class="kw">global</span> portrait = <span class="kw">false</span>
 
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)
-    <span class="bi">graphics</span>.fitArea()
+    <span class="bi">gfx</span>.canvas(W, H, <span class="str">"Title"</span>)
+    <span class="bi">gfx</span>.fitArea()
 <span class="kw">end</span>
 
 <span class="kw">func</span> window.resized(w, h)
@@ -3129,8 +3129,8 @@ image.endDraw()
 <span class="kw">end</span></code></pre>
 <div class="callout tip">Most of the time you do not need <code>window</code>: the engine already supplies the globals <code>W</code> and <code>H</code> (the render area's width and height), <code>CX</code> and <code>CY</code> (the centre, that is <code>W/2</code> and <code>H/2</code>), and <code>SIZE</code> (<code>min(W, H)</code>, a size that fits either dimension), initialised from <code>window</code> before the run.</div>
 <pre data-no-run><code><span class="cmt">## W, H, CX, CY and SIZE come from the engine — no need for window here</span>
-<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## a window filling the area</span>
-<span class="bi">graphics</span>.circle(CX, CY, SIZE / <span class="num">4</span>)  <span class="cmt">## a circle sized to fit, at the centre</span></code></pre>
+<span class="bi">gfx</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## a window filling the area</span>
+<span class="bi">gfx</span>.circle(CX, CY, SIZE / <span class="num">4</span>)  <span class="cmt">## a circle sized to fit, at the centre</span></code></pre>
 </section>
 
 

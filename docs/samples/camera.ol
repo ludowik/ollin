@@ -9,7 +9,7 @@ global frame = nil
 global why = nil               ## nil while all is well, otherwise what stopped us
 
 func setup()
-    graphics.canvas(640, 480)
+    gfx.canvas(640, 480)
     try
         camera.open(W / scale, H / scale)
     catch e
@@ -31,17 +31,17 @@ func update(dt)
 end
 
 func draw()
-    graphics.clear(Color(0.04, 0.04, 0.06))
+    gfx.clear(Color(0.04, 0.04, 0.06))
     if frame then
-        graphics.sprite(frame, 0, 0, W, H)
+        gfx.sprite(frame, 0, 0, W, H)
         return
     end
-    graphics.fontSize(16)
-    graphics.textMode("center", "center")
-    graphics.stroke(Color(0.9, 0.92, 1))
+    gfx.fontSize(16)
+    gfx.textMode("center", "center")
+    gfx.stroke(Color(0.9, 0.92, 1))
     if why <> nil then
-        graphics.text(why, CX, CY)
+        gfx.text(why, CX, CY)
     else
-        graphics.text("waiting for the camera...", CX, CY)
+        gfx.text("waiting for the camera...", CX, CY)
     end
 end

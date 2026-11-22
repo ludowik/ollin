@@ -313,14 +313,14 @@ func drawTokens(r, t, s)
     var x = math.lerp(r.x + L.pad + a.x + a.w / 2, r.x + L.pad + b.x + b.w / 2, frac)
     var y = math.lerp(top + a.y + a.h, top + b.y + b.h, frac)
     var size = L.fs * 0.5
-    graphics.noStroke()
-    graphics.fill(CARET)
-    graphics.polygon([x - size, y + size * 1.6, x + size, y + size * 1.6, x, y + size * 0.2])
-    graphics.font("mono")
-    graphics.fontSize(L.tfs)
-    graphics.textMode("center", "top")
+    gfx.noStroke()
+    gfx.fill(CARET)
+    gfx.polygon([x - size, y + size * 1.6, x + size, y + size * 1.6, x, y + size * 0.2])
+    gfx.font("mono")
+    gfx.fontSize(L.tfs)
+    gfx.textMode("center", "top")
     label("peek()", x, y + size * 1.7, CARET)
-    graphics.textMode("left", "top")
+    gfx.textMode("left", "top")
 end
 
 ## ── the tree ─────────────────────────────────────────────────────────────────
@@ -369,25 +369,25 @@ end
 func drawNode(item, f, alpha, glow, returned)
     var c = nodeColor(item.group)
     var x = f.x - f.w / 2
-    graphics.font("mono")
+    gfx.font("mono")
     if returned then
-        graphics.noFill()
-        graphics.stroke(fade(CARET, 0.55 * alpha), 1.5)
-        graphics.rect(x - 4, f.y - 4, f.w + 8, f.h + 8, f.fs * 0.5)
+        gfx.noFill()
+        gfx.stroke(fade(CARET, 0.55 * alpha), 1.5)
+        gfx.rect(x - 4, f.y - 4, f.w + 8, f.h + 8, f.fs * 0.5)
     end
-    graphics.fill(fade(c, 0.16 * alpha))
+    gfx.fill(fade(c, 0.16 * alpha))
     if glow then
-        graphics.stroke(fade(CARET, alpha), 2.5)
+        gfx.stroke(fade(CARET, alpha), 2.5)
     else
-        graphics.stroke(fade(c, alpha), 1.4)
+        gfx.stroke(fade(c, alpha), 1.4)
     end
-    graphics.rect(x, f.y, f.w, f.h, f.fs * 0.35)
-    graphics.textMode("center", "top")
-    graphics.fontSize(f.fs * 0.8)
+    gfx.rect(x, f.y, f.w, f.h, f.fs * 0.35)
+    gfx.textMode("center", "top")
+    gfx.fontSize(f.fs * 0.8)
     label(item.kind, f.x, f.y + f.fs * 0.3, fade(c, alpha))
-    graphics.fontSize(f.fs)
+    gfx.fontSize(f.fs)
     label(item.detail, f.x, f.y + f.fs * 1.5, fade(TEXT, alpha))
-    graphics.textMode("left", "top")
+    gfx.textMode("left", "top")
 end
 
 func drawTree(r, i, t, s)
@@ -421,30 +421,30 @@ func drawTree(r, i, t, s)
         frames[item.id] = f
     end
 
-    graphics.noFill()
+    gfx.noFill()
     for item in cur.items do
         if item.parent <> 0 then
             var f = frames[item.id]
             var p = frames[item.parent]
-            graphics.stroke(fade(DIM, 0.8 * math.min(f.alpha, p.alpha)), 1.2)
-            graphics.line(p.x, p.y + p.h, f.x, f.y)
+            gfx.stroke(fade(DIM, 0.8 * math.min(f.alpha, p.alpha)), 1.2)
+            gfx.line(p.x, p.y + p.h, f.x, f.y)
         end
     end
 
     ## the name of the field each node is held in, on the edge that leads to it
-    graphics.font("mono")
-    graphics.textMode("center", "top")
+    gfx.font("mono")
+    gfx.textMode("center", "top")
     for item in cur.items do
         if item.slot <> "" then
             var f = frames[item.id]
-            graphics.fontSize(f.fs * 0.7)
-            var w = graphics.textSize(item.slot) + f.fs * 0.5
+            gfx.fontSize(f.fs * 0.7)
+            var w = gfx.textSize(item.slot) + f.fs * 0.5
             var y = f.y - f.fs * 1.25
             box(f.x - w / 2, y, w, f.fs * 0.95, f.fs * 0.3, fade(PANEL, 0.9 * f.alpha))
             label(item.slot, f.x, y + f.fs * 0.1, fade(DIM, f.alpha))
         end
     end
-    graphics.textMode("left", "top")
+    gfx.textMode("left", "top")
 
     ## a node the line destroyed fades where it was
     for item in before.items do
@@ -477,7 +477,7 @@ func setup()
     stage.columns = 96
     stage.skip = true
     stage.speed = 2.0
-    graphics.canvas(W, H, "How the parser works")
+    gfx.canvas(W, H, "How the parser works")
     openMenu()
     loadProgram(1)
 end

@@ -15,7 +15,7 @@ cette revue répond à « est-ce que ça marche, et est-ce que tout le reste est
 | aucun | **diff** | la cible de l'algorithme partagé (modifications en attente, sinon depuis la dernière revue, sinon le dernier commit) |
 | un intervalle git (`HEAD~3..HEAD`, `main..HEAD`) | **diff** | exactement cet intervalle |
 | une référence seule (`HEAD~3`, `a1b2c3d`) | **diff** | `<réf>..HEAD` : les commits écrits depuis elle (jamais `git diff <réf>` nu, qui y ajouterait les modifications non commitées) |
-| un chemin de fichier ou de dossier, ou un nom de module (`tween`, `ui`, `sound`, `graphics`…) | **module** | ces fichiers, lus EN ENTIER, que le code date du dernier commit ou d'il y a six mois |
+| un chemin de fichier ou de dossier, ou un nom de module (`tween`, `ui`, `sound`, `gfx`…) | **module** | ces fichiers, lus EN ENTIER, que le code date du dernier commit ou d'il y a six mois |
 
 Un argument qui n'est ni une référence git valide (`git rev-parse --verify`) ni un chemin existant ni
 un nom de module : le dire en une ligne et demander ce qui est visé.
@@ -40,7 +40,7 @@ Aucun diff n'est lu, `refs/reviewed` n'est ni consulté ni avancé. Résoudre l'
 
 - un chemin de fichier → ce fichier ;
 - un dossier → tous ses fichiers de code ;
-- un nom court (`ui`, `tween`, `sound`, `graphics`, `touch`, `image`, `data`…) →
+- un nom court (`ui`, `tween`, `sound`, `gfx`, `touch`, `image`, `data`…) →
   `src/modules/<nom>_module.cpp` **plus** tout fichier frère du même préfixe : en-tête
   (`<nom>_module.h`), stub (`<nom>_stub.cpp`), frontière interne (`<nom>_internal.h`), fichiers éclatés
   (`graphics3d.cpp`, `graphics_quat.cpp`, `sound_output*.cpp`). Un module se juge avec sa frontière.

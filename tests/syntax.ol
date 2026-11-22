@@ -1280,13 +1280,13 @@ assert(sw_hit == "only else")
 ## ── 23. The graphics module (raylib) ─────────────────────────────────────────
 ##
 ## Available in the native build as in WASM, which the playground uses. The DEFAULT native build
-## uses the stub, where `graphics` is nil. For examples, see docs/samples/.
+## uses the stub, where `gfx` is nil. For examples, see docs/samples/.
 ##
-##   graphics.canvas(800, 600, "Title")   ## opens a window
+##   gfx.canvas(800, 600, "Title")   ## opens a window
 ##   func draw()                          ## called on every frame
-##       graphics.clear(colors.BLACK)
-##       graphics.stroke(colors.RED)      ## style: the current state
-##       graphics.line(x1, y1, x2, y2)    ## geometry: the arguments
+##       gfx.clear(colors.BLACK)
+##       gfx.stroke(colors.RED)      ## style: the current state
+##       gfx.line(x1, y1, x2, y2)    ## geometry: the arguments
 ##   end
 ##
 ## The module's RULE: geometry goes through the ARGUMENTS, style comes from the current STATE
@@ -1296,16 +1296,16 @@ assert(sw_hit == "only else")
 ## Predefined colours: the `colors` module (colors.BLACK, colors.WHITE, colors.RED…)
 ## Custom colours: Color(r, g, b[, a]), with components from 0 to 1
 ##   (a packed integer does NOT work: the values are clamped to 1, hence white)
-## FPS: graphics.fps() gives an integer
-## Text: graphics.text(text, x, y) — in the stroke colour, one writing with a pen
-##   graphics.fontSize(n) sets the font size; it takes a fractional value, has no minimum, and is
+## FPS: gfx.fps() gives an integer
+## Text: gfx.text(text, x, y) — in the stroke colour, one writing with a pen
+##   gfx.fontSize(n) sets the font size; it takes a fractional value, has no minimum, and is
 ##   reset to 18 on every frame
-## Rectangle anchoring: graphics.rectMode("corner" | "center") — "corner" (the default, x,y being
+## Rectangle anchoring: gfx.rectMode("corner" | "center") — "corner" (the default, x,y being
 ##   the top-left corner) is restored on every frame; in "center", x,y is the centre
-## Anchoring of circle, ellipse and arc: graphics.ellipseMode("center" | "corner") — the default
+## Anchoring of circle, ellipse and arc: gfx.ellipseMode("center" | "corner") — the default
 ##   is "center", those primitives being centred; in "corner", the reference box of an arc is
 ##   that of the whole ellipse, not of the sector drawn
-## Image anchoring: graphics.spriteMode("corner" | "center") — it applies to graphics.sprite AND
+## Image anchoring: gfx.spriteMode("corner" | "center") — it applies to gfx.sprite AND
 ##   to image.draw; the offset bears on the displayed size
 
 ## ── 24. Array instance methods (higher-order functions) ─────────────────────

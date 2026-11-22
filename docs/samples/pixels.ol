@@ -7,7 +7,7 @@ const SCALE = 0.044   ## small = broader blobs
 global canvas = nil
 
 func setup()
-    graphics.canvas(W, H, "Perlin per pixel")
+    gfx.canvas(W, H, "Perlin per pixel")
     math.noiseSeed(7)
     ## The buffer is a texture, so it is built once the window exists.
     canvas = image.create(LOW_W, LOW_H)
@@ -26,8 +26,8 @@ func draw()
     end
     image.endPixels(canvas)
 
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)
-    graphics.stroke(Color(1, 1, 1))
-    graphics.text("Perlin per pixel", 12, 12)
+    gfx.stroke(Color(1, 1, 1))
+    gfx.text("Perlin per pixel", 12, 12)
 end

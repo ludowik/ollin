@@ -103,7 +103,7 @@ end
 ## the two differ by more than a wheel's radius — which is what buried the car when it read heightAt.
 ## Past the baked world there is no mesh to ask, so the true field answers.
 func surfaceAt(x, z)
-    var h = graphics.terrainHeight(x, z)
+    var h = gfx.terrainHeight(x, z)
     if h == nil then
         return heightAt(x, z)
     end
@@ -111,8 +111,8 @@ func surfaceAt(x, z)
 end
 
 ## Bakes the ground into BLOCKS of BLOCK x BLOCK cells, each one retained mesh
-## (graphics.heightfield), and returns their handles: each carries a bounding sphere (x, y, z, r),
-## so a frame can skip the blocks outside the camera's view (graphics.inFrustum) instead of pushing
+## (gfx.heightfield), and returns their handles: each carries a bounding sphere (x, y, z, r),
+## so a frame can skip the blocks outside the camera's view (gfx.inFrustum) instead of pushing
 ## the whole world through the vertex shader. The circuit never changes, so this runs once from
 ## setup(), not every frame.
 ##
@@ -178,7 +178,7 @@ func bakeTerrain()
                     tints.push(latTint[idx])
                 end
             end
-            blocks.push(graphics.heightfield({
+            blocks.push(gfx.heightfield({
                 cols: x1 - x0 + 1, rows: z1 - z0 + 1,
                 x: x0 * CELL, z: z0 * CELL, cell: CELL,
                 heights: heights, slopesX: slopesX, slopesZ: slopesZ, colors: tints

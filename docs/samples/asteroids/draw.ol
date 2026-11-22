@@ -1,9 +1,9 @@
 ## Everything the game draws on the field, and the art it draws it with.
 
 func drawField()
-    graphics.noFill()
-    graphics.strokeSize(1.4)
-    graphics.stroke(INK)
+    gfx.noFill()
+    gfx.strokeSize(1.4)
+    gfx.stroke(INK)
 
     for r in rocks do
         drawWrapped(rockArt[r.shape][r.size], r.x, r.y, r.rot, ROCK_R[r.size], FIELD_W, FIELD_H)
@@ -14,10 +14,10 @@ func drawField()
         if saucer.small then
             art = saucerArt.small
         end
-        graphics.stroke(WARM)
+        gfx.stroke(WARM)
         drawAt(art.hull, saucer.x, saucer.y, 0.0, true)
         drawAt(art.deck, saucer.x, saucer.y, 0.0, false)
-        graphics.stroke(INK)
+        gfx.stroke(INK)
     end
 
     if ship <> nil then
@@ -25,31 +25,31 @@ func drawField()
         ## The flame is drawn every other frame, so it flickers as the original's did — a steady
         ## flame reads as part of the hull.
         if ship.push > 0.0 and math.frac(elapsedTime * 20.0) < 0.5 then
-            graphics.stroke(WARM)
+            gfx.stroke(WARM)
             drawAt(flameArt, ship.x, ship.y, ship.ang, false)
-            graphics.stroke(INK)
+            gfx.stroke(INK)
         end
     end
 
-    graphics.noStroke()
-    graphics.fill(INK)
+    gfx.noStroke()
+    gfx.fill(INK)
     for s in shots do
-        graphics.circle(s.x, s.y, 1.6)
+        gfx.circle(s.x, s.y, 1.6)
     end
-    graphics.fill(WARM)
+    gfx.fill(WARM)
     for s in saucerShots do
-        graphics.circle(s.x, s.y, 1.6)
+        gfx.circle(s.x, s.y, 1.6)
     end
-    graphics.fill(DIM)
+    gfx.fill(DIM)
     for d in debris do
-        graphics.circle(d.x, d.y, 1.2)
+        gfx.circle(d.x, d.y, 1.2)
     end
 end
 
 ## The lives left, as ships: a count of the thing itself reads faster than a number.
 func drawLives()
-    graphics.noFill()
-    graphics.stroke(INK)
+    gfx.noFill()
+    gfx.stroke(INK)
     for i = 1, lives - 1 do
         drawAt(shipIcon, 22 + (i - 1) * 20, 46, -math.PI / 2, true)
     end
@@ -63,43 +63,43 @@ func drawTrigger()
     var r = pad.radius() * 0.5
     var cx = W * (1.0 - pad.centerXFrac)
     var cy = H * pad.centerFrac
-    graphics.noStroke()
-    graphics.fill(Color(1, 1, 1, 0.06))
-    graphics.circle(cx, cy, r)
+    gfx.noStroke()
+    gfx.fill(Color(1, 1, 1, 0.06))
+    gfx.circle(cx, cy, r)
     if fireId <> nil then
-        graphics.fill(Color(1.0, 0.55, 0.3, 0.7))
-        graphics.circle(cx, cy, r * 0.55)
+        gfx.fill(Color(1.0, 0.55, 0.3, 0.7))
+        gfx.circle(cx, cy, r * 0.55)
     else
-        graphics.fill(Color(1, 1, 1, 0.16))
-        graphics.circle(cx, cy, r * 0.4)
+        gfx.fill(Color(1, 1, 1, 0.16))
+        gfx.circle(cx, cy, r * 0.4)
     end
 end
 
 func drawTitle()
-    graphics.fontSize(30)
-    graphics.stroke(INK)
-    graphics.textMode("center", "center")
-    graphics.text("OLLIN ASTEROIDS", FIELD_W / 2, 120)
-    graphics.fontSize(11)
-    graphics.stroke(DIM)
-    graphics.text("a large rock breaks into two faster ones — and there is no brake", FIELD_W / 2, 158)
-    graphics.stroke(INK)
-    graphics.fontSize(12)
-    graphics.text("large 20    medium 50    small 100    saucer 200 or 1000", FIELD_W / 2, 210)
-    graphics.fontSize(11)
-    graphics.stroke(WARM)
+    gfx.fontSize(30)
+    gfx.stroke(INK)
+    gfx.textMode("center", "center")
+    gfx.text("OLLIN ASTEROIDS", FIELD_W / 2, 120)
+    gfx.fontSize(11)
+    gfx.stroke(DIM)
+    gfx.text("a large rock breaks into two faster ones — and there is no brake", FIELD_W / 2, 158)
+    gfx.stroke(INK)
+    gfx.fontSize(12)
+    gfx.text("large 20    medium 50    small 100    saucer 200 or 1000", FIELD_W / 2, 210)
+    gfx.fontSize(11)
+    gfx.stroke(WARM)
     var go = "arrows turn, up thrusts, hold space to fire"
     if touchPlay then
         go = "right thumb aims and thrusts — hold the left half to fire"
     end
-    graphics.text(go, FIELD_W / 2, 250)
+    gfx.text(go, FIELD_W / 2, 250)
     if math.frac(demo) < 0.6 then
-        graphics.stroke(INK)
-        graphics.text("press or tap to play", FIELD_W / 2, 280)
+        gfx.stroke(INK)
+        gfx.text("press or tap to play", FIELD_W / 2, 280)
     end
     if best > 0 then
-        graphics.stroke(DIM)
-        graphics.text("BEST {best}", FIELD_W / 2, 310)
+        gfx.stroke(DIM)
+        gfx.text("BEST {best}", FIELD_W / 2, 310)
     end
 end
 
@@ -126,25 +126,25 @@ end
 ## The score, the wave and the ships left belong to a game in progress: showing them on the title screen would announce a
 ## score of zero and two spare ships before anything has started.
 func drawHud()
-    graphics.fontSize(14)
-    graphics.stroke(INK)
-    graphics.textMode("left", "top")
-    graphics.text("{score}", 18, 14)
-    graphics.textMode("right", "top")
-    graphics.text("WAVE {wave}", FIELD_W - 18, 14)
+    gfx.fontSize(14)
+    gfx.stroke(INK)
+    gfx.textMode("left", "top")
+    gfx.text("{score}", 18, 14)
+    gfx.textMode("right", "top")
+    gfx.text("WAVE {wave}", FIELD_W - 18, 14)
     drawLives()
     if state == "over" then
-        graphics.fontSize(24)
-        graphics.stroke(WARM)
-        graphics.textMode("center", "center")
-        graphics.text("GAME OVER", FIELD_W / 2, FIELD_H / 2 - 14)
-        graphics.fontSize(12)
-        graphics.stroke(INK)
-        graphics.text("SCORE {score} — press or tap to play again", FIELD_W / 2, FIELD_H / 2 + 14)
+        gfx.fontSize(24)
+        gfx.stroke(WARM)
+        gfx.textMode("center", "center")
+        gfx.text("GAME OVER", FIELD_W / 2, FIELD_H / 2 - 14)
+        gfx.fontSize(12)
+        gfx.stroke(INK)
+        gfx.text("SCORE {score} — press or tap to play again", FIELD_W / 2, FIELD_H / 2 + 14)
     elseif paused then
-        graphics.fontSize(20)
-        graphics.stroke(WARM)
-        graphics.textMode("center", "center")
-        graphics.text("PAUSED", FIELD_W / 2, FIELD_H / 2)
+        gfx.fontSize(20)
+        gfx.stroke(WARM)
+        gfx.textMode("center", "center")
+        gfx.text("PAUSED", FIELD_W / 2, FIELD_H / 2)
     end
 end

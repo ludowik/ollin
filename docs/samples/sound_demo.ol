@@ -67,7 +67,7 @@ func keyWidth()
 end
 
 func setup()
-    graphics.canvas(W, H, "sound")
+    gfx.canvas(W, H, "sound")
 
     ## One buffer per note: the waveform is sampled ONCE, then the envelope is applied to the
     ## samples. Nothing is recomputed on playback.
@@ -279,9 +279,9 @@ func collectHeldKeys()
 end
 
 func draw()
-    graphics.clear(Color(0.08, 0.09, 0.13))
-    graphics.noStroke()
-    graphics.fontSize(textSize())
+    gfx.clear(Color(0.08, 0.09, 0.13))
+    gfx.noStroke()
+    gfx.fontSize(textSize())
     ## The geometry is read once: those three functions were being called some thirty times.
     var hb = bandTop()
     var bb = bandBottom()
@@ -289,24 +289,24 @@ func draw()
 
     ## The bow's band: its hue says whether it is sounding.
     var warm = (bowHolder <> nil) and 1 or 0
-    graphics.fill(Color(0.13 + 0.2 * warm, 0.15, 0.24))
-    graphics.rect(0, hb, W, bb - hb)
+    gfx.fill(Color(0.13 + 0.2 * warm, 0.15, 0.24))
+    gfx.rect(0, hb, W, bb - hb)
     if bowHolder <> nil then
-        graphics.fill(Color(0.55, 0.85, 1))
-        graphics.rect(bowPos * W - 2, hb, 4, bb - hb)
+        gfx.fill(Color(0.55, 0.85, 1))
+        gfx.rect(bowPos * W - 2, hb, 4, bb - hb)
     end
-    graphics.stroke(Color(0.75, 0.82, 0.95))
-    graphics.text("drag here: a living oscillator", W * 0.04, hb + H * 0.05)
+    gfx.stroke(Color(0.75, 0.82, 0.95))
+    gfx.text("drag here: a living oscillator", W * 0.04, hb + H * 0.05)
     if bowHolder <> nil then
-        graphics.text("{bow.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
+        gfx.text("{bow.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end
 
     ## The keyboard: eight keys, the last played staying lit for as long as its glow lasts. The key
     ## UNDER THE FINGER is ringed, so that a sweep is seen as much as it is heard.
-    graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("hold several fingers down", W * 0.04, hc - H * 0.07)
-    graphics.text("digits 1 to 8: short notes", W * 0.04, hc - H * 0.03)
-    graphics.noStroke()
+    gfx.stroke(Color(0.62, 0.7, 0.85))
+    gfx.text("hold several fingers down", W * 0.04, hc - H * 0.07)
+    gfx.text("digits 1 to 8: short notes", W * 0.04, hc - H * 0.03)
+    gfx.noStroke()
     var l = keyWidth()
     collectHeldKeys()
     for i, name in notes do
@@ -315,20 +315,20 @@ func draw()
         var bright = held and 1 or ((i == lastKey) and glow or 0)
         ## noStroke BEFORE the rectangle, and stroke only for the text: in the other order, the
         ## text's outline rings the following keys as well.
-        graphics.noStroke()
-        graphics.fill(Color(0.16 + 0.5 * bright, 0.18 + 0.35 * bright, 0.3 + 0.4 * bright))
-        graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
+        gfx.noStroke()
+        gfx.fill(Color(0.16 + 0.5 * bright, 0.18 + 0.35 * bright, 0.3 + 0.4 * bright))
+        gfx.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
         if held then
-            graphics.noFill()
-            graphics.stroke(Color(0.55, 0.85, 1), 3)
-            graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
+            gfx.noFill()
+            gfx.stroke(Color(0.55, 0.85, 1), 3)
+            gfx.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
         end
-        graphics.stroke(Color(0.8, 0.86, 0.96))
-        graphics.text(name, l * (i - 1) + l * 0.28, hc + H * 0.07)
+        gfx.stroke(Color(0.8, 0.86, 0.96))
+        gfx.text(name, l * (i - 1) + l * 0.28, hc + H * 0.07)
     end
 
     ## What a buffer's accessors read: nothing else lets one see them.
-    graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("buffer: {buffers[1].duration():.2f} s, peak {buffers[1].peak():.2f}",
+    gfx.stroke(Color(0.62, 0.7, 0.85))
+    gfx.text("buffer: {buffers[1].duration():.2f} s, peak {buffers[1].peak():.2f}",
                   W * 0.04, bb - H * 0.04)
 end

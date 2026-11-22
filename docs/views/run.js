@@ -31,7 +31,7 @@ export async function init(ctx) {
   const pane = document.getElementById('output-pane')
   canvasEl.style.display = 'none'
   pane.appendChild(canvasEl)
-  const unwatchArea = watchRenderArea(pane)   // a rotation resizes the pane: the engine follows (graphics.fitArea)
+  const unwatchArea = watchRenderArea(pane)   // a rotation resizes the pane: the engine follows (gfx.fitArea)
 
   function showText(text) {
     outEl.style.display    = 'block'

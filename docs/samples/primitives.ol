@@ -1,6 +1,6 @@
 ## A tour of the 2D primitives: one function per primitive, all called from draw().
 ## px, py and fs scale everything to the window; the drawing was designed for 700x600.
-const g = graphics
+const g = gfx
 const DIM = Color(0.6, 0.65, 0.75)
 
 global t = 0
@@ -35,7 +35,7 @@ func buildTile()
 end
 
 func setup()
-    graphics.canvas(W, H, "Primitives")
+    gfx.canvas(W, H, "Primitives")
     buildTile()
 end
 
@@ -215,7 +215,7 @@ func demoTransforms()
 end
 
 ## The font is a STYLE, like fill or fontSize: it stays in place until
-## the next graphics.font, hence the pushStyle that gives the previous font back to the
+## the next gfx.font, hence the pushStyle that gives the previous font back to the
 ## demonstrations that follow.
 func demoText()
     label("text / font", 460, 300)
@@ -236,7 +236,7 @@ func demoText()
     g.popStyle()
 end
 
-## textMode anchors text on the two axes, and the red marks show the point given to graphics.text:
+## textMode anchors text on the two axes, and the red marks show the point given to gfx.text:
 ## a vertical tick for the horizontal modes, a single line for the vertical ones. Each mode is
 ## paired with its position in one table, so the two can never fall out of step; the positions are
 ## written out rather than strided from the index, which is how a word once landed off the canvas.

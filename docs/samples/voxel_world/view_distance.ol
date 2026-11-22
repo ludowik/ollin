@@ -227,17 +227,17 @@ class ViewDistance
         ## [the button index, its label, the glyph's X nudge] — the "-" is narrower
         var btns = [[0, "+", -9], [1, "-", -6], [2, "A", -9]]
         var ty = self.BTN_Y + self.BTN / 2 - 16
-        graphics.noStroke()
+        gfx.noStroke()
         for b in btns do
             var x = self.btnX(b[1])
-            graphics.fill(Color(0, 0, 0, 0.38))
+            gfx.fill(Color(0, 0, 0, 0.38))
             if b[2] == "A" and not self.manual then
-                graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## a lit A means self-adaptation is on
+                gfx.fill(Color(0.30, 0.70, 1.00, 0.55))   ## a lit A means self-adaptation is on
             end
-            graphics.rect(x, self.BTN_Y, self.BTN, self.BTN)
-            graphics.stroke(colors.WHITE)
-            graphics.fontSize(30)
-            graphics.text(b[2], x + self.BTN / 2 + b[3], ty)
+            gfx.rect(x, self.BTN_Y, self.BTN, self.BTN)
+            gfx.stroke(colors.WHITE)
+            gfx.fontSize(30)
+            gfx.text(b[2], x + self.BTN / 2 + b[3], ty)
         end
     end
 end

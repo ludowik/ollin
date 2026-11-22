@@ -395,22 +395,22 @@ end
 ## The magnifier that opens the search.
 func drawSearchButton(b)
     fillC(WHITE, 0.18)
-    graphics.circle(b.x, b.y, b.r)
-    graphics.noFill()
-    graphics.stroke(1, 1, 1, 0.95)
-    graphics.strokeSize(b.r * 0.13)
-    graphics.circle(b.x - b.r * 0.1, b.y - b.r * 0.1, b.r * 0.38)
-    graphics.line(b.x + b.r * 0.18, b.y + b.r * 0.18, b.x + b.r * 0.5, b.y + b.r * 0.5)
-    graphics.noStroke()
+    gfx.circle(b.x, b.y, b.r)
+    gfx.noFill()
+    gfx.stroke(1, 1, 1, 0.95)
+    gfx.strokeSize(b.r * 0.13)
+    gfx.circle(b.x - b.r * 0.1, b.y - b.r * 0.1, b.r * 0.38)
+    gfx.line(b.x + b.r * 0.18, b.y + b.r * 0.18, b.x + b.r * 0.5, b.y + b.r * 0.5)
+    gfx.noStroke()
 end
 
 ## A card over the sky: a rounded, tinted panel with a faint edge, and its title.
 func drawCard(x, y, w, h, title)
     var r = w * 0.045
     fillC(WHITE, 0.1)
-    graphics.rect(x - 1, y - 1, w + 2, h + 2, r + 1)
+    gfx.rect(x - 1, y - 1, w + 2, h + 2, r + 1)
     fillC(CARD)
-    graphics.rect(x, y, w, h, r)
+    gfx.rect(x, y, w, h, r)
     drawText(title, x + w * 0.05, y + w * 0.065, w * 0.042, "left", "center", WHITE, 0.65)
 end
 
@@ -432,7 +432,7 @@ end
 ## temperature now stands on the day it is for.
 func drawRange(day, lo, hi, now, x, y, w, h)
     fillC(WHITE, 0.15)
-    graphics.rect(x, y - h / 2, w, h, h / 2)
+    gfx.rect(x, y - h / 2, w, h, h / 2)
     var from = x + w * onTrack(day.low, lo, hi)
     var to = math.max(x + w * onTrack(day.high, lo, hi), from + h)
     if to > x + w then
@@ -441,16 +441,16 @@ func drawRange(day, lo, hi, now, x, y, w, h)
     end
     var inner = to - from - h
     fillC(day.bar[1])
-    graphics.circle(from + h / 2, y, h / 2)
+    gfx.circle(from + h / 2, y, h / 2)
     fillC(day.bar[2])
-    graphics.circle(to - h / 2, y, h / 2)
+    gfx.circle(to - h / 2, y, h / 2)
     for k = 0, BAR_SLICES - 1 do
         fillC(day.bar[3 + k])
-        graphics.rect(from + h / 2 + inner * k / BAR_SLICES, y - h / 2, inner / BAR_SLICES + 1, h)
+        gfx.rect(from + h / 2 + inner * k / BAR_SLICES, y - h / 2, inner / BAR_SLICES + 1, h)
     end
     if now <> nil then
         fillC(WHITE)
-        graphics.circle(x + w * onTrack(math.clamp(now, day.low, day.high), lo, hi), y, h * 0.8)
+        gfx.circle(x + w * onTrack(math.clamp(now, day.low, day.high), lo, hi), y, h * 0.8)
     end
 end
 
@@ -477,7 +477,7 @@ func drawDays(weather, view, card)
         var cy = top + (i - 0.5) * rowH
         if i > 1 then
             fillC(WHITE, 0.12)
-            graphics.rect(x + w * 0.05, cy - rowH / 2, w * 0.9, 1)
+            gfx.rect(x + w * 0.05, cy - rowH / 2, w * 0.9, 1)
         end
         drawText(text.label, x + w * 0.05, cy, size, "left", "center", WHITE)
         drawIcon(skyOf(day.code).kind, x + w * 0.31, cy, math.min(rowH * 0.3, w * 0.05))
@@ -518,23 +518,23 @@ func drawDots(y)
     var spacing = r * 3.4
     for i = 1, n do
         fillC(WHITE, 1 - 0.6 * math.min(1, math.abs(i - app.pos)))
-        graphics.circle(CX + (i - (n + 1) / 2) * spacing, y, r)
+        gfx.circle(CX + (i - (n + 1) / 2) * spacing, y, r)
     end
 end
 
 func draw()
-    graphics.font("sans")
-    graphics.noStroke()
+    gfx.font("sans")
+    gfx.noStroke()
     var layout = layoutOf()
     var sky = skyAt(app.pos)
     drawGradient(sky[1], sky[2])
     for i = 1, len(app.pages) do
         var offset = (i - app.pos) * W
         if offset > -W + 1 and offset < W - 1 then      ## a page less than a pixel wide on the screen is not drawn
-            graphics.push()
-            graphics.translate(offset, 0)
+            gfx.push()
+            gfx.translate(offset, 0)
             drawPage(app.pages[i], layout)
-            graphics.pop()
+            gfx.pop()
         end
     end
     drawDots(H * 0.93)
@@ -584,8 +584,8 @@ end
 
 func setup()
     restoreLanguage()
-    graphics.canvas(W, H, tr("windowTitle"))
-    graphics.fitArea()
+    gfx.canvas(W, H, tr("windowTitle"))
+    gfx.fitArea()
     buildInterface()
     for city in CITIES do
         app.pages.push(newPage(city))

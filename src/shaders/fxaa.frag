@@ -6,7 +6,7 @@ out vec4 finalColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform vec2 texelSize;   // 1 / render texture size, same units as fragTexCoord
-uniform float spanMax;    // how far, in texels, the edge search may slide (graphics.antialias size)
+uniform float spanMax;    // how far, in texels, the edge search may slide (gfx.antialias size)
 
 // FXAA (Lottes/NVIDIA "PC quality" formulation): find an edge from the luma of the four diagonal
 // neighbours, then blur ALONG that edge rather than across it, so a texel straddling a hard

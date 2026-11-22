@@ -52,7 +52,7 @@ func setup()
     ui.open()
 end
 func draw()
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
 end
 `
 // No keyboard.typed here: the field alone must make the page take the focus.
@@ -69,7 +69,7 @@ func setup()
     ui.open()
 end
 func draw()
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
 end
 `
 const FIELD_FIT = '/samples/_keyboard_field_fit.ol'
@@ -94,7 +94,7 @@ func mouse.pressed(x, y)
     keyboard.show()
 end
 func draw()
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
 end
 `
 const program = `
@@ -110,7 +110,7 @@ func keyboard.keypressed(key)
     end
 end
 func draw()
-    graphics.clear(colors.BLACK)
+    gfx.clear(colors.BLACK)
 end
 `
 
@@ -350,7 +350,7 @@ server.listen(0, '127.0.0.1', async () => {
     }
 
     // ── the window shrinks while a field is edited (a keyboard that resizes the page) ────────────────
-    // Once with graphics.fitArea (the area follows the pane) and once without (the engine scales the canvas to fit the pane).
+    // Once with gfx.fitArea (the area follows the pane) and once without (the engine scales the canvas to fit the pane).
     for (const [label, url] of [['fitArea', FIELD_FIT], ['scale to fit', FIELD_TOUCH]]) {
       const pg = await (await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })).newPage()
       await pg.goto(`http://127.0.0.1:${server.address().port}/index.html#/run${url.replace('/samples/', '/sample/')}`)

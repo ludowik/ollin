@@ -3,7 +3,7 @@
 ##
 ## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs; the other files keep
 ## theirs in one object each (`board`, `pieces`, `sounds`, `i18n`). The layout follows the orientation of the area
-## (graphics.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
+## (gfx.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
 
 import "board.ol"
 import "pieces.ol"
@@ -474,8 +474,8 @@ end
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
 
 func setup()
-    graphics.canvas(W, H, "Blockudoku")
-    graphics.fitArea()
+    gfx.canvas(W, H, "Blockudoku")
+    gfx.fitArea()
     buildShapes()
     buildSounds()
     restoreLanguage()
@@ -511,8 +511,8 @@ end
 
 func draw()
     layoutCompute()
-    graphics.clear(config.paper)
-    graphics.noStroke()
+    gfx.clear(config.paper)
+    gfx.noStroke()
     if game.screen <> "game" then
         screens[game.screen].draw()
         return

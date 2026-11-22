@@ -2,7 +2,7 @@
 ## cell could hold; a hint circles a cell and says how to find its digit.
 ##
 ## Two global objects hold everything: `config`, what can be tuned, and `game`, what changes as it runs. The layout follows the
-## orientation of the area (graphics.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
+## orientation of the area (gfx.fitArea) and is computed again whenever it is needed, so nothing has to be kept in step.
 
 import "board.ol"
 import "solver.ol"
@@ -429,8 +429,8 @@ end
 ## ── Engine entry points ─────────────────────────────────────────────────────────────────────────
 
 func setup()
-    graphics.canvas(W, H, "Sudoku")
-    graphics.fitArea()
+    gfx.canvas(W, H, "Sudoku")
+    gfx.fitArea()
     buildSounds()
     restoreLanguage()
     useMenu({ink: config.ink, muted: config.muted, button: config.button, primary: config.buttonOn, accent: config.blue, paper: config.paper,
@@ -462,8 +462,8 @@ end
 
 func draw()
     layoutCompute()
-    graphics.clear(config.paper)
-    graphics.noStroke()
+    gfx.clear(config.paper)
+    gfx.noStroke()
     if game.screen == "play" then
         drawPlay()
     else

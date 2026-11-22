@@ -28,7 +28,7 @@ C'est le seul tableau à rendre ; le tableau par fichier du script n'est jamais 
 
 - **Langage** : une ligne par étage (lexer, parser, compilateur, VM, collections, chemins et
   sources, point d'entrée) et un sous-total.
-- **Modules** : une ligne par module, une ligne « stubs » à part (un 0 % y est ATTENDU, `graphics`
+- **Modules** : une ligne par module, une ligne « stubs » à part (un 0 % y est ATTENDU, `gfx`
   étant nil dans le build headless) et un sous-total **sans** les stubs.
 - Sous le tableau, deux lignes qui complètent le chiffre, tirées des gardes (elles durent moins
   d'une seconde) : `bash tests/check_grammar_coverage.sh` (règles de la grammaire citées par
@@ -46,7 +46,7 @@ Puis un compte rendu en français, en prose et listes :
      `source_registry.cpp`, `collections/`) ;
   3. **les stubs** (`*_stub.cpp`, `graphics_stub`, `image_stub`, `camera_stub`) : les signaler une
      fois, ne pas les compter parmi les faiblesses.
-- ce que la mesure ne voit pas : les vrais modules graphiques (`graphics`, `image`, `camera`,
+- ce que la mesure ne voit pas : les vrais modules graphiques (`gfx`, `image`, `camera`,
   `mouse`, `keyboard`) ne sont pas compilés en headless, donc absents du chiffre.
 
 ## Phase 3 — les lignes qui ne s'exécutent jamais
