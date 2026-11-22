@@ -515,6 +515,54 @@
       "loop": 25756267,
       "map": 46796485,
       "subject": "The class of an object is a slot of its map (set by the engine, no longer a data key), one is_instance for the class link test"
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "f8e0fe3",
+      "fib": 51521733,
+      "loop": 25753481,
+      "map": 46695500,
+      "subject": "language: instanceOf(obj, Class) and classOf(obj) ask for the class of an object, now that no script can read it as a field; the palette of colors shares the global Color class"
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "037d87e",
+      "fib": 51520597,
+      "loop": 25752352,
+      "map": 46294898,
+      "subject": "simplify: dead code and unused includes removed, one way to read a handle, the class names kept in a deque with a guard on their ceiling, the monitor rate asked only once the readout can use it, the CLAUDE.md paragraph on the class link told once"
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "9a163de",
+      "fib": 51301436,
+      "loop": 25455700,
+      "map": 46280652,
+      "subject": "compiler: the variable of a catch, captured by a closure, is closed with the catch block; weather refuses a day that is not a date"
+    },
+    {
+      "date": "2026-11-16",
+      "commit": "a17a280",
+      "fib": 51319475,
+      "loop": 25473542,
+      "map": 46297942,
+      "subject": "map.clear: a big map gives its buckets back, one helper for the version bump, simpler tests"
+    },
+    {
+      "date": "2026-11-17",
+      "commit": "4efa121",
+      "fib": 51316934,
+      "loop": 25471132,
+      "map": 46295365,
+      "subject": "array.clear: a big array gives its capacity back, like a big map"
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "63136ad",
+      "fib": 51178393,
+      "loop": 25482310,
+      "map": 46436175,
+      "subject": "Coroutines (the day's commits): open upvalues name their register file, the coroutine type with resume and a yield that leaves run_goto by a flag, vm.cpp compiled with one GCC register-allocation region (-fira-region=one)"
     }
   ]
 }
