@@ -165,5 +165,5 @@ func drawTitle()
     end
     drawTextCentre("PRESS SPACE OR TAP", 132, WHITE)
     drawTextCentre("ARROWS OR TAP THE SIDE", 148, YELLOW)
-    drawTextCentre("OF THE FROG TO HOP", 156, YELLOW)
+    drawTextCentre("OF THE FROG TO HOP", 160, YELLOW)
 end
