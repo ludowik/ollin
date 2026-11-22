@@ -180,6 +180,10 @@ ollin/
 │                      Stanford, licence NON commerciale, cf. plus bas),
 │                      convert_helmet_glb.py (idem pour docs/samples/helmet.glb — Damaged Helmet,
 │                      crédit obligatoire et NON commercial, cf. plus bas),
+│                      convert_frog_data.py (engendre docs/samples/frog/{tiles,arcade}.ol — les images et les voies du jeu
+│                      d'arcade de 1981, décodées depuis l'analyse publiée par Computer Archeology ; lancé à la MAIN, réclame le
+│                      réseau ; les images sont l'œuvre de Konami, gardées pour l'usage de l'utilisateur, décision de sa part ;
+│                      le script EST la trace de provenance),
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      test-https-browser.js (essaie le moteur WASM du module https contre un vrai serveur HTTPS local, dans
 │                      Chromium — à la MAIN, cf. « Modules `https` et `json` »),
