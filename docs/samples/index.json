@@ -84,7 +84,7 @@
     "controls": "Left and right move a piece, down drops it faster, X or up turns it clockwise, Z counter-clockwise, Enter starts and pauses, M switches the music, V the style. On the screens before the game the arrows choose, X or Enter confirms and Z goes back. On a touch screen the pads appear with the first touch." },
   { "group": "Games", "name": "Ollin Frog", "file": "frog/frog.ol", "icon": "icons/frog.png",
     "description": "Frog: cross a road and a river on logs and turtles to fill five homes, with the pictures and the lanes of the 1981 arcade game.",
-    "controls": "Arrow keys or WASD hop one square, P pauses, M switches the sound, space starts. On a touch screen, the four arrows, PAUSE and SOUND buttons under the field do the same, and a tap starts a game." },
+    "controls": "Arrow keys or WASD hop one square, P pauses, M switches the sound, space starts. On a touch screen, the four arrows (under the right thumb), PAUSE and SOUND buttons under the field do the same, and a tap starts a game." },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol",
     "description": "Live webcam capture in greyscale, available in the browser only." },

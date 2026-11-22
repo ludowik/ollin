@@ -12,17 +12,17 @@ const CELL    = 16
 const STRIP   = 256            ## a lane is a strip of 32 tiles that wraps, wider than the 28 that show
 const TILE    = 8
 
-## The buttons, in the pixels of the viewport: the four ways on the left as a cross, pause and sound on the right.
+## The buttons, in the pixels of the viewport: the four ways on the right as a cross, under the right thumb, pause and sound on the left.
 const BTN = 28
-const PAD_CX = 62
+const PAD_CX = 162
 const PAD_CY = FIELD_H + PAD_H / 2
 const BUTTONS = [
     {name: "up",    x: PAD_CX - BTN / 2,       y: PAD_CY - BTN * 3 / 2, w: BTN, h: BTN},
     {name: "down",  x: PAD_CX - BTN / 2,       y: PAD_CY + BTN / 2,     w: BTN, h: BTN},
     {name: "left",  x: PAD_CX - BTN * 3 / 2,   y: PAD_CY - BTN / 2,     w: BTN, h: BTN},
     {name: "right", x: PAD_CX + BTN / 2,       y: PAD_CY - BTN / 2,     w: BTN, h: BTN},
-    {name: "pause", x: 140,                    y: PAD_CY - BTN - 2,     w: 72,  h: BTN},
-    {name: "sound", x: 140,                    y: PAD_CY + 2,           w: 72,  h: BTN}
+    {name: "pause", x: 12,                     y: PAD_CY - BTN - 2,     w: 72,  h: BTN},
+    {name: "sound", x: 12,                     y: PAD_CY + 2,           w: 72,  h: BTN}
 ]
 
 const ROW_START  = 0
