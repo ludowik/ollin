@@ -10,6 +10,7 @@ import "screens.ol"
 import "modern_pure.ol"
 import "places.ol"
 import "../lib/draw.ol"
+import "../lib/arrow.ol"
 
 global modernLook = {
     skyTop: [0.090, 0.100, 0.215, 1],
@@ -223,13 +224,8 @@ func modernPads()
             if b.text then
                 drawText(b.text, b.x, b.y, b.h * 0.42, "center", "center", ink)
             else
-                var k = b.w * 0.2
-                var pts = {
-                    up: [0, -k, -k, k, k, k], down: [0, k, -k, -k, k, -k],
-                    left: [-k, 0, k, -k, k, k], right: [k, 0, -k, -k, -k, k]
-                }[b.name]
                 fillC(ink)
-                graphics.polygon([b.x + pts[1], b.y + pts[2], b.x + pts[3], b.y + pts[4], b.x + pts[5], b.y + pts[6]])
+                graphics.polygon(arrowPoints(b.name, b.x, b.y, b.w * 0.2))
             end
         end
     end

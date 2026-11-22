@@ -11,7 +11,6 @@
 import "field.ol"
 import "arcade.ol"
 import "tiles.ol"
-import "../lib/area.ol"
 
 ## The way each lane runs, from the top of the river (read from the arcade routine that moves the eleven lane objects):
 ## 1 to the right, -1 to the left, 0 for the median strip.
@@ -158,10 +157,11 @@ func laneArt(lane)
     return [lo, hi]
 end
 
+## Only the vehicles of the road run the frog down: the other lanes have none.
 func buildArt()
     var out = []
     for lane = 0, 10 do
-        if hasObjects(lane) then
+        if LANE_KIND[lane + 1] == "truck" or LANE_KIND[lane + 1] == "car" then
             out.push(laneArt(lane))
         else
             out.push(nil)
@@ -281,16 +281,6 @@ end
 ## Which of the three pictures of a splash is shown t seconds after the frog went in the water.
 func splashFrame(t)
     return 1 + math.floor(t / SPLASH_STEP)
-end
-
-## The button of a list under a point of the viewport, by name, or nil.
-func buttonAt(buttons, x, y)
-    for b in buttons do
-        if inRect(x, y, b) then
-            return b.name
-        end
-    end
-    return nil
 end
 
 ## What a frog is given for arriving home with `left` seconds on the clock, `fly` saying it ate the fly.

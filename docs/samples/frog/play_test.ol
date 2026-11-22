@@ -230,14 +230,27 @@ pressButton("pause")
 assert(not paused, "there is nothing to pause on the title")
 state = "play"
 
+## A tap: the same for a mouse and for every finger.
 fresh()
 var arrowUp = buttons[1]
-touchPress(1, arrowUp.x + 2, arrowUp.y + 2)
-assert(frog.hop == nil, "the first finger is the mouse's: a touch alone does not hop")
-touchPress(2, arrowUp.x + 2, arrowUp.y + 2)
-assert(frog.hop <> nil, "a second finger on an arrow hops")
+tap(arrowUp.x + 2, arrowUp.y + 2)
+assert(frog.hop <> nil, "a tap on an arrow hops")
 run(HOP_TIME + 0.05)
-touchPress(2, 5, 5)
-assert(frog.hop == nil, "a second finger elsewhere does nothing")
+tap(5, 5)
+assert(frog.hop == nil, "a tap elsewhere does nothing")
+paused = true
+var rowNow = frog.row
+tap(arrowUp.x + 2, arrowUp.y + 2)
+assert(not paused and frog.hop == nil and frog.row == rowNow, "a tap on an arrow that resumes a paused game does not hop as well")
+tap(buttons[5].x + 2, buttons[5].y + 2)
+assert(paused, "a tap on PAUSE pauses")
+paused = false
+state = "over"
+frog.deadT = 0.0
+tap(5, 5)
+assert(state == "over", "a tap during the end of a game does not start another")
+frog.deadT = 2.0
+tap(5, 5)
+assert(state == "play" and lives == LIVES, "a tap on the end screen starts a game")
 
 print("frog play ok")

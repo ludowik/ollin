@@ -33,24 +33,7 @@ func fitView(w, h)
 end
 
 func window.resized(w, h)
-    fitView(window.width, window.height)
-end
-
-func start()
-    newGame()
-    play(sndStart)
-end
-
-## Space starts a game from the title and from the end screen, and the same press must not hop the frog: one place decides.
-func begin()
-    if state == "play" then
-        return false
-    end
-    if state == "over" and frog.deadT < 1.5 then
-        return true
-    end
-    start()
-    return true
+    fitView(w, h)
 end
 
 const KEY_BUTTON = {
@@ -67,25 +50,16 @@ func keyboard.keypressed(key)
     end
 end
 
-## The buttons under the field. A tap starts a game from the title and the end screen, resumes a paused one, and otherwise
-## presses the button it is on. A single finger also emulates the mouse, so that is the path of the first finger; a second
-## finger arrives only as a touch (touchPress).
+## A tap, from the mouse or from a finger. A finger also emulates the mouse, and touch.count() tells the two apart (it is
+## already counted when the mouse callback runs), so each tap is heard once, by the path that knows about every finger.
 func mouse.pressed(x, y)
-    if begin() then
-        return
-    end
-    if paused then
-        paused = false
-        return
-    end
-    var name = buttonAt(buttons, x, y)
-    if name <> nil then
-        pressButton(name)
+    if touch.count() == 0 then
+        tap(x, y)
     end
 end
 
 func touch.began(id, x, y)
-    touchPress(touch.count(), x, y)
+    tap(x, y)
 end
 
 func update(dt)

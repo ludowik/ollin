@@ -128,23 +128,6 @@ hop.t = HOP_TIME * 0.5
 assert(hopRow(hop) == 4, "halfway it is over the row it goes to")
 hop.t = HOP_TIME * 3
 assert(hopFraction(hop) == 1.0 and hopX(hop) == 56.0, "a hop that took longer than it lasts stops at its end")
-assert(viewHeight(390, 732) == 420 and viewHeight(800, 400) == FIELD_H + PAD_MIN and viewHeight(224, 5000) == FIELD_H + PAD_MAX, "the viewport is as tall as the area's shape asks, within bounds")
-for view = FIELD_H + PAD_MIN, FIELD_H + PAD_MAX, 26 do
-    var list = padButtons(view)
-    for b in list do
-        assert(buttonAt(list, b.x + b.w / 2, b.y + b.h / 2) == b.name, "view {view}: the middle of the {b.name} button is on it")
-        assert(b.y >= FIELD_H and b.y + b.h <= view and b.x >= 0 and b.x + b.w <= FIELD_W, "view {view}: the {b.name} button is in the strip under the field")
-    end
-    for a = 1, #list do
-        for c = a + 1, #list do
-            var p = list[a]
-            var q = list[c]
-            assert(p.x + p.w <= q.x or q.x + q.w <= p.x or p.y + p.h <= q.y or q.y + q.h <= p.y, "view {view}: {p.name} and {q.name} do not overlap")
-        end
-    end
-    assert(buttonAt(list, 10, 10) == nil, "the field is no button")
-end
-assert(padButtons(FIELD_H + PAD_MAX)[1].w > padButtons(FIELD_H + PAD_MIN)[1].w, "the buttons grow with the strip")
 assert(splashFrame(0.0) == 1 and splashFrame(0.2) == 2 and splashFrame(0.44) == 3, "a splash has three pictures")
 for kind in ["car", "croc", "drown", "edge", "wall", "time"] do
     assert(DEATHS[kind] <> nil, "{kind} is a way to die")

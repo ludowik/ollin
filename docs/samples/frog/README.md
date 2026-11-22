@@ -40,8 +40,9 @@ generated: run `python3 tools/convert_frog_data.py` (it needs the network) to re
 
 | file | what it is |
 |---|---|
-| `frog.ol` | the entry: setup, the keys, the buttons and the taps, the frame |
+| `frog.ol` | the entry: setup, the keys, the taps and the fit to the screen, the frame |
 | `field.ol` | the size of the field and the grid |
+| `layout.ol` | how tall the viewport is for the shape of the screen, and where the buttons are (tested by `layout_test.ol`) |
 | `rules.ol` | the rules with no state: lanes, vehicles, support, turtles, homes, score (tested by `rules_test.ol`) |
 | `state.ol` | what changes as a game runs |
 | `play.ol` | what a frame of play does to the frog (tested by `play_test.ol`) |

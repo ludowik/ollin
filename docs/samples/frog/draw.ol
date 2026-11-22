@@ -5,6 +5,7 @@ import "field.ol"
 import "rules.ol"
 import "state.ol"
 import "sprites.ol"
+import "../lib/arrow.ol"
 
 const BLACK   = Color(0, 0, 0)
 const WATER   = Color(0.0, 0.08, 0.55)
@@ -46,32 +47,23 @@ func drawTextCentre(str, y, col)
     drawText(str, (FIELD_W - len(str) * TILE) / 2, y, col)
 end
 
-## A triangle in the button of the way it points.
-func drawArrow(name, b)
-    var cx = b.x + b.w / 2
-    var cy = b.y + b.h / 2
-    var r = math.floor(b.w / 4)
-    var pts = [cx, cy - r, cx - r, cy + r, cx + r, cy + r]
-    if name == "down" then
-        pts = [cx, cy + r, cx - r, cy - r, cx + r, cy - r]
-    elseif name == "left" then
-        pts = [cx - r, cy, cx + r, cy - r, cx + r, cy + r]
-    elseif name == "right" then
-        pts = [cx + r, cy, cx - r, cy - r, cx - r, cy + r]
+## The strip under the field: the four ways, and pause and sound with what they do now.
+func drawPad()
+    graphics.segments(8)                    ## the corners are 4 pixels: the default 64 segments each would be thousands of triangles
+    graphics.fill(KEY_FILL)
+    graphics.stroke(KEY_EDGE)
+    graphics.strokeSize(1)
+    for b in buttons do
+        graphics.rect(b.x, b.y, b.w, b.h, 4)
     end
     graphics.noStroke()
     graphics.fill(YELLOW)
-    graphics.polygon(pts)
-end
-
-## The strip under the field: the four ways, and pause and sound with what they do now.
-func drawPad()
-    block(BLACK, 0, FIELD_H, FIELD_W, viewH - FIELD_H)
     for b in buttons do
-        graphics.fill(KEY_FILL)
-        graphics.stroke(KEY_EDGE)
-        graphics.strokeSize(1)
-        graphics.rect(b.x, b.y, b.w, b.h, 4)
+        if b.name <> "pause" and b.name <> "sound" then
+            graphics.polygon(arrowPoints(b.name, b.x + b.w / 2, b.y + b.h / 2, math.floor(b.w / 4)))
+        end
+    end
+    for b in buttons do
         if b.name == "pause" or b.name == "sound" then
             var label = "PAUSE"
             if b.name == "sound" then
@@ -80,8 +72,6 @@ func drawPad()
                 label = "RESUME"
             end
             drawText(label, b.x + (b.w - len(label) * TILE) / 2, b.y + (b.h - TILE) / 2, WHITE)
-        else
-            drawArrow(b.name, b)
         end
     end
 end

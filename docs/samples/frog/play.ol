@@ -5,6 +5,7 @@ import "field.ol"
 import "rules.ol"
 import "state.ol"
 import "sounds.ol"
+import "../lib/area.ol"
 
 const DIRS = {up: {dr: 1, dx: 0}, down: {dr: -1, dx: 0}, left: {dr: 0, dx: -CELL}, right: {dr: 0, dx: CELL}}
 
@@ -121,15 +122,36 @@ func pressButton(name)
     end
 end
 
-## A finger landing on the buttons while another is already down. The first finger also emulates the mouse, which has already
-## dealt with it (a tap on an arrow that resumes a paused game must not hop as well), so only a later finger is read as a touch.
-func touchPress(count, x, y)
-    if count < 2 then
+func start()
+    newGame()
+    play(sndStart)
+end
+
+## Space and a tap start a game from the title and from the end screen, and the same press must not hop the frog: one place
+## decides. True when the press was spent on starting (or on waiting out the end screen).
+func begin()
+    if state == "play" then
+        return false
+    end
+    if state == "over" and frog.deadT < 1.5 then
+        return true
+    end
+    start()
+    return true
+end
+
+## A tap on the screen at (x, y) of the viewport: it starts a game, resumes a paused one, and otherwise presses the button it is on.
+func tap(x, y)
+    if begin() then
         return
     end
-    var name = buttonAt(buttons, x, y)
-    if name <> nil and DIRS[name] <> nil then
-        tryHop(name)
+    if paused then
+        paused = false
+        return
+    end
+    var b = rectAt(buttons, x, y)
+    if b <> nil then
+        pressButton(b.name)
     end
 end
 

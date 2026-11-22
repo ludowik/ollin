@@ -2,6 +2,7 @@
 
 import "field.ol"
 import "rules.ol"
+import "layout.ol"
 import "../lib/keep.ol"
 
 const BEST_KEY     = "best"    ## where the best score is kept between two runs
