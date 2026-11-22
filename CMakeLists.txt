@@ -54,6 +54,7 @@ set(OLLIN_SOURCES
     src/parser.cpp
     src/compiler.cpp
     src/vm.cpp
+    src/coroutine.cpp
     src/paths.cpp
     src/source_registry.cpp
     src/modules/modules.cpp
@@ -177,6 +178,15 @@ else()
     target_compile_options(unit_tests PRIVATE -Wall -Wextra)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-Og")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # run_goto is one giant function whose handlers all share a handful of callee-saved registers, and GCC's default
+        # register allocator (regional) is BISTABLE on it: adding or removing code in ANY handler, however far from the hot
+        # paths, can make it spill the pointer to the frame's registers (R) and cost every handler a load — measured, +2 to
+        # +4 % of instructions on fib, loop, array and float when the coroutines were added, and the same swing from changes
+        # that touched nothing the benchmark runs. One region over the whole function keeps R in a register whatever the
+        # handlers contain: the same benchmarks back within 0.6 % of the figures before the change, fib and closures below.
+        # GCC only: the option does not exist in clang.
+        set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-fira-region=one")
     endif()
 
     find_program(EMCC emcc)

@@ -9,6 +9,10 @@
 
 std::string value_to_string(const Value& v);
 
+// The function index a callable value stands for, and in `out_closure` the closure to hold while it runs when it captured upvalues.
+// `not_callable` is the caller's own message for a value that is none (a call and a method call name different mistakes).
+FuncIdx resolve_func_val(const Value& fv, ClosureRef& out_closure, const char* not_callable);
+
 // The same conversion WITHOUT the one branch that runs Ollin code: an instance wears its class
 // name instead of being handed to its __str. For a native function that must not re-enter the VM.
 std::string value_to_string_plain(const Value& v);

@@ -125,7 +125,7 @@ LANGUAGE_ROWS = [
     ("lexer", ["src/lexer.cpp"]),
     ("parser", ["src/parser.cpp"]),
     ("compiler", ["src/compiler.cpp", "src/chunk.cpp"]),
-    ("vm", ["src/vm.cpp"]),
+    ("vm", ["src/vm.cpp", "src/coroutine.cpp"]),
     ("collections", [f for f in files if f.startswith("src/collections/")]),
     ("paths and sources", ["src/paths.cpp", "src/source_registry.cpp"]),
     ("entry point", ["src/main.cpp"]),
