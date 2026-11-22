@@ -106,14 +106,17 @@ std::vector<Value>& VM::resume_coroutine(const Value& co_value, const Value* arg
             last_results_ = argc;
         }
         run_goto(0);
-        // The body returned: its values sit at the bottom of the file, last_results_ of them.
-        co->xfer.clear();
-        const int n = std::min(last_results_, (int)regs.size());
-        for (int i = 0; i < n; ++i)
-            co->xfer.push_back(regs[i]);
-        leave(Coroutine::DEAD);
-    } catch (const CoroutineYield&) {
-        leave(Coroutine::SUSPENDED); // the values it yielded are in xfer already
+        if (yield_pending_) {
+            yield_pending_ = false;
+            leave(Coroutine::SUSPENDED); // the values it yielded are in xfer already
+        } else {
+            // The body returned: its values sit at the bottom of the file, last_results_ of them.
+            co->xfer.clear();
+            const int n = std::min(last_results_, (int)regs.size());
+            for (int i = 0; i < n; ++i)
+                co->xfer.push_back(regs[i]);
+            leave(Coroutine::DEAD);
+        }
     } catch (...) {
         leave(Coroutine::DEAD);
         throw;
@@ -121,7 +124,7 @@ std::vector<Value>& VM::resume_coroutine(const Value& co_value, const Value* arg
     return co->xfer;
 }
 
-void VM::yield_current(CallCtx& ctx) {
+int VM::yield_current(CallCtx& ctx) {
     if (!current_co_)
         throw std::runtime_error("yield outside a coroutine");
     // A native function (array.map, sort, __str…) that called Ollin code has a C++ frame in the way, which cannot be suspended.
@@ -131,5 +134,6 @@ void VM::yield_current(CallCtx& ctx) {
     co->yield_base = ctx.regs_base;
     co->yield_cap = ctx.result_cap;
     co->xfer.assign(ctx.args, ctx.args + ctx.argc);
-    throw CoroutineYield{};
+    yield_pending_ = true;
+    return 0;
 }

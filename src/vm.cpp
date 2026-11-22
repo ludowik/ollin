@@ -1833,6 +1833,8 @@ dispatch_loop:
     call_dyn_common:
         if (R[B].is_builtin()) {
             invoke_builtin_regs(R[B].as_builtin(), base + A, argc_dyn);
+            if (__builtin_expect(yield_pending_, 0))
+                return; // a yield: this run_goto is the coroutine's own, and resume_coroutine takes over
             NEXT();
         }
         if (R[B].is_class()) {
@@ -2032,6 +2034,8 @@ dispatch_loop:
             int total = argc + off;
             if (fn.is_builtin()) {
                 invoke_builtin_regs(fn.as_builtin(), cb, total);
+                if (__builtin_expect(yield_pending_, 0))
+                    return;
                 goto call_method_done;
             }
             {

@@ -1605,11 +1605,16 @@ qu'elle tourne, `Coroutine::st` tient l'état de **celui qui l'a reprise**, ce q
 comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'exécution ajouté à la VM s'ajoute à `CoState` ET à
 `swap_exec_state`** — rien ne le vérifie ; `CoState` est `friend` de `VM` pour nommer ses types privés (`Frame`, `Handler`).
 
-- **`yield` sort de `run_goto` par une exception C++ `CoroutineYield`** (pas un `runtime_error` : les deux `catch` de `run_goto` la laissent
-  passer). Aucun opcode, aucun test dans les sites d'appel natif : après `invoke_builtin_regs`, `CALL_DYN` et `CALL_METHOD` ne font
-  que `NEXT()`, rien ne dépend de la fin normale de l'appel. À la reprise, les valeurs du `resume` sont écrites dans les cases de
-  résultat du `yield` (`yield_base`/`yield_cap`, relevés dans le `CallCtx`), `last_results_` est posé, et `run_goto(0)` repart à `ip`
-  (son prologue relit `base`/`R` de la pile courante). Une coroutine s'exécute dans un `run_goto` imbriqué de plancher 0 sur SA pile.
+- **`yield` sort de `run_goto` par un DRAPEAU, pas par une exception** : le builtin `__yield` lève `yield_pending_` ; les deux sites de
+  `run_goto` qui appellent un builtin (`call_dyn_common` et `CALL_METHOD`) le testent au retour de l'appel et font `return`, ce qui rend la
+  main à `resume_coroutine`. Rien ne dépend de la fin normale d'un appel natif après lui (`NEXT()` et l'`ip` déjà avancé), donc l'état
+  est cohérent à cet instant. À la reprise, les valeurs du `resume` sont écrites dans les cases de résultat du `yield`
+  (`yield_base`/`yield_cap`, relevés dans le `CallCtx`), `last_results_` est posé, et `run_goto(0)` repart à `ip` (son prologue relit
+  `base`/`R` de la pile courante). Une coroutine s'exécute dans un `run_goto` imbriqué de plancher 0 sur SA pile.
+  **Résultat négatif mesuré : la première version sortait par une exception C++** (aucun test dans les sites d'appel) et coûtait
+  **3,3 µs l'aller-retour** (~36 000 instructions, 95 % dans le déroulement de la pile par libgcc) : 1 000 coroutines reprises par
+  image mangeaient 3,8 ms de l'image. Le drapeau : **0,1 µs** (200 000 allers-retours en 0,019 s), pour un test d'un octet après un appel
+  natif, que `-fira-region=one` rend indifférent (les dix scripts de `bench/` restent à moins de 0,6 % d'instructions).
 - **Refus à travers un natif** : `native_nest_` compte les `run_goto` qu'un natif a ouverts (`NestGuard` dans `call_value_multi` et
   `invoke_str`) ; un `yield` n'est permis qu'à zéro (et si l'appel vient du fichier de registres : `ctx.regs_base >= 0`). La pile du
   processeur de ces `run_goto` ne peut pas être suspendue. Une erreur claire plutôt qu'un plantage.

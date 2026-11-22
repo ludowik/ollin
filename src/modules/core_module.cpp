@@ -167,7 +167,7 @@ static int core_instance_of(CallCtx& ctx) {
 // __yield(...) is INTERNAL like __fmt: the parser turns the `yield` keyword into a call of it. It suspends the running coroutine,
 // handing its arguments to whoever resumed it; what the next resume passes comes back as its results.
 static int core_yield(CallCtx& ctx) {
-    ctx.vm->yield_current(ctx);
+    return ctx.vm->yield_current(ctx);
 }
 
 Value make_core_module() {

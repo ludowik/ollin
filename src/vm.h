@@ -38,10 +38,6 @@ struct OllinThrow {
     Value value;
 };
 
-// Thrown by a yield to leave run_goto: all of a coroutine's state is in VM members, so there is nothing for the unwinding to
-// lose, and it costs nothing on the paths that do not yield. NOT a runtime_error, so run_goto's two catch clauses let it through.
-struct CoroutineYield {};
-
 class VM {
     // The saved state of a coroutine is made of the VM's private types.
     friend struct CoState;
@@ -69,8 +65,9 @@ class VM {
     // register file, which nothing touches meanwhile. Returns the values it yielded or returned — its `xfer`, valid until the next
     // resume, which the caller reads and clears. An error the body does not catch kills the coroutine and propagates.
     std::vector<Value>& resume_coroutine(const Value& co, const Value* args, int argc);
-    // The builtin __yield: suspends the running coroutine, handing `ctx`'s arguments to its resumer. Never returns.
-    [[noreturn]] void yield_current(CallCtx& ctx);
+    // The builtin __yield: suspends the running coroutine, handing `ctx`'s arguments to its resumer. It only raises yield_pending_:
+    // the two sites of run_goto that call a builtin test it as the call returns and leave the loop, back into resume_coroutine.
+    int yield_current(CallCtx& ctx);
     Coroutine* running_coroutine() const {
         return current_co_;
     }
@@ -350,6 +347,7 @@ class VM {
     // refused unless it is zero, because the C++ stack of those invocations cannot be suspended. Each coroutine starts at zero.
     int native_nest_ = 0;
     Coroutine* current_co_ = nullptr; // the coroutine that runs, nil for the main program
+    bool yield_pending_ = false;      // a yield has been made and run_goto has not left yet
     // How many coroutines are being resumed one inside another. Each level is a run_goto on the processor's stack, which no register
     // file bounds (every coroutine has its own), so a body that resumes a coroutine that resumes a coroutine… would end in a crash.
     // ⚠ The WASM stack (-sSTACK_SIZE in CMakeLists.txt) is sized for this limit: raise one and the other.
