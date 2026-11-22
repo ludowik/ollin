@@ -85,6 +85,9 @@
   { "group": "Games", "name": "Ollin Frog", "file": "frog/frog.ol", "icon": "icons/frog.png",
     "description": "Frog: cross a road and a river on logs and turtles to fill five homes, with the pictures and the lanes of the 1981 arcade game.",
     "controls": "Arrow keys or WASD hop one square, P pauses, M switches the sound, space starts. On a touch screen, the four arrows (under the right thumb), PAUSE and SOUND buttons under the field do the same, and a tap starts a game." },
+  { "group": "Games", "name": "Connect Four", "file": "connect4/connect4.ol", "icon": "icons/connect4.png",
+    "description": "Connect Four against the computer, at three levels: a search that looks ahead and thinks between frames, take-backs, and the scores and the game in progress kept between runs.",
+    "controls": "Tap or click a column to drop a disc, or press, slide to aim and lift over the column. Left and right arrows aim, space or down drops, 1 to 7 drop in a column, U takes a move back, M or Escape goes to the menu. On the menu, left and right choose the level, F switches who plays first, space begins and C goes on with the game in progress." },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol",
     "description": "Live webcam capture in greyscale, available in the browser only." },
