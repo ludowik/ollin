@@ -10,6 +10,7 @@
 
 import "field.ol"
 import "arcade.ol"
+import "tiles.ol"
 import "../lib/area.ol"
 
 ## The way each lane runs, from the top of the river (read from the arcade routine that moves the eleven lane objects):
@@ -120,6 +121,57 @@ func laneSpec(tier, lane)
     return SPECS[tier][lane + 1]
 end
 
+## The picture of a lane's object: its tiles in pairs, the first pair at the right-hand end (the arcade draws its strips
+## that way round), a pair being the 8 pixels of one tile above the 8 of the other. `phase` picks one of the poses of
+## swimming a turtle has: the pictures follow each other in the table a fixed distance apart, which is more than the tiles a
+## group of turtles takes of each.
+func laneRows(lane, phase)
+    var rows = laneSpec(1, lane).tiles
+    var codes = LANE_TILES[lane + 1]
+    var base = phase * (#codes // LANE_PHASES[lane + 1])
+    var out = []
+    for y = 0, CELL - 1 do
+        var line = []
+        for x = 0, rows * TILE - 1 do
+            var code = codes[base + 2 * (rows - 1 - x // TILE) + y // TILE + 1]
+            line.push(TILES[code + 1].char((y % TILE) * TILE + x % TILE + 1))
+        end
+        out.push(line.join(""))
+    end
+    return out
+end
+
+## The columns of a lane's object that are drawn, [first, one past the last]: a vehicle runs the frog down where it SHOWS, and
+## its picture has margins that are blank.
+func laneArt(lane)
+    var rows = laneRows(lane, 0)
+    var lo = len(rows[1])
+    var hi = 0
+    for row in rows do
+        for x = 1, len(row) do
+            if row.char(x) <> "0" then
+                lo = math.min(lo, x - 1)
+                hi = math.max(hi, x)
+            end
+        end
+    end
+    return [lo, hi]
+end
+
+func buildArt()
+    var out = []
+    for lane = 0, 10 do
+        if hasObjects(lane) then
+            out.push(laneArt(lane))
+        else
+            out.push(nil)
+        end
+    end
+    return out
+end
+
+const LANE_ART = buildArt()
+
 ## How fast a lane's strip runs on a board, in pixels per second, and which way (negative to the left).
 func laneVelocity(lane, board)
     return LANE_DIR[lane + 1] * LANE_SPEED[lane + 1] * speedFactor(board)
@@ -170,8 +222,9 @@ end
 
 ## Whether a vehicle of the road lane runs the frog down, its cell being at x.
 func roadHit(tier, lane, pos, x)
+    var art = LANE_ART[lane + 1]
     for it in laneItems(tier, lane, pos) do
-        if x + CELL - BODY_INSET > it.x0 and x + BODY_INSET < it.x1 then
+        if x + CELL - BODY_INSET > it.x0 + art[1] and x + BODY_INSET < it.x0 + art[2] then
             return true
         end
     end

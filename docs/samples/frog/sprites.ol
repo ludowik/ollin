@@ -3,9 +3,8 @@
 ## this file says what colour each index takes on each object: the board's colour PROM is not part of what was decoded, so the
 ## colours are ours, chosen to read as the originals do.
 
-import "tiles.ol"
-import "arcade.ol"
 import "field.ol"
+import "tiles.ol"
 import "rules.ol"
 
 global laneImgs = []           ## per lane, its object's picture: one for a log or a car, the three poses of swimming for turtles
@@ -45,26 +44,6 @@ func turnRows(rows)
         var line = []
         for x = 0, size - 1 do
             line.push(rows[size - x].char(y + 1))
-        end
-        out.push(line.join(""))
-    end
-    return out
-end
-
-## The picture of a lane's object: its tiles in pairs, the first pair at the right-hand end (the arcade draws its strips
-## that way round), a pair being the 8 pixels of one tile above the 8 of the other. `phase` picks one of the poses of
-## swimming a turtle has: the pictures follow each other in the table a fixed distance apart, which is more than the tiles a
-## group of turtles takes of each.
-func laneRows(lane, phase)
-    var rows = laneSpec(1, lane).tiles
-    var codes = LANE_TILES[lane + 1]
-    var base = phase * (#codes // LANE_PHASES[lane + 1])
-    var out = []
-    for y = 0, CELL - 1 do
-        var line = []
-        for x = 0, rows * TILE - 1 do
-            var code = codes[base + 2 * (rows - 1 - x // TILE) + y // TILE + 1]
-            line.push(TILES[code + 1].char((y % TILE) * TILE + x % TILE + 1))
         end
         out.push(line.join(""))
     end

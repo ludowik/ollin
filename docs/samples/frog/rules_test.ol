@@ -52,6 +52,12 @@ for lane = 0, 10 do
 end
 assert(laneVelocity(1, 1) == -24.0 and laneVelocity(5, 9) == 0.0 and laneVelocity(0, 3) == 28.0 * speedFactor(3), "a lane's velocity is its way, its speed and the board's factor")
 
+## A vehicle runs the frog down where it is DRAWN, not over the blank margins of its picture: the truck of lane 6 shows from
+## column 3 to column 29 of its 32 (a hit needs the body inside [3, 30[).
+assert(LANE_ART[7][1] == 3 and LANE_ART[7][2] == 30, "the truck's picture has three blank columns on the left and two on the right")
+assert(roadHit(1, 6, 0.0, 27) and not roadHit(1, 6, 0.0, 28), "the frog beside the end of the truck's picture is not hit by its margin")
+assert(roadHit(1, 6, 0.0, -10) and not roadHit(1, 6, 0.0, -11), "nor in front of it")
+
 ## ── Where the objects are, and the strip that wraps ──────────────────────────────────────────────────────────────────────
 var items = laneItems(1, 0, 0.0)
 assert(#items == 3 and items[1].x0 == 0 and items[1].x1 == 64 and items[2].x0 == 88 and items[3].x0 == 176, "three logs from the offset")
