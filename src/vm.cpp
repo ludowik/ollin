@@ -456,7 +456,7 @@ void VM::close_upvals() {
         return;
     for (auto* uv : *ouv) {
         if (!uv->closed) {
-            uv->val = regs[uv->frame_base + uv->reg_idx];
+            uv->val = uv->file[uv->frame_base + uv->reg_idx];
             uv->closed = true;
         }
         if (--uv->refcount == 0)
@@ -479,7 +479,7 @@ void VM::close_upvals_above(int threshold) {
             continue;
         }
         if (!uv->closed) {
-            uv->val = regs[uv->frame_base + uv->reg_idx];
+            uv->val = uv->file[uv->frame_base + uv->reg_idx];
             uv->closed = true;
         }
         if (--uv->refcount == 0)
@@ -1905,6 +1905,7 @@ dispatch_loop:
                         uv = upvalue_pool().acquire();
                         uv->frame_base = base;
                         uv->reg_idx = desc.idx;
+                        uv->file = regs.data();
                         if (!frame_open)
                             frame_open.create();
                         frame_open->push_back(uv);
@@ -1925,7 +1926,7 @@ dispatch_loop:
 
     op_GET_UPVAL: {
         Upvalue* uv = call_stack.back().closure->upvals[B];
-        R[A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
+        R[A] = uv->closed ? uv->val : uv->file[uv->frame_base + uv->reg_idx];
         NEXT();
     }
 
@@ -1934,7 +1935,7 @@ dispatch_loop:
         if (uv->closed)
             uv->val = R[A];
         else
-            regs[uv->frame_base + uv->reg_idx] = R[A];
+            uv->file[uv->frame_base + uv->reg_idx] = R[A];
         NEXT();
     }
 

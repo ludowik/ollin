@@ -12,6 +12,10 @@ struct Upvalue {
     bool closed = false;
     int frame_base = 0;
     int reg_idx = 0;
+    // The register file the variable lives in while the upvalue is open: the main program's or a coroutine's, each a
+    // block that never moves (VM::execute and grow_regs). An open upvalue is read and written here, NOT through the VM's
+    // current `regs`, which belongs to whichever coroutine runs now and is not necessarily the one that owns the variable.
+    Value* file = nullptr;
     Value val; // holds value after close
 };
 
@@ -28,7 +32,7 @@ struct UpvaluePool {
         if (Upvalue* u = pool.take()) {
             u->refcount = 1;
             u->closed = false;
-            // frame_base/reg_idx are NOT reset here: MAKE_CLOSURE's only caller overwrites both
+            // frame_base/reg_idx/file are NOT reset here: MAKE_CLOSURE's only caller overwrites all three
             // unconditionally right after acquire() returns, so resetting them first was dead
             // work on every capture.
             return u; // val already cleared by release()
