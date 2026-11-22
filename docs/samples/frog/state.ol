@@ -22,6 +22,8 @@ global furthest  = 0           ## the row nearest the homes this frog has reache
 global event     = nil         ## what is in a home now: {kind: "fly" or "crocodile", home, left}
 global eventWait = EVENT_GAP
 global rng       = nil
+global viewH     = FIELD_H + PAD_MIN       ## the height of the viewport: the field and the strip of buttons under it
+global buttons   = padButtons(FIELD_H + PAD_MIN)
 global banner    = nil         ## a short message over the field: {text, left}
 
 func resetLanes()

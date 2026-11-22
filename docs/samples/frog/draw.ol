@@ -50,7 +50,7 @@ end
 func drawArrow(name, b)
     var cx = b.x + b.w / 2
     var cy = b.y + b.h / 2
-    var r = 7
+    var r = math.floor(b.w / 4)
     var pts = [cx, cy - r, cx - r, cy + r, cx + r, cy + r]
     if name == "down" then
         pts = [cx, cy + r, cx - r, cy - r, cx + r, cy - r]
@@ -66,8 +66,8 @@ end
 
 ## The strip under the field: the four ways, and pause and sound with what they do now.
 func drawPad()
-    block(BLACK, 0, FIELD_H, FIELD_W, PAD_H)
-    for b in BUTTONS do
+    block(BLACK, 0, FIELD_H, FIELD_W, viewH - FIELD_H)
+    for b in buttons do
         graphics.fill(KEY_FILL)
         graphics.stroke(KEY_EDGE)
         graphics.strokeSize(1)

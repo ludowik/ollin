@@ -18,11 +18,22 @@ import "draw.ol"
 func setup()
     graphics.canvas(W, H, "Ollin Frog")
     graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
-    graphics.viewport(FIELD_W, VIEW_H)
+    fitView(window.width, window.height)
     loadBest()
     buildSprites()
     buildSounds()
     resetField()
+end
+
+## The viewport and the buttons for an area of w x h pixels.
+func fitView(w, h)
+    viewH = viewHeight(w, h)
+    buttons = padButtons(viewH)
+    graphics.viewport(FIELD_W, viewH)
+end
+
+func window.resized(w, h)
+    fitView(window.width, window.height)
 end
 
 func start()
@@ -67,7 +78,7 @@ func mouse.pressed(x, y)
         paused = false
         return
     end
-    var name = buttonAt(x, y)
+    var name = buttonAt(buttons, x, y)
     if name <> nil then
         pressButton(name)
     end

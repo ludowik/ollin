@@ -231,7 +231,7 @@ assert(not paused, "there is nothing to pause on the title")
 state = "play"
 
 fresh()
-var arrowUp = BUTTONS[1]
+var arrowUp = buttons[1]
 touchPress(1, arrowUp.x + 2, arrowUp.y + 2)
 assert(frog.hop == nil, "the first finger is the mouse's: a touch alone does not hop")
 touchPress(2, arrowUp.x + 2, arrowUp.y + 2)

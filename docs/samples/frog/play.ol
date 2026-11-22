@@ -127,7 +127,7 @@ func touchPress(count, x, y)
     if count < 2 then
         return
     end
-    var name = buttonAt(x, y)
+    var name = buttonAt(buttons, x, y)
     if name <> nil and DIRS[name] <> nil then
         tryHop(name)
     end

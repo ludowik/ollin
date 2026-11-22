@@ -283,9 +283,9 @@ func splashFrame(t)
     return 1 + math.floor(t / SPLASH_STEP)
 end
 
-## The button under a point of the viewport, by name, or nil.
-func buttonAt(x, y)
-    for b in BUTTONS do
+## The button of a list under a point of the viewport, by name, or nil.
+func buttonAt(buttons, x, y)
+    for b in buttons do
         if inRect(x, y, b) then
             return b.name
         end
