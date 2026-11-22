@@ -1,4 +1,4 @@
-## The rectangles of a screen, and the size of the area they were laid out for.
+## The rectangles of a screen, the size of the area they were laid out for, and the height a field takes from the shape of the area.
 
 func rectOf(x, y, w, h)
     return {x: x, y: y, w: w, h: h}
@@ -19,8 +19,11 @@ func rectAt(list, x, y)
 end
 
 ## The height of a field `fieldW` wide for an area of w x h pixels: as tall as the shape of the area asks, within `low` and `high`, so that
-## a tall screen is filled and a wide one is not stretched.
+## a tall screen is filled and a wide one is not stretched. An area with no width yet gets `low`.
 func fitHeight(fieldW, w, h, low, high)
+    if w <= 0 then
+        return low
+    end
     return math.floor(math.clamp(fieldW * h / w, low, high))
 end
 

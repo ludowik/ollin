@@ -93,7 +93,7 @@ end
 leaf = nothing
 var checked = 0
 rng = Random(99)
-for n = 1, 60 do
+for n = 1, 80 do
     var p = randomPosition(rng, 6 + n % 20)
     if p == nil then
         continue
@@ -113,7 +113,7 @@ for n = 1, 60 do
     assert(v == expected, "position {n}, depth {depth}: column {col} is worth {v} and the best is {expected}")
     checked += 1
 end
-assert(checked > 30, "enough positions were checked: {checked}")
+assert(checked > 45, "enough positions were checked: {checked}")
 leaf = evaluate
 
 ## ── Ties are broken at random, among the best ────────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-## The rectangles of a screen (docs/samples/lib/area.ol).
+## The rectangles of a screen, the area they were laid out for, and the height of a field (docs/samples/lib/area.ol).
 
 import "area.ol"
 
@@ -18,4 +18,5 @@ cache.w = W + 1
 assert(areaChanged(cache) and not areaChanged(cache), "a different width is one change")
 assert(fitHeight(400, 400, 800, 600, 900) == 800 and fitHeight(400, 390, 844, 600, 780) == 780 and fitHeight(400, 1000, 500, 600, 780) == 600, "as tall as the shape asks, within the bounds")
 assert(fitHeight(224, 224, 300, 0, 1000) == 300 and typeof(fitHeight(400, 390, 700, 0, 1000)) == "int", "a whole number of pixels")
+assert(fitHeight(400, 0, 0, 600, 800) == 600, "no width yet: the lowest height, not a division by zero")
 print("area ok")
