@@ -40,7 +40,7 @@ generated: run `python3 tools/convert_frog_data.py` (it needs the network) to re
 
 | file | what it is |
 |---|---|
-| `frog.ol` | the entry: setup, the keys and the taps, the frame |
+| `frog.ol` | the entry: setup, the keys, the buttons and the taps, the frame |
 | `field.ol` | the size of the field and the grid |
 | `rules.ol` | the rules with no state: lanes, vehicles, support, turtles, homes, score (tested by `rules_test.ol`) |
 | `state.ol` | what changes as a game runs |

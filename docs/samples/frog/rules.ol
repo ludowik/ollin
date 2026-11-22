@@ -10,6 +10,7 @@
 
 import "field.ol"
 import "arcade.ol"
+import "../lib/area.ol"
 
 ## The way each lane runs, from the top of the river (read from the arcade routine that moves the eleven lane objects):
 ## 1 to the right, -1 to the left, 0 for the median strip.
@@ -229,19 +230,14 @@ func splashFrame(t)
     return 1 + math.floor(t / SPLASH_STEP)
 end
 
-## The way a tap at (dx, dy) from the middle of the frog points: the axis it is further along, the side it is on. A tap exactly
-## on a diagonal goes up or down.
-func tapDirection(dx, dy)
-    if math.abs(dx) > math.abs(dy) then
-        if dx > 0 then
-            return "right"
+## The button under a point of the viewport, by name, or nil.
+func buttonAt(x, y)
+    for b in BUTTONS do
+        if inRect(x, y, b) then
+            return b.name
         end
-        return "left"
     end
-    if dy < 0 then
-        return "up"
-    end
-    return "down"
+    return nil
 end
 
 ## What a frog is given for arriving home with `left` seconds on the clock, `fly` saying it ate the fly.

@@ -212,4 +212,22 @@ updateFrame(0.05)
 assert(laneOff[1] == before, "nothing moves while the game is paused")
 paused = false
 
+## ── The buttons ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+fresh()
+pressButton("up")
+assert(frog.hop <> nil and frog.hop.toRow == 1, "the up button hops the frog")
+run(HOP_TIME + 0.05)
+pressButton("pause")
+assert(paused, "the pause button pauses")
+pressButton("pause")
+assert(not paused, "and pauses again to resume")
+var wasOn = soundOn
+pressButton("sound")
+assert(soundOn <> wasOn, "the sound button switches the sound")
+pressButton("sound")
+state = "title"
+pressButton("pause")
+assert(not paused, "there is nothing to pause on the title")
+state = "play"
+
 print("frog play ok")

@@ -122,8 +122,11 @@ hop.t = HOP_TIME * 0.5
 assert(hopRow(hop) == 4, "halfway it is over the row it goes to")
 hop.t = HOP_TIME * 3
 assert(hopFraction(hop) == 1.0 and hopX(hop) == 56.0, "a hop that took longer than it lasts stops at its end")
-assert(tapDirection(10, 3) == "right" and tapDirection(-10, 3) == "left" and tapDirection(2, -9) == "up" and tapDirection(2, 9) == "down", "a tap points along the axis it is further on")
-assert(tapDirection(5, 5) == "down" and tapDirection(5, -5) == "up" and tapDirection(0, 0) == "down", "a tap on a diagonal goes up or down")
+for b in BUTTONS do
+    assert(buttonAt(b.x + b.w / 2, b.y + b.h / 2) == b.name, "the middle of the {b.name} button is on it")
+    assert(b.y >= FIELD_H and b.y + b.h <= VIEW_H and b.x >= 0 and b.x + b.w <= FIELD_W, "the {b.name} button is in the strip under the field")
+end
+assert(buttonAt(10, 10) == nil and buttonAt(PAD_CX, PAD_CY) == nil, "the field and the middle of the cross are no button")
 assert(splashFrame(0.0) == 1 and splashFrame(0.2) == 2 and splashFrame(0.44) == 3, "a splash has three pictures")
 for kind in ["car", "croc", "drown", "edge", "wall", "time"] do
     assert(DEATHS[kind] <> nil, "{kind} is a way to die")

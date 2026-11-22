@@ -18,7 +18,7 @@ import "draw.ol"
 func setup()
     graphics.canvas(W, H, "Ollin Frog")
     graphics.fitArea()                      ## the area is the whole screen of the phone: the field is scaled up to it, whatever it is
-    graphics.viewport(FIELD_W, FIELD_H)
+    graphics.viewport(FIELD_W, VIEW_H)
     loadBest()
     buildSprites()
     buildSounds()
@@ -42,24 +42,23 @@ func begin()
     return true
 end
 
-const KEY_DIR = {up: "up", w: "up", down: "down", s: "down", left: "left", a: "left", right: "right", d: "right"}
+const KEY_BUTTON = {
+    up: "up", w: "up", down: "down", s: "down", left: "left", a: "left", right: "right", d: "right", p: "pause", m: "sound"
+}
 
 func keyboard.keypressed(key)
     if key == "space" then
         if not begin() and paused then
             paused = false
         end
-    elseif key == "p" and state == "play" then
-        paused = not paused
-    elseif key == "m" then
-        soundOn = not soundOn
-    elseif KEY_DIR[key] <> nil then
-        tryHop(KEY_DIR[key])
+    elseif KEY_BUTTON[key] <> nil then
+        pressButton(KEY_BUTTON[key])
     end
 end
 
-## A tap hops the frog the way it points from the frog: the side the tap is on more than the other. A single finger also
-## emulates the mouse, so this one path serves both.
+## The buttons under the field. A tap starts a game from the title and the end screen, resumes a paused one, and otherwise
+## presses the button it is on. A single finger also emulates the mouse, so it is the one path for the first finger; a second
+## finger arrives only as a touch, which hops (a hop is ignored while one is on, so the first finger's two calls are one).
 func mouse.pressed(x, y)
     if begin() then
         return
@@ -68,7 +67,17 @@ func mouse.pressed(x, y)
         paused = false
         return
     end
-    tryHop(tapDirection(x - (frog.x + CELL / 2), y - (rowY(frog.row) + CELL / 2)))
+    var name = buttonAt(x, y)
+    if name <> nil then
+        pressButton(name)
+    end
+end
+
+func touch.began(id, x, y)
+    var name = buttonAt(x, y)
+    if name <> nil and DIRS[name] <> nil then
+        tryHop(name)
+    end
 end
 
 func update(dt)

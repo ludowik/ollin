@@ -6,9 +6,24 @@
 
 const FIELD_W = 224
 const FIELD_H = 256
+const PAD_H   = 96             ## the strip under the field that holds the buttons, drawn in the same viewport
+const VIEW_H  = FIELD_H + PAD_H
 const CELL    = 16
 const STRIP   = 256            ## a lane is a strip of 32 tiles that wraps, wider than the 28 that show
 const TILE    = 8
+
+## The buttons, in the pixels of the viewport: the four ways on the left as a cross, pause and sound on the right.
+const BTN = 28
+const PAD_CX = 62
+const PAD_CY = FIELD_H + PAD_H / 2
+const BUTTONS = [
+    {name: "up",    x: PAD_CX - BTN / 2,       y: PAD_CY - BTN * 3 / 2, w: BTN, h: BTN},
+    {name: "down",  x: PAD_CX - BTN / 2,       y: PAD_CY + BTN / 2,     w: BTN, h: BTN},
+    {name: "left",  x: PAD_CX - BTN * 3 / 2,   y: PAD_CY - BTN / 2,     w: BTN, h: BTN},
+    {name: "right", x: PAD_CX + BTN / 2,       y: PAD_CY - BTN / 2,     w: BTN, h: BTN},
+    {name: "pause", x: 140,                    y: PAD_CY - BTN - 2,     w: 72,  h: BTN},
+    {name: "sound", x: 140,                    y: PAD_CY + 2,           w: 72,  h: BTN}
+]
 
 const ROW_START  = 0
 const ROW_MEDIAN = 6

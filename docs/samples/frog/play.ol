@@ -108,6 +108,19 @@ func land()
     end
 end
 
+## What a button does, whether it is pressed on the screen or by its key.
+func pressButton(name)
+    if name == "pause" then
+        if state == "play" then
+            paused = not paused
+        end
+    elseif name == "sound" then
+        soundOn = not soundOn
+    else
+        tryHop(name)
+    end
+end
+
 ## A fly or a crocodile in one of the homes that is still empty, from time to time.
 func updateEvent(dt)
     if event <> nil then

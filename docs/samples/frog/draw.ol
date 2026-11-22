@@ -15,6 +15,8 @@ const RED     = Color(0.92, 0.2, 0.2)
 const YELLOW  = Color(1.0, 0.85, 0.1)
 const GREEN   = Color(0.2, 0.85, 0.3)
 const BAR_LOW = Color(0.95, 0.25, 0.15)
+const KEY_FILL = Color(0.2, 0.12, 0.34)         ## the buttons under the field
+const KEY_EDGE = Color(0.62, 0.48, 0.9)
 
 const SWIM = [0, 1, 2, 1]                      ## the poses of a swimming turtle, in the order its legs move
 
@@ -42,6 +44,46 @@ end
 
 func drawTextCentre(str, y, col)
     drawText(str, (FIELD_W - len(str) * TILE) / 2, y, col)
+end
+
+## A triangle in the button of the way it points.
+func drawArrow(name, b)
+    var cx = b.x + b.w / 2
+    var cy = b.y + b.h / 2
+    var r = 7
+    var pts = [cx, cy - r, cx - r, cy + r, cx + r, cy + r]
+    if name == "down" then
+        pts = [cx, cy + r, cx - r, cy - r, cx + r, cy - r]
+    elseif name == "left" then
+        pts = [cx - r, cy, cx + r, cy - r, cx + r, cy + r]
+    elseif name == "right" then
+        pts = [cx + r, cy, cx - r, cy - r, cx - r, cy + r]
+    end
+    graphics.noStroke()
+    graphics.fill(YELLOW)
+    graphics.polygon(pts)
+end
+
+## The strip under the field: the four ways, and pause and sound with what they do now.
+func drawPad()
+    block(BLACK, 0, FIELD_H, FIELD_W, PAD_H)
+    for b in BUTTONS do
+        graphics.fill(KEY_FILL)
+        graphics.stroke(KEY_EDGE)
+        graphics.strokeSize(1)
+        graphics.rect(b.x, b.y, b.w, b.h, 4)
+        if b.name == "pause" or b.name == "sound" then
+            var label = "PAUSE"
+            if b.name == "sound" then
+                label = soundOn and "SOUND" or "MUTED"
+            elseif paused then
+                label = "RESUME"
+            end
+            drawText(label, b.x + (b.w - len(label) * TILE) / 2, b.y + (b.h - TILE) / 2, WHITE)
+        else
+            drawArrow(b.name, b)
+        end
+    end
 end
 
 func drawBackground()
@@ -149,6 +191,7 @@ func drawPlay()
     drawHomes()
     drawFrog()
     drawHud()
+    drawPad()
     if banner <> nil then
         drawTextCentre(banner.text, 120, YELLOW)
     end
@@ -165,11 +208,12 @@ func drawTitle()
     drawBackground()
     drawLanes()
     drawHud()
+    drawPad()
     block(BLACK, 8, 88, FIELD_W - 16, 84)
     for i = 1, 4 do
         graphics.sprite(titleImgs[i], 80 + (i - 1) * 16, 100, CELL, CELL)
     end
     drawTextCentre("PRESS SPACE OR TAP", 132, WHITE)
-    drawTextCentre("ARROWS OR TAP THE SIDE", 148, YELLOW)
-    drawTextCentre("OF THE FROG TO HOP", 160, YELLOW)
+    drawTextCentre("ARROWS OR THE BUTTONS", 148, YELLOW)
+    drawTextCentre("BELOW TO HOP", 160, YELLOW)
 end
