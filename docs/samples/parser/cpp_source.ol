@@ -473,7 +473,7 @@ const PARSER_CPP_SOURCE = {
         "    return chain;",
         "}"
     ]},
-    "unary": {first: 875, lines: [
+    "unary": {first: 876, lines: [
         "std::unique_ptr<Expr> Parser::unary() \{",
         "    if (check(TokenType::MINUS)) \{",
         "        advance();",
@@ -498,7 +498,7 @@ const PARSER_CPP_SOURCE = {
         "    return power();",
         "}"
     ]},
-    "power": {first: 899, lines: [
+    "power": {first: 900, lines: [
         "std::unique_ptr<Expr> Parser::power() \{",
         "    auto left = primary();",
         "    if (!check(TokenType::CARET))",
@@ -508,7 +508,7 @@ const PARSER_CPP_SOURCE = {
         "    return std::make_unique<BinaryExpr>('p', std::move(left), unary());",
         "}"
     ]},
-    "parse_postfix": {first: 908, lines: [
+    "parse_postfix": {first: 909, lines: [
         "std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) \{",
         "    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) || at_optional_call()) \{",
         "        if (check(TokenType::LBRACKET)) \{",
@@ -557,7 +557,7 @@ const PARSER_CPP_SOURCE = {
         "    return base;",
         "}"
     ]},
-    "primary": {first: 1011, lines: [
+    "primary": {first: 1012, lines: [
         "std::unique_ptr<Expr> Parser::primary() \{",
         "    if (check(TokenType::NUMBER)) \{",
         "        Token tok = advance();",

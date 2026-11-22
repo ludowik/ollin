@@ -1599,7 +1599,7 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
 > `status`, `running`, `isYieldable`) + mot-clé `yield`.
 
 **Sans pile du processeur, comme Lua** : une coroutine n'a que ce que la VM garde déjà dans des membres — fichier de registres, pile de
-cadres, gestionnaires `try` ouverts, `ip`, `last_results_`, `va_low_`, `max_regs_`, `native_nest_`. Reprendre = **échanger** ces membres
+cadres, gestionnaires `try` ouverts, `ip`, `va_low_`. Reprendre = **échanger** ces membres
 avec ceux de la VM (`swap_exec_state`, des échanges de pointeurs de vecteurs), suspendre = les rendre. L'échange est SYMÉTRIQUE : pendant
 qu'elle tourne, `Coroutine::st` tient l'état de **celui qui l'a reprise**, ce qui fait une seule fonction pour les deux sens. Même
 comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'exécution ajouté à la VM s'ajoute à `CoState` ET à
@@ -1615,16 +1615,15 @@ comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'e
   **3,3 µs l'aller-retour** (~36 000 instructions, 95 % dans le déroulement de la pile par libgcc) : 1 000 coroutines reprises par
   image mangeaient 3,8 ms de l'image. Le drapeau : **0,1 µs** (200 000 allers-retours en 0,019 s), pour un test d'un octet après un appel
   natif, que `-fira-region=one` rend indifférent (les dix scripts de `bench/` restent à moins de 0,6 % d'instructions).
-- **Refus à travers un natif** : `native_nest_` compte les `run_goto` qu'un natif a ouverts (`NestGuard` dans `call_value_multi` et
-  `invoke_str`) ; un `yield` n'est permis qu'à zéro (et si l'appel vient du fichier de registres : `ctx.regs_base >= 0`). La pile du
+- **Refus à travers un natif** : `native_nest_` compte les `run_goto` qu'un natif a ouverts (`run_nested`, dans `call_value_multi` et
+  `invoke_str`) ; chaque `resume` le met à zéro pour la coroutine et le rétablit ; un `yield` n'est permis qu'à zéro (et si l'appel vient du fichier de registres : `ctx.regs_base >= 0`). La pile du
   processeur de ces `run_goto` ne peut pas être suspendue. Une erreur claire plutôt qu'un plantage.
-- **Chaque coroutine a son fichier de registres de 1024 cases, réservé à la création et jamais réalloué** (même invariant que le
-  principal : `R` de `run_goto` et les upvalues ouvertes y pointent). `grow_regs_slow` lit `max_regs_` (membre échangé avec le
-  fichier) ; le message nomme le plafond, en littéral (`to_string` y déplaçait l'inlining de `run_goto`).
+- **Chaque coroutine a son fichier de registres de 1024 cases, réservé à son premier `resume` et jamais réalloué** (même invariant que le
+  principal : `R` de `run_goto` et les upvalues ouvertes y pointent ; une coroutine jamais lancée ne coûte rien). `grow_regs_slow` choisit le plafond selon `current_co_` ; le message nomme le plafond, en littéral (`to_string` y déplaçait l'inlining de `run_goto`).
 - **Un upvalue ouvert nomme SON fichier** (`Upvalue::file`) : `GET_UPVAL`/`SET_UPVAL`/`close_upvals` lisent `uv->file[frame_base +
   reg_idx]`, plus `regs[…]` de la VM, qui est celui de la coroutine qui tourne et pas forcément de celle qui possède la variable
   (une locale du programme capturée par le corps d'une coroutine, ou une fermeture née dans une coroutine appelée dehors).
-  `coroutine_destroy` **ferme d'abord les upvalues ouvertes** de ses cadres : une fermeture peut survivre à la coroutine et pointerait
+  `~Coroutine` (par `CoState::discard`) **ferme d'abord les upvalues ouvertes** de ses cadres : une fermeture peut survivre à la coroutine et pointerait
   dans un fichier libéré (figé dans `tests/regressions/modules/coroutine.ol`, vérifié sous valgrind).
   ⚠ **Résultat négatif mesuré : un pointeur `slot` à la Lua** (`closed ⇔ slot == &val`, `GET_UPVAL` réduit à `*uv->slot`) simplifie le code
   mais coûte **+2,3 % à +4,7 %** d'instructions (fib, boucle, tableau, flottants) : l'allocation de registres déversait `R`. Le
@@ -1647,7 +1646,7 @@ comportement en natif et en WASM, aucun Asyncify. ⚠ **Tout morceau d'état d'e
   où la ligne d'un jeton compte. `yield` est une expression entière, jamais un opérande (`1 + yield` est refusé).
 - **Toutes les valeurs, quel que soit le cadre appelant** : un builtin n'écrit normalement que `result_cap` valeurs (le budget de registres du
   cadre, quelques-unes pour une petite fonction) ; `resume` et la reprise d'un `yield` rendent autant de valeurs qu'on leur en donne, donc
-  `VM::result_room`/`make_room` font la place comme une queue `...` (agrandir le fichier, relever les varargs). Sans cela
+  `CallCtx::reserve_results`/`VM::make_room` font la place comme une queue `...` (agrandir le fichier, relever les varargs). Sans cela
   `return coroutine.resume(c)` perdait des valeurs en silence dans une petite fonction (reproduit par la revue).
 - **Imbrication bornée à 100 (`k_max_co_depth`)** : chaque `resume` dans un `resume` est un `run_goto` sur la pile du processeur (~1,3 Ko en
   natif), que le fichier de registres propre à chaque coroutine ne borne pas — une chaîne sans fin faisait planter le moteur.

@@ -424,3 +424,8 @@ var coEcho = coroutine.create(func(...)
     return #all
 end)
 assert(coForward(coEcho, 1, 2, 3) == 1 and coForward(coEcho, 7, 8, 9, 10, 11, 12, 13, 14) == 8)
+var coRange = coroutine.create(func()
+    yield ]0;3]
+    yield [0;3]
+end)
+assert(typeof(coroutine.resume(coRange)) == "range" and typeof(coroutine.resume(coRange)) == "range", "a range open on the left is a value to yield")

@@ -764,6 +764,7 @@ static bool starts_value(TokenType t) {
     case TokenType::FUNC:
     case TokenType::LPAREN:
     case TokenType::LBRACKET:
+    case TokenType::RBRACKET: // a range open on the left: ]0;3]
     case TokenType::LBRACE:
     case TokenType::MINUS:
     case TokenType::NOT:
