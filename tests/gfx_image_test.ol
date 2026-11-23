@@ -52,8 +52,8 @@ func check_loading()
     assert(refusal(func() image.filter(img, 3) end) == "image.filter: expected " + modes)
     assert(refusal(func() image.filter(img, "cubic") end) == "image.filter: unknown mode 'cubic' (expected " + modes + ")")
     assert(refusal(func() image.load("no_such_image.png") end) == "image.load: cannot open 'no_such_image.png'")
-    image.unload(img)
-    image.unload(dotted)
+    image.free(img)
+    image.free(dotted)
 end
 
 ## ── render targets and pixel access ───────────────────────────────────────
@@ -115,10 +115,10 @@ func check_pixels()
     image.setPixel(rt, 7, 0, Color(1, 0, 0))
     assert(pixel_is(rt, 7, 0, 1, 0, 0, 1))
     assert(pixel_is(rt, 1, 1, 1, 1, 0, 1))
-    image.unload(rt)
-    image.unload(rt)
-    image.unload(5)
-    image.unload()
+    image.free(rt)
+    image.free(rt)
+    image.free(5)
+    image.free()
     assert(refusal(func() image.getPixel(rt, 0, 0) end) == "image.getPixel: expected image handle")
 
     ## The checks every function makes on its arguments.
@@ -137,7 +137,7 @@ func check_pixels()
     image.endPixels(loaded)
     assert(pixel_is(loaded, 0, 0, 0, 0, 0, 1))
     assert(pixel_is(loaded, 1, 0, 0, 1, 0, 1))
-    image.unload(loaded)
+    image.free(loaded)
 end
 
 ## ── sprites from a pattern ────────────────────────────────────────────────
@@ -162,9 +162,9 @@ func check_patterns()
     assert(refusal(func() image.fromPattern([""]) end) == "image.fromPattern: the rows are empty")
     assert(refusal(func() image.fromPattern(["#"], 5) end) == "image.fromPattern: the palette must be a map of character to Color")
     assert(refusal(func() image.fromPattern(["#x"], {"#": Color(1, 1, 1)}) end) == "image.fromPattern: 'x' at row 1, column 2 is not in the palette")
-    image.unload(plain)
-    image.unload(painted)
-    image.unload(viaNil)
+    image.free(plain)
+    image.free(painted)
+    image.free(viaNil)
 end
 
 ## ── drawing images on the screen ──────────────────────────────────────────
@@ -236,7 +236,7 @@ func draw()
         assert(lr > 0.9, "left {lr} {lg} {lb} {la}")
         mr, mg, mb, ma = image.getPixel(shot, 20, 45)
         assert(mr > 0.3 and mr < 0.7 and mb > 0.3 and mb < 0.7)
-        image.unload(shot)
+        image.free(shot)
         gfx.quit()
     end
 end

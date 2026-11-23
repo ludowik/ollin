@@ -164,6 +164,7 @@ const OLD_NAMES = [
   [/\bgfx\.textSize\b/g, 'gfx.measureText'],
   [/\bmath\.smoothstep\b/g, 'math.smoothStep'],
   [/\bgfx\.rotateq\b/g, 'gfx.rotateQuat'],
+  [/\bimage\.unload\b/g, 'image.free'],
 ]
 
 function migrateOldNames(record) {

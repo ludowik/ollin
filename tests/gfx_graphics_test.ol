@@ -186,7 +186,7 @@ func check_a()
     assert(lit(s, 90, 59, 98, 61) > 8)
     assert(lit(s, 88, 66, 98, 76) > 15)
     assert(lit(s, 49, 66, 53, 74) > 5)
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene B: transforms, text, blending, tint, sprites ────────────────────
@@ -293,7 +293,7 @@ func check_b()
     assert(is(s, 79, 41, 0, 0, 0.25))
     assert(is(s, 7, 69, 0, 0.25, 0) and is(s, 17, 69, 0, 0.5, 0))
     assert(lit(s, 27, 66, 34, 72) > 20)
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene C: outlines, thin strokes, the forms of the style calls ─────────
@@ -341,7 +341,7 @@ func check_c()
     assert(is(s, 38, 55, 0, 1, 0))
     assert(lit(s, 50, 59, 60, 61) > 8)
     assert(is(s, 85, 65, 1, 0, 0))
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene D: a viewport letterboxes what the script draws ────────────────
@@ -357,7 +357,7 @@ func check_d()
     var s = image.load(SHOT_D)
     assert(is(s, 50, 40, 1, 0, 0) and is(s, 12, 4, 1, 0, 0) and is(s, 88, 76, 1, 0, 0))
     assert(is(s, 5, 40, 0, 0, 0) and is(s, 95, 40, 0, 0, 0))
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene E: the engine fonts are distance fields, drawn sharp at a large size ──
@@ -383,7 +383,7 @@ func check_e()
         end
     end
     assert(solid >= 8)
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene F: a text leaves its shader bound, and what follows must not be drawn through it ──
@@ -425,7 +425,7 @@ func check_f()
     assert(lit(s, 30, 56, 45, 78) > 3)                 ## the bitmap-font text
     assert(lit(s, 72, 16, 88, 36) > 20 and lit(s, 72, 46, 88, 66) == 0)   ## "D" stayed where it was written
     assert(is(s, 94, 36, 1, 1, 0))                     ## and the shape after the translate is moved
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── the viewport variables ────────────────────────────────────────────────
@@ -465,7 +465,7 @@ func draw()
         check_f()
         assert(updates >= 5 and lastDt >= 0)
         var gone = image.fromPattern(["#"])
-        image.unload(gone)
+        image.free(gone)
         expect(refusal(func() gfx.sprite(gone, 1, 2) end), "")        ## an unloaded image draws nothing
         expect(refusal(func() gfx.sprite({}, 1, 2) end), "gfx.sprite: invalid image handle")
         gfx.quit()

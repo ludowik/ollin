@@ -566,7 +566,7 @@ static int img_filter(CallCtx& ctx) {
 }
 
 
-static int img_unload(CallCtx& ctx) {
+static int img_free(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         return ctx.ret(Value{});
@@ -798,7 +798,7 @@ Value make_image_module() {
         .fn("endDraw", with_area<img_end>)
         .fn("draw", with_area<img_draw>)
         .fn("filter", with_area<img_filter>)
-        .fn("unload", with_area<img_unload>)
+        .fn("free", with_area<img_free>)
         .fn("beginPixels", with_area<img_begin_pixels>)
         .fn("endPixels", with_area<img_end_pixels>)
         .fn("getPixel", with_area<img_get_pixel>)

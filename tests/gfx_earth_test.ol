@@ -71,9 +71,9 @@ func draw()
     assert(glow(night, -85, -75, -60, 60) < 0.005)
     r, g, b = place(night, 48.9, 2.4)
     assert(r >= b)                                ## warm, not blue
-    image.unload(night)
+    image.free(night)
 
-    image.unload(ground)
-    image.unload(clouds)
+    image.free(ground)
+    image.free(clouds)
     gfx.quit()
 end

@@ -207,7 +207,7 @@ func check_a()
     assert(count(s, 82, 50, 102, 70, 0, 1, 1) > 100)      ## the plane, turned to face the camera
     assert(count(s, 0, 0, 119, 89, 1, 1, 1) == 0)
     check_project(s)
-    image.unload(s)
+    image.free(s)
 end
 
 ## gfx.project must agree with what begin3d drew: the centre of each solid projects onto its own colour.
@@ -271,13 +271,13 @@ func check_b_front()
     assert(grey(s, 60, 45) > 0.8)                      ## facing the light
     assert(grey(s, 60 + 43, 45) < grey(s, 60, 45) - 0.1)    ## the rim turns away from it
     assert(grey(s, 5, 5) == 0)                         ## no sphere there: nothing is drawn
-    image.unload(s)
+    image.free(s)
 end
 
 func check_b_side()
     var s = image.load(SHOT + "b2.png")
     assert(grey(s, 60 - 25, 45) > grey(s, 60 + 25, 45) + 0.3)   ## light travelling to +x lights the left side
-    image.unload(s)
+    image.free(s)
 end
 
 ## The highlight is its own setting: a half-bright sphere facing the light, whose centre is where the
@@ -305,9 +305,9 @@ func check_specular()
     assert(near(grey(tight, 60, 45), 0.85))                     ## as strong at the peak...
     assert(grey(soft, 60 + 8, 45) > grey(tight, 60 + 8, 45) + 0.05)   ## ...but narrower: less of it off the peak
     assert(grey(tight, 60 + 8, 45) >= grey(none, 60 + 8, 45) - 0.01)
-    image.unload(none)
-    image.unload(soft)
-    image.unload(tight)
+    image.free(none)
+    image.free(soft)
+    image.free(tight)
     expect(refusal(func() gfx.specular(-1) end), "gfx.specular: the strength must be 0 or more")
     expect(refusal(func() gfx.specular(math.sqrt(-1)) end), "gfx.specular: the strength must be 0 or more")
     expect(refusal(func() gfx.specular(1, math.sqrt(-1)) end), "gfx.specular: the shininess must be at least 1")
@@ -355,11 +355,11 @@ func check_bump()
     var differ = differing(flat, bumpy)
     assert(differ > 50, "the relief changed {differ} pixels")
     assert(differing(plain, blank) == 0, "the relief marked a surface that has no texture")
-    image.unload(plain)
-    image.unload(blank)
+    image.free(plain)
+    image.free(blank)
     assert(grey(flat, 5, 5) == 0 and grey(bumpy, 5, 5) == 0)      ## nothing is drawn off the sphere
-    image.unload(flat)
-    image.unload(bumpy)
+    image.free(flat)
+    image.free(bumpy)
     expect(refusal(func() gfx.bump(-1) end), "gfx.bump: the height must be 0 or more")
     expect(refusal(func() gfx.bump(math.sqrt(-1)) end), "gfx.bump: the height must be 0 or more")
     expect(refusal(func() gfx.bump(1, -1) end), "gfx.bump: the grain must be 0 or more")
@@ -395,7 +395,7 @@ func check_c()
     assert(count(s, 8, 20, 62, 70, 1, 1, 0) > 100)
     assert(count(s, 75, 20, 115, 70, 1, 0, 0) > 200)
     assert(count(s, 75, 20, 115, 70, 0, 1, 0) == 0)
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene D: atlas tiles, chunks, transparency and a terrain mesh ─────────
@@ -449,7 +449,7 @@ func check_d()
     assert(count(s, 0, 0, 119, 89, 1, 0, 0) > 50)      ## the tops of the first cube: tile 0
     assert(count(s, 0, 0, 119, 89, 0, 1, 0) > 100)     ## the sides: tile 1
     assert(count(s, 0, 0, 119, 89, 0.5, 0.5, 0.5) > 100)   ## the terrain
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene E: models, wires, transforms and quaternions ────────────────────
@@ -473,7 +473,7 @@ end
 func check_e()
     var s = image.load(SHOT + "e.png")
     assert(count(s, 0, 0, 119, 89, 0, 0, 0) < 120 * 90 - 1500)   ## the model covers a good part of the picture
-    image.unload(s)
+    image.free(s)
 end
 
 ## Wires use the stroke, solids the fill; the transforms move a solid as the 2D ones move a rectangle.
@@ -518,7 +518,7 @@ func check_f()
     assert(count(s, 30, 43, 90, 47, 0.75, 0.75, 0.75) > 30)   ## the grid
     assert(count(s, 80, 0, 115, 40, 1, 1, 0) > 100)    ## the transformed cube, tall and turned
     assert(count(s, 10, 0, 45, 40, 0, 1, 1) > 100)     ## the cube turned by the quaternion
-    image.unload(s)
+    image.free(s)
 end
 
 ## ── scene G: wires, an animated tile, a chunk slot reused, a block left open ─
@@ -550,7 +550,7 @@ func check_g()
     var s = image.load(SHOT + "g.png")
     assert(count(s, 0, 0, 119, 89, 1, 1, 1) > 100)     ## the wires
     assert(count(s, 0, 0, 119, 89, 0, 0, 0) > 120 * 90 - 1500)
-    image.unload(s)
+    image.free(s)
 end
 
 func draw()
