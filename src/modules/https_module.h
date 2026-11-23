@@ -15,7 +15,7 @@
 //             status and body, and `error` is nil. When nothing came back at all (no network, a refused
 //             connection, the time limit, a server that does not allow this page to read it) status is 0,
 //             body is "" and `error` says why.
-//   request   req.cancel() — the callback will not run;  req.done() — answered or cancelled
+//   request   req.cancel() — the callback will not run;  req.isDone() — answered or cancelled
 //
 // Only https:// addresses are accepted: a page served over HTTPS may not ask for anything else, and an
 // unencrypted exchange is not one this module offers. Mistakes in the call (a wrong address, a wrong type,

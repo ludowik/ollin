@@ -22,17 +22,17 @@ var seen = []
 var req = https.get("https://example.org/data", func(res)
     seen.push(res)
 end)
-assert(req.done() == false, "the answer has not been delivered yet")
+assert(req.isDone() == false, "the answer has not been delivered yet")
 assert(len(seen) == 0, "the callback never runs inside the call that made the request")
 https.update()
-assert(len(seen) == 1 and req.done() == true)
+assert(len(seen) == 1 and req.isDone() == true)
 var res = seen[1]
 assert(res.ok == false and res.status == 0 and res.body == "" and res.error == "unsupported")
 assert(res.url == "https://example.org/data" and res.statusText == "" and len(res.headers) == 0)
 https.update()
 assert(len(seen) == 1, "an answer is delivered once")
 req.cancel()
-assert(req.done() == true, "cancelling a finished request is harmless")
+assert(req.isDone() == true, "cancelling a finished request is harmless")
 
 ## ── Cancelling ─────────────────────────────────────────────────────────────
 var ran = 0
@@ -43,7 +43,7 @@ var kept = https.get("https://example.org/b", func(r)
     ran += 10
 end)
 cancelled.cancel()
-assert(cancelled.done() == true and kept.done() == false)
+assert(cancelled.isDone() == true and kept.isDone() == false)
 https.update()
 assert(ran == 10, "only the request that was not cancelled is answered")
 
@@ -68,7 +68,7 @@ first = https.get("https://example.org/first", func(r)
 end)
 https.update()
 assert(len(chain) == 1 and chain[1] == "first", "the request made by a callback waits for the next delivery")
-assert(first.done() == true)
+assert(first.isDone() == true)
 https.update()
 assert(len(chain) == 2 and chain[2] == "second")
 
@@ -78,7 +78,7 @@ https.update()
 var new = https.get("https://example.org/new", func(r)
     chain.push("new")
 end)
-assert(old.done() == true and new.done() == false, "a stale handle is not the request that took its slot")
+assert(old.isDone() == true and new.isDone() == false, "a stale handle is not the request that took its slot")
 old.cancel()
 https.update()
 assert(chain[len(chain)] == "new", "cancelling through a stale handle did nothing")
@@ -95,12 +95,12 @@ var dropped = https.get("https://example.org/dropped", func(r)
     delivered.push("dropped")
 end)
 assert(failure(func() https.update() end) == "boom", "the error reaches the caller of the delivery")
-assert(len(delivered) == 0 and bad.done() == true and after.done() == false, "the answer behind it waits")
+assert(len(delivered) == 0 and bad.isDone() == true and after.isDone() == false, "the answer behind it waits")
 dropped.cancel()
-assert(dropped.done() == true, "a request whose answer is waiting can still be cancelled")
+assert(dropped.isDone() == true, "a request whose answer is waiting can still be cancelled")
 https.update()
 assert(len(delivered) == 1 and delivered[1] == "after", "the next delivery runs what was left, minus what was cancelled")
-assert(after.done() == true)
+assert(after.isDone() == true)
 
 ## ── Options ────────────────────────────────────────────────────────────────
 var optionsRan = 0
@@ -164,7 +164,7 @@ end
 assert(failure(func() https.get("https://example.org/33", ignore) end) == "https.get: too many requests at once (32)")
 pending[1].cancel()
 var again = https.get("https://example.org/34", ignore)
-assert(again.done() == false, "a cancelled request frees its place")
+assert(again.isDone() == false, "a cancelled request frees its place")
 https.update()
 assert(failure(func() https.get("https://example.org/35", ignore) end) == nil, "after the answers, the places are free")
 https.update()
@@ -206,12 +206,12 @@ https.update()
 ## ── A method taken off its request is refused, not read from a stale register ──
 var detached = https.get("https://example.org/d", ignore)
 var cancelFn = detached.cancel
-var doneFn = detached.done
+var isDoneFn = detached.isDone
 assert(failure(func() cancelFn() end) == "request.cancel: expected a request")
-assert(failure(func() doneFn() end) == "request.done: expected a request")
+assert(failure(func() isDoneFn() end) == "request.isDone: expected a request")
 assert(failure(func() cancelFn(5) end) == "request.cancel: expected a request")
-assert(failure(func() doneFn({}) end) == "request.done: expected a request")
-assert(failure(func() doneFn({a: 1}) end) == "request.done: expected a request")
+assert(failure(func() isDoneFn({}) end) == "request.isDone: expected a request")
+assert(failure(func() isDoneFn({a: 1}) end) == "request.isDone: expected a request")
 https.update()
 
 ## ── A request handle is a Request ──────────────────────────────────────────

@@ -331,16 +331,16 @@ int method_cancel(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-int method_done(CallCtx& ctx) {
+int method_is_done(CallCtx& ctx) {
     if (ctx.argc < 1)
-        throw std::runtime_error("request.done: expected a request");
-    return ctx.ret(Value::make_bool(handle_slot(ctx.args[0], "request.done") < 0));
+        throw std::runtime_error("request.isDone: expected a request");
+    return ctx.ret(Value::make_bool(handle_slot(ctx.args[0], "request.isDone") < 0));
 }
 
 Value make_https_class() {
     return MapBuilder(Value::make_class("Request"))
         .fn("cancel", method_cancel)
-        .fn("done", method_done)
+        .fn("isDone", method_is_done)
         .done();
 }
 

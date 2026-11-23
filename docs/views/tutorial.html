@@ -2978,7 +2978,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
     <tr><td><code>https.query(url, fields)</code></td><td>The address followed by the fields of a map, in the order of their names: <code>?name=value&amp;…</code> (before a <code>#fragment</code>, which a request never carries). A <code>nil</code> field is left out; a value is a string, a number or a boolean</td></tr>
     <tr><td><code>https.update()</code></td><td>Delivers the answers by hand. Only a program with <strong>no</strong> <code>draw()</code> (a test) needs it: when the engine runs a loop it delivers by itself, and this call then does nothing</td></tr>
     <tr><td><code>req.cancel()</code></td><td>The callback will not run. Harmless once the request is answered</td></tr>
-    <tr><td><code>req.done()</code></td><td><code>true</code> once the request is answered or cancelled</td></tr>
+    <tr><td><code>req.isDone()</code></td><td><code>true</code> once the request is answered or cancelled</td></tr>
   </tbody>
 </table>
 <table>
