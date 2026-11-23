@@ -316,7 +316,7 @@ func mouse.released(x, y)
     pad.release()
 end
 ## The C key toggles the control camera; the movement itself reads keyboard.isDown.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if string.upper(key) == "C" then
         debugCam = not debugCam
     end

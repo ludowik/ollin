@@ -162,7 +162,7 @@ func openMenu()
     ui.close()
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if KEYS.has(key) then
         ACTIONS[KEYS[key]]()
     elseif key == "up" then

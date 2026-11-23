@@ -154,7 +154,7 @@ func setup()
     reset()
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         paused = not paused
     elseif key == "r" then

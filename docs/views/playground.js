@@ -299,8 +299,8 @@ const MODULE_MEMBERS = {
     cst('window.height','the render area height (px)'),
   ],
   keyboard: [
-    fn('keyboard.keypressed','keypressed(key) — to be defined: called on a press'),
-    fn('keyboard.keyrelease','keyrelease(key) — to be defined: called on a release'),
+    fn('keyboard.pressed','keyboard.pressed(key) — to be defined: called on a press'),
+    fn('keyboard.released','keyboard.released(key) — to be defined: called on a release'),
   ],
   mouse: [
     fn('mouse.pressed','pressed(x,y) — to be defined: called on a click'),

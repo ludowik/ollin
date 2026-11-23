@@ -247,7 +247,7 @@ end
 ## ── Input ──────────────────────────────────────────────────────────────────────────────────────────
 
 ## A text typed while the field is closed opens it with that text, as typing a letter always did, unless it is only spaces.
-## Once it is open the field takes the keys itself: neither typed nor keypressed is called.
+## Once it is open the field takes the keys itself: neither typed nor keyboard.pressed is called.
 func keyboard.typed(chars)
     if string.trim(chars) == "" then
         return
@@ -257,7 +257,7 @@ func keyboard.typed(chars)
 end
 
 ## The keys that WRITE nothing, by name.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "return" then
         ask(app.pages[app.index])
     elseif key == "left" then

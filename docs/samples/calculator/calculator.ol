@@ -75,7 +75,7 @@ func mouse.pressed(x, y)
 end
 
 ## The keyboard has no key names for the operators: only what it names is mapped.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "return" then
         pressKey("=")
     elseif key == "backspace" or key == "delete" then

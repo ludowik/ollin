@@ -393,7 +393,7 @@ func mouse.pressed(x, y)
 end
 
 ## The keyboard, for a computer: the digits, the arrows, backspace, p for the pencil and h for a hint.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if game.screen <> "play" or game.state <> "play" then
         return
     end

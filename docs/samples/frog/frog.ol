@@ -40,7 +40,7 @@ const KEY_BUTTON = {
     up: "up", w: "up", down: "down", s: "down", left: "left", a: "left", right: "right", d: "right", p: "pause", m: "sound"
 }
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         if not begin() and paused then
             paused = false

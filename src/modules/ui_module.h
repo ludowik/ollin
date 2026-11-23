@@ -26,7 +26,7 @@ void ui_reset();
 // Text entry (ui.textField), where the ui module meets the keyboard module. Only the raylib build has them: the stub has
 // no field to edit, and keyboard_module.cpp is itself part of that build only.
 // ui_editing()    a field is being edited. keyboard_poll then hands it the text and the control keys INSTEAD of the
-//                 script's keyboard.typed / keypressed, and keyboard.isDown answers false. It also ends an edit whose
+//                 script's keyboard.typed / keyboard.pressed, and keyboard.isDown answers false. It also ends an edit whose
 //                 field is no longer on display (removed, interface folded, another menu shown), without writing.
 // ui_wants_text() a field exists, which is what makes a phone's page take the focus when the canvas is touched.
 // ui_edit_text()  text typed while editing; ui_edit_key() a key NAME (return validates, escape cancels, backspace erases).

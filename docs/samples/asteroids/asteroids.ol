@@ -136,7 +136,7 @@ end
 
 ## Space does not fire from here: it is HELD, and the cadence in update reads it. Firing here too
 ## spent two of the four shots on a single press.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         if not unpause() then
             begin()

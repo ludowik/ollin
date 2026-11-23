@@ -108,7 +108,7 @@ end
 
 ## Space stops the gentle drift and starts it again; Return puts the model back as it was found.
 ## Both are key EVENTS and not held states: they say "do this once", unlike the arrows.
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         drifting = not drifting
     elseif key == "return" then

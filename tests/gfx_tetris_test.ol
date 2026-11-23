@@ -33,7 +33,7 @@ end
 
 func keyAsks(key)
     game.pressed = {}
-    keyboard.keypressed(key)
+    keyboard.pressed(key)
     return askedText()
 end
 game.state = "title"

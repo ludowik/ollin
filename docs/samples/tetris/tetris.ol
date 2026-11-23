@@ -71,7 +71,7 @@ func loadStyle()
     applyStyle()
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     var commands = KEY_COMMANDS[key]
     if commands then
         for command in commands do

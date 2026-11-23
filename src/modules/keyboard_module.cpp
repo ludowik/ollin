@@ -30,8 +30,8 @@ static bool query_blocked() {
 
 // Functions are assigned to the `keyboard` module and the engine calls whichever exist, with no
 // activation needed:
-//   keyboard.keypressed = func(key) ... end   key pressed (an event)
-//   keyboard.keyrelease = func(key) ... end   key released (an event)
+//   keyboard.pressed = func(key) ... end   key pressed (an event)
+//   keyboard.released = func(key) ... end   key released (an event)
 //   keyboard.typed = func(text) ... end       text typed (an event): what the keys PRODUCE, which a key name cannot say
 //   keyboard.show() / keyboard.hide()         the keyboard of a phone, which a canvas cannot raise by itself
 // plus a HELD-state builtin, for continuous movement:
@@ -40,9 +40,9 @@ static bool query_blocked() {
 // "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", "f1".."f12", and so on.
 // `text` is the characters the keyboard layout and the system made of the presses of the frame, in UTF-8: an accent,
 // a hyphen, an apostrophe, a capital, a dead key's result. A fast typist or a paste gives several characters in one
-// call. Control characters (return, tab, backspace) are never part of it: they are key names, for keypressed.
+// call. Control characters (return, tab, backspace) are never part of it: they are key names, for keyboard.pressed.
 // While a ui text field is edited it takes the text and the control keys instead (ui_editing, ui_module.h), and neither
-// typed nor keypressed is called.
+// typed nor keyboard.pressed is called.
 // On a phone the text comes from an invisible element of the page that holds the focus (docs/lib/pg-text-input.js): the
 // reasons, and what a browser accepts, are written there. On a computer it comes from raylib's character queue.
 //
@@ -131,7 +131,7 @@ static int kbd_is_down(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(down));
 }
 
-// Keys currently held, so that keyrelease can be emitted. Indexed by raylib keycode (< 512), and
+// Keys currently held, so that keyboard.released can be emitted. Indexed by raylib keycode (< 512), and
 // zero-initialized by static lifetime.
 static bool s_down[512];
 // Was any key pressed during THIS frame? raylib's queue is drained right here, so another module
@@ -278,7 +278,7 @@ static int kbd_hide(CallCtx& ctx) {
 
 // Clears the held state. Called at the start of every gfx_run: on the shared WASM instance
 // s_down is static and would otherwise survive from one run to the next, so a key held across a
-// reset would produce a keyrelease with no keypressed.
+// reset would produce a keyboard.released with no keyboard.pressed.
 void keyboard_reset() {
     for (int i = 0; i < 512; i++)
         s_down[i] = false;
@@ -302,8 +302,8 @@ void keyboard_poll() {
     Value kbd = vm->get_global("keyboard");
     Value pressed, released, typed;
     if (kbd.is_map()) {
-        pressed = kbd.map_get(Value(std::string("keypressed")));
-        released = kbd.map_get(Value(std::string("keyrelease")));
+        pressed = kbd.map_get(Value(std::string("pressed")));
+        released = kbd.map_get(Value(std::string("released")));
         typed = kbd.map_get(Value(std::string("typed")));
     }
     HostText host = host_text(typed.is_callable() || ui_wants_text());
@@ -312,7 +312,7 @@ void keyboard_poll() {
 
     if (s_blocked) {
         // The editor has focus, so the game no longer receives the keyboard. We RELEASE the keys
-        // still tracked (keyrelease, then clear) so none stays stuck, and drain the press queue so
+        // still tracked (keyboard.released, then clear) so none stays stuck, and drain the press queue so
         // they are not replayed when input is unblocked.
         for (int k = 0; k < 512; k++) {
             if (!s_down[k])
@@ -342,7 +342,7 @@ void keyboard_poll() {
         text.clear();
 
     // This frame's presses, taken from the key queue, which is robust to timing. We drain it and
-    // track the held state even without a keypressed callback, for keyrelease's sake.
+    // track the held state even without a keyboard.pressed callback, for keyboard.released's sake.
     int key;
     while ((key = GetKeyPressed()) != 0) {
         s_pressed_any = true;
@@ -378,7 +378,7 @@ void keyboard_poll() {
 }
 
 // The `keyboard` module exposes isDown(); the user additionally assigns
-// keypressed / keyrelease, read by keyboard_poll().
+// keyboard.pressed / keyboard.released, read by keyboard_poll().
 Value make_keyboard_module() {
     return MapBuilder()
         .fn("isDown", kbd_is_down)

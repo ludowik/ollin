@@ -2,7 +2,7 @@
 //  - On a computer: the text the keys PRODUCE reaches the script, which a key name cannot say (a capital, a hyphen, an
 //    apostrophe, an accent), no control character comes with it, and nothing is delivered while the page blocks the
 //    keyboard (the playground's editor has the focus).
-//  - A ui.textField takes the keys while it is edited: the program's typed() and keypressed() hear nothing, return
+//  - A ui.textField takes the keys while it is edited: the program's typed() and keyboard.pressed() hear nothing, return
 //    writes the variable and calls the callback, escape cancels, a click elsewhere validates and is not a click for the
 //    program, and the limit counts characters. On a touch screen the same field raises the keyboard of a program that
 //    never declared typed().
@@ -38,7 +38,7 @@ global clicks = 0
 func keyboard.typed(text)
     typedLog += "[" + text + "]"
 end
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     keyLog += key + ","
     if key == "f1" then
         assert(false, "NAME=" + name + " SEEN=" + seen + " TYPED=" + typedLog + " KEYS=" + keyLog + " CLICKS=" + clicks)
@@ -59,7 +59,7 @@ end
 const programFieldTouch = `
 global name = nil
 global seen = ""
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "f1" then
         assert(false, "NAME=" + name + " SEEN=" + seen)
     end
@@ -81,7 +81,7 @@ global taps = 0
 func keyboard.typed(text)
     typedLog += "[" + text + "]"
 end
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     keyLog += key + ","
     if key == "f2" then
         keyboard.hide()
@@ -103,7 +103,7 @@ global keyLog = ""
 func keyboard.typed(text)
     typedLog += "[" + text + "]"
 end
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     keyLog += key + ","
     if key == "f1" then
         assert(false, "TYPED=" + typedLog + " KEYS=" + keyLog)

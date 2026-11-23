@@ -3,8 +3,8 @@
 // Implementation in keyboard_module.cpp, which requires raylib.
 
 // Called once per frame from the render loop (graphics_module.cpp):
-// pumps the keys and calls keyboard.keypressed(key) and the others when they exist. /
-// keyboard.keyrelease(key) (key = a key name), and keyboard.typed(text) with the text the keys produced.
+// pumps the keys and calls keyboard.pressed(key) and the others when they exist. /
+// keyboard.released(key) (key = a key name), and keyboard.typed(text) with the text the keys produced.
 void keyboard_poll();
 
 // True when keyboard_poll saw at least one press during the current frame. Needed

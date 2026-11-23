@@ -62,7 +62,7 @@ func bandTap(y)
     return true
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         if not unpause() and not begin() then
             fire()

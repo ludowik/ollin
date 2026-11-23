@@ -22,7 +22,7 @@ An example fills the `stage` map in its `setup()`, then calls `openMenu()` and `
 | `cpp` | the engine's text, by function: `{first, lines, trimmed}` |
 | `skip` | adds the SKIP button, which runs to the next step flagged `event` |
 
-The callbacks `update`, `keyboard.keypressed` and `mouse.pressed` live in `stage.ol`: a module can declare them, a class
+The callbacks `update`, `keyboard.pressed` and `mouse.pressed` live in `stage.ol`: a module can declare them, a class
 cannot. A `const` of the program that imports the file is not visible from it, which is why the example's own words come
 through `stage`.
 

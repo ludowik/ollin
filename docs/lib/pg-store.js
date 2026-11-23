@@ -143,19 +143,27 @@ export async function listProjects() {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
-// TEMPORARY MIGRATION, to remove once the existing projects have been opened: the graphics module was
-// renamed `gfx` (with no alias), so a project written before keeps failing with "undeclared variable
-// 'graphics'". Opening a project rewrites the word in its scripts, and the rewrite is KEPT: stored, and
-// flagged to be pushed, so the project is updated for good and not at every opening. `graphics` as a field
-// (`a.graphics`), as a map key (`graphics:`) and as a file name (`graphics.ol`) is left alone. The edit time is not changed: opening
-// a project is not an edit by the user.
-const OLD_GFX_NAME = /(?<![.\w])graphics\b(?!\.ol|\s*:)/g
+// TEMPORARY MIGRATION, to remove once the existing projects have been opened: names of the engine were renamed
+// with no alias, so a project written before fails (`graphics`: "undeclared variable") or silently stops being
+// called (a keyboard callback). Opening a project rewrites the old names in its scripts, and the rewrite is KEPT:
+// stored, and flagged to be pushed, so the project is updated for good and not at every opening. The edit time is
+// not changed: opening a project is not an edit by the user. One line per rename: add one for the next.
+//   graphics -> gfx            the word alone; a field (`a.graphics`), a map key (`graphics:`) and a file name
+//                              (`graphics.ol`) are left alone
+//   keyboard.keypressed  -> keyboard.pressed
+//   keyboard.keyrelease  -> keyboard.released
+const OLD_NAMES = [
+  [/(?<![.\w])graphics\b(?!\.ol|\s*:)/g, 'gfx'],
+  [/\bkeyboard\.keypressed\b/g, 'keyboard.pressed'],
+  [/\bkeyboard\.keyrelease\b/g, 'keyboard.released'],
+]
 
-function migrateGfxName(record) {
+function migrateOldNames(record) {
   let changed = false
   for (const [name, text] of Object.entries(record.files || {})) {
     if (!name.endsWith('.ol') || typeof text !== 'string') continue
-    const migrated = text.replace(OLD_GFX_NAME, 'gfx')
+    let migrated = text
+    for (const [oldName, newName] of OLD_NAMES) migrated = migrated.replace(oldName, newName)
     if (migrated !== text) { record.files[name] = migrated; changed = true }
   }
   return changed
@@ -164,7 +172,7 @@ function migrateGfxName(record) {
 export async function getProject(id) {
   const store = await tx('readwrite')
   const record = (await reqAsync(store.get(id))) || null
-  if (record && migrateGfxName(record)) {
+  if (record && migrateOldNames(record)) {
     record.dirty = true
     await reqAsync(store.put(record))
   }

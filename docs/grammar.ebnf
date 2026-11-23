@@ -173,7 +173,7 @@ throwStmt      = "throw" expr NL ;
 funcDecl       = "func" IDENT [ "." IDENT ] "(" [ params ] ")" NL { stmt } "end" NL ;
                (* "func obj.field(...) ... end" is sugar for "obj.field = func(...) ... end":
                   it defines a function on a field of a map or a module, as in
-                  func keyboard.keypressed(key) ... end *)
+                  func keyboard.pressed(key) ... end *)
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
                  (* "..." among the parameters makes the function variadic. In the BODY, `...`

@@ -134,7 +134,7 @@ func mouse.doubleClicked(x, y)
     resetView()
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     if key == "space" then
         config.paused = not config.paused
     elseif key == "return" then

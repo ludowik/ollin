@@ -25,7 +25,7 @@ func window.resized(w, h)
     fitView(w, h)
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     keyPressed(key)
 end
 

@@ -245,7 +245,7 @@ func mouse.released(x, y)
     end
 end
 
-func keyboard.keypressed(key)
+func keyboard.pressed(key)
     ## The digits 1 to 8 play the eight notes, which is enough to try it on a physical keyboard.
     var i = DIGIT[key]
     if i then

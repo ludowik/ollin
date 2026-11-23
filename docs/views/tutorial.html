@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-22 20:48</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-23 19:37</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -459,7 +459,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-22 20:48</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-23 19:37</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -912,7 +912,7 @@ the same value, <code>"1"</code> and <code>1</code> are not.</p>
 <span class="bi">assert</span>(add(<span class="num">3</span>, <span class="num">4</span>) == <span class="num">7</span>)</code></pre>
 
 <h3>A function on a map field</h3>
-<p><code>func obj.field(...)</code> defines a function straight onto a field of a map or a module — sugar for <code>obj.field = func(...) ... end</code>. Handy for the engine hooks (<code>keyboard.keypressed</code>, for instance).</p>
+<p><code>func obj.field(...)</code> defines a function straight onto a field of a map or a module — sugar for <code>obj.field = func(...) ... end</code>. Handy for the engine hooks (<code>keyboard.pressed</code>, for instance).</p>
 <pre><code><span class="kw">var</span> obj = {}
 <span class="kw">func</span> obj.greet(name)
     <span class="kw">return</span> <span class="str">"greet "</span> + name
@@ -2398,8 +2398,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>keyboard.isDown(key)</code></td><td>Returns <code>true</code>/<code>false</code> according to whether the key is <strong>down right now</strong>; ask inside <code>draw</code>/<code>update</code></td></tr>
-    <tr><td><code>func keyboard.keypressed(key)</code></td><td>Called on every key <strong>press</strong>, as an event</td></tr>
-    <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
+    <tr><td><code>func keyboard.pressed(key)</code></td><td>Called on every key <strong>press</strong>, as an event</td></tr>
+    <tr><td><code>func keyboard.released(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
     <tr><td><code>func keyboard.typed(text)</code></td><td>Called with the <strong>text</strong> the keys produced, as an event — see below</td></tr>
     <tr><td><code>keyboard.show()</code></td><td>Asks for the <strong>keyboard of a phone</strong>; does nothing on a computer. Call it from a tap handler (<code>mouse.pressed</code>)</td></tr>
     <tr><td><code>keyboard.trace([lines])</code></td><td>The last <code>lines</code> (12 by default) of what the page saw of a phone's keyboard, as one text, newest last: the focus it took and lost, the keys it sent, the size of the visible area. A diagnostic — the <em>Keyboard diagnostic</em> example shows it on the screen. Empty outside the browser</td></tr>
@@ -2407,21 +2407,21 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 <p><code>key</code> is a <strong>key name</strong>: <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>, <code>"f1"</code>…<code>"f12"</code>.</p>
-<p><strong>Writing a text</strong> is what <code>keyboard.typed(text)</code> is for. A key name says which key was pressed, not what it wrote: <code>"a"</code> is the same key for <code>a</code> and <code>A</code>, and the hyphen, the apostrophe or an accented letter have no name at all. <code>text</code> is what the keyboard layout and the system made of the presses — <code>"A"</code>, <code>"-"</code>, <code>"é"</code> — as UTF-8. A fast typist or a paste can give several characters in one call. The control keys (<code>"return"</code>, <code>"tab"</code>, <code>"backspace"</code>) never come in it: they stay key names, for <code>keypressed</code>. A key pressed that writes something calls both, <code>keypressed</code> first.</p>
+<p><strong>Writing a text</strong> is what <code>keyboard.typed(text)</code> is for. A key name says which key was pressed, not what it wrote: <code>"a"</code> is the same key for <code>a</code> and <code>A</code>, and the hyphen, the apostrophe or an accented letter have no name at all. <code>text</code> is what the keyboard layout and the system made of the presses — <code>"A"</code>, <code>"-"</code>, <code>"é"</code> — as UTF-8. A fast typist or a paste can give several characters in one call. The control keys (<code>"return"</code>, <code>"tab"</code>, <code>"backspace"</code>) never come in it: they stay key names, for <code>keyboard.pressed</code>. A key pressed that writes something calls both, <code>keyboard.pressed</code> first.</p>
 <pre><code><span class="kw">global</span> name = <span class="str">""</span>
 <span class="kw">func</span> keyboard.typed(text)
     name += text
 <span class="kw">end</span>
-<span class="kw">func</span> keyboard.keypressed(key)
+<span class="kw">func</span> keyboard.pressed(key)
     <span class="kw">if</span> key == <span class="str">"backspace"</span> <span class="kw">then</span>
         name = <span class="bi">string</span>.substr(name, <span class="num">1</span>, <span class="bi">len</span>(name) - <span class="num">1</span>)
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
-<p><strong>On a phone</strong> the system keyboard is not something a canvas can raise by itself, so a program asks for it: <code>keyboard.show()</code> from the handler of a tap (the box the user touches to write), <code>keyboard.hide()</code> when the writing is over. Declaring <code>keyboard.typed</code> is what tells the page that the program wants text: from then on the first touch of the canvas gets ready for the keyboard, and <code>show()</code> lets it come. The text arrives through <code>typed</code> in the same way as from a physical keyboard, with two differences to know: the straight apostrophe and the straight quote come as typed, because the phone's curly ones (<code>‘ ’ “ ”</code>) are turned back into <code>'</code> and <code>"</code>; and the control keys (<code>"return"</code>, <code>"backspace"</code>) are still key names, for <code>keypressed</code>. To edit a text without drawing the field yourself, see <code>ui.textField</code> in <a href="#ui">The ui module</a>.</p>
+<p><strong>On a phone</strong> the system keyboard is not something a canvas can raise by itself, so a program asks for it: <code>keyboard.show()</code> from the handler of a tap (the box the user touches to write), <code>keyboard.hide()</code> when the writing is over. Declaring <code>keyboard.typed</code> is what tells the page that the program wants text: from then on the first touch of the canvas gets ready for the keyboard, and <code>show()</code> lets it come. The text arrives through <code>typed</code> in the same way as from a physical keyboard, with two differences to know: the straight apostrophe and the straight quote come as typed, because the phone's curly ones (<code>‘ ’ “ ”</code>) are turned back into <code>'</code> and <code>"</code>; and the control keys (<code>"return"</code>, <code>"backspace"</code>) are still key names, for <code>keyboard.pressed</code>. To edit a text without drawing the field yourself, see <code>ui.textField</code> in <a href="#ui">The ui module</a>.</p>
 <p>Without a <code>typed</code> function the page does nothing to the touches of the canvas, so a program that does not write text is not changed.</p>
 <pre><code><span class="bi">gfx</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
-<span class="kw">func</span> keyboard.keypressed(key)
+<span class="kw">func</span> keyboard.pressed(key)
     last = key
 <span class="kw">end</span>
 <span class="kw">func</span> draw()
@@ -2607,7 +2607,7 @@ ui.slider(<span class="str">"Speed"</span>, <span class="kw">ref</span> speed, <
 
 <h3>Text fields</h3>
 <p>A text field edits a string in place. A click on its row starts the edit: the row gets an accent outline and a blinking cursor, and on a phone the system keyboard comes up. What is typed goes into a <strong>draft</strong>; the variable is written only when the edit is <strong>validated</strong>, by <strong>return</strong> or by a <strong>click anywhere else</strong> (that click is consumed, so it does not also press whatever lies under it). <strong>Escape</strong> cancels and leaves the variable as it was. Backspace erases one character, an accented letter or an emoji included. The text is edited at its end only: there is no cursor to move, no selection and no paste in this version. A text longer than the field shows its end.</p>
-<p>While a field is being edited it <strong>owns the keyboard</strong>: <code>keyboard.typed</code> and <code>keypressed</code> are not called, and <code>keyboard.isDown</code> answers <code>false</code>. A program that declares no <code>keyboard.typed</code> still gets text, since the field alone is enough to ask for it. Folding the interface, showing another menu or removing the field ends the edit <strong>without writing</strong> and without calling anything.</p>
+<p>While a field is being edited it <strong>owns the keyboard</strong>: <code>keyboard.typed</code> and <code>keyboard.pressed</code> are not called, and <code>keyboard.isDown</code> answers <code>false</code>. A program that declares no <code>keyboard.typed</code> still gets text, since the field alone is enough to ask for it. Folding the interface, showing another menu or removing the field ends the edit <strong>without writing</strong> and without calling anything.</p>
 <pre><code><span class="kw">global</span> name = <span class="kw">nil</span>
 ui.textField(<span class="str">"Name"</span>, <span class="kw">ref</span> name, <span class="num">20</span>, <span class="str">"your name"</span>, <span class="kw">func</span>(text) print(<span class="str">"hello {text}"</span>) <span class="kw">end</span>)
 ui.open()</code></pre>
