@@ -136,12 +136,8 @@ assert(humansTurn() and humanDrop(4), "the human is player 2, with three in colu
 assert(outcome.winner == 2 and scores[2].wins == 1 and scores[2].fastest == 4, "and wins as player 2: four discs of its own")
 
 ## ── A drawn game ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-var almost = []
-for i = 1, CELLS - 1 do
-    almost.push(DRAW[i])
-end
 fresh(2, true)
-position(almost, 1)
+position(ALMOST_DRAW, 1)
 assert(not humansTurn() and thinker <> nil, "the last disc is the computer's")
 untilMoves(CELLS)
 assert(outcome.winner == 0 and outcome.result == "draw" and #outcome.cells == 0 and scores[2].draws == 1 and scores[2].streak == 0, "a full grid is a draw")
@@ -150,7 +146,7 @@ assert(state == "over")
 fresh(2, true)
 scores[2].streak = 1
 scores[2].bestStreak = 1
-position(almost, 2)
+position(ALMOST_DRAW, 2)
 assert(humansTurn() and humanDrop(DRAW[CELLS]), "the human can play the last disc as well")
 assert(outcome.winner == 0 and scores[2].draws == 1 and scores[2].streak == 0)
 

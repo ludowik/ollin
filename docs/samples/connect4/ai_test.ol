@@ -79,11 +79,7 @@ for level in LEVELS do
         assert(canDrop(b, chooseMove(b, level, rng)), "{level.name}: a full column is not played")
     end
 end
-var almost = []
-for i = 1, CELLS - 1 do
-    almost.push(DRAW[i])
-end
-b = replay(almost)
+b = replay(ALMOST_DRAW)
 assert(openColumns(b).len() == 1, "one cell of the grid is left")
 for level in LEVELS do
     assert(chooseMove(b, level, rng) == openColumns(b)[1], "{level.name}: the only open column is the move")

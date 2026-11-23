@@ -17,7 +17,7 @@ global thinkTime = 0.0
 global fall = nil           ## the disc in the air: {col, row, who, t, dur}
 global outcome = nil        ## how the game ended: {result ("win", "loss" or "draw" for the human), winner (1, 2, or 0 for a draw), cells (the four, or none)}
 global hover = 4            ## the column the next disc is aimed at
-global rng = nil
+global rng = Random()
 global resumable = nil      ## a game in progress that was kept, which the title can go on with
 global viewH = VIEW_MIN    ## the height of the field: it follows the shape of the area
 

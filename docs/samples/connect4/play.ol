@@ -16,18 +16,19 @@ func beginThinking()
     thinkTime = 0.0
 end
 
+func stopThinking()
+    thinker = nil
+    thought = nil
+end
+
 ## Puts the game in the state a game is in when it begins or goes on: nothing in the air, nothing being thought, nobody has won.
 func settle()
     computer = 3 - human
     outcome = nil
     fall = nil
-    thinker = nil
-    thought = nil
+    stopThinking()
     hover = 4
     state = "play"
-    if rng == nil then
-        rng = Random()
-    end
     if toMove(game) == computer then
         beginThinking()
     end
@@ -37,11 +38,7 @@ end
 func newGame()
     forgetGame()
     game = newBoard()
-    if humanFirst then
-        human = 1
-    else
-        human = 2
-    end
+    human = humanFirst and 1 or 2
     settle()
 end
 
@@ -63,7 +60,7 @@ func endGame(winner)
 end
 
 ## Drops a disc for whoever's turn it is, in a column that is open.
-func place(col)
+func dropDisc(col)
     var row = heightOf(game, col)
     fall = {col: col, row: row, who: toMove(game), t: 0.0, dur: FALL_BASE + FALL_PER_ROW * (ROWS - 1 - row)}
     drop(game, col)
@@ -80,7 +77,7 @@ end
 ## The human drops a disc in `col`. Whether the disc went in: it is refused outside the human's turn, while another is falling, and in a full column.
 func humanDrop(col)
     if humansTurn() and canDrop(game, col) then
-        place(col)
+        dropDisc(col)
         return true
     end
     return false
@@ -110,9 +107,8 @@ func think(dt)
     end
     if thought <> nil and thinkTime >= MIN_THINK then
         var col = thought
-        thought = nil
-        thinker = nil
-        place(col)
+        stopThinking()
+        dropDisc(col)
     end
 end
 
@@ -136,8 +132,7 @@ func undoMove()
     if not canUndo() then
         return false
     end
-    thinker = nil
-    thought = nil
+    stopThinking()
     undo(game)
     while toMove(game) <> human and game.count > 0 do
         undo(game)
@@ -152,8 +147,7 @@ end
 
 ## Back to the title: a game in progress is kept, and can be gone on with.
 func goTitle()
-    thinker = nil
-    thought = nil
+    stopThinking()
     fall = nil
     state = "title"
 end

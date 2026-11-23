@@ -5,7 +5,7 @@ import "layout.ol"
 
 assert(viewHeight(400, 800) == VIEW_MAX and viewHeight(390, 844) == VIEW_MAX, "a tall screen gets a tall field")
 assert(viewHeight(1000, 500) == VIEW_MIN and viewHeight(400, 5000) == VIEW_MAX and viewHeight(400, 640) == 640, "within bounds, as tall as the shape asks")
-assert(playHeight() <= VIEW_MIN, "the game's screen fits the smallest field: {playHeight()}")
+assert(PLAY_H <= VIEW_MIN, "the game's screen fits the smallest field: {PLAY_H}")
 
 ## a rectangle is in the field, and a point is in a rectangle
 func inside(r, viewH)

@@ -165,6 +165,20 @@ while b.count > 0 do
 end
 assert(b.mine[1] == 0 and b.mine[2] == 0 and b.next.join(",") == newBoard().next.join(",") and #b.moves == 0, "everything taken back is an empty grid")
 
+## the four cells of a line, in each of the four directions
+func cellList(b)
+    var out = []
+    for c in winningCells(b) do
+        out.push("{c.col}.{c.row}")
+    end
+    return out.join(" ")
+end
+assert(cellList(replay([1, 1, 2, 2, 3, 3, 4])) == "1.0 2.0 3.0 4.0", "across")
+assert(cellList(replay([2, 3, 2, 3, 2, 3, 2])) == "2.0 2.1 2.2 2.3", "up")
+assert(cellList(replay([1, 2, 2, 3, 4, 3, 3, 4, 5, 4, 4])) == "1.0 2.1 3.2 4.3", "up and to the right")
+assert(cellList(replay([7, 6, 6, 5, 4, 5, 5, 4, 3, 4, 4])) == "4.3 5.2 6.1 7.0", "up and to the left")
+assert(cellList(newBoard()) == "", "no line, no cells")
+
 ## place and lift are drop and undo without the history
 b = play([4, 4, 3])
 var kept = [b.mine[1], b.mine[2], b.count, b.next.join(","), b.moves.join(",")]

@@ -25,14 +25,12 @@ func viewHeight(w, h)
 end
 
 ## The room the screen of a game takes, in pixels.
-func playHeight()
-    return HEADER_H + GAP + AIM_H + BOARD_H + 2 * PANEL_PAD + GAP + STATUS_H + GAP + BUTTON_H + MARGIN
-end
+const PLAY_H = HEADER_H + GAP + AIM_H + BOARD_H + 2 * PANEL_PAD + GAP + STATUS_H + GAP + BUTTON_H + MARGIN
 
 ## The screen of a game, in a field `viewH` tall: the header, the strip where the disc is held, the grid, the line that says what is
 ## going on, and two buttons under it.
 func playLayout(viewH)
-    var y = (viewH - playHeight()) // 2
+    var y = (viewH - PLAY_H) // 2
     var lay = {headerY: y}
     y += HEADER_H + GAP
     lay.aimTop = y

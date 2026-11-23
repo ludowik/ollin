@@ -60,11 +60,7 @@ state = "play"
 ## ── What is trusted ──────────────────────────────────────────────────────────────────────────────────────────────────────
 assert(comesBack(good([])), "no disc yet is a game")
 assert(comesBack(good([4, 3, 4, 3])))
-var almost = []
-for i = 1, CELLS - 1 do
-    almost.push(DRAW[i])
-end
-assert(comesBack(good(almost)), "a grid with one cell left is a game")
+assert(comesBack(good(ALMOST_DRAW)), "a grid with one cell left is a game")
 assert(comesBack({v: GAME_VERSION, level: 1, human: 2, moves: [4]}) and resumable.human == 2 and resumable.level == 1)
 
 ## ── What is not ──────────────────────────────────────────────────────────────────────────────────────────────────────────

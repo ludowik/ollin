@@ -5,13 +5,13 @@
 import "play.ol"
 import "layout.ol"
 
-global pointer = nil        ## the finger or the mouse that is down on the grid: {id}
+global pointerId = nil      ## the finger or the mouse that is down on the grid
 
 ## A lift that was never seen must not leave the screen deaf to the next touch: with no finger and no button down, nobody holds the
 ## screen. Called every frame with what the engine says.
 func releaseLostPointer(touches, mouseHeld)
-    if pointer <> nil and touches == 0 and not mouseHeld then
-        pointer = nil
+    if pointerId <> nil and touches == 0 and not mouseHeld then
+        pointerId = nil
     end
 end
 
@@ -55,7 +55,7 @@ end
 func pressPlay(id, x, y)
     var lay = playLay()
     if inBoardZone(lay, x, y) then
-        pointer = {id: id}
+        pointerId = id
         aim(x)
     elseif inRect(x, y, lay.left) then
         undoMove()
@@ -75,7 +75,7 @@ end
 
 ## A finger, or the mouse, goes down at x, y. Only one at a time is followed; `id` can be 0, which is why it is compared and never tested.
 func pointerDown(id, x, y)
-    if pointer <> nil then
+    if pointerId <> nil then
         return
     end
     if state == "title" then
@@ -95,10 +95,10 @@ end
 
 ## It lifts: a disc is dropped in the column it is over, when it was aimed and is still over the grid.
 func pointerUp(id, x, y)
-    if pointer == nil or pointer.id <> id then
+    if pointerId == nil or pointerId <> id then
         return
     end
-    pointer = nil
+    pointerId = nil
     var lay = playLay()
     if state == "play" and inBoardZone(lay, x, y) then
         hover = columnAt(x)
@@ -106,7 +106,15 @@ func pointerUp(id, x, y)
     end
 end
 
-const DIGIT_COLUMN = {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7}
+func makeDigitColumns()
+    var columns = {}
+    for col = 1, COLS do
+        columns["{col}"] = col
+    end
+    return columns
+end
+
+const DIGIT_COLUMN = makeDigitColumns()
 
 func keyTitle(key)
     if key == "left" then

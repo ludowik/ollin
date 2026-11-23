@@ -5,6 +5,17 @@ import "board.ol"
 ## A full game in which nobody has four in a row: 42 columns, found by random play.
 const DRAW = [2,7,2,3,3,7,6,4,7,3,7,3,1,2,6,1,1,1,2,6,6,3,2,2,5,1,3,1,4,4,6,7,6,4,7,5,4,4,5,5,5,5]
 
+## The same game one move short: one cell of the grid is left.
+func makeAlmostDraw()
+    var list = []
+    for i = 1, CELLS - 1 do
+        list.push(DRAW[i])
+    end
+    return list
+end
+
+const ALMOST_DRAW = makeAlmostDraw()
+
 ## The grid after a list of columns, with no rule applied but gravity.
 func play(list)
     var b = newBoard()

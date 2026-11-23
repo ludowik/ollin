@@ -7,7 +7,7 @@ up four, across, up or on a diagonal.
 
 - **The grid is two integers.** Each player's discs are one 49-bit integer, a bit per square: a column takes seven bits, its six squares
   and a guard bit above them that is never set, so that a line cannot run from the top of one column into the foot of the next. A line
-  of four is then four shifts and four ANDs (`hasFour` in `board.ol`). That is what makes a search fast enough for an interpreter: a
+  of four is then two shifts and two ANDs a direction (`hasFour` in `board.ol`). That is what makes a search fast enough for an interpreter: a
   complete random game is played in well under a millisecond, and the test checks the bits against a plain scan of a grid it keeps by
   itself, on four hundred random games.
 - **Negamax with alpha-beta pruning** (`ai.ol`), the columns tried from the middle outwards. A position where the player to move can
@@ -17,8 +17,8 @@ up four, across, up or on a diagonal.
   squares that would complete four for each side.
 - **Ties are broken at random**, among the columns that are equally good, so two games are not the same.
 - **Three levels**: Easy looks two moves ahead and plays a column at random three times in ten; Medium looks five ahead; Hard looks nine.
-  Measured in the browser, a search of nine moves takes between a quarter of a second and six tenths of one; ten took up to two
-  seconds, which was too much for a phone.
+  Measured in the browser before the search was made about a third faster, nine moves took between a quarter of a second and six
+  tenths of one, and ten took up to two seconds, which was too much for a phone.
 - **It thinks between frames.** The search is a coroutine that gives the screen back every 500 positions with a bare `yield`, and the
   game gives it six milliseconds a frame (`thinkFor`). The grid goes on being drawn while the computer thinks, and the computer waits
   at least 0.45 seconds before it answers, however quick it was, so that a reply is seen to come. Outside a coroutine the same function

@@ -2,41 +2,20 @@
 ##
 ## Each player's discs are ONE integer, a bit per cell. A column takes STRIDE bits, its six cells and a guard bit above them
 ## that is never set, so that a line of discs cannot run from the top of one column into the foot of the next: a line of four
-## is then four shifts and four ANDs, which is what makes a search fast enough for an interpreter. Bit (col - 1) * STRIDE + row
-## is the cell of column col (1 to COLS, from the left) and row `row` (0 to ROWS - 1, from the bottom).
+## is then two shifts and two ANDs a direction, which is what makes a search fast enough for an interpreter. Bit
+## (col - 1) * STRIDE + row is the cell of column col (1 to COLS, from the left) and row `row` (0 to ROWS - 1, from the bottom).
 
 const COLS = 7
 const ROWS = 6
 const CELLS = COLS * ROWS
 const STRIDE = ROWS + 1
 
-## The four ways a line can run, as a step of {columns, rows}: across, up, and the two diagonals. Every rule that looks at lines
-## takes them from here: in bits, a step is the distance between two neighbours of a line (LINE_SHIFTS).
-const DIRECTIONS = [[1, 0], [0, 1], [1, 1], [1, -1]]
-
-func lineShifts()
-    var shifts = []
-    for dir in DIRECTIONS do
-        shifts.push(dir[1] * STRIDE + dir[2])
-    end
-    return shifts
-end
-
-const LINE_SHIFTS = lineShifts()
+## The four ways a line can run, as the distance in bits between two neighbours of a line: across, up, and the two diagonals.
+const LINE_SHIFTS = [STRIDE, 1, STRIDE + 1, STRIDE - 1]
 const SHIFT_A = LINE_SHIFTS[1]          ## the four, named, for the loops that run a million times and must not iterate a list
 const SHIFT_B = LINE_SHIFTS[2]
 const SHIFT_C = LINE_SHIFTS[3]
 const SHIFT_D = LINE_SHIFTS[4]
-
-func makeBoardMask()
-    var mask = 0
-    for col = 1, COLS do
-        mask = mask | (((1 << ROWS) - 1) << ((col - 1) * STRIDE))
-    end
-    return mask
-end
-
-const BOARD_MASK = makeBoardMask()      ## the bits that are squares, not guards
 
 ## The first bit of a column that is no square — its guard: a disc goes in while the next bit of the column is below it.
 func makeColumnTops()
@@ -48,6 +27,17 @@ func makeColumnTops()
 end
 
 const COLUMN_TOP = makeColumnTops()
+
+func makeFeet()
+    var m = 0
+    for col = 1, COLS do
+        m = m | (1 << ((col - 1) * STRIDE))
+    end
+    return m
+end
+
+const FEET = makeFeet()                 ## the bit of the lowest square of every column
+const BOARD_MASK = FEET * ((1 << ROWS) - 1)     ## the bits that are squares, not guards
 
 ## An empty grid. `mine` holds the discs of player 1 (who moves first) and of player 2; `next` the index of the bit a disc
 ## dropped in each column takes; `moves` the columns played, in order, which is also how a game is undone and saved.
@@ -73,9 +63,14 @@ func heightOf(b, col)
     return b.next[col] - (col - 1) * STRIDE
 end
 
+## The player who plays the i-th move of a game (1 to ...): the first moves first.
+func playerOfMove(i)
+    return (i - 1) % 2 + 1
+end
+
 ## The player whose turn it is, 1 or 2.
 func toMove(b)
-    return b.count % 2 + 1
+    return playerOfMove(b.count + 1)
 end
 
 ## Puts a disc of the player to move in column `col`, which must be open, and takes it back: the grid without its history. A
@@ -124,7 +119,7 @@ end
 
 ## Whether the disc just played completed a line: only the player who moved last can have, so the other's discs are not looked at.
 func justWon(b)
-    return b.count > 0 and hasFour(b.mine[(b.count - 1) % 2 + 1])
+    return b.count > 0 and hasFour(b.mine[playerOfMove(b.count)])
 end
 
 ## The player who has four in a row, 1 or 2, or 0 when nobody has.
@@ -151,16 +146,6 @@ func openColumns(b)
     end
     return list
 end
-
-func makeFeet()
-    var m = 0
-    for col = 1, COLS do
-        m = m | (1 << ((col - 1) * STRIDE))
-    end
-    return m
-end
-
-const FEET = makeFeet()                 ## the bit of the lowest square of every column
 
 ## The squares a disc can be dropped on now, one per open column: adding one at the foot of a column carries up through its discs to
 ## the first free square, and into the guard bit, which BOARD_MASK drops, when the column is full.
@@ -203,29 +188,22 @@ func cellAt(b, col, row)
     return 0
 end
 
-## The first line of four cells found, as a list of {col, row}, or an empty list: what the screen lights when a game is won.
+## The first line of four found, as a list of {col, row}, or an empty list: what the screen lights when a game is won. A line of
+## four starts at a bit that is set where `bits & (bits >> s)` has a pair two steps further on; the lowest such bit is found.
 func winningCells(b)
-    for col = 1, COLS do
-        for row = 0, ROWS - 1 do
-            var who = cellAt(b, col, row)
-            if who == 0 then
-                continue
-            end
-            for dir in DIRECTIONS do
-                var cells = [{col: col, row: row}]
-                var c = col
-                var r = row
-                while #cells < 4 do
-                    c += dir[1]
-                    r += dir[2]
-                    if c < 1 or c > COLS or r < 0 or r >= ROWS or cellAt(b, c, r) <> who then
-                        break
-                    end
-                    cells.push({col: c, row: r})
+    for who = 1, 2 do
+        var bits = b.mine[who]
+        for s in LINE_SHIFTS do
+            var pairs = bits & (bits >> s)
+            var starts = pairs & (pairs >> 2 * s)
+            if starts <> 0 then
+                var low = countBits((starts & -starts) - 1)
+                var cells = []
+                for i = 0, 3 do
+                    var at = low + i * s
+                    cells.push({col: at // STRIDE + 1, row: at % STRIDE})
                 end
-                if #cells == 4 then
-                    return cells
-                end
+                return cells
             end
         end
     end

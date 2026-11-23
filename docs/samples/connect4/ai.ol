@@ -27,14 +27,13 @@ const LEVELS = [
 ]
 
 global nodes = 0                ## how many positions the last search looked at
-global leaf = nil               ## what is worth a position when the search stops looking: set below, and replaced by a test
 
 ## How much the player to move is ahead by the positions of the discs alone: the weight of the columns, for them minus for the other.
 func positional(b)
     var who = toMove(b)
     var total = 0
     for i, col in b.moves do
-        if (i - 1) % 2 + 1 == who then
+        if playerOfMove(i) == who then
             total += COLUMN_WEIGHT[col]
         else
             total -= COLUMN_WEIGHT[col]
@@ -56,7 +55,7 @@ func evaluate(b, bal, mineThreats = nil)
     return bal + THREAT * (countBits(mineThreats & empty) - countBits(threatCells(theirs) & empty))
 end
 
-leaf = evaluate
+global leaf = evaluate          ## what is worth a position when the search stops looking: a test replaces it
 
 func checkpoint()
     if coroutine.isYieldable() then
@@ -88,20 +87,16 @@ func negamax(b, depth, alpha, beta, bal, ply, mineThreats = nil)
     end
     var theirThreats = threatCells(b.mine[3 - who])
     var danger = theirThreats & playable
-    var forced = 0
+    var forced = 0                        ## the square that has to be blocked, when the other side threatens exactly one
     if danger <> 0 and depth >= 2 then
         if (danger & (danger - 1)) <> 0 then
             return -(WIN - ply - 1)       ## two squares to block, and only one disc to block with: the other side wins next move
         end
-        for col = 1, COLS do
-            if (1 << b.next[col]) == danger then
-                forced = col
-            end
-        end
+        forced = danger
     end
     var best = -INFINITY
     for col in CENTRE_FIRST do
-        if (forced == 0 or col == forced) and b.next[col] < COLUMN_TOP[col] then
+        if (forced == 0 or (1 << b.next[col]) == forced) and b.next[col] < COLUMN_TOP[col] then
             place(b, col)
             var v = -negamax(b, depth - 1, -beta, -alpha, -(bal + COLUMN_WEIGHT[col]), ply + 1, theirThreats)
             lift(b, col)

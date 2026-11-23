@@ -16,6 +16,7 @@ const KEY_FILL = Color(0.14, 0.18, 0.32)
 const KEY_EDGE = Color(0.5, 0.58, 0.82)
 const KEY_OFF  = Color(0.09, 0.11, 0.2)
 const KEY_TEXT_OFF = Color(0.4, 0.44, 0.58)
+const KEY_EDGE_OFF = Color(0.2, 0.24, 0.36)
 const DISC_R   = CELL / 2 - 5
 
 func discColour(player)
@@ -56,6 +57,7 @@ end
 
 ## A button; `primary` is the one a screen wants pressed.
 func drawButton(r, text, enabled, primary)
+    var ink = TEXT
     gfx.strokeSize(2)
     if enabled and primary then
         gfx.fill(PANEL)
@@ -65,15 +67,12 @@ func drawButton(r, text, enabled, primary)
         gfx.stroke(KEY_EDGE)
     else
         gfx.fill(KEY_OFF)
-        gfx.stroke(Color(0.2, 0.24, 0.36))
+        gfx.stroke(KEY_EDGE_OFF)
+        ink = KEY_TEXT_OFF
     end
     gfx.rect(r.x, r.y, r.w, r.h, 12)
     gfx.noStroke()
-    if enabled then
-        label(text, r.x + r.w / 2, r.y + r.h / 2, 20, TEXT, "center")
-    else
-        label(text, r.x + r.w / 2, r.y + r.h / 2, 20, KEY_TEXT_OFF, "center")
-    end
+    label(text, r.x + r.w / 2, r.y + r.h / 2, 20, ink, "center")
 end
 
 ## The grid: the blue panel, a hole for every square, and the discs in them.
@@ -86,14 +85,16 @@ func drawBoard(lay)
     gfx.rect(p.x, p.y, p.w, p.h, 16)
     gfx.fill(HOLE)
     for col = 1, COLS do
+        var x = cellX(col)
         for row = 0, ROWS - 1 do
-            gfx.circle(cellX(col), cellY(lay, row), DISC_R)
+            gfx.circle(x, cellY(lay, row), DISC_R)
         end
     end
     for col = 1, COLS do
+        var x = cellX(col)
         for row = 0, heightOf(game, col) - 1 do
             if fall == nil or col <> fall.col or row <> fall.row then
-                drawDisc(cellX(col), cellY(lay, row), cellAt(game, col, row), 1.0)
+                drawDisc(x, cellY(lay, row), cellAt(game, col, row), 1.0)
             end
         end
     end
