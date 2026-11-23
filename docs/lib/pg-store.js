@@ -143,9 +143,32 @@ export async function listProjects() {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
+// TEMPORARY MIGRATION, to remove once the existing projects have been opened: the graphics module was
+// renamed `gfx` (with no alias), so a project written before keeps failing with "undeclared variable
+// 'graphics'". Opening a project rewrites the word in its scripts, and the rewrite is KEPT: stored, and
+// flagged to be pushed, so the project is updated for good and not at every opening. `graphics` as a field
+// (`a.graphics`), as a map key (`graphics:`) and as a file name (`graphics.ol`) is left alone. The edit time is not changed: opening
+// a project is not an edit by the user.
+const OLD_GFX_NAME = /(?<![.\w])graphics\b(?!\.ol|\s*:)/g
+
+function migrateGfxName(record) {
+  let changed = false
+  for (const [name, text] of Object.entries(record.files || {})) {
+    if (!name.endsWith('.ol') || typeof text !== 'string') continue
+    const migrated = text.replace(OLD_GFX_NAME, 'gfx')
+    if (migrated !== text) { record.files[name] = migrated; changed = true }
+  }
+  return changed
+}
+
 export async function getProject(id) {
-  const store = await tx('readonly')
-  return (await reqAsync(store.get(id))) || null
+  const store = await tx('readwrite')
+  const record = (await reqAsync(store.get(id))) || null
+  if (record && migrateGfxName(record)) {
+    record.dirty = true
+    await reqAsync(store.put(record))
+  }
+  return record
 }
 
 // Builds an id (a slug) unique in the database from the name: my-game, my-game-2, … `exclude` is
