@@ -189,12 +189,12 @@ static int math_lerp(CallCtx& ctx) {
 }
 
 // A zero-width interval is a step at `lo`, where the division would give nan.
-static int math_smoothstep(CallCtx& ctx) {
+static int math_smooth_step(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double lo = num_arg(args, argc, 0, "math.smoothstep");
-    double hi = num_arg(args, argc, 1, "math.smoothstep");
-    double x = num_arg(args, argc, 2, "math.smoothstep");
+    double lo = num_arg(args, argc, 0, "math.smoothStep");
+    double hi = num_arg(args, argc, 1, "math.smoothStep");
+    double x = num_arg(args, argc, 2, "math.smoothStep");
     if (hi == lo)
         return ctx.ret(num_value(x < lo ? 0.0 : 1.0));
     double t = (x - lo) / (hi - lo);
@@ -357,7 +357,7 @@ Value make_math_module() {
         .fn("pow", math_pow)
         .fn("clamp", math_clamp)
         .fn("lerp", math_lerp)
-        .fn("smoothstep", math_smoothstep)
+        .fn("smoothStep", math_smooth_step)
         .fn("hypot", math_hypot)
         .fn("approach", math_approach)
         .fn("min", math_min)

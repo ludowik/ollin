@@ -1166,9 +1166,9 @@ check_error "math.approach without its time step" \
     'math.approach(0, 1, 6)' \
     "math.approach"
 
-check_error "math.smoothstep with a non-number" \
-    'math.smoothstep(0, 1, nil)' \
-    "math.smoothstep"
+check_error "math.smoothStep with a non-number" \
+    'math.smoothStep(0, 1, nil)' \
+    "math.smoothStep"
 
 check_error "math.randInt without argument" \
     'math.randInt()' \

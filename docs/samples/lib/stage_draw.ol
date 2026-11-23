@@ -253,7 +253,7 @@ func drawCode(r, i, t, s)
     var rows = math.max(math.floor((bottom - top) / lh), 1)
 
     ## the view and the bar glide from the previous line to this one, inside the same function
-    var e = math.smoothstep(0, 0.45, t)
+    var e = math.smoothStep(0, 0.45, t)
     var first = codeTop(s, rows)
     var barLine = s.at
     var barSpan = s.span

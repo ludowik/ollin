@@ -299,7 +299,7 @@ func drawTokens(r, t, s)
     var L = chipLayout(r.w)
     var top = r.y + titleHeight()
     ## where peek() is, sliding from where the line began to where it ends
-    var cur = math.lerp(s.p0, s.p1, math.smoothstep(0, 0.8, t))
+    var cur = math.lerp(s.p0, s.p1, math.smoothStep(0, 0.8, t))
     for k, tok in run.tokens do
         var chip = L.chips[k]
         var consumed = math.clamp(cur - k, 0, 1)
@@ -399,8 +399,8 @@ func drawTree(r, i, t, s)
     end
     var pc = forestPixels(cur, r)
     var pb = forestPixels(before, r)
-    var e = math.smoothstep(0.05, 0.8, t)
-    var arrive = math.smoothstep(0.1, 0.6, t)
+    var e = math.smoothStep(0.05, 0.8, t)
+    var arrive = math.smoothStep(0.1, 0.6, t)
     var focus = focusOf(s)
 
     ## the frame of every node: where it is now, between where it was and where it goes

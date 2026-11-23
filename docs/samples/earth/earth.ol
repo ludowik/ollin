@@ -212,7 +212,7 @@ func drawHalo()
     var warms = []
     for i = 1, HALO_STEPS do
         var lit = HALO_COS[i + 1] * sunRight + HALO_SIN[i + 1] * sunUp     ## the Sun, along this part of the rim
-        glows.push(math.max(math.smoothstep(-0.25, 0.55, lit), behind * behind * 0.9))
+        glows.push(math.max(math.smoothStep(-0.25, 0.55, lit), behind * behind * 0.9))
         warms.push(math.max(0, 1 - math.abs(lit - 0.02) / 0.2) * (1 - behind))
     end
     var thickness = radius * 0.006 + 1
