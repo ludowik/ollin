@@ -43,13 +43,12 @@ static int arr_dequeue(CallCtx& ctx) {
     return ctx.ret(ctx.args[0].array_shift());
 }
 
-// insert(v) = push ; insert(i, v) = insertion positionnelle (index 1-based).
+// insert(i, v): positional insertion, 1-based. Appending is push, so a lone value is refused.
 static int arr_insert(CallCtx& ctx) {
-    arr_check(ctx, 1, "insert: expected (array[, index], value)");
-    if (ctx.argc == 2)
-        ctx.args[0].array_push(ctx.args[1]);
-    else if (ctx.argc >= 3 && ctx.args[1].is_integer())
-        ctx.args[0].array_insert(ctx.args[1].as_int(), ctx.args[2]);
+    arr_check(ctx, 1, "insert: expected (array, index, value)");
+    if (ctx.argc < 3 || !ctx.args[1].is_integer())
+        throw std::runtime_error("insert: expected (array, index, value); use push to append");
+    ctx.args[0].array_insert(ctx.args[1].as_int(), ctx.args[2]);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -330,7 +329,6 @@ Value make_array_module() {
     return MapBuilder()
         .fn("len", arr_len)
         .fn("push", arr_push)
-        .fn("add", arr_push)
         .fn("enqueue", arr_push)
         .fn("pop", arr_pop)
         .fn("dequeue", arr_dequeue)

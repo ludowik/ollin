@@ -77,12 +77,46 @@ var srt_mix = [3, "a", nil, 1].sort()
 assert(srt_mix[1] == nil)      ## nil < numbers < strings
 assert(srt_mix[2] == 1)
 assert(srt_mix[4] == "a")
-## insert(v) is push, insert(i, v) is positional (1-based)
+## insert(i, v) is positional (1-based); appending is push, so a lone value is refused
 var ins = [1, 2]
-ins.insert(9)
-assert(ins[3] == 9)
 ins.insert(1, 7)
-assert(ins[1] == 7)
+assert(ins[1] == 7 and #ins == 3)
+ins.insert(4, 9)
+assert(ins[4] == 9)
+var insFailure = ""
+try
+    ins.insert(9)
+catch e
+    insFailure = e
+end
+assert(insFailure == "insert: expected (array, index, value); use push to append")
+assert(#ins == 4, "a refused insert leaves the array as it was")
+try
+    ins.insert("x", 9)
+catch e
+    insFailure = e
+end
+assert(insFailure == "insert: expected (array, index, value); use push to append")
+
+## enqueue is push under the name that pairs with dequeue; pop and dequeue need an element, first and last only read
+var qa = []
+qa.enqueue(1)
+qa.push(2)
+assert(qa.dequeue() == 1 and qa.pop() == 2 and #qa == 0)
+assert(qa.first() == nil and qa.last() == nil)
+var qaFailure = ""
+try
+    qa.pop()
+catch e
+    qaFailure = e
+end
+assert(qaFailure == "runtime: pop on empty array")
+try
+    qa.dequeue()
+catch e
+    qaFailure = e
+end
+assert(qaFailure == "runtime: dequeue on empty array")
 
 ## A native member that calls back into Ollin must not keep a REFERENCE into the register file:
 ## the call can grow it, which reallocates it. map/filter/reduce/sort held `ctx.args[0]` and
