@@ -7,7 +7,7 @@
 #        bash tools/coverage.sh --floor    records the current total, less half a point, as the floor
 #
 # What is measured: src/**/*.cpp, by tests/run.sh and tests/samples.sh run with the instrumented binary.
-# That is the HEADLESS build, where graphics, image, camera and the other display modules are stubs.
+# That is the HEADLESS build, where graphics, image, webcam and the other display modules are stubs.
 # A second instrumented build WITH raylib (build-cov-gfx/, tools/native-gfx.sh) runs tests/run_gfx.sh under
 # Xvfb, and its counters are MERGED with the first: a line counts as run when either binary ran it, which
 # is how the lines of vm.cpp that only a graphics session reaches get measured. The sources only that build

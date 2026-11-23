@@ -34,7 +34,7 @@ const SETTLE_LONG = {                  // the heavier ones bake a world or load 
 }
 // Examples whose picture is no use as an icon, though they draw: the generated tile reads better.
 const NO_ICON = {
-  'camera.ol': 'needs a camera; its picture is a waiting message',
+  'webcam.ol': 'needs a webcam; its picture is a waiting message',
   'data_demo.ol': 'only small text on a flat background',
 }
 const FLAT = 3                         // a picture whose brightness varies less than this is blank

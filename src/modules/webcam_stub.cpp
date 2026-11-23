@@ -1,10 +1,10 @@
-#include "camera_module.h"
+#include "webcam_module.h"
 #include "module_utils.h"
 #include "../vm.h"
 
-Value make_camera_module() {
+Value make_webcam_module() {
     auto stub = [](CallCtx& ctx) -> int {
-        throw std::runtime_error("camera: only available in the playground (WASM)");
+        throw std::runtime_error("webcam: only available in the playground (WASM)");
         return ctx.ret(Value{});
     };
     return MapBuilder()
@@ -15,4 +15,4 @@ Value make_camera_module() {
         .done();
 }
 
-void camera_reset() {}
+void webcam_reset() {}

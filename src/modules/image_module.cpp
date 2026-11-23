@@ -57,7 +57,7 @@ static Rectangle sprite_dest(float x, float y, float dw, float dh) {
 struct TexHandle {
     int id = 0;
     bool is_render = false;
-    bool is_streaming = false; // a texture fed by image_push_pixels (the camera), so the CPU shadow is kept up to date
+    bool is_streaming = false; // a texture fed by image_push_pixels (the webcam), so the CPU shadow is kept up to date
     bool pixels_open = false;
     bool gpu_dirty = false;   // the GPU was drawn into (beginDraw), so the CPU is resynced on the next pixel access
     // The texture's rows are in OpenGL bottom-up order, which is the case only for content written
@@ -237,7 +237,7 @@ static void pixels_open(TexHandle& h) {
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     } else if (h.is_streaming) {
-        // Camera: the CPU shadow is kept up to date by image_push_pixels.
+        // Webcam: the CPU shadow is kept up to date by image_push_pixels.
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.tex.width, h.tex.height, BLANK);
     } else {

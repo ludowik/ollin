@@ -37,7 +37,7 @@ bool image_gl_flipped(unsigned int gl_texid);
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char r, unsigned char g, unsigned char b,
                        unsigned char a);
 
-// Streaming texture API (camera module).
+// Streaming texture API (webcam module).
 // Creates a plain Texture2D from blank RGBA data. Returns a handle map {id,width,height}.
 // *id_out receives the numeric id for image_push_pixels.
 Value image_alloc_tex(int w, int h, int* id_out);

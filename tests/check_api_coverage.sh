@@ -16,7 +16,7 @@
 # every module. The numbers of a real line-coverage run are the other half (tools/coverage.sh).
 #
 # EXCLUDED, with the reason: the modules that need a display or a device and are `nil` or inert in the
-# headless build this suite runs on — graphics (2D, 3D, quaternions), image, camera, mouse, keyboard — and
+# headless build this suite runs on — graphics (2D, 3D, quaternions), image, webcam, mouse, keyboard — and
 # the stubs, whose names are those of the real module. The ui module is checked: its stub has the same names.
 # The meta names (`__str`, `__fmt`...) are the engine's own hooks, not API.
 set -u
@@ -27,7 +27,7 @@ cd "$root" || exit 2
 python3 - <<'PYEOF'
 import collections, glob, os, re, sys
 
-EXCLUDE = {"graphics_module", "graphics3d", "graphics_quat", "image_module", "camera_module",
+EXCLUDE = {"graphics_module", "graphics3d", "graphics_quat", "image_module", "webcam_module",
            "keyboard_module", "mouse_module"}
 PATTERNS = [
     r'\.(?:fn|static_fn)\("([A-Za-z_]\w*)"',

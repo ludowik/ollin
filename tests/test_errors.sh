@@ -474,9 +474,9 @@ check_error "menu.textField without a reference" \
 ui.menu("Profile").textField("City", v)' \
     "must be a reference"
 
-check_error "camera.open without a browser" \
-    'camera.open()' \
-    "camera: only available in the playground (WASM)"
+check_error "webcam.open without a browser" \
+    'webcam.open()' \
+    "webcam: only available in the playground (WASM)"
 
 check_error "ui.slider without a reference" \
     'global v = 1

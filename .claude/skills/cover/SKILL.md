@@ -44,9 +44,9 @@ Puis un compte rendu en français, en prose et listes :
   1. **les modules de `src/modules/`** (`data`, `color`, `core`, `sound`…) : ce sont eux la cible ;
   2. **le cœur** (`vm.cpp`, `compiler.cpp`, `parser.cpp`, `lexer.cpp`, `paths.cpp`,
      `source_registry.cpp`, `collections/`) ;
-  3. **les stubs** (`*_stub.cpp`, `graphics_stub`, `image_stub`, `camera_stub`) : les signaler une
+  3. **les stubs** (`*_stub.cpp`, `graphics_stub`, `image_stub`, `webcam_stub`) : les signaler une
      fois, ne pas les compter parmi les faiblesses.
-- ce que la mesure ne voit pas : les vrais modules graphiques (`gfx`, `image`, `camera`,
+- ce que la mesure ne voit pas : les vrais modules graphiques (`gfx`, `image`, `webcam`,
   `mouse`, `keyboard`) ne sont pas compilés en headless, donc absents du chiffre.
 
 ## Phase 3 — les lignes qui ne s'exécutent jamais

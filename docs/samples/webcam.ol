@@ -1,6 +1,6 @@
 ## Live webcam capture, in greyscale.
 ##
-## The webcam belongs to the BROWSER: `camera.open` is refused anywhere else, so the call is
+## The webcam belongs to the BROWSER: `webcam.open` is refused anywhere else, so the call is
 ## guarded and the reason is drawn on the canvas. An example that dies on its first line teaches
 ## nothing, and this one still shows what the code looks like.
 
@@ -11,17 +11,17 @@ global why = nil               ## nil while all is well, otherwise what stopped 
 func setup()
     gfx.canvas(640, 480)
     try
-        camera.open(W / scale, H / scale)
+        webcam.open(W / scale, H / scale)
     catch e
         why = e
     end
 end
 
 func update(dt)
-    if why <> nil or not camera.isOpen() then
+    if why <> nil or not webcam.isOpen() then
         return
     end
-    frame = camera.capture()
+    frame = webcam.capture()
     if frame then
         image.mapPixel(frame, func(x, y, r, g, b, a)
             var lum = 0.299 * r + 0.587 * g + 0.114 * b
@@ -42,6 +42,6 @@ func draw()
     if why <> nil then
         gfx.text(why, CX, CY)
     else
-        gfx.text("waiting for the camera...", CX, CY)
+        gfx.text("waiting for the webcam...", CX, CY)
     end
 end

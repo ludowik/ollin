@@ -89,7 +89,7 @@
     "description": "Connect Four against the computer, at three levels: a search that looks ahead and thinks between frames, take-backs, and the scores and the game in progress kept between runs.",
     "controls": "Tap or click a column to drop a disc, or press, slide to aim and lift over the column. Left and right arrows aim, space or down drops, 1 to 7 drop in a column, U takes a move back, M or Escape goes to the menu. On the menu, left and right choose the level, F switches who plays first, space begins and C goes on with the game in progress." },
 
-  { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol",
+  { "group": "Device and storage", "name": "Webcam", "file": "webcam.ol",
     "description": "Live webcam capture in greyscale, available in the browser only." },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol",
     "description": "The data module: a run counter and a score that come back when the program restarts.",

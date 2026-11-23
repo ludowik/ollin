@@ -1,7 +1,7 @@
 #include "modules.h"
 #include "../rng.h"
 #include "audio_module.h"
-#include "camera_module.h"
+#include "webcam_module.h"
 #include "https_module.h"
 #include "image_module.h"
 #include "map_module.h"
@@ -29,7 +29,7 @@ Value make_image_module();
 Value make_keyboard_module();
 Value make_mouse_module();
 Value make_data_module();
-Value make_camera_module();
+Value make_webcam_module();
 Value make_ui_module();
 Value make_tween_module();
 Value make_audio_module();
@@ -65,7 +65,7 @@ static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modu
     { "keyboard", make_keyboard_module, nullptr          },
     { "mouse",    make_mouse_module,    mouse_reset      },   // no button left pressed
     { "data",     make_data_module,     nullptr          },
-    { "camera",   make_camera_module,   camera_reset     },
+    { "webcam",   make_webcam_module,   webcam_reset     },
     { "ui",       make_ui_module,       ui_reset         },
     { "tween",    make_tween_module,    tween_reset      },
     { "audio",    make_audio_module,    audio_reset      },   // the master volume a program may have turned down

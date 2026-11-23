@@ -1,4 +1,4 @@
-#include "camera_module.h"
+#include "webcam_module.h"
 #include "image_module.h"
 #include "modules/module_utils.h"
 #include <emscripten.h>
@@ -12,7 +12,7 @@ static int   s_cam_h = 0;
 
 static void cam_reset_js() {
     EM_ASM({
-        const cam = window.__ollinCam;
+        const cam = window.__ollinWebcam;
         if (!cam) return;
         if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
         if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
@@ -20,7 +20,7 @@ static void cam_reset_js() {
     });
 }
 
-void camera_reset() {
+void webcam_reset() {
     cam_reset_js();
     s_cam_id = 0;
     s_cam_w = 0;
@@ -29,8 +29,8 @@ void camera_reset() {
 }
 
 static int cam_open(CallCtx& ctx) {
-    int w = ctx.argc >= 1 ? (int)num_arg(ctx.args, 0, "camera.open") : 640;
-    int h = ctx.argc >= 2 ? (int)num_arg(ctx.args, 1, "camera.open") : 480;
+    int w = ctx.argc >= 1 ? (int)num_arg(ctx.args, 0, "webcam.open") : 640;
+    int h = ctx.argc >= 2 ? (int)num_arg(ctx.args, 1, "webcam.open") : 480;
 
     if (!s_cam_id || !image_tex_valid(s_cam_id) || s_cam_w != w || s_cam_h != h) {
         if (s_cam_id)
@@ -43,13 +43,13 @@ static int cam_open(CallCtx& ctx) {
     EM_ASM({
         var w = $0;
         var h = $1;
-        if (!window.__ollinCam) window.__ollinCam = {};
-        const cam = window.__ollinCam;
+        if (!window.__ollinWebcam) window.__ollinWebcam = {};
+        const cam = window.__ollinWebcam;
         if (cam.state === 'open' || cam.state === 'opening') return;
         // Guard before creating any DOM node: otherwise every retry in an insecure context (the
         // 'error' state) would leave one more orphan <video> behind.
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            cam.state = 'error'; // an insecure context (HTTP outside localhost) has no camera API
+            cam.state = 'error'; // an insecure context (HTTP outside localhost) has no webcam API
             return;
         }
         cam.w = w; cam.h = h;
@@ -87,7 +87,7 @@ static int cam_capture(CallCtx& ctx) {
     if (pixels.size() != need)
         pixels.resize(need);
     int ok = EM_ASM_INT({
-        const cam = window.__ollinCam;
+        const cam = window.__ollinWebcam;
         if (!cam || cam.state !== 'open') return 0;
         const vid = cam.video;
         if (!vid || vid.readyState < 2) return 0;
@@ -120,13 +120,13 @@ static int cam_close(CallCtx& ctx) {
 
 static int cam_is_open(CallCtx& ctx) {
     int r = EM_ASM_INT({
-        const cam = window.__ollinCam;
+        const cam = window.__ollinWebcam;
         return (cam && cam.state === 'open') ? 1 : 0;
     });
     return ctx.ret(Value::make_bool(r != 0));
 }
 
-Value make_camera_module() {
+Value make_webcam_module() {
     return MapBuilder()
         .set("open",    Value::make_builtin(cam_open))
         .fn("capture", cam_capture)

@@ -152,10 +152,12 @@ export async function listProjects() {
 //                              (`graphics.ol`) are left alone
 //   keyboard.keypressed  -> keyboard.pressed
 //   keyboard.keyrelease  -> keyboard.released
+//   camera.open/close/capture/isOpen -> webcam.…   (the module of the webcam; gfx.camera is the 3D camera, untouched)
 const OLD_NAMES = [
   [/(?<![.\w])graphics\b(?!\.ol|\s*:)/g, 'gfx'],
   [/\bkeyboard\.keypressed\b/g, 'keyboard.pressed'],
   [/\bkeyboard\.keyrelease\b/g, 'keyboard.released'],
+  [/\bcamera\.(open|close|capture|isOpen)\b/g, 'webcam.$1'],
 ]
 
 function migrateOldNames(record) {
