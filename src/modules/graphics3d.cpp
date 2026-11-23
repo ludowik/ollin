@@ -261,8 +261,27 @@ static int cam_get_up(CallCtx& ctx) {
     return ctx.ret(vector_map(camera_axes(ctx.args[0]).up));
 }
 
+// Fills a Camera instance from (px,py,pz, tx,ty,tz [, fovy or size]): what gfx.camera, gfx.cameraOrtho and the
+// Camera constructor share, `who` naming the caller in an error. `last_default` is the vertical field of view, or
+// the visible height of an orthographic camera, when the call gives none.
+static void camera_fill(Value& cam, Value* args, int argc, const char* who, double last_default, bool ortho) {
+    static const char* const fields[] = {"px", "py", "pz", "tx", "ty", "tz"};
+    for (int i = 0; i < 6; i++)
+        cam.map_set(Value(std::string(fields[i])), Value(num_arg(args, argc, i, who)));
+    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, who) : last_default));
+    if (ortho)
+        cam.map_set(Value(std::string("ortho")), Value((int64_t)1));
+}
+
+// Camera(px,py,pz, tx,ty,tz [, fovy]): the constructor of a perspective camera, the same as gfx.camera.
+static int cam_init(CallCtx& ctx) {
+    camera_fill(ctx.args[0], ctx.args + 1, ctx.argc - 1, "Camera", 45.0, false);
+    return ctx.ret(Value{});
+}
+
 static Value make_camera_class() {
     return MapBuilder(Value::make_class("Camera"))
+        .fn("init", cam_init)
         .fn("setPos", cam_set_pos)
         .fn("lookAt", cam_look_at)
         .fn("move", cam_move)
@@ -275,7 +294,7 @@ static Value make_camera_class() {
 }
 
 // Shared Camera class, built once and reused by every instance.
-static Value camera_class() {
+Value camera_class() {
     static Value cls = make_camera_class();
     return cls;
 }
@@ -284,16 +303,9 @@ static Value camera_class() {
 // (tx,ty,tz) from (px,py,pz), up = +Y, fovy = vertical field of view (45° by default).
 // Mutable through its methods (setPos/lookAt/move/orbit/zoom); getViewDir, getRight and getUp return its axes {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
     cam.set_class(camera_class());
-    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "gfx.camera")));
-    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "gfx.camera")));
-    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "gfx.camera")));
-    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "gfx.camera")));
-    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "gfx.camera")));
-    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "gfx.camera")));
-    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "gfx.camera") : 45.0));
+    camera_fill(cam, ctx.args, ctx.argc, "gfx.camera", 45.0, false);
     return ctx.ret(cam);
 }
 
@@ -301,17 +313,9 @@ static int gfx_camera(CallCtx& ctx) {
 // perspective — the visible world is `size` units tall (10 by default). Same methods as
 // camera(); zoom() adjusts size.
 static int gfx_camera_ortho(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
     cam.set_class(camera_class());
-    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "gfx.cameraOrtho")));
-    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "gfx.cameraOrtho") : 10.0));
-    cam.map_set(Value(std::string("ortho")), Value((int64_t)1));
+    camera_fill(cam, ctx.args, ctx.argc, "gfx.cameraOrtho", 10.0, true);
     return ctx.ret(cam);
 }
 
@@ -1017,8 +1021,11 @@ static int light_enable(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
+static int light_init(CallCtx& ctx);
+
 static Value make_light_class() {
     return MapBuilder(Value::make_class("Light"))
+        .fn("init", light_init)
         .fn("setDir", light_set_dir)
         .fn("setPos", light_set_pos)
         .fn("setColor", light_set_color)
@@ -1026,28 +1033,27 @@ static Value make_light_class() {
         .done();
 }
 
-static Value light_class() {
+Value light_class() {
     static Value cls = make_light_class();
     return cls;
 }
 
-// gfx.light("dir"|"point", x,y,z [, colour]): creates a Light object and enables it.
-// For "dir", (x,y,z) is the direction of propagation; for "point", the position.
-static int gfx_light(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
+// Fills a Light instance from ("dir"|"point", x,y,z [, colour]) and enables it: what gfx.light and the Light
+// constructor share, `who` naming the caller in an error. For "dir", (x,y,z) is the direction of propagation; for
+// "point", the position.
+static void light_fill(Value& inst, Value* args, int argc, const char* who) {
+    const std::string name(who);
     // The kind is an IDENTIFIER: anything else used to become "dir" in silence, so a mistyped call
     // lit the scene the wrong way with no word said.
     if (argc > 0 && !args[0].is_string())
-        throw std::runtime_error("gfx.light: expected \"dir\" or \"point\"");
+        throw std::runtime_error(name + ": expected \"dir\" or \"point\"");
     std::string type = argc > 0 ? args[0].as_string() : "dir";
     if (type != "dir" && type != "point")
-        throw std::runtime_error("gfx.light: unknown kind '" + type + "' — expected \"dir\" or \"point\"");
-    float x = (float)num_arg(args, argc, 1, "gfx.light");
-    float y = (float)num_arg(args, argc, 2, "gfx.light");
-    float z = (float)num_arg(args, argc, 3, "gfx.light");
+        throw std::runtime_error(name + ": unknown kind '" + type + "' — expected \"dir\" or \"point\"");
+    float x = (float)num_arg(args, argc, 1, who);
+    float y = (float)num_arg(args, argc, 2, who);
+    float z = (float)num_arg(args, argc, 3, who);
     Color c = color_arg_or_white(args, argc, 4);
-    Value inst = Value::make_map();
-    inst.set_class(light_class());
     inst.map_set(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
     inst.map_set(Value(std::string("dx")), Value((double)x));
     inst.map_set(Value(std::string("dy")), Value((double)y));
@@ -1055,6 +1061,19 @@ static int gfx_light(CallCtx& ctx) {
     set_color_fields(inst, c);
     inst.map_set(Value(std::string("enabled")), Value::make_bool(true));
     apply_light_from_instance(inst);
+}
+
+// Light(kind, x,y,z [, colour]): the constructor, the same as gfx.light.
+static int light_init(CallCtx& ctx) {
+    light_fill(ctx.args[0], ctx.args + 1, ctx.argc - 1, "Light");
+    return ctx.ret(Value{});
+}
+
+// gfx.light("dir"|"point", x,y,z [, colour]): creates a Light object and enables it.
+static int gfx_light(CallCtx& ctx) {
+    Value inst = Value::make_map();
+    inst.set_class(light_class());
+    light_fill(inst, ctx.args, ctx.argc, "gfx.light");
     return ctx.ret(inst);
 }
 

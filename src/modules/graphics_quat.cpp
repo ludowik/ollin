@@ -14,7 +14,7 @@ static double quat_field(const Value& v, const char* k) {
     return f.is_number() ? f.as_num() : 0.0;
 }
 
-static Value quat_class();   // defined below
+Value quat_class();   // defined below
 
 Quaternion quat_from_instance(const Value& v, const char* fn) {
     // Checks this really is a Quat instance and not some other map (a Camera or a Light object…): a quaternion
@@ -25,14 +25,27 @@ Quaternion quat_from_instance(const Value& v, const char* fn) {
                       (float)quat_field(v, "w")};
 }
 
-Value make_quat_instance(Quaternion q) {
-    Value inst = Value::make_map();
-    inst.set_class(quat_class());
+static void quat_fill(Value& inst, Quaternion q) {
     inst.map_set(Value(std::string("x")), Value((double)q.x));
     inst.map_set(Value(std::string("y")), Value((double)q.y));
     inst.map_set(Value(std::string("z")), Value((double)q.z));
     inst.map_set(Value(std::string("w")), Value((double)q.w));
+}
+
+Value make_quat_instance(Quaternion q) {
+    Value inst = Value::make_map();
+    inst.set_class(quat_class());
+    quat_fill(inst, q);
     return inst;
+}
+
+// Quat(): the identity, the same as gfx.quat(). A rotation is built by gfx.quatAxis or gfx.quatEuler.
+static int quat_init(CallCtx& ctx) {
+    if (ctx.argc > 1)
+        throw std::runtime_error(
+            "Quat: takes no argument, it is the identity (gfx.quatAxis and gfx.quatEuler build a rotation)");
+    quat_fill(ctx.args[0], QuaternionIdentity());
+    return ctx.ret(Value{});
 }
 
 // A quaternion is a VALUE: the methods return a NEW Quat instead of mutating, which makes them
@@ -88,6 +101,7 @@ static int quat_rotate_vec(CallCtx& ctx) {
 
 static Value make_quat_class() {
     return MapBuilder(Value::make_class("Quat"))
+        .fn("init", quat_init)
         .fn("mul", quat_mul)
         .fn("slerp", quat_slerp)
         .fn("normalize", quat_normalize)
@@ -96,7 +110,7 @@ static Value make_quat_class() {
         .done();
 }
 
-static Value quat_class() {
+Value quat_class() {
     static Value cls = make_quat_class();
     return cls;
 }

@@ -16,6 +16,15 @@
 #include <stdexcept>
 
 Value make_core_module();
+Value make_color_class();
+Value make_random_class();
+Value native_tween_class();
+Value native_osc_class();
+Value native_request_class();
+// The 3D classes: graphics3d.cpp and graphics_quat.cpp with a window, graphics_stub.cpp (nil) without.
+Value camera_class();
+Value light_class();
+Value quat_class();
 Value make_math_module();
 Value make_graphics_module();
 // The `blend` module is defined in the graphics pair (graphics_module holds the enums
@@ -96,9 +105,23 @@ const std::vector<std::string>& builtin_module_names() {
     return names;
 }
 
+const std::vector<NativeClass>& native_classes() {
+    static const std::vector<NativeClass> classes = {
+        {"Color", make_color_class}, {"Random", make_random_class}, {"Tween", native_tween_class},
+        {"Osc", native_osc_class},   {"Request", native_request_class},
+        {"Camera", camera_class},    {"Light", light_class},        {"Quat", quat_class},
+    };
+    return classes;
+}
+
 const std::vector<std::string>& builtin_func_names() {
-    static const std::vector<std::string> names = {"print", "printf", "__fmt", "__yield", "typeof", "classOf", "instanceOf", "assert",
-                                                   "time", "cpuTime", "mem", "Color", "Random", "len"};
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> n = {"print", "printf", "__fmt", "__yield", "typeof", "classOf",
+                                      "instanceOf", "assert", "time", "cpuTime", "mem", "len"};
+        for (auto& c : native_classes())
+            n.push_back(c.name);
+        return n;
+    }();
     return names;
 }
 

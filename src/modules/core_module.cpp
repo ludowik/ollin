@@ -1,4 +1,5 @@
 #include "module_utils.h"
+#include "modules.h"
 #include "random_module.h"
 #include "vm.h"
 #include <iostream>
@@ -6,8 +7,6 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
-
-Value make_color_class();
 
 // Formatting core, shared by interpolation ({expr:spec}) AND printf ({N:spec}). `spec` is a C
 // conversion specification WITHOUT the '%', such as ".3f", "04x" or ">8s". We read the trailing
@@ -171,15 +170,18 @@ static int core_yield(CallCtx& ctx) {
 }
 
 Value make_core_module() {
-    return MapBuilder()
-        .fn("print", core_print)
+    MapBuilder core;
+    core.fn("print", core_print)
         .fn("printf", core_printf)
         .fn("__fmt", core_fmt)   // internal: the desugaring of {expr:spec}
         .fn("__yield", core_yield) // internal: the desugaring of `yield`
         .fn("typeof", core_typeof)
         .fn("classOf", core_class_of)
-        .fn("instanceOf", core_instance_of)
-        .set("Color", make_color_class())
-        .set("Random", make_random_class())
-        .done();
+        .fn("instanceOf", core_instance_of);
+    for (auto& c : native_classes()) {
+        Value cls = c.make();
+        if (!cls.is_nil())
+            core.set(c.name, cls);
+    }
+    return core.done();
 }

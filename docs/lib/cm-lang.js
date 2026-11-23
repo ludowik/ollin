@@ -15,7 +15,7 @@ export const KEYWORDS = new Set([
   'switch', 'case', 'default', 'enum', 'ref', 'yield',
 ])
 export const BUILTINS = new Set([
-  'print', 'printf', 'time', 'assert', 'len', 'typeof', 'classOf', 'instanceOf', 'Color', 'Random',
+  'print', 'printf', 'time', 'assert', 'len', 'typeof', 'classOf', 'instanceOf', 'Color', 'Random', 'Tween', 'Osc', 'Request', 'Camera', 'Light', 'Quat',
   'math', 'gfx', 'string', 'map', 'array', 'colors', 'blend', 'window', 'image', 'keyboard', 'mouse', 'data', 'ui',
   'tween', 'webcam', 'motion', 'https', 'json', 'coroutine',
 ])

@@ -154,6 +154,12 @@ const AC_BUILTINS = [
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(grey | r, g, b [, a])'),
   fn('Random', 'Random([seed]) → generator: rand, randInt, seed'),
+  fn('Tween',  'Tween(object, {field: target}, duration [, curve] [, onDone]) → tween (as tween.to)'),
+  fn('Osc',    'Osc([freq [, shape]]) → oscillator (as sound.osc)'),
+  fn('Request', 'Request(url [, options], callback) → request (as https.get)'),
+  fn('Camera', 'Camera(px, py, pz, tx, ty, tz [, fovy]) → camera (as gfx.camera)'),
+  fn('Light',  'Light("dir" | "point", x, y, z [, color]) → light (as gfx.light)'),
+  fn('Quat',   'Quat() → the identity rotation (gfx.quatAxis and gfx.quatEuler build others)'),
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (bytes used)'),
 ]
 

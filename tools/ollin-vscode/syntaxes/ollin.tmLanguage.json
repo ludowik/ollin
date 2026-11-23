@@ -32,7 +32,7 @@
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
-            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|classOf|instanceOf|Color|Random|math|gfx|string|map|array|colors|window|mouse|keyboard|image|data|ui|tween|webcam|blend|audio|sound|touch|motion|date|https|json|coroutine)\\b"
+            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|classOf|instanceOf|Color|Random|Tween|Osc|Request|Camera|Light|Quat|math|gfx|string|map|array|colors|window|mouse|keyboard|image|data|ui|tween|webcam|blend|audio|sound|touch|motion|date|https|json|coroutine)\\b"
         },
         "number": {
             "name": "constant.numeric.ollin",

@@ -249,3 +249,11 @@ for name in ["stop", "volume", "duration"] do
     assert(soundFailure(func() detached(soundOther) end) == "sound.{name}: expected a sound", "{name} of a sound on a tween")
 end
 soundOsc.free()
+
+## ── Osc(…) builds the same oscillator as sound.osc(…) ──────────────────────
+var soundCtor = Osc(330, "saw")
+assert(instanceOf(soundCtor, Osc) and classOf(soundCtor) == classOf(sound.osc(330)), "one class for both ways")
+assert(soundCtor.freq() == 330 and soundCtor.shape() == "saw")
+assert(soundFailure(func() Osc(220, 5) end).substr(1, 28) == "Osc: waveform must be a name", "its errors name the class")
+soundCtor.free()
+assert(soundFailure(func() soundCtor.freq() end) == "sound.freq: this oscillator no longer exists", "a freed one is refused")

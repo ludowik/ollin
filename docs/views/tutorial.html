@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-23 20:05</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-23 20:35</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -459,7 +459,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-23 20:05</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-23 20:35</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1999,6 +1999,24 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))  <span class="cmt">## 1: __eq compares the fields</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))  <span class="cmt">## 0</span></code></pre>
 <div class="callout warn">Two subtleties about <code>__eq</code>: it is looked up on the <strong>left</strong> operand only (when only the right one is an instance, the comparison stays by reference); and it is called <strong>even when both operands are the same instance</strong> — there is no identity short-circuit.</div>
+
+<h3 id="native-classes">Native classes</h3>
+<p>The objects the engine hands out belong to classes, and the classes are global names: an object can be made <strong>from its class</strong> or <strong>from the module that owns it</strong>, and the two give the same object. <code>instanceOf</code> and <code>classOf</code> see the class either way.</p>
+<table>
+  <thead><tr><th>Class</th><th>Also built by</th></tr></thead>
+  <tbody>
+    <tr><td><code>Color(…)</code></td><td>the constants of <code>colors</code></td></tr>
+    <tr><td><code>Random([seed])</code></td><td>nothing else, see <a href="#class-random"><code>Random</code></a></td></tr>
+    <tr><td><code>Tween(object, {field: target}, duration [, curve] [, onDone])</code></td><td><code>tween.to(…)</code></td></tr>
+    <tr><td><code>Osc([freq [, shape]])</code></td><td><code>sound.osc(…)</code></td></tr>
+    <tr><td><code>Request(url [, options], callback)</code></td><td><code>https.get(…)</code></td></tr>
+    <tr><td><code>Camera(px, py, pz, tx, ty, tz [, fovy])</code></td><td><code>gfx.camera(…)</code></td></tr>
+    <tr><td><code>Light(kind, x, y, z [, color])</code></td><td><code>gfx.light(…)</code></td></tr>
+    <tr><td><code>Quat()</code></td><td><code>gfx.quat()</code> — the identity; <code>gfx.quatAxis</code> and <code>gfx.quatEuler</code> build the others</td></tr>
+  </tbody>
+</table>
+<div class="callout">A class of your own with one of these names shadows the native one, as any declaration does. Without a window, <code>Camera</code>, <code>Light</code> and <code>Quat</code> are <code>nil</code>, like <code>gfx</code> itself.</div>
+
 </section>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->

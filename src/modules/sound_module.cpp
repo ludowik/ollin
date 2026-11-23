@@ -107,6 +107,12 @@ int sound_osc(CallCtx& ctx) {
     return ctx.ret(make_handle(make_osc(ctx.args, ctx.argc, "sound.osc", -1)));
 }
 
+// Osc([freq [, shape]]): the constructor, the same as sound.osc.
+int osc_init(CallCtx& ctx) {
+    adopt_slot_handle(ctx.args[0], make_handle(make_osc(ctx.args + 1, ctx.argc - 1, "Osc", -1)));
+    return ctx.ret(Value{});
+}
+
 // Per-waveform shortcuts, as in p5: more readable than a name passed as a string, and a misspelled
 // name becomes impossible.
 template <int SHAPE>
@@ -511,6 +517,7 @@ Value buffer_class() {
 
 Value make_osc_class() {
     return MapBuilder(Value::make_class("Osc"))
+        .fn("init", osc_init)
         .fn("start", method_start)
         .fn("stop", method_stop)
         .fn("isPlaying", method_is_playing)
@@ -531,6 +538,10 @@ Value osc_class() {
 }
 
 } // namespace
+
+Value native_osc_class() {
+    return osc_class();
+}
 
 // The voice table lives HERE, in the file compiled everywhere: the output reaches it only through
 // sound_voices(), so the mixer needs to know nothing about the module.

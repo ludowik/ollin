@@ -21,6 +21,13 @@ static inline Value make_slot_handle(const Value& cls, int slot, uint32_t gen) {
     return h;
 }
 
+// The constructor of a handle class (Tween(...), Osc(...), Request(...)): `self` is the instance the class call
+// made, and it takes the {slot, gen} of the handle that the factory of the module made for the same arguments.
+static inline void adopt_slot_handle(Value& self, const Value& handle) {
+    self.map_set(Value(std::string("slot")), handle.map_get(Value(std::string("slot"))));
+    self.map_set(Value(std::string("gen")), handle.map_get(Value(std::string("gen"))));
+}
+
 // The slot of a handle of the class, and its generation in `gen`; the caller then tests them against its table. Throws
 // "<fn>: expected <what>" ("a request") for anything else.
 static inline int read_slot_handle(const Value& v, const Value& cls, const char* fn, const char* what, uint32_t& gen) {

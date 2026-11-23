@@ -428,3 +428,16 @@ for name in ["pause", "resume", "cancel", "isDone", "progress", "delay", "repeat
 end
 assert(twMine.isDone() == false, "the tween itself is untouched")
 twMine.cancel()
+
+## ── Tween(…) builds the same tween as tween.to(…) ──────────────────────────
+var twCtorObj = {v: 0}
+var twCtor = Tween(twCtorObj, {v: 10}, 1)
+assert(instanceOf(twCtor, Tween) and classOf(twCtor) == classOf(tween.to({v: 0}, {v: 1}, 1)), "one class for both ways")
+tween.update(0.5)
+assert(twCtorObj.v == 5, "it animates like tween.to")
+assert(twCtor.isDone() == false)
+twCtor.cancel()
+assert(twCtor.isDone() == true)
+assert(twFailure(func() Tween(1, {v: 1}, 1) end) == "Tween: first argument must be an object", "its errors name the class")
+assert(twFailure(func() Tween({v: 0}) end) == "Tween: expected object, \{field: target}, duration")
+assert(twFailure(func() tween.to({v: 0}) end) == "tween.to: expected object, \{field: target}, duration", "tween.to keeps its own name")

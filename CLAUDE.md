@@ -1910,6 +1910,12 @@ la bidouille écartée ci-dessus.
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
 
+## Classes natives globales (`native_classes()`, modules.cpp)
+
+Une classe native qu'un script nomme sans la déclarer — `Color`, `Random`, `Tween`, `Osc`, `Request`, `Camera`, `Light`, `Quat` — vit dans **un seul registre**, `native_classes()` : `make_core_module` en pose chaque membre dans `core`, `builtin_func_names()` en tire les noms que le compilateur accepte, et `VM::execute` les installe comme globales. Ajouter une classe, c'est une ligne de ce registre. **Une classe que le build n'a pas** (`Camera`, `Light`, `Quat` sans raylib : `graphics_stub.cpp` rend nil) est NIL, comme `gfx` : le nom est connu et l'erreur est l'appel d'un nil, pas « undefined ».
+
+**Un objet se crée de DEUX façons, qui partagent le même code** : `tween.to(...)` et `Tween(...)`, `sound.osc(...)` et `Osc(...)`, `https.get(...)` et `Request(...)`, `gfx.camera(...)` et `Camera(...)`, `gfx.light(...)` et `Light(...)`. La fabrique du module et l'`init` de la classe appellent la MÊME fonction (`declare_tween_to`, `make_osc`, `start_request`, `camera_fill`, `light_fill`), paramétrée par le nom de l'appelant pour que l'erreur nomme celui que le script a écrit. Pour les poignées à `{slot, gen}` (Tween, Osc, Request), `init` fait adopter à `self` la poignée que la fabrique a construite (`adopt_slot_handle`, module_utils.h). `Quat()` n'a pas d'arguments : l'identité ; les rotations restent `gfx.quatAxis`/`quatEuler` (une classe n'a pas de méthode statique). Une classe de l'utilisateur de même nom masque la native sans conflit.
+
 ## Shaders (src/shaders/)
 
 Le GLSL vit dans **`src/shaders/lit.vert` et `lit.frag`**, pas dans du C++. Il est **embarqué** :

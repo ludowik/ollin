@@ -218,3 +218,17 @@ https.update()
 var r = https.get("https://example.org/t", ignore)
 assert("{r}" == "\{Request}", "it is made from the Request class, whose name it wears")
 https.update()
+
+## ── Request(…) starts the same request as https.get(…) ─────────────────────
+var rc = Request("https://example.org/ctor", ignore)
+assert(instanceOf(rc, Request) and classOf(rc) == classOf(r), "one class for both ways")
+assert(rc.isDone() == false)
+rc.cancel()
+assert(rc.isDone() == true)
+var rcFailure = ""
+try
+    Request("http://example.org/ctor", ignore)
+catch e
+    rcFailure = e
+end
+assert(rcFailure == "Request: only https:// addresses are accepted, not http:// ('http://example.org/ctor')", "its errors name the class")

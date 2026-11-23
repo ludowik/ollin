@@ -177,24 +177,25 @@ int handle_slot(const Value& self, const char* fn) {
     return i;
 }
 
-// get(url [, options], callback)
-int https_get(CallCtx& ctx) {
-    const char* fn = "https.get";
-    const std::string& url = str_arg(ctx.args, ctx.argc, 0, fn);
-    int last = ctx.argc - 1;
-    if (ctx.argc < 2 || ctx.argc > 3 || !ctx.args[last].is_callable())
-        throw std::runtime_error("https.get: expected (url [, options], callback)");
+// Starts the request of https.get and of the Request constructor, `fn` naming the caller in an error.
+Value start_request(Value* args, int argc, const char* fn) {
+    const std::string& url = str_arg(args, argc, 0, fn);
+    int last = argc - 1;
+    if (argc < 2 || argc > 3 || !args[last].is_callable())
+        throw std::runtime_error(std::string(fn) + ": expected (url [, options], callback)");
     HttpsRequest rq;
     rq.url = url;
     rq.timeout_ms = (int)(k_default_timeout * 1000.0);
     check_url(url, fn);
-    if (ctx.argc == 3) {
-        if (!ctx.args[1].is_map())
-            throw std::runtime_error("https.get: options must be a map, got " + std::string(ctx.args[1].type_name()));
-        read_options(ctx.args[1], rq, fn);
+    if (argc == 3) {
+        if (!args[1].is_map())
+            throw std::runtime_error(std::string(fn) + ": options must be a map, got " +
+                                     std::string(args[1].type_name()));
+        read_options(args[1], rq, fn);
     }
     if (inflight() >= k_max_inflight)
-        throw std::runtime_error("https.get: too many requests at once (" + std::to_string(k_max_inflight) + ")");
+        throw std::runtime_error(std::string(fn) + ": too many requests at once (" +
+                                 std::to_string(k_max_inflight) + ")");
 
     int slot;
     if (!s_free.empty()) {
@@ -207,10 +208,20 @@ int https_get(CallCtx& ctx) {
     Req& r = s_reqs[slot];
     r.alive = true;
     r.id = s_next_id++;
-    r.callback = ctx.args[last];
+    r.callback = args[last];
     Value handle = make_handle(slot);
     https_engine_start(r.id, rq);
-    return ctx.ret(handle);
+    return handle;
+}
+
+int https_get(CallCtx& ctx) {
+    return ctx.ret(start_request(ctx.args, ctx.argc, "https.get"));
+}
+
+// Request(url [, options], callback): the constructor, the same as https.get.
+int request_init(CallCtx& ctx) {
+    adopt_slot_handle(ctx.args[0], start_request(ctx.args + 1, ctx.argc - 1, "Request"));
+    return ctx.ret(Value{});
 }
 
 // ── Answers ──────────────────────────────────────────────────────────────────────────────────────
@@ -339,6 +350,7 @@ int method_is_done(CallCtx& ctx) {
 
 Value make_https_class() {
     return MapBuilder(Value::make_class("Request"))
+        .fn("init", request_init)
         .fn("cancel", method_cancel)
         .fn("isDone", method_is_done)
         .done();
@@ -350,6 +362,10 @@ Value https_class() {
 }
 
 } // namespace
+
+Value native_request_class() {
+    return https_class();
+}
 
 void https_poll() {
     s_engine_driven = true;   // the engine delivers, so https.update becomes a no-op on the script side

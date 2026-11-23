@@ -503,30 +503,38 @@ double duration_arg(const Value* args, int argc, int i, const char* fn) {
 }
 
 
-// tween.to(object, {field: target, …}, duration [, curve] [, onDone])
-int tween_to(CallCtx& ctx) {
-    Value* args = ctx.args;
-    int argc = ctx.argc;
+// Declares the animation of tween.to and of the Tween constructor, `fn` naming the caller in an error.
+Value declare_tween_to(Value* args, int argc, const char* fn) {
     if (argc < 3)
-        throw std::runtime_error("tween.to: expected object, {field: target}, duration");
+        throw std::runtime_error(std::string(fn) + ": expected object, {field: target}, duration");
     if (!is_object(args[0]))
-        throw std::runtime_error("tween.to: first argument must be an object");
+        throw std::runtime_error(std::string(fn) + ": first argument must be an object");
     if (!args[1].is_map())
-        throw std::runtime_error("tween.to: second argument must be a map {field: target}");
+        throw std::runtime_error(std::string(fn) + ": second argument must be a map {field: target}");
     if (args[1].map_size() == 0)
-        throw std::runtime_error("tween.to: no target value");
-    double dur = duration_arg(args, argc, 2, "tween.to");
+        throw std::runtime_error(std::string(fn) + ": no target value");
+    double dur = duration_arg(args, argc, 2, fn);
     int curve = k_curve_default;
     Value curve_fn;
     Value on_done;
-    read_options(args, argc, 3, curve, curve_fn, on_done, "tween.to");
+    read_options(args, argc, 3, curve, curve_fn, on_done, fn);
 
     std::vector<Chan> chans;
-    add_map_chans(chans, args[0], args[1], "tween.to");
+    add_map_chans(chans, args[0], args[1], fn);
     drop_conflicts(chans);
     std::vector<Step> steps;
     steps.push_back(single_step(std::move(chans), dur, curve, curve_fn));
-    return ctx.ret(make_handle(create_tween(std::move(steps), on_done)));
+    return make_handle(create_tween(std::move(steps), on_done));
+}
+
+int tween_to(CallCtx& ctx) {
+    return ctx.ret(declare_tween_to(ctx.args, ctx.argc, "tween.to"));
+}
+
+// Tween(object, {field: target, …}, duration [, curve] [, onDone]): the constructor, the same as tween.to.
+int tween_init(CallCtx& ctx) {
+    adopt_slot_handle(ctx.args[0], declare_tween_to(ctx.args + 1, ctx.argc - 1, "Tween"));
+    return ctx.ret(Value{});
 }
 
 // tween.value(ref v, target, duration [, curve] [, onDone])
@@ -794,6 +802,7 @@ int method_delay(CallCtx& ctx) {
 
 Value make_tween_class() {
     return MapBuilder(Value::make_class("Tween"))
+        .fn("init", tween_init)
         .fn("pause", method_pause)
         .fn("resume", method_resume)
         .fn("cancel", method_cancel)
@@ -810,6 +819,10 @@ Value tween_class() {
 }
 
 } // namespace
+
+Value native_tween_class() {
+    return tween_class();
+}
 
 void tween_update_all(double dt) {
     s_engine_driven = true;   // the engine drives, so tween.update becomes a no-op on the script side

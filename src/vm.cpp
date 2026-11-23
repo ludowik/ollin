@@ -2280,6 +2280,10 @@ void VM::execute(Chunk chunk) {
                 continue;
             init_global(k.as_string(), v);
         }
+        // A class this build lacks (Camera without a window) is nil, like `gfx` itself: the name is known, so
+        // the error is the call of a nil and not an unknown name.
+        for (auto& c : native_classes())
+            init_global(c.name, core.map_get(Value(std::string(c.name))));
     }
     for (auto& name : builtin_module_names())
         if (owned_chunk.identifier_index(name) >= 0) // do not BUILD a module the program never names

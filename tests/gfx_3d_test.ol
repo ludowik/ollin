@@ -100,6 +100,18 @@ func check_state()
     assert(gfx.cameraOrtho(0, 0, 10, 0, 0, 0, 20).fovy == 20)
     assert(near(gfx.fitDistance(2), 5.226) and near(gfx.fitDistance(2, 30), 7.727))
 
+    ## The classes build the objects the module factories build, with the same checks.
+    var cc = Camera(1, 2, 3, 4, 5, 6)
+    assert(instanceOf(cc, Camera) and classOf(cc) == classOf(gfx.camera(0, 0, 10, 0, 0, 0)))
+    assert(cc.px == 1 and cc.tz == 6 and cc.fovy == 45 and Camera(0, 0, 1, 0, 0, 0, 30).fovy == 30)
+    expect(refusal(func() Camera(1, 2) end), "Camera: missing argument")
+    var cl = Light("point", 1, 2, 3)
+    assert(instanceOf(cl, Light) and classOf(cl) == classOf(gfx.light("dir", 0, -1, 0)) and cl.type == 1 and cl.dz == 3)
+    expect(refusal(func() Light("zzz", 0, 0, 1) end), "Light: unknown kind 'zzz' — expected {Q}dir{Q} or {Q}point{Q}")
+    var cq = Quat()
+    assert(instanceOf(cq, Quat) and classOf(cq) == classOf(gfx.quat()) and cq.w == 1 and cq.x == 0)
+    expect(refusal(func() Quat(1, 2, 3, 4) end), "Quat: takes no argument, it is the identity (gfx.quatAxis and gfx.quatEuler build a rotation)")
+
     var l = gfx.light("dir", 0, -1, 0)
     assert(l.type == 0 and l.dy == -1 and l.enabled == true)
     l.setPos(1, 2, 3)
