@@ -51,7 +51,7 @@ func wrapText(str, size, width)
         var trial = line + " " + word
         if line == "" then
             line = word
-        elseif gfx.textSize(trial) > width then
+        elseif gfx.measureText(trial) > width then
             lines.push(line)
             line = word
         else
@@ -77,7 +77,7 @@ end
 ## The size at which the text is no wider than maxW, `size` at most: a translation is not as long as the original.
 func fitSize(str, size, maxW)
     gfx.fontSize(size)
-    var tw = gfx.textSize(str)
+    var tw = gfx.measureText(str)
     if tw > maxW then
         return size * maxW / tw
     end

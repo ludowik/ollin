@@ -438,7 +438,7 @@ func drawTree(r, i, t, s)
         if item.slot <> "" then
             var f = frames[item.id]
             gfx.fontSize(f.fs * 0.7)
-            var w = gfx.textSize(item.slot) + f.fs * 0.5
+            var w = gfx.measureText(item.slot) + f.fs * 0.5
             var y = f.y - f.fs * 1.25
             box(f.x - w / 2, y, w, f.fs * 0.95, f.fs * 0.3, fade(PANEL, 0.9 * f.alpha))
             label(item.slot, f.x, y + f.fs * 0.1, fade(DIM, f.alpha))

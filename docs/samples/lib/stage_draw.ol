@@ -133,7 +133,7 @@ func beginFrame()
     if monoRatio == nil then
         gfx.font("mono")
         gfx.fontSize(100)
-        monoRatio = gfx.textSize("M") / 100
+        monoRatio = gfx.measureText("M") / 100
     end
 end
 
@@ -163,9 +163,9 @@ func layoutChips(tokens, fs, availW, rowGap)
     gfx.font("mono")
     for k, tok in tokens do
         gfx.fontSize(fs)
-        var w1 = gfx.textSize(tokenLabel(tok))
+        var w1 = gfx.measureText(tokenLabel(tok))
         gfx.fontSize(tfs)
-        var w2 = gfx.textSize(tok.type)
+        var w2 = gfx.measureText(tok.type)
         var w = math.max(w1, w2) + SIZE * 0.022
         if x > 0 and x + w > availW then
             x = 0

@@ -28,18 +28,18 @@ func run()
     gfx.font("sans")
     for size in [9, 14, 30] do
         gfx.fontSize(size)
-        var oneLine = gfx.textSize(TEXTS[3])
+        var oneLine = gfx.measureText(TEXTS[3])
         for width in [1, oneLine * 0.2, oneLine * 0.5, oneLine * 0.9, oneLine * 2] do
             for text in TEXTS do
                 var lines = wrapText(text, size, width)
                 var label = "'{text}' at {size} in {width}"
                 assert(joined(lines) == text, "no word lost or added: " + label)
                 for line in lines do
-                    assert(line.split(" ").len() == 1 or gfx.textSize(line) <= width, "a line fits, or is one word: " + label)
+                    assert(line.split(" ").len() == 1 or gfx.measureText(line) <= width, "a line fits, or is one word: " + label)
                 end
                 for i = 2, #lines do
                     var longer = lines[i - 1] + " " + firstWord(lines[i])
-                    assert(gfx.textSize(longer) > width, "a line is as full as it can be: " + label)
+                    assert(gfx.measureText(longer) > width, "a line is as full as it can be: " + label)
                 end
             end
         end

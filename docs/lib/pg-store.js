@@ -152,12 +152,14 @@ export async function listProjects() {
 //                              (`graphics.ol`) are left alone
 //   keyboard.keypressed  -> keyboard.pressed
 //   keyboard.keyrelease  -> keyboard.released
+//   gfx.textSize -> gfx.measureText   (it measures a text; fontSize and strokeSize set a size)
 //   camera.open/close/capture/isOpen -> webcam.…   (the module of the webcam; gfx.camera is the 3D camera, untouched)
 const OLD_NAMES = [
   [/(?<![.\w])graphics\b(?!\.ol|\s*:)/g, 'gfx'],
   [/\bkeyboard\.keypressed\b/g, 'keyboard.pressed'],
   [/\bkeyboard\.keyrelease\b/g, 'keyboard.released'],
   [/\bcamera\.(open|close|capture|isOpen)\b/g, 'webcam.$1'],
+  [/\bgfx\.textSize\b/g, 'gfx.measureText'],
 ]
 
 function migrateOldNames(record) {

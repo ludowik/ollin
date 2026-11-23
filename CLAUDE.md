@@ -1738,10 +1738,10 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   précédent, déjà détruit.
 - Côté langage, la police est un **état de style** comme `fontSize` : `s_font_idx` est
   sauvegardé par `capture_style`/`restore_style` et remis au défaut par `reset_styles`.
-  `gfx.font([nom])` le pilote et renvoie le nom courant ; `gfx.textSize(valeur)`
+  `gfx.font([nom])` le pilote et renvoie le nom courant ; `gfx.measureText(valeur)`
   mesure avec la police ET la taille courantes (deux valeurs, via `ctx.set_result`).
 - **Un argument texte se convertit ou se refuse, jamais ne s'ignore.** La conversion est
-  réservée à ce que le moteur DESSINE — `gfx.text` et `gfx.textSize`, par
+  réservée à ce que le moteur DESSINE — `gfx.text` et `gfx.measureText`, par
   `drawn_text` (graphics_module.cpp), donc `value_to_string` et la méta-méthode `__str` comme
   `print`. **Partout ailleurs la chaîne est obligatoire** : un titre de fenêtre ou un message
   d'`assert` est écrit par l'auteur, un nombre y est une faute et non un raccourci (une valeur
@@ -1757,7 +1757,7 @@ toutes les cibles, WASM compris (les deux atlas SDF pèsent environ 80 Ko de plu
   intact, l'absence de message donne « assertion failed »).
 - **`gfx.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
   `print`, méta-méthode `__str` comprise. Auparavant un non-string devenait la chaîne vide :
-  `gfx.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `textSize` fait la
+  `gfx.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `measureText` fait la
   même conversion, sinon on pourrait écrire un nombre sans jamais pouvoir le centrer (vérifié :
   mêmes largeur et hauteur pour `42` et `"42"`, pour une instance et son `__str`).
   ⚠ **La géométrie est lue AVANT la conversion** : `__str` est du code Ollin, son appel peut
@@ -3022,7 +3022,7 @@ n'importe quel appel. Mesuré neutre (`fib` −0,29 %, boucle +0,00 %, map +0,26
   DESCEND jamais `varargs_base`, donc quand il ne relève pas la capacité est celle que le
   compilateur garantit (`reg_count ≥ call_base + n` pour `n` cibles) ; et quand il relève, c'est
   que `total > n`, donc la capacité vaut `total`. Vérifié sous Xvfb sur `var w, h =
-  gfx.textSize(...)`, le cas que la zone fraîche avait été écrite pour corriger — les deux
+  gfx.measureText(...)`, le cas que la zone fraîche avait été écrite pour corriger — les deux
   valeurs arrivent.
 - ⚠ **`push_frame_self` relève AVANT de glisser.** Insérer `self` rend le cadre une case plus
   large que le bloc que l'appelant a posé, si bien que la glissade écrit au-delà — sur les varargs

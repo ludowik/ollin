@@ -841,13 +841,13 @@ static std::string drawn_text(const Value* args, int argc, int i) {
 }
 
 
-// gfx.textSize(text) gives the width and height of the text WITH the current font and size — two
+// gfx.measureText(text) gives the width and height of the text WITH the current font and size — two
 // values, so centring or aligning needs no reimplementation of the measurement.
-static int gfx_text_size(CallCtx& ctx) {
+static int gfx_measure_text(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("gfx.textSize: expected a text");
+        throw std::runtime_error("gfx.measureText: expected a text");
     if (!engine_font_usable(s_font_idx)) {
         // With no drawing area no font is loaded, so we return 0 rather than divide by the native
         // height — the same choice as gfx.text, which draws nothing.
@@ -2088,7 +2088,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("text")), Value::make_builtin(with_area_text_safe<gfx_text>));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
     m.map_set(Value(std::string("font")), Value::make_builtin(gfx_font));
-    m.map_set(Value(std::string("textSize")), Value::make_builtin(with_area_text_safe<gfx_text_size>));
+    m.map_set(Value(std::string("measureText")), Value::make_builtin(with_area_text_safe<gfx_measure_text>));
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
     m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));

@@ -166,7 +166,7 @@ func draw()
         var cy = H * (rows - 0.5 - row) / rows
         ## The label is MEASURED rather than guessed: a hand-written table of half-widths had to be
         ## revised at every rename, and drifted with the font and the size in any case.
-        var tw, th = gfx.textSize(names[i])
+        var tw, th = gfx.measureText(names[i])
         gfx.noStroke()
         gfx.fill(Color(1, 1, 1, 0.88))
         gfx.rect(cx - tw/2 - pad, cy - th/2 - pad, tw + pad*2, th + pad*2)
