@@ -165,7 +165,7 @@ func draw()
     gfx.begin3d(cam)
         gfx.fill(current.tint)
         gfx.translate(sz.cx, sz.cy, sz.cz)            ## pivot around the model's centre
-        gfx.rotateq(ball.orient())
+        gfx.rotateQuat(ball.orient())
         gfx.translate(-sz.cx, -sz.cy, -sz.cz)
         gfx.drawModel(gfx.model(current.file), 0, 0, 0, 1)
     gfx.end3d()

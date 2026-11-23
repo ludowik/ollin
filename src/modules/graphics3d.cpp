@@ -1259,15 +1259,15 @@ static int gfx_point3d(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// gfx.rotateq(q): applies the quaternion q's rotation in the current transformation
+// gfx.rotateQuat(q): applies the quaternion q's rotation in the current transformation
 // stack — like rotate/rotateX-Y-Z but from a Quat. It therefore composes, works with
 // push/pop, and applies to instanced solids AS WELL AS immediate ones. rlMultMatrixf
 // left-multiplies (like rlRotatef), so the composition is identical.
-static int gfx_rotateq(CallCtx& ctx) {
+static int gfx_rotate_quat(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        throw std::runtime_error("gfx.rotateq: expected a Quat (gfx.quat…)");
-    Matrix m = QuaternionToMatrix(quat_from_instance(args[0], "gfx.rotateq"));
+        throw std::runtime_error("gfx.rotateQuat: expected a Quat (gfx.quat…)");
+    Matrix m = QuaternionToMatrix(quat_from_instance(args[0], "gfx.rotateQuat"));
     rlMultMatrixf(MatrixToFloatV(m).v);
     return ctx.ret(Value{});
 }
@@ -2004,6 +2004,6 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("freeChunk")), Value::make_builtin(with_area<gfx_free_chunk>));
     m.map_set(Value(std::string("line3d")), Value::make_builtin(with_area<gfx_line3d>));
     m.map_set(Value(std::string("point3d")), Value::make_builtin(with_area<gfx_point3d>));
-    m.map_set(Value(std::string("rotateq")), Value::make_builtin(with_area<gfx_rotateq>));
+    m.map_set(Value(std::string("rotateQuat")), Value::make_builtin(with_area<gfx_rotate_quat>));
     register_quat(m);   // quat / quatAxis / quatEuler (the Quat class, graphics_quat.cpp)
 }

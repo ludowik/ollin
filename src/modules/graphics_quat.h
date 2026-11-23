@@ -1,6 +1,6 @@
 #pragma once
 // The Quat class (quaternion rotations), in its own file since it is pure raymath with no rlgl or
-// GL dependency. Used by graphics3d.cpp for gfx.rotateq.
+// GL dependency. Used by graphics3d.cpp for gfx.rotateQuat.
 #include "value.h"
 #include <raymath.h>
 

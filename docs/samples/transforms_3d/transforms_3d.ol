@@ -45,8 +45,8 @@ func draw()
 
     gfx.noStroke()
     gfx.begin3d(cam)
-        gfx.grid(16, 2)         ## before rotateq, hence unaffected by it
-        gfx.rotateq(ball.orient())
+        gfx.grid(16, 2)         ## before rotateQuat, hence unaffected by it
+        gfx.rotateQuat(ball.orient())
         for x = -4, 4 do
             for z = -4, 4 do
                 var t = elapsedTime * 2 + x + z

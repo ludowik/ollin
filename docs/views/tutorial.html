@@ -2302,7 +2302,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>q.slerp(other, t)</code></td><td>Spherical interpolation, <code>t</code> ∈ [0,1] → a new <code>Quat</code></td></tr>
     <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>The normalised quaternion / the inverse rotation</td></tr>
     <tr><td><code>q.rotateVec(x,y,z)</code></td><td>Returns the vector <code>(x,y,z)</code> rotated, as <code>[x,y,z]</code></td></tr>
-    <tr><td><code>gfx.rotateq(q)</code></td><td>Applies the rotation <code>q</code>, as <code>rotate</code> does but from a <code>Quat</code></td></tr>
+    <tr><td><code>gfx.rotateQuat(q)</code></td><td>Applies the rotation <code>q</code>, as <code>rotate</code> does but from a <code>Quat</code></td></tr>
   </tbody>
 </table>
 <pre><code><span class="cmt">## interpolates smoothly between two orientations</span>
@@ -2313,7 +2313,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">gfx</span>.clear(colors.BLACK)
     <span class="kw">var</span> t = (<span class="bi">math</span>.sin(elapsedTime) + <span class="num">1</span>) / <span class="num">2</span>   <span class="cmt">## back and forth, 0↔1</span>
     <span class="bi">gfx</span>.begin3d(cam)
-        <span class="bi">gfx</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## the interpolated rotation</span>
+        <span class="bi">gfx</span>.rotateQuat(qa.slerp(qb, t))       <span class="cmt">## the interpolated rotation</span>
         <span class="bi">gfx</span>.fill(colors.ORANGE)
         <span class="bi">gfx</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
     <span class="bi">gfx</span>.end3d()

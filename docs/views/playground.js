@@ -257,7 +257,7 @@ const MODULE_MEMBERS = {
     fn('gfx.quat','quat() → Quat (identity)'),
     fn('gfx.quatAxis','quatAxis(ax,ay,az, deg) → Quat'),
     fn('gfx.quatEuler','quatEuler(pitch,yaw,roll) → Quat'),
-    fn('gfx.rotateq','rotateq(q)'),
+    fn('gfx.rotateQuat','rotateQuat(q)'),
   ],
   image: [
     fn('image.load','load(path) → img'),

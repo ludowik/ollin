@@ -1,7 +1,7 @@
 ## A REUSABLE "trackball" rotation: dragging with the mouse or a finger turns a scene or an
 ## object, with no gimbal lock, by composing quaternions.
 ##
-##   orient()  gives the current orientation quaternion, to pass to gfx.rotateq
+##   orient()  gives the current orientation quaternion, to pass to gfx.rotateQuat
 ##   dragging  → true while dragging, so an automatic rotation can be suspended
 ##   spin(dxDeg, dyDeg)          turns it directly, for the keyboard or any other source
 ##   idle(dt, degreesPerSecond)  a gentle rotation at rest, to be called from update(dt)
@@ -15,7 +15,7 @@
 ##   func mouse.pressed(x, y)  ball.press(x, y) end
 ##   func mouse.moved(x, y)    ball.move(x, y)  end
 ##   func mouse.released(x, y) ball.release()   end
-##   ## in draw(): gfx.rotateq(ball.orient())
+##   ## in draw(): gfx.rotateQuat(ball.orient())
 
 class Trackball
     func init(sensitivity)
