@@ -19,6 +19,8 @@
 // `ollin.project.json` is a REAL entry of `files` rather than a set of columns of its own, hence
 // no divergence between the local store and GitHub, and a self-describing exported project.
 
+import { migrateText } from './pg-migrate.js'
+
 const DB_NAME    = 'ollin-playground'
 const DB_VERSION = 1
 const STORE      = 'projects'
@@ -143,56 +145,8 @@ export async function listProjects() {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
-// TEMPORARY MIGRATION, to remove once the existing projects have been opened: names of the engine were renamed
-// with no alias, so a project written before fails (`graphics`: "undeclared variable") or silently stops being
-// called (a keyboard callback). Opening a project rewrites the old names in its scripts, and the rewrite is KEPT:
-// stored, and flagged to be pushed, so the project is updated for good and not at every opening. The edit time is
-// not changed: opening a project is not an edit by the user. One line per rename: add one for the next.
-//   graphics -> gfx            the word alone; a field (`a.graphics`), a map key (`graphics:`) and a file name
-//                              (`graphics.ol`, `graphics-utils.ol`) are left alone. A word inside a string or a comment
-//                              is rewritten too, and a variable the user named `graphics` is not told from the module:
-//                              both need a lexer, and are accepted
-//   keyboard.keypressed  -> keyboard.pressed
-//   keyboard.keyrelease  -> keyboard.released
-//   gfx.rotateq -> gfx.rotateQuat
-//   math.smoothstep -> math.smoothStep
-//   gfx.textSize -> gfx.measureText   (it measures a text; fontSize and strokeSize set a size)
-//   camera.open/close/capture/isOpen -> webcam.…   (the module of the webcam; gfx.camera is the 3D camera, untouched)
-//   image.unload -> image.free
-//   colors.X -> palette.X      (the module of the named colours)
-//   palette.DARKGRAY -> palette.DARK_GRAY, palette.SKYBLUE -> palette.SKY_BLUE
-//   touch.began -> touch.pressed, touch.ended -> touch.released
-// tests/check_old_names.sh runs every rule on the old spelling and on lookalikes that must stay as they are.
-// array.contains -> array.has has NO line: `.contains(` would also rewrite the method of a class of the user.
-const OLD_NAMES = [
-  // `graphics` alone: not a field, a path or a file name (`graphics.ol`, `graphics-utils.ol`), not a map key.
-  [/(?<![.\w/-])graphics\b(?![\w-]|\.ol|\s*:)/g, 'gfx'],
-  [/(?<![.\w])keyboard\.keypressed\b/g, 'keyboard.pressed'],
-  [/(?<![.\w])keyboard\.keyrelease\b/g, 'keyboard.released'],
-  [/(?<![.\w])camera\.(open|close|capture|isOpen)\b/g, 'webcam.$1'],
-  [/(?<![.\w])gfx\.textSize\b/g, 'gfx.measureText'],
-  [/(?<![.\w])math\.smoothstep\b/g, 'math.smoothStep'],
-  [/(?<![.\w])gfx\.rotateq\b/g, 'gfx.rotateQuat'],
-  [/(?<![.\w])image\.unload\b/g, 'image.free'],
-  // A project that declares its own `colors` (a variable or a parameter) keeps it: `colors.RED` is then its field.
-  [/(?<![.\w])colors\.([A-Z])/g, 'palette.$1', /\b(?:var|global|const)\s+colors\b|\bfunc\b[^\n(]*\([^\n)]*\bcolors\b/],
-  [/(?<![.\w])palette\.DARKGRAY\b/g, 'palette.DARK_GRAY'],
-  [/(?<![.\w])palette\.SKYBLUE\b/g, 'palette.SKY_BLUE'],
-  [/(?<![.\w])touch\.began\b/g, 'touch.pressed'],
-  [/(?<![.\w])touch\.ended\b/g, 'touch.released'],
-]
-
-// A rule is [pattern, replacement] or [pattern, replacement, skipIf]: `skipIf` is tested on the whole script, and a
-// match leaves the script alone for that rule.
-function migrateText(text) {
-  let migrated = text
-  for (const [oldName, newName, skipIf] of OLD_NAMES) {
-    if (skipIf && skipIf.test(text)) continue
-    migrated = migrated.replace(oldName, newName)
-  }
-  return migrated
-}
-
+// Rewrites the old names of the engine in the scripts of a project (the rules and their limits: pg-migrate.js). The edit
+// time is not changed: opening a project is not an edit by the user.
 function migrateOldNames(record) {
   let changed = false
   for (const [name, text] of Object.entries(record.files || {})) {

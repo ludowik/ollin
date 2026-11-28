@@ -161,8 +161,6 @@ void read_options(const Value& options, HttpsRequest& rq, const char* fn) {
 
 // ── Requests ─────────────────────────────────────────────────────────────────────────────────────
 
-Value https_class();
-
 Value make_handle(int slot) {
     return make_slot_handle(https_class(), slot, s_reqs[slot].gen);
 }
@@ -356,15 +354,11 @@ Value make_https_class() {
         .done();
 }
 
+} // namespace
+
 Value https_class() {
     static Value cls = make_https_class();
     return cls;
-}
-
-} // namespace
-
-Value native_request_class() {
-    return https_class();
 }
 
 void https_poll() {

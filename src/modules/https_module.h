@@ -26,6 +26,9 @@
 // every request fails with the error "unsupported".
 Value make_https_module();
 
+// The `Request` class, one for the whole program: what Request(...) builds and the handles of https.get belong to.
+Value https_class();
+
 // Delivers the answers that have come in. Called once a frame by the render loop, before update().
 void https_poll();
 

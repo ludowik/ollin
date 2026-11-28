@@ -16,6 +16,9 @@
 // ONCE, outside the callback.
 Value make_sound_module();
 
+// The `Osc` class, one for the whole program: what Osc(...) builds and the handles of sound.osc belong to.
+Value osc_class();
+
 // Reset when a program starts (ollin_run), like ui_reset: the statics survive the VM between two
 // playground runs, and an oscillator from the previous program would keep sounding.
 void sound_reset();

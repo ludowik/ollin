@@ -20,8 +20,6 @@ Voice* voices() {
     return sound_voices();
 }
 
-Value osc_class();
-
 Value make_handle(int slot) {
     return make_slot_handle(osc_class(), slot, voices()[slot].gen);
 }
@@ -532,15 +530,11 @@ Value make_osc_class() {
         .done();
 }
 
+} // namespace
+
 Value osc_class() {
     static Value cls = make_osc_class();
     return cls;
-}
-
-} // namespace
-
-Value native_osc_class() {
-    return osc_class();
 }
 
 // The voice table lives HERE, in the file compiled everywhere: the output reaches it only through

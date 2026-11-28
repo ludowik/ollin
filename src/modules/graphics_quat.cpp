@@ -4,6 +4,7 @@
 // (consistent with rotate and rotateX/Y/Z), converted internally to radians for raymath.
 #include "graphics_quat.h"
 #include "module_utils.h"
+#include "modules.h"
 #include "value.h"
 #include <raymath.h>
 #include <stdexcept>
@@ -13,8 +14,6 @@ static double quat_field(const Value& v, const char* k) {
     Value f = v.map_get(Value(std::string(k)));
     return f.is_number() ? f.as_num() : 0.0;
 }
-
-Value quat_class();   // defined below
 
 Quaternion quat_from_instance(const Value& v, const char* fn) {
     // Checks this really is a Quat instance and not some other map (a Camera or a Light object…): a quaternion
@@ -119,8 +118,13 @@ static Value quat_from_euler(const Value* args, int argc, const char* who) {
     return make_quat_instance(QuaternionFromEuler(pitch, yaw, roll));
 }
 
-static int quat_static_axis(CallCtx& ctx);
-static int quat_static_euler(CallCtx& ctx);
+static int quat_static_axis(CallCtx& ctx) {
+    return ctx.ret(quat_from_axis(ctx.args, ctx.argc, "Quat.axis"));
+}
+
+static int quat_static_euler(CallCtx& ctx) {
+    return ctx.ret(quat_from_euler(ctx.args, ctx.argc, "Quat.euler"));
+}
 
 static Value make_quat_class() {
     return MapBuilder(Value::make_class("Quat"))
@@ -156,14 +160,6 @@ static int gfx_quat_axis(CallCtx& ctx) {
 // gfx.quatEuler(...) and Quat.euler(...).
 static int gfx_quat_euler(CallCtx& ctx) {
     return ctx.ret(quat_from_euler(ctx.args, ctx.argc, "gfx.quatEuler"));
-}
-
-static int quat_static_axis(CallCtx& ctx) {
-    return ctx.ret(quat_from_axis(ctx.args, ctx.argc, "Quat.axis"));
-}
-
-static int quat_static_euler(CallCtx& ctx) {
-    return ctx.ret(quat_from_euler(ctx.args, ctx.argc, "Quat.euler"));
 }
 
 void register_quat(Value& m) {

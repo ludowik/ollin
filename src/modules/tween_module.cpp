@@ -314,8 +314,6 @@ void advance(double dt) {
 // Never a pointer: declaring a tween from a completion callback push_backs onto s_tweens, which
 // would invalidate any reference kept.
 
-Value tween_class();
-
 Value make_handle(int slot) {
     return make_slot_handle(tween_class(), slot, s_tweens[slot].gen);
 }
@@ -813,15 +811,11 @@ Value make_tween_class() {
         .done();
 }
 
+} // namespace
+
 Value tween_class() {
     static Value cls = make_tween_class();
     return cls;
-}
-
-} // namespace
-
-Value native_tween_class() {
-    return tween_class();
 }
 
 void tween_update_all(double dt) {

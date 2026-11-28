@@ -3,6 +3,9 @@
 
 Value make_tween_module();
 
+// The `Tween` class, one for the whole program: what Tween(...) builds and the handles of tween.to belong to.
+Value tween_class();
+
 // Called by the render loop (graphics_module.cpp, run_user_callbacks):
 // tween_update_all(dt) BEFORE update() and draw(), so both see this frame's values. The first call
 //                      marks the module as engine-driven and turns tween.update into a no-op for

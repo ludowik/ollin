@@ -1,6 +1,5 @@
 #include "module_utils.h"
 #include "modules.h"
-#include "random_module.h"
 #include "vm.h"
 #include <iostream>
 #include <vector>
