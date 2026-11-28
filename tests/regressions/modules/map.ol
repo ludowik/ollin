@@ -73,7 +73,7 @@ class MapOnClass
 end
 assert(map.has(MapOnClass, "init") and not map.has(MapOnClass, "__name__"))
 assert(map.len(MapOnClass) == 2)
-assert(map.keys(MapOnClass).contains("greet"))
+assert(map.keys(MapOnClass).has("greet"))
 
 ## storing an UNRELATED builtin under a map's own key must keep calling it plainly — is_map_module_fn
 ## excludes it (math.sin is none of them), so no self is injected regardless of the receiver

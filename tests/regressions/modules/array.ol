@@ -61,14 +61,14 @@ end
 assert(rm_arr.len() == 5)
 assert(rm_arr[1].n == 2 and rm_arr[5].n == 10)
 assert(rm_arr.remove(RmObj(2)) == nil)     ## a DIFFERENT instance with the same field: no identity match
-## indexOf and contains share the same identity rule as remove — never a script's __eq — and
+## indexOf and has share the same identity rule as remove — never a script's __eq — and
 ## indexOf is 1-based, like every other array index.
 var idx_arr = [RmObj(2), RmObj(4), RmObj(6)]
 assert(idx_arr.indexOf(idx_arr[2]) == 2)
 assert(idx_arr.indexOf(RmObj(4)) == nil)       ## a different instance, same field: no match
-assert(idx_arr.contains(idx_arr[3]))
-assert(not idx_arr.contains(RmObj(6)))
-assert([1, 2, 3].indexOf(2.0) == 2 and [1, 2, 3].contains(2.0))   ## numbers: value equality, INTEGER(2) == FLOAT(2.0)
+assert(idx_arr.has(idx_arr[3]))
+assert(not idx_arr.has(RmObj(6)))
+assert([1, 2, 3].indexOf(2.0) == 2 and [1, 2, 3].has(2.0))   ## numbers: value equality, INTEGER(2) == FLOAT(2.0)
 ## sorting: an explicit comparator, and an order by type rank without one
 var srt = [1, 2, 3].sort(func(x, y) return x > y end)
 assert(srt[1] == 3)
@@ -152,11 +152,11 @@ assert([3, 9, 4].reduce(math.max, 0) == 9)
 ## A method called without its argument names itself in the refusal.
 var arrNoArg = nil
 try
-    var r = [1, 2].contains()
+    var r = [1, 2].has()
 catch e
     arrNoArg = e
 end
-assert(arrNoArg == "array.contains: expected (array, value)")
+assert(arrNoArg == "array.has: expected (array, value)")
 
 ## delete takes an integer index: anything else removes nothing and answers nil.
 var arrKeep = [1, 2]
@@ -235,7 +235,7 @@ assert(array.len(ccBase) == 2 and array.concat(ccBase, [7]).join(",") == "1,2,7"
 assert(array.copy(ccBase).len() == 2 and array.repeat([0, 1], 2).join(",") == "0,1,0,1")
 var arrFree = [3, 1, 2]
 array.push(arrFree, 0)
-assert(array.indexOf(arrFree, 0) == 4 and array.contains(arrFree, 3) and array.sort(arrFree)[1] == 0)
+assert(array.indexOf(arrFree, 0) == 4 and array.has(arrFree, 3) and array.sort(arrFree)[1] == 0)
 assert(array.map([1, 2], func(v) return v * 2 end).join(",") == "2,4" and array.join([1, 2], "-") == "1-2")
 ## a local may take the name, as it may take `string` or `map`
 func arrShadow(array)

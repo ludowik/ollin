@@ -87,14 +87,14 @@ end
 ## On a grid with one hole, the help keeps the piece that clears it in every hand, at level 0 ...
 for i = 1, 100 do
     var hand = drawHand(hole, 0)
-    assert(hand.contains(single), "the hand {i} of level 0 has no piece that clears the hole")
+    assert(hand.has(single), "the hand {i} of level 0 has no piece that clears the hole")
     assert(fitsSomewhere(hole, hand))
 end
 ## The same on a grid that is far from full, so that no small piece is given: only the help brings a piece that fills
 ## the row, and it is there in every hand of level 0, but not in every hand once the help is over.
 var cleared = boardCompleting(rowGap, pieces.shapes)
 func clearsRow(hand)
-    return len(hand.filter(func(s) return cleared.contains(s) end)) > 0
+    return len(hand.filter(func(s) return cleared.has(s) end)) > 0
 end
 var early = 0
 var late = 0

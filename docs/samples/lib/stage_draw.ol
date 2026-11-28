@@ -70,7 +70,7 @@ func kindOf(ty)
         return "text"
     elseif ty == "EOF_T" then
         return "ending"
-    elseif PUNCTUATION.contains(ty) then
+    elseif PUNCTUATION.has(ty) then
         return "punct"
     end
     return "operator"

@@ -91,7 +91,7 @@ func modernWell(f)
             var v = game.well[wellIdx(col, row)]
             if v <> 0 then
                 modernBlock(x + col * c, y + row * c, c, v)
-                if flash and game.clearing.contains(row) then
+                if flash and game.clearing.has(row) then
                     fillC(MODERN_WHITE, 0.85)
                     gfx.rect(x + col * c, y + row * c, c, c, c * 0.18)
                 end

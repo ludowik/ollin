@@ -155,7 +155,7 @@ func boardFillsGap(g, shape, gap)
         if boardCanPlace(g, shape, r, c) then
             var covered = 0
             for off in shape.cells do
-                if gap.contains(boardIdx(r + off[1], c + off[2])) then
+                if gap.has(boardIdx(r + off[1], c + off[2])) then
                     covered += 1
                 end
             end

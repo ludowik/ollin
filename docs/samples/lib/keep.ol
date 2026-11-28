@@ -17,7 +17,7 @@ func isNumber(v, low, high)
 end
 
 func isOneOf(v, list)
-    return typeof(v) == "string" and list.contains(v)
+    return typeof(v) == "string" and list.has(v)
 end
 
 func isBool(v)

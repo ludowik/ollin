@@ -39,7 +39,7 @@ end
 func rowsFilled(rows, except)
     for r in rows do
         for c = 0, COLS - 1 do
-            if except.contains(c) then
+            if except.has(c) then
                 game.well[wellIdx(c, r)] = 0
             else
                 game.well[wellIdx(c, r)] = Piece.Z

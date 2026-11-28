@@ -125,7 +125,7 @@ end
 func collapse(well, rows)
     var to = ROWS - 1
     for from = ROWS - 1, 0, -1 do
-        if not rows.contains(from) then
+        if not rows.has(from) then
             if to <> from then
                 for c = 0, COLS - 1 do
                     well[wellIdx(c, to)] = well[wellIdx(c, from)]

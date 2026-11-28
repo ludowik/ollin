@@ -46,7 +46,7 @@ func assist(g, picks, help, completing)
     var kept = 0
     if len(completing) > 0 and math.rand() < help then
         for i, s in picks do
-            if completing.contains(s) then
+            if completing.has(s) then
                 kept = i
                 break
             end

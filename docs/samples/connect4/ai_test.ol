@@ -62,12 +62,12 @@ end
 ## two open ends are a win in three moves: 3 and 4 on the bottom row, then 2 or 5 makes three with a free cell on each side
 b = replay([3, 7, 4, 7])
 assert(negamax(b, 4, -INFINITY, INFINITY, positional(b), 0) > WIN - 10, "a line open at both ends wins by force")
-assert([2, 5].contains(bestColumn(b, 4, rng)), "and the search plays the move that makes it")
+assert([2, 5].has(bestColumn(b, 4, rng)), "and the search plays the move that makes it")
 ## the player to move cannot stop two threats: the other side has 2, 3 and 4 on the bottom row, and columns 1 and 5 are both open
 b = replay([7, 2, 6, 3, 7, 4])
 assert(toMove(b) == 1 and (threatCells(b.mine[2]) & playableCells(b)) == (1 << 0 | 1 << 4 * STRIDE), "two cells to block")
 assert(negamax(b, 2, -INFINITY, INFINITY, 0, 0) == -(WIN - 1), "and only one disc to block with: the other side wins next move")
-assert(openColumns(b).contains(bestColumn(b, 3, rng)), "a lost position still gets a move")
+assert(openColumns(b).has(bestColumn(b, 3, rng)), "a lost position still gets a move")
 
 ## ── Never a full column ──────────────────────────────────────────────────────────────────────────────────────────────────
 b = newBoard()

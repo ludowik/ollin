@@ -42,7 +42,7 @@ for s in pieces.shapes do
     assert(shapeWeight(s, DIFFICULTY.helpEnd) == s.weight, "{s.key} must weigh its own weight at the reference level")
 end
 assert(total == 83, "the weights add up to {total}, expected 83")
-assert(len(light) == 3 and light.contains("#") and light.contains("#####") and light.contains("#/#/#/#/#"), "the weight-1 shapes are wrong")
+assert(len(light) == 3 and light.has("#") and light.has("#####") and light.has("#/#/#/#/#"), "the weight-1 shapes are wrong")
 
 ## randomShape follows the weights: over many draws the light shapes come about half as often as a heavy one.
 var drawn = {}

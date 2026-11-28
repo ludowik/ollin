@@ -62,7 +62,7 @@ static int arr_delete(CallCtx& ctx) {
 // 0-based index of the array's first element identical to v — ValueEqual, the same rule as a map
 // key (pointer identity for maps, arrays, instances, closures and ranges; value equality for
 // numbers, strings and booleans), NEVER a script's __eq — or -1 when none matches. Shared by
-// indexOf, contains and remove, the only difference between them being what they do with it.
+// indexOf, has and remove, the only difference between them being what they do with it.
 static int64_t arr_find(const std::vector<Value>& items, const Value& v) {
     for (size_t i = 0; i < items.size(); i++) {
         if (ValueEqual{}(items[i], v))
@@ -77,8 +77,8 @@ static int arr_index_of(CallCtx& ctx) {
     return ctx.ret(i < 0 ? Value{} : Value(i + 1)); // 1-based, like every other array index
 }
 
-static int arr_contains(CallCtx& ctx) {
-    arr_check(ctx, 2, "contains: expected (array, value)");
+static int arr_has(CallCtx& ctx) {
+    arr_check(ctx, 2, "has: expected (array, value)");
     return ctx.ret(Value::make_bool(arr_find(ctx.args[0].aptr->items, ctx.args[1]) >= 0));
 }
 
@@ -336,7 +336,7 @@ Value make_array_module() {
         .fn("delete", arr_delete)
         .fn("remove", arr_remove)
         .fn("indexOf", arr_index_of)
-        .fn("contains", arr_contains)
+        .fn("has", arr_has)
         .fn("map", arr_map)
         .fn("filter", arr_filter)
         .fn("reduce", arr_reduce)

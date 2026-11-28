@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-28 12:48</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-28 13:07</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -459,7 +459,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-28 12:48</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-28 13:07</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1371,7 +1371,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.delete(i)</code></td><td>Removes and returns the element at index <code>i</code></td></tr>
 <tr><td><code>arr.remove(v)</code></td><td>Removes and returns the array's first element identical to <code>v</code> (or <code>nil</code> when none matched) — by identity for objects, arrays and the like, by value for numbers, strings and booleans</td></tr>
 <tr><td><code>arr.indexOf(v)</code></td><td>The 1-based index of the first element identical to <code>v</code> (same rule as <code>remove</code>), or <code>nil</code></td></tr>
-<tr><td><code>arr.contains(v)</code></td><td><code>true</code> when the array holds an element identical to <code>v</code>, <code>false</code> otherwise</td></tr>
+<tr><td><code>arr.has(v)</code></td><td><code>true</code> when the array holds an element identical to <code>v</code>, <code>false</code> otherwise</td></tr>
 <tr><td><code>arr.enqueue(v)</code></td><td>The same as <code>push</code>, under the name that pairs with <code>dequeue</code>: appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue) — an error on an empty array. Every other element moves down by one, so its cost grows with the length of the array: fine for a short queue, slow for a very long one</td></tr>
 <tr><td><code>arr.copy()</code></td><td>A <strong>new</strong> array with the same elements. The copy is <strong>shallow</strong>: a map, an array or an instance held by the array is shared, not duplicated</td></tr>

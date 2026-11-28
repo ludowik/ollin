@@ -136,7 +136,7 @@ func drawWell()
         for c = 0, COLS - 1 do
             var v = game.well[wellIdx(c, r)]
             if v <> 0 then
-                if game.clearing.contains(r) then
+                if game.clearing.has(r) then
                     block(wx + c * CELL, r * CELL, CELL, CELL, flash and 1 or 4)
                 else
                     drawBlock(wx + c * CELL, r * CELL, v, v == Piece.I and wellSides(c, r) or 0)

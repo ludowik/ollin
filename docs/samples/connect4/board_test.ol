@@ -71,7 +71,7 @@ for i = 1, ROWS do
     drop(b, 1)
 end
 assert(not canDrop(b, 1) and canDrop(b, 2), "a column holds six discs")
-assert(openColumns(b).len() == COLS - 1 and not openColumns(b).contains(1))
+assert(openColumns(b).len() == COLS - 1 and not openColumns(b).has(1))
 assert(not canDrop(b, 0) and not canDrop(b, COLS + 1) and not canDrop(b, -1), "and there is no column outside the grid")
 assert(not canDrop(b, 2.5) and not canDrop(b, "3") and not canDrop(b, nil) and not canDrop(b, true), "that is not a whole number")
 

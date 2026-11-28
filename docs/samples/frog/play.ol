@@ -81,7 +81,7 @@ func arriveHome()
         event = nil
     end
     play(sndHome)
-    if not homes.contains(false) then
+    if not homes.has(false) then
         earn(SCORE_BOARD)
         lives += 1
         board += 1

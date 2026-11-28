@@ -29,7 +29,7 @@ assert(skyOf(0).kind == "clear" and skyOf(2).kind == "partly" and skyOf(3).key =
 assert(skyOf(61).kind == "rain" and skyOf(73).kind == "snow" and skyOf(95).kind == "storm" and skyOf(45).kind == "fog")
 assert(skyOf(1234).kind == "cloud" and skyOf(1234).key == nil and skyOf(1234).code == 1234, "an unknown code is not a failure")
 for code, sky in SKIES do
-    assert(sky.key <> nil and ["clear", "partly", "cloud", "fog", "rain", "snow", "storm"].contains(sky.kind), "code {code}")
+    assert(sky.key <> nil and ["clear", "partly", "cloud", "fog", "rain", "snow", "storm"].has(sky.kind), "code {code}")
 end
 
 ## ── A forecast ──
