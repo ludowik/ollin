@@ -156,6 +156,12 @@ export async function listProjects() {
 //   math.smoothstep -> math.smoothStep
 //   gfx.textSize -> gfx.measureText   (it measures a text; fontSize and strokeSize set a size)
 //   camera.open/close/capture/isOpen -> webcam.…   (the module of the webcam; gfx.camera is the 3D camera, untouched)
+//   image.unload -> image.free
+//   colors.X -> palette.X      (the module of the named colours)
+//   palette.DARKGRAY -> palette.DARK_GRAY, palette.SKYBLUE -> palette.SKY_BLUE
+//   touch.began -> touch.pressed, touch.ended -> touch.released
+// tests/check_old_names.sh runs every rule on the old spelling and on lookalikes that must stay as they are.
+// array.contains -> array.has has NO line: `.contains(` would also rewrite the method of a class of the user.
 const OLD_NAMES = [
   [/(?<![.\w])graphics\b(?!\.ol|\s*:)/g, 'gfx'],
   [/\bkeyboard\.keypressed\b/g, 'keyboard.pressed'],

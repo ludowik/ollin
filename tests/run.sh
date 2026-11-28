@@ -49,6 +49,7 @@ checks=(
     "guard: class-name ceiling|tests/check_class_name_limit.sh"
     "guard: unit tests|tests/check_unit.sh"
     "guard: data persistence|tests/check_data_persistence.sh"
+    "guard: renamed names|tests/check_old_names.sh"
 )
 reports=$(mktemp -d)
 trap 'rm -rf "$reports"' EXIT
