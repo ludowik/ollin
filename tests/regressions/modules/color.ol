@@ -15,7 +15,7 @@ assert(Color(0, 0, 0).pastel().r == 0.5)
 assert(colOrig.r == 1 and colOrig.g == 0 and colOrig.a == 0.5, "the colour itself does not change")
 assert(colGray.pastel().a == 0.5 and instanceOf(colSoft.grayscale(), Color), "the results are colours too, of the same class")
 
-## ── Color.__str, Color.gray and the colors palette ──
+## ── Color.__str, Color.gray and the palette module ──
 ## Color(...) prints its four components with six decimals; interpolation and print go through the same path.
 assert(Color(1, 0, 0.5, 1).__str() == "Color(1.000000,0.000000,0.500000,1.000000)")
 assert("{Color(0)}" == "Color(0.000000,0.000000,0.000000,1.000000)", "interpolation uses __str")
@@ -29,16 +29,16 @@ assert(Color.gray(0.25).g == 0.25 and instanceOf(Color.gray(0.25), Color) and cl
 assert(Color(1, 0, 0).gray(0.5).r == 0.5, "gray ignores the receiver")
 
 ## The palette: every constant is a real Color, built from 8-bit components.
-assert(colors.BLACK.r == 0 and colors.BLACK.a == 1)
-assert(colors.WHITE.r == 1 and colors.WHITE.g == 1 and colors.WHITE.b == 1)
-assert(math.abs(colors.RED.r - 230 / 255) < 0.000001 and math.abs(colors.RED.g - 41 / 255) < 0.000001)
-assert(instanceOf(colors.RED, Color), "a palette constant is an instance of the Color class")
-assert(colors.MAGENTA.r == 1 and colors.MAGENTA.g == 0 and colors.MAGENTA.b == 1)
-assert(colors.BLUE.pastel().a == 1, "the methods work on palette constants")
+assert(palette.BLACK.r == 0 and palette.BLACK.a == 1)
+assert(palette.WHITE.r == 1 and palette.WHITE.g == 1 and palette.WHITE.b == 1)
+assert(math.abs(palette.RED.r - 230 / 255) < 0.000001 and math.abs(palette.RED.g - 41 / 255) < 0.000001)
+assert(instanceOf(palette.RED, Color), "a palette constant is an instance of the Color class")
+assert(palette.MAGENTA.r == 1 and palette.MAGENTA.g == 0 and palette.MAGENTA.b == 1)
+assert(palette.BLUE.pastel().a == 1, "the methods work on palette constants")
 for name in ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "GRAY", "ORANGE", "PINK", "PURPLE", "BROWN", "DARKGRAY", "SKYBLUE", "LIME", "MAGENTA"] do
-    assert(instanceOf(colors[name], Color), "colors.{name} is a Color")
+    assert(instanceOf(palette[name], Color), "palette.{name} is a Color")
 end
-assert(len(map.keys(colors)) == 15, "the palette has fifteen colours")
+assert(len(map.keys(palette)) == 15, "the palette has fifteen colours")
 
 ## a Color may be built from any map that has r, g, b and a, the absent ones defaulting to 0 and 1
 var cxFromMap = Color({r: 1, g: 0.5, b: 0})

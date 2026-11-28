@@ -159,7 +159,7 @@ const AC_BUILTINS = [
   fn('Request', 'Request(url [, options], callback) → request (as https.get)'),
   fn('Camera', 'Camera(px, py, pz, tx, ty, tz [, fovy]) → camera (as gfx.camera)'),
   fn('Light',  'Light("dir" | "point", x, y, z [, color]) → light (as gfx.light)'),
-  fn('Quat',   'Quat() → the identity rotation (gfx.quatAxis and gfx.quatEuler build others)'),
+  fn('Quat',   'Quat() → the identity rotation (Quat.axis and Quat.euler build others)'),
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (bytes used)'),
 ]
 
@@ -279,12 +279,12 @@ const MODULE_MEMBERS = {
     fn('image.endPixels','endPixels(img)'),
     fn('image.mapPixel','mapPixel(img, f(x,y,r,g,b,a) → r,g,b,a)'),
   ],
-  colors: [
-    cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
-    cst('colors.GREEN',''),   cst('colors.BLUE',''),   cst('colors.YELLOW',''),
-    cst('colors.GRAY',''),    cst('colors.ORANGE',''), cst('colors.PINK',''),
-    cst('colors.PURPLE',''),  cst('colors.BROWN',''),  cst('colors.DARKGRAY',''),
-    cst('colors.SKYBLUE',''), cst('colors.LIME',''),   cst('colors.MAGENTA',''),
+  palette: [
+    cst('palette.BLACK',''),   cst('palette.WHITE',''),  cst('palette.RED',''),
+    cst('palette.GREEN',''),   cst('palette.BLUE',''),   cst('palette.YELLOW',''),
+    cst('palette.GRAY',''),    cst('palette.ORANGE',''), cst('palette.PINK',''),
+    cst('palette.PURPLE',''),  cst('palette.BROWN',''),  cst('palette.DARKGRAY',''),
+    cst('palette.SKYBLUE',''), cst('palette.LIME',''),   cst('palette.MAGENTA',''),
   ],
   blend: [
     cst('blend.ALPHA','normal blending (default)'), cst('blend.ADD','additive (glow)'),

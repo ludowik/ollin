@@ -32,7 +32,7 @@ Value make_graphics_module();
 // without raylib too, and so cannot reference the enum. See make_graphics_module.
 Value make_blend_module();
 Value make_string_module();
-Value make_colors_module();
+Value make_palette_module();
 Value make_window_module();
 Value make_image_module();
 Value make_keyboard_module();
@@ -67,7 +67,7 @@ static const struct { const char* name; Value(*make)(); void(*reset)(); } k_modu
     { "string",   make_string_module,   nullptr          },
     { "map",      make_map_module,      nullptr          },
     { "array",    make_array_module,    nullptr          },
-    { "colors",   make_colors_module,   nullptr          },
+    { "palette",  make_palette_module,  nullptr          },
     { "blend",    make_blend_module,    nullptr          },
     { "window",   make_window_module,   nullptr          },
     { "image",    make_image_module,    image_reset      },   // stale GL texture handles, before the context may be reset

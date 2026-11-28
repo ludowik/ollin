@@ -118,7 +118,7 @@ func draw()
                 gfx.stroke(Color(0.3 + r * 0.5, 0.5 + r * 0.2, 1.0 - r * 0.4))
                 gfx.point3d(r * math.cos(t), r * math.sin(t), math.sin(t * 2) * 0.4)
             end
-            gfx.stroke(colors.WHITE)
+            gfx.stroke(palette.WHITE)
             gfx.strokeSize(10)
             gfx.point3d(0, 0, 0)
             gfx.strokeSize(1)

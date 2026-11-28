@@ -1284,8 +1284,8 @@ assert(sw_hit == "only else")
 ##
 ##   gfx.canvas(800, 600, "Title")   ## opens a window
 ##   func draw()                          ## called on every frame
-##       gfx.clear(colors.BLACK)
-##       gfx.stroke(colors.RED)      ## style: the current state
+##       gfx.clear(palette.BLACK)
+##       gfx.stroke(palette.RED)      ## style: the current state
 ##       gfx.line(x1, y1, x2, y2)    ## geometry: the arguments
 ##   end
 ##
@@ -1293,7 +1293,7 @@ assert(sw_hit == "only else")
 ## (fill, stroke, strokeSize, fontSize, rectMode, spriteMode). No drawing primitive takes a colour
 ## or a size as an argument.
 ##
-## Predefined colours: the `colors` module (colors.BLACK, colors.WHITE, colors.RED…)
+## Predefined colours: the `palette` module (palette.BLACK, palette.WHITE, palette.RED…)
 ## Custom colours: Color(r, g, b[, a]), with components from 0 to 1
 ##   (a packed integer does NOT work: the values are clamped to 1, hence white)
 ## FPS: gfx.fps() gives an integer

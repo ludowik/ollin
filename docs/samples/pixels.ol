@@ -26,7 +26,7 @@ func draw()
     end
     image.endPixels(canvas)
 
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
     image.draw(canvas, 0, 0, W, H)
     gfx.stroke(Color(1, 1, 1))
     gfx.text("Perlin per pixel", 12, 12)

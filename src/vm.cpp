@@ -2271,7 +2271,7 @@ void VM::execute(Chunk chunk) {
             it = built.emplace(name, make_builtin_module(name)).first;
         return it->second;
     };
-    // core's members come FIRST: the `colors` module is built below and gives its palette the global Color class,
+    // core's members come FIRST: the `palette` module is built below and gives its palette the global Color class,
     // which must exist by then, or the constants would be instances of another class that merely has the same name.
     {
         const Value& core = module_of("core");

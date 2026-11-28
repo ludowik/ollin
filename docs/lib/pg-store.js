@@ -165,6 +165,7 @@ const OLD_NAMES = [
   [/\bmath\.smoothstep\b/g, 'math.smoothStep'],
   [/\bgfx\.rotateq\b/g, 'gfx.rotateQuat'],
   [/\bimage\.unload\b/g, 'image.free'],
+  [/\bcolors\.([A-Z])/g, 'palette.$1'],
 ]
 
 function migrateOldNames(record) {

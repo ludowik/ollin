@@ -2118,6 +2118,6 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("point")), Value::make_builtin(with_area_text_safe<gfx_point>));
     m.map_set(Value(std::string("sprite")), Value::make_builtin(with_area<gfx_sprite>));
     register3d_graphics(m);   // 3D: the camera, begin3d/end3d, the primitives, the lighting and the texture — graphics3d.cpp
-    // The colour constants are NOT here: use the `colors` module.
+    // The colour constants are NOT here: use the `palette` module.
     return m;
 }

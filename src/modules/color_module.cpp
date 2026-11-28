@@ -140,7 +140,7 @@ static Value make_color_instance(const Value& cls, double r, double g, double b,
     return MapBuilder().klass(cls).num("r", r).num("g", g).num("b", b).num("a", a).done();
 }
 
-Value make_colors_module() {
+Value make_palette_module() {
     Value cls = color_class(); // the global Color class, shared by every constant of the palette
     auto rgb = [&](int r, int g, int b) { return make_color_instance(cls, r / 255.0, g / 255.0, b / 255.0); };
     return MapBuilder()

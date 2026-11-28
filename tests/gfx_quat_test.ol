@@ -74,3 +74,15 @@ assert(refusal(func() quarterZ.slerp(quarterY, "x") end) == "Quat.slerp: argumen
 assert(refusal(func() quarterZ.rotateVec(1, 2) end) == "Quat.rotateVec: missing argument")
 assert(refusal(func() gfx.quatAxis(1, 2) end) == "gfx.quatAxis: missing argument")
 assert(refusal(func() gfx.quatEuler(1) end) == "gfx.quatEuler: missing argument")
+
+## Quat.axis and Quat.euler build the same rotations as gfx.quatAxis and gfx.quatEuler
+var sa = Quat.axis(0, 0, 1, 90)
+var sb = gfx.quatAxis(0, 0, 1, 90)
+assert(instanceOf(sa, Quat) and classOf(sa) == classOf(sb))
+assert(near(sa.x, sb.x) and near(sa.y, sb.y) and near(sa.z, sb.z) and near(sa.w, sb.w))
+assert(vec_is(Quat.axis(0, 0, 1, 90).rotateVec(1, 0, 0), 0, 1, 0))
+assert(vec_is(Quat.axis(0, 0, 0, 90).rotateVec(1, 2, 3), 1, 2, 3))
+assert(vec_is(Quat.euler(90, 0, 0).rotateVec(0, 1, 0), 0, 0, 1))
+assert(instanceOf(Quat.euler(1, 2, 3), Quat))
+assert(refusal(func() Quat.axis(1, 2) end) == "Quat.axis: missing argument")
+assert(refusal(func() Quat.euler(1) end) == "Quat.euler: missing argument")

@@ -41,7 +41,7 @@ func mouse.released(x, y)
 end
 
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
 
     gfx.noStroke()
     gfx.begin3d(cam)
@@ -60,12 +60,12 @@ func draw()
             gfx.translate(0, 6, 0)
             gfx.rotateY(elapsedTime * 60)
             gfx.rotate(elapsedTime * 40, 1, 0, 1)
-            gfx.fill(colors.WHITE)
+            gfx.fill(palette.WHITE)
             gfx.cube(0, 0, 0,  2, 2, 2)
         gfx.pop()
     gfx.end3d()
 
-    gfx.stroke(colors.WHITE)
+    gfx.stroke(palette.WHITE)
     gfx.fontSize(20)
     gfx.text("Drag to turn the scene", 12, 12)
 end

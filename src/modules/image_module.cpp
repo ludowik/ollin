@@ -420,7 +420,7 @@ static int img_create(CallCtx& ctx) {
 
 
 // A sprite from a text PATTERN: one string per row, '.' and a space transparent, every other
-// character taken from the palette — {"#": colors.WHITE, "o": Color(1, 0.4, 0.4)} — or opaque white
+// character taken from the palette — {"#": palette.WHITE, "o": Color(1, 0.4, 0.4)} — or opaque white
 // when no palette is given. It stands in for create + beginPixels + a double loop + endPixels, and
 // with it the only place where a script had to count pixels from ZERO while the rest of the language
 // counts from one.

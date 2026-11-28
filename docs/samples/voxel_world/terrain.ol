@@ -136,7 +136,7 @@ end
 
 func bakeChunk(cx, cz)
     gfx.beginChunk()
-    gfx.fill(colors.WHITE)   ## a neutral tint: the atlas supplies the colour
+    gfx.fill(palette.WHITE)   ## a neutral tint: the atlas supplies the colour
     var x0 = cx * CS
     var z0 = cz * CS
     ## RAW heights over the area plus a one-cell border (indices -1..CS), used to cull
@@ -171,7 +171,7 @@ func bakeChunk(cx, cz)
                         var dk = math.clamp((SEA - y) / 5.0, 0, 0.85)   ## it darkens earlier and harder
                         gfx.fill(Color(1 - dk, 1 - dk, 1 - dk))
                     else
-                        gfx.fill(colors.WHITE)
+                        gfx.fill(palette.WHITE)
                     end
                     gfx.cube(x, y, z,  1, 1, 1)
                 end
@@ -184,7 +184,7 @@ func bakeChunk(cx, cz)
                 gfx.tile(T_WATER)
                 gfx.fill(Color(1, 1, 1, 0.72))
                 gfx.plane(x, WATER, z,  1, 1)
-                gfx.fill(colors.WHITE)
+                gfx.fill(palette.WHITE)
             end
             var hp = treeHash(x, z, 0) % 100    ## a scattered placement, from the mixed hash
             var grassy = h > SEA and h < SEA + 8 and b <> 0

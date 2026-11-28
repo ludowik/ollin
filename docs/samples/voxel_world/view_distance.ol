@@ -235,7 +235,7 @@ class ViewDistance
                 gfx.fill(Color(0.30, 0.70, 1.00, 0.55))   ## a lit A means self-adaptation is on
             end
             gfx.rect(x, self.BTN_Y, self.BTN, self.BTN)
-            gfx.stroke(colors.WHITE)
+            gfx.stroke(palette.WHITE)
             gfx.fontSize(30)
             gfx.text(b[2], x + self.BTN / 2 + b[3], ty)
         end

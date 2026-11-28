@@ -52,7 +52,7 @@ func setup()
     ui.open()
 end
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
 end
 `
 // No keyboard.typed here: the field alone must make the page take the focus.
@@ -69,7 +69,7 @@ func setup()
     ui.open()
 end
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
 end
 `
 const FIELD_FIT = '/samples/_keyboard_field_fit.ol'
@@ -94,7 +94,7 @@ func mouse.pressed(x, y)
     keyboard.show()
 end
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
 end
 `
 const program = `
@@ -110,7 +110,7 @@ func keyboard.pressed(key)
     end
 end
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
 end
 `
 

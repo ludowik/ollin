@@ -99,6 +99,29 @@ static int quat_rotate_vec(CallCtx& ctx) {
     return ctx.ret(arr);
 }
 
+// (ax, ay, az, deg): a rotation of deg degrees about the axis (ax,ay,az).
+static Value quat_from_axis(const Value* args, int argc, const char* who) {
+    Vector3 axis = {(float)num_arg(args, argc, 0, who), (float)num_arg(args, argc, 1, who),
+                    (float)num_arg(args, argc, 2, who)};
+    // A null axis (0,0,0) defines no rotation, so we return the identity explicitly rather than
+    // depend on raymath's internal behaviour.
+    if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
+        return make_quat_instance(QuaternionIdentity());
+    float rad = (float)num_arg(args, argc, 3, who) * DEG2RAD;
+    return make_quat_instance(QuaternionFromAxisAngle(axis, rad));
+}
+
+// (pitch, yaw, roll): from Euler angles, in degrees.
+static Value quat_from_euler(const Value* args, int argc, const char* who) {
+    float pitch = (float)num_arg(args, argc, 0, who) * DEG2RAD;
+    float yaw = (float)num_arg(args, argc, 1, who) * DEG2RAD;
+    float roll = (float)num_arg(args, argc, 2, who) * DEG2RAD;
+    return make_quat_instance(QuaternionFromEuler(pitch, yaw, roll));
+}
+
+static int quat_static_axis(CallCtx& ctx);
+static int quat_static_euler(CallCtx& ctx);
+
 static Value make_quat_class() {
     return MapBuilder(Value::make_class("Quat"))
         .fn("init", quat_init)
@@ -107,6 +130,8 @@ static Value make_quat_class() {
         .fn("normalize", quat_normalize)
         .fn("inverse", quat_inverse)
         .fn("rotateVec", quat_rotate_vec)
+        .static_fn("axis", quat_static_axis)
+        .static_fn("euler", quat_static_euler)
         .done();
 }
 
@@ -123,27 +148,22 @@ static int gfx_quat(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionIdentity()));
 }
 
-// gfx.quatAxis(ax, ay, az, deg): a rotation of deg degrees about the axis (ax,ay,az).
+// gfx.quatAxis(...) and Quat.axis(...): the same rotation, named by whoever the script wrote.
 static int gfx_quat_axis(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 axis = {(float)num_arg(args, argc, 0, "gfx.quatAxis"),
-                    (float)num_arg(args, argc, 1, "gfx.quatAxis"),
-                    (float)num_arg(args, argc, 2, "gfx.quatAxis")};
-    // A null axis (0,0,0) defines no rotation, so we return the identity explicitly rather than
-    // depend on raymath's internal behaviour.
-    if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
-        return ctx.ret(make_quat_instance(QuaternionIdentity()));
-    float rad = (float)num_arg(args, argc, 3, "gfx.quatAxis") * DEG2RAD;
-    return ctx.ret(make_quat_instance(QuaternionFromAxisAngle(axis, rad)));
+    return ctx.ret(quat_from_axis(ctx.args, ctx.argc, "gfx.quatAxis"));
 }
 
-// gfx.quatEuler(pitch, yaw, roll): from Euler angles, in degrees.
+// gfx.quatEuler(...) and Quat.euler(...).
 static int gfx_quat_euler(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
-    float pitch = (float)num_arg(args, argc, 0, "gfx.quatEuler") * DEG2RAD;
-    float yaw = (float)num_arg(args, argc, 1, "gfx.quatEuler") * DEG2RAD;
-    float roll = (float)num_arg(args, argc, 2, "gfx.quatEuler") * DEG2RAD;
-    return ctx.ret(make_quat_instance(QuaternionFromEuler(pitch, yaw, roll)));
+    return ctx.ret(quat_from_euler(ctx.args, ctx.argc, "gfx.quatEuler"));
+}
+
+static int quat_static_axis(CallCtx& ctx) {
+    return ctx.ret(quat_from_axis(ctx.args, ctx.argc, "Quat.axis"));
+}
+
+static int quat_static_euler(CallCtx& ctx) {
+    return ctx.ret(quat_from_euler(ctx.args, ctx.argc, "Quat.euler"));
 }
 
 void register_quat(Value& m) {

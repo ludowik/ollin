@@ -19,12 +19,12 @@ global cam = gfx.camera(0, 0, 10,  0, 0, 0)
 ## One entry per model: everything that differs from one object to the next lives here, and the
 ## rest of the program does not depend on it.
 global models = [
-    {name: "Rubik cube (.glb)", file: "rubik.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
-    {name: "Suzanne (.obj)", file: "suzanne.obj", tint: colors.GRAY, ambient: 0.3, margin: 1.1, height: 0.1},
-    {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: colors.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
-    {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.15, height: 0.1},
-    {name: "Coloured terrain (.glb)", file: "terrain.glb", tint: colors.WHITE, ambient: 0.4, margin: 1.05, height: 0.45},
-    {name: "Utah teapot (.glb)", file: "teapot.glb", tint: colors.SKYBLUE, ambient: 0.3, margin: 1.15, height: 0.2}
+    {name: "Rubik cube (.glb)", file: "rubik.glb", tint: palette.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
+    {name: "Suzanne (.obj)", file: "suzanne.obj", tint: palette.GRAY, ambient: 0.3, margin: 1.1, height: 0.1},
+    {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: palette.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
+    {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: palette.WHITE, ambient: 0.5, margin: 1.15, height: 0.1},
+    {name: "Coloured terrain (.glb)", file: "terrain.glb", tint: palette.WHITE, ambient: 0.4, margin: 1.05, height: 0.45},
+    {name: "Utah teapot (.glb)", file: "teapot.glb", tint: palette.SKYBLUE, ambient: 0.3, margin: 1.15, height: 0.2}
 ]
 global current = nil   ## the entry on display
 global sz = nil       ## the model's dimensions, for the framing
@@ -157,7 +157,7 @@ func update(dt)
 end
 
 func draw()
-    gfx.clear(colors.BLACK)
+    gfx.clear(palette.BLACK)
     var dist = gfx.fitDistance(sz.radius) * current.margin / zoom.factor
     cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
@@ -172,7 +172,7 @@ func draw()
 
     ## Two lines: the model's name, then the controls. On one line they ran under the menu, which
     ## sits in the top right corner.
-    gfx.stroke(colors.WHITE)
+    gfx.stroke(palette.WHITE)
     gfx.text(current.name, 12, 12)
     gfx.text("drag or arrows: turn   space: drift on/off   wheel or pinch: zoom   return: reset",
                   12, 12 + gfx.fontSize() * 1.4)

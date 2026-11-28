@@ -293,7 +293,7 @@ func drawCamButton()
         gfx.fill(Color(0.30, 0.70, 1.00, 0.55))
         gfx.rect(12, 36, CAMBTN, CAMBTN)
     end
-    gfx.stroke(colors.WHITE)
+    gfx.stroke(palette.WHITE)
     gfx.fontSize(28)
     gfx.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15)
 end
@@ -465,7 +465,7 @@ func drawClouds(secs)
         end
     end
     gfx.noTexture()
-    gfx.fill(colors.WHITE)
+    gfx.fill(palette.WHITE)
 end
 
 ## The walk, the streaming of the chunks and the eye's placement: everything that advances the
@@ -550,11 +550,11 @@ func draw()
     drawCamButton()
     var camlbl = "player"
     if debugCam then camlbl = "control" end
-    gfx.stroke(colors.WHITE)
+    gfx.stroke(palette.WHITE)
     gfx.fontSize(15)
     gfx.text("view " + vd.radius + " " + vd.mode() + " " + vd.hz() + "Hz  chunks " + #vis +
                   "  cam " + camlbl, 12, 12)
-    gfx.stroke(colors.WHITE)
+    gfx.stroke(palette.WHITE)
     gfx.fontSize(13)
     gfx.text("clouds: " + cloudStats.tested + "/" + cloudStats.full + " tested  " + cloudStats.kept + " drawn", 12, 30)
 end
