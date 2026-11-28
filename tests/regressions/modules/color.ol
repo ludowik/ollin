@@ -35,7 +35,7 @@ assert(math.abs(palette.RED.r - 230 / 255) < 0.000001 and math.abs(palette.RED.g
 assert(instanceOf(palette.RED, Color), "a palette constant is an instance of the Color class")
 assert(palette.MAGENTA.r == 1 and palette.MAGENTA.g == 0 and palette.MAGENTA.b == 1)
 assert(palette.BLUE.pastel().a == 1, "the methods work on palette constants")
-for name in ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "GRAY", "ORANGE", "PINK", "PURPLE", "BROWN", "DARKGRAY", "SKYBLUE", "LIME", "MAGENTA"] do
+for name in ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "GRAY", "ORANGE", "PINK", "PURPLE", "BROWN", "DARK_GRAY", "SKY_BLUE", "LIME", "MAGENTA"] do
     assert(instanceOf(palette[name], Color), "palette.{name} is a Color")
 end
 assert(len(map.keys(palette)) == 15, "the palette has fifteen colours")

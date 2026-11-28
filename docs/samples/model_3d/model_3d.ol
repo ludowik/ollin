@@ -24,7 +24,7 @@ global models = [
     {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: palette.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
     {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: palette.WHITE, ambient: 0.5, margin: 1.15, height: 0.1},
     {name: "Coloured terrain (.glb)", file: "terrain.glb", tint: palette.WHITE, ambient: 0.4, margin: 1.05, height: 0.45},
-    {name: "Utah teapot (.glb)", file: "teapot.glb", tint: palette.SKYBLUE, ambient: 0.3, margin: 1.15, height: 0.2}
+    {name: "Utah teapot (.glb)", file: "teapot.glb", tint: palette.SKY_BLUE, ambient: 0.3, margin: 1.15, height: 0.2}
 ]
 global current = nil   ## the entry on display
 global sz = nil       ## the model's dimensions, for the framing

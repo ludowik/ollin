@@ -283,8 +283,8 @@ const MODULE_MEMBERS = {
     cst('palette.BLACK',''),   cst('palette.WHITE',''),  cst('palette.RED',''),
     cst('palette.GREEN',''),   cst('palette.BLUE',''),   cst('palette.YELLOW',''),
     cst('palette.GRAY',''),    cst('palette.ORANGE',''), cst('palette.PINK',''),
-    cst('palette.PURPLE',''),  cst('palette.BROWN',''),  cst('palette.DARKGRAY',''),
-    cst('palette.SKYBLUE',''), cst('palette.LIME',''),   cst('palette.MAGENTA',''),
+    cst('palette.PURPLE',''),  cst('palette.BROWN',''),  cst('palette.DARK_GRAY',''),
+    cst('palette.SKY_BLUE',''), cst('palette.LIME',''),   cst('palette.MAGENTA',''),
   ],
   blend: [
     cst('blend.ALPHA','normal blending (default)'), cst('blend.ADD','additive (glow)'),

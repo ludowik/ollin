@@ -155,8 +155,8 @@ Value make_palette_module() {
         .set("PINK", rgb(255, 109, 194))
         .set("PURPLE", rgb(200, 122, 255))
         .set("BROWN", rgb(127, 106, 79))
-        .set("DARKGRAY", rgb(80, 80, 80))
-        .set("SKYBLUE", rgb(102, 191, 255))
+        .set("DARK_GRAY", rgb(80, 80, 80))
+        .set("SKY_BLUE", rgb(102, 191, 255))
         .set("LIME", rgb(0, 158, 47))
         .set("MAGENTA", rgb(255, 0, 255))
         .done();

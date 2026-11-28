@@ -2183,11 +2183,11 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>palette.ORANGE</code></td><td>1.0</td><td>0.631</td><td>0.0</td></tr>
     <tr><td><code>palette.PINK</code></td><td>1.0</td><td>0.427</td><td>0.761</td></tr>
     <tr><td><code>palette.PURPLE</code></td><td>0.784</td><td>0.478</td><td>1.0</td></tr>
-    <tr><td><code>palette.SKYBLUE</code></td><td>0.400</td><td>0.749</td><td>1.0</td></tr>
+    <tr><td><code>palette.SKY_BLUE</code></td><td>0.400</td><td>0.749</td><td>1.0</td></tr>
     <tr><td><code>palette.LIME</code></td><td>0.0</td><td>0.620</td><td>0.184</td></tr>
     <tr><td><code>palette.MAGENTA</code></td><td>1.0</td><td>0.0</td><td>1.0</td></tr>
     <tr><td><code>palette.BROWN</code></td><td>0.498</td><td>0.416</td><td>0.310</td></tr>
-    <tr><td><code>palette.DARKGRAY</code></td><td>0.314</td><td>0.314</td><td>0.314</td></tr>
+    <tr><td><code>palette.DARK_GRAY</code></td><td>0.314</td><td>0.314</td><td>0.314</td></tr>
   </tbody>
 </table>
 
@@ -2281,7 +2281,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="bi">gfx</span>.push()
             <span class="bi">gfx</span>.translate(<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
             <span class="bi">gfx</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## an arbitrary axis</span>
-            <span class="bi">gfx</span>.fill(palette.SKYBLUE)
+            <span class="bi">gfx</span>.fill(palette.SKY_BLUE)
             <span class="bi">gfx</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
         <span class="bi">gfx</span>.pop()
     <span class="bi">gfx</span>.end3d()
@@ -2300,7 +2300,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="bi">gfx</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
         <span class="bi">gfx</span>.fill(palette.RED)
         <span class="bi">gfx</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## shaded faces</span>
-        <span class="bi">gfx</span>.fill(palette.SKYBLUE)
+        <span class="bi">gfx</span>.fill(palette.SKY_BLUE)
         <span class="bi">gfx</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
     <span class="bi">gfx</span>.end3d()
     <span class="bi">gfx</span>.fontSize(<span class="num">22</span>)

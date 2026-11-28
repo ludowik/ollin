@@ -166,6 +166,8 @@ const OLD_NAMES = [
   [/\bgfx\.rotateq\b/g, 'gfx.rotateQuat'],
   [/\bimage\.unload\b/g, 'image.free'],
   [/\bcolors\.([A-Z])/g, 'palette.$1'],
+  [/\bpalette\.DARKGRAY\b/g, 'palette.DARK_GRAY'],
+  [/\bpalette\.SKYBLUE\b/g, 'palette.SKY_BLUE'],
 ]
 
 function migrateOldNames(record) {
