@@ -11,7 +11,7 @@ assert(typeof(touch.points()) == "array" and #touch.points() == 0)
 ## The callbacks are assigned as `mouse`'s are: the engine calls whatever exists, and the absence
 ## of all three is not a fault.
 global tcSeen = []
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     tcSeen[#tcSeen + 1] = id
 end
 assert(#tcSeen == 0)

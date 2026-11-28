@@ -58,7 +58,7 @@ func mouse.pressed(x, y)
     end
 end
 
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     tap(x, y)
 end
 

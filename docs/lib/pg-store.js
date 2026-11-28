@@ -168,6 +168,8 @@ const OLD_NAMES = [
   [/\bcolors\.([A-Z])/g, 'palette.$1'],
   [/\bpalette\.DARKGRAY\b/g, 'palette.DARK_GRAY'],
   [/\bpalette\.SKYBLUE\b/g, 'palette.SKY_BLUE'],
+  [/\btouch\.began\b/g, 'touch.pressed'],
+  [/\btouch\.ended\b/g, 'touch.released'],
 ]
 
 function migrateOldNames(record) {

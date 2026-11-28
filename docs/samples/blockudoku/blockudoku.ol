@@ -447,7 +447,7 @@ func releaseAt(id, x, y)
     dropHeld()
 end
 
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     pressAt(id, x, y)
 end
 
@@ -455,7 +455,7 @@ func touch.moved(id, x, y)
     moveTo(id, x, y)
 end
 
-func touch.ended(id, x, y)
+func touch.released(id, x, y)
     releaseAt(id, x, y)
 end
 
@@ -503,7 +503,7 @@ func update()
         end
     end
     updateFloaters()
-    ## A finger can vanish with no touch.ended (the browser cancelled it): the piece is dropped where it was.
+    ## A finger can vanish with no touch.released (the browser cancelled it): the piece is dropped where it was.
     if game.dragId <> nil and game.dragId <> "mouse" and touch.count() == 0 then
         dropHeld()
     end

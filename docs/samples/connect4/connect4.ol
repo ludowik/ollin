@@ -49,7 +49,7 @@ func mouse.released(x, y)
     end
 end
 
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     pointerDown(id, x, y)
 end
 
@@ -57,7 +57,7 @@ func touch.moved(id, x, y)
     pointerMove(id, x, y)
 end
 
-func touch.ended(id, x, y)
+func touch.released(id, x, y)
     pointerUp(id, x, y)
 end
 

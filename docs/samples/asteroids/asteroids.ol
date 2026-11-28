@@ -154,7 +154,7 @@ end
 ## A single finger also emulates the mouse, so the same gesture arrives twice. Each path is written
 ## to be IDEMPOTENT: the joystick only takes a finger it does not already have, and holding the
 ## trigger twice is holding it once.
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     touchPlay = true
     if unpause() or begin() then
         return
@@ -176,7 +176,7 @@ func touch.moved(id, x, y)
     end
 end
 
-func touch.ended(id, x, y)
+func touch.released(id, x, y)
     if padId == id then
         padId = nil
         pad.release()
@@ -186,7 +186,7 @@ func touch.ended(id, x, y)
 end
 
 func mouse.pressed(x, y)
-    if begin() or touchPlay or unpause() then    ## a finger was already answered by touch.began
+    if begin() or touchPlay or unpause() then    ## a finger was already answered by touch.pressed
         return
     end
     fire()                          ## a real click, on a desktop: it fires as space does

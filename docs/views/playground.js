@@ -316,9 +316,9 @@ const MODULE_MEMBERS = {
     fn('mouse.doubleClicked','doubleClicked(x,y) — to be defined: a double click'),
   ],
   touch: [
-    fn('touch.began','began(id,x,y) — to be defined: a finger lands'),
+    fn('touch.pressed','pressed(id,x,y) — to be defined: a finger lands'),
     fn('touch.moved','moved(id,x,y) — to be defined: a finger moves'),
-    fn('touch.ended','ended(id,x,y) — to be defined: a finger lifts'),
+    fn('touch.released','released(id,x,y) — to be defined: a finger lifts'),
     fn('touch.pinch','pinch(scale,cx,cy) — to be defined: the two-finger zoom'),
     fn('touch.count','count() → int'),
     fn('touch.points','points() → array of {id, x, y}'),

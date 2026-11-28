@@ -173,7 +173,7 @@ func inBand(y)
 end
 
 ## Multitouch: several fingers, each followed by its identifier.
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     if inBand(y) and bowHolder == nil then
         bowHolder = id
         moveBow(x, y)
@@ -192,7 +192,7 @@ func touch.moved(id, x, y)
     underFinger[id] = follow(id, underFinger[id], x, y)
 end
 
-func touch.ended(id, x, y)
+func touch.released(id, x, y)
     if id == bowHolder then
         bowHolder = nil
     end

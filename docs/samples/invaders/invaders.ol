@@ -75,7 +75,7 @@ end
 ## A single finger also emulates the mouse, so the same gesture arrives twice. Each path is written
 ## to be IDEMPOTENT: aiming twice at the same place is one aim, and firing twice is one shot, only
 ## one being allowed in the air.
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     touchPlay = true
     if unpause() or begin() or bandTap(y) then    ## the band pauses, and none of them takes hold of the cannon
         return
@@ -90,7 +90,7 @@ func touch.moved(id, x, y)
     end
 end
 
-func touch.ended(id, x, y)
+func touch.released(id, x, y)
     if aimId == id then
         aimId = nil
     end
@@ -100,7 +100,7 @@ func mouse.pressed(x, y)
     if begin() then
         return
     end
-    ## A finger has already been answered by touch.began, band included: the emulated click must not
+    ## A finger has already been answered by touch.pressed, band included: the emulated click must not
     ## pause a second time, which would undo it.
     if touchPlay or unpause() then
         return

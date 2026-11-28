@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-28 13:07</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-11-28 13:11</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -459,7 +459,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-28 13:07</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-11-28 13:11</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2486,9 +2486,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Callback</th><th>Called when</th></tr></thead>
   <tbody>
-    <tr><td><code>touch.began(id, x, y)</code></td><td>a finger lands</td></tr>
+    <tr><td><code>touch.pressed(id, x, y)</code></td><td>a finger lands</td></tr>
     <tr><td><code>touch.moved(id, x, y)</code></td><td>a finger moves</td></tr>
-    <tr><td><code>touch.ended(id, x, y)</code></td><td>a finger lifts, at its last known position</td></tr>
+    <tr><td><code>touch.released(id, x, y)</code></td><td>a finger lifts, at its last known position</td></tr>
     <tr><td><code>touch.pinch(scale, cx, cy)</code></td><td>two fingers spread or close — the zoom gesture</td></tr>
   </tbody>
 </table>
@@ -2498,12 +2498,12 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <pre><code><span class="cmt">## One note per finger: the identifier is the key, so several sound together.</span>
 <span class="kw">global</span> under = {}
 
-<span class="kw">func</span> touch.began(id, x, y)
+<span class="kw">func</span> touch.pressed(id, x, y)
     under[id] = keyAt(x, y)
     <span class="bi">sound</span>.tone(<span class="bi">sound</span>.note(notes[under[id]]), <span class="num">0.5</span>).play()
 <span class="kw">end</span>
 
-<span class="kw">func</span> touch.ended(id, x, y)
+<span class="kw">func</span> touch.released(id, x, y)
     under[id] = <span class="kw">nil</span>
 <span class="kw">end</span></code></pre>
 

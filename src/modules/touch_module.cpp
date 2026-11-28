@@ -312,9 +312,9 @@ void touch_poll() {
     Value m = vm->get_global("touch");
     if (!m.is_map())
         return;
-    Value began = callback(m, "began");
+    Value pressed = callback(m, "pressed");
     Value moved = callback(m, "moved");
-    Value ended = callback(m, "ended");
+    Value released = callback(m, "released");
     Value pinch = callback(m, "pinch");
 
     // Presses and moves: an identifier absent from the previous frame is a new finger. Three
@@ -324,8 +324,8 @@ void touch_poll() {
         int j = index_of(s_prev, s_prev_count, s_cur[i].id);
         Value args[3] = {Value((int64_t)s_cur[i].id), Value((double)s_cur[i].x), Value((double)s_cur[i].y)};
         if (j < 0) {
-            if (began.is_callable())
-                vm->call_value(began, args, 3);
+            if (pressed.is_callable())
+                vm->call_value(pressed, args, 3);
         } else if (moved.is_callable() && (s_cur[i].x != s_prev[j].x || s_cur[i].y != s_prev[j].y)) {
             vm->call_value(moved, args, 3);
         }
@@ -336,10 +336,10 @@ void touch_poll() {
     for (int i = 0; i < s_prev_count; i++) {
         if (index_of(s_cur, s_cur_count, s_prev[i].id) >= 0)
             continue;
-        if (ended.is_callable()) {
+        if (released.is_callable()) {
             Value args[3] = {Value((int64_t)s_prev[i].id), Value((double)s_prev[i].x),
                              Value((double)s_prev[i].y)};
-            vm->call_value(ended, args, 3);
+            vm->call_value(released, args, 3);
         }
     }
 
@@ -358,7 +358,7 @@ void touch_reset() {
     pinch_disarm();
 }
 
-// The module is an empty map: the script assigns began, moved, ended and pinch to it, and reads
+// The module is an empty map: the script assigns pressed, moved, released and pinch to it, and reads
 // count and points. Same pattern as `mouse`.
 Value make_touch_module() {
     return MapBuilder()

@@ -10,10 +10,10 @@
 // screen.
 //
 // The script assigns whichever functions it wants and the engine calls those that exist:
-//   touch.began(id, x, y)  a finger landed
-//   touch.moved(id, x, y)  a finger moved
-//   touch.ended(id, x, y)  a finger lifted (last known position)
-//   touch.pinch(scale, cx, cy)  two fingers spread or closed — the zoom gesture
+//   touch.pressed(id, x, y)   a finger landed
+//   touch.moved(id, x, y)     a finger moved
+//   touch.released(id, x, y)  a finger lifted (last known position)
+//   touch.pinch(scale, cx, cy) two fingers spread or closed — the zoom gesture
 // The state can also be read directly, through touch.count() and touch.points().
 //
 // `pinch` is DERIVED from two contacts, and computed here rather than in every script: identifying
@@ -29,7 +29,7 @@ Value make_touch_module();
 // `mouse` callback reading touch.count() must see THIS frame's fingers.
 void touch_begin_frame();
 
-// Compares the sample with the previous frame's and calls began, moved and ended.
+// Compares the sample with the previous frame's and calls pressed, moved and released.
 void touch_poll();
 
 // When a program starts: forget the previous one's contacts, otherwise a finger still listed as

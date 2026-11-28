@@ -78,7 +78,7 @@ func mouse.released(x, y)
 end
 
 ## The wheel button takes the way the phone is held right now as straight ahead.
-func touch.began(id, x, y)
+func touch.pressed(id, x, y)
     if tiltOn() and inRect(x, y, wheelButton()) then
         wheel.calibrate(motion.tilt())
     end
