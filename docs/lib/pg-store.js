@@ -149,7 +149,9 @@ export async function listProjects() {
 // stored, and flagged to be pushed, so the project is updated for good and not at every opening. The edit time is
 // not changed: opening a project is not an edit by the user. One line per rename: add one for the next.
 //   graphics -> gfx            the word alone; a field (`a.graphics`), a map key (`graphics:`) and a file name
-//                              (`graphics.ol`) are left alone
+//                              (`graphics.ol`, `graphics-utils.ol`) are left alone. A word inside a string or a comment
+//                              is rewritten too, and a variable the user named `graphics` is not told from the module:
+//                              both need a lexer, and are accepted
 //   keyboard.keypressed  -> keyboard.pressed
 //   keyboard.keyrelease  -> keyboard.released
 //   gfx.rotateq -> gfx.rotateQuat
@@ -163,27 +165,39 @@ export async function listProjects() {
 // tests/check_old_names.sh runs every rule on the old spelling and on lookalikes that must stay as they are.
 // array.contains -> array.has has NO line: `.contains(` would also rewrite the method of a class of the user.
 const OLD_NAMES = [
-  [/(?<![.\w])graphics\b(?!\.ol|\s*:)/g, 'gfx'],
-  [/\bkeyboard\.keypressed\b/g, 'keyboard.pressed'],
-  [/\bkeyboard\.keyrelease\b/g, 'keyboard.released'],
-  [/\bcamera\.(open|close|capture|isOpen)\b/g, 'webcam.$1'],
-  [/\bgfx\.textSize\b/g, 'gfx.measureText'],
-  [/\bmath\.smoothstep\b/g, 'math.smoothStep'],
-  [/\bgfx\.rotateq\b/g, 'gfx.rotateQuat'],
-  [/\bimage\.unload\b/g, 'image.free'],
-  [/\bcolors\.([A-Z])/g, 'palette.$1'],
-  [/\bpalette\.DARKGRAY\b/g, 'palette.DARK_GRAY'],
-  [/\bpalette\.SKYBLUE\b/g, 'palette.SKY_BLUE'],
-  [/\btouch\.began\b/g, 'touch.pressed'],
-  [/\btouch\.ended\b/g, 'touch.released'],
+  // `graphics` alone: not a field, a path or a file name (`graphics.ol`, `graphics-utils.ol`), not a map key.
+  [/(?<![.\w/-])graphics\b(?![\w-]|\.ol|\s*:)/g, 'gfx'],
+  [/(?<![.\w])keyboard\.keypressed\b/g, 'keyboard.pressed'],
+  [/(?<![.\w])keyboard\.keyrelease\b/g, 'keyboard.released'],
+  [/(?<![.\w])camera\.(open|close|capture|isOpen)\b/g, 'webcam.$1'],
+  [/(?<![.\w])gfx\.textSize\b/g, 'gfx.measureText'],
+  [/(?<![.\w])math\.smoothstep\b/g, 'math.smoothStep'],
+  [/(?<![.\w])gfx\.rotateq\b/g, 'gfx.rotateQuat'],
+  [/(?<![.\w])image\.unload\b/g, 'image.free'],
+  // A project that declares its own `colors` (a variable or a parameter) keeps it: `colors.RED` is then its field.
+  [/(?<![.\w])colors\.([A-Z])/g, 'palette.$1', /\b(?:var|global|const)\s+colors\b|\bfunc\b[^\n(]*\([^\n)]*\bcolors\b/],
+  [/(?<![.\w])palette\.DARKGRAY\b/g, 'palette.DARK_GRAY'],
+  [/(?<![.\w])palette\.SKYBLUE\b/g, 'palette.SKY_BLUE'],
+  [/(?<![.\w])touch\.began\b/g, 'touch.pressed'],
+  [/(?<![.\w])touch\.ended\b/g, 'touch.released'],
 ]
+
+// A rule is [pattern, replacement] or [pattern, replacement, skipIf]: `skipIf` is tested on the whole script, and a
+// match leaves the script alone for that rule.
+function migrateText(text) {
+  let migrated = text
+  for (const [oldName, newName, skipIf] of OLD_NAMES) {
+    if (skipIf && skipIf.test(text)) continue
+    migrated = migrated.replace(oldName, newName)
+  }
+  return migrated
+}
 
 function migrateOldNames(record) {
   let changed = false
   for (const [name, text] of Object.entries(record.files || {})) {
     if (!name.endsWith('.ol') || typeof text !== 'string') continue
-    let migrated = text
-    for (const [oldName, newName] of OLD_NAMES) migrated = migrated.replace(oldName, newName)
+    const migrated = migrateText(text)
     if (migrated !== text) { record.files[name] = migrated; changed = true }
   }
   return changed
